@@ -14,12 +14,7 @@ function getSheetId() {
     throw new Error('SHEET_ID not found in Script Properties. Please set it in the Apps Script editor.');
   }
   
-  // Trim whitespace and log for debugging
-  const cleanSheetId = sheetId.trim();
-  console.log('Retrieved Sheet ID:', cleanSheetId);
-  console.log('Sheet ID length:', cleanSheetId.length);
-  
-  return cleanSheetId;
+  return sheetId.trim();
 }
 
 /**
@@ -30,11 +25,9 @@ function testSheetAccess() {
     const sheetId = getSheetId();
     console.log('Testing Sheet ID:', sheetId);
     
-    // Try to open the spreadsheet
     const spreadsheet = SpreadsheetApp.openById(sheetId);
     console.log('Spreadsheet opened successfully:', spreadsheet.getName());
     
-    // Try to get the specific sheet
     const sheet = spreadsheet.getSheetByName(SHEET_NAME);
     if (sheet) {
       console.log('Sheet found:', SHEET_NAME);
@@ -68,7 +61,6 @@ function doGet(e) {
   } catch (error) {
     console.error('Error in doGet:', error);
     
-    // Return a more detailed error page
     const errorHtml = `
       <html>
         <body>
@@ -90,19 +82,16 @@ function doGet(e) {
 
 /**
  * Reads and parses data from the Google Sheet
+ * Now with correct best practices cell mapping
  */
 function getSheetData() {
   try {
     const sheetId = getSheetId();
     console.log('Using Sheet ID:', sheetId);
     
-    const spreadsheet = SpreadsheetApp.openById(sheetId);
-    console.log('Opened spreadsheet:', spreadsheet.getName());
-    
-    const sheet = spreadsheet.getSheetByName(SHEET_NAME);
+    const sheet = SpreadsheetApp.openById(sheetId).getSheetByName(SHEET_NAME);
     if (!sheet) {
-      const availableSheets = spreadsheet.getSheets().map(s => s.getName());
-      throw new Error(`Sheet "${SHEET_NAME}" not found. Available sheets: ${availableSheets.join(', ')}`);
+      throw new Error(`Sheet "${SHEET_NAME}" not found`);
     }
     
     const data = sheet.getDataRange().getValues();
@@ -115,6 +104,18 @@ function getSheetData() {
       components: []
     };
     
+    // Define the mapping of components to their best practices cells
+    // Based on your description: 1a→7B, 1b→10B, 1c→13B, 1d→16B, 1e→19B, 1f→22B
+    // In 0-indexed arrays: 1a→[6,1], 1b→[9,1], 1c→[12,1], 1d→[15,1], 1e→[18,1], 1f→[21,1]
+    const bestPracticesMap = {
+      '1a:': { row: 6, col: 1 },   // Row 7, Column B
+      '1b:': { row: 9, col: 1 },   // Row 10, Column B  
+      '1c:': { row: 12, col: 1 },  // Row 13, Column B
+      '1d:': { row: 15, col: 1 },  // Row 16, Column B
+      '1e:': { row: 18, col: 1 },  // Row 19, Column B
+      '1f:': { row: 21, col: 1 }   // Row 22, Column B
+    };
+    
     // Parse components starting from row 5 (index 4)
     let i = 4;
     while (i < data.length) {
@@ -122,8 +123,11 @@ function getSheetData() {
       
       // Check if this is a component row (has component title with number and colon)
       if (row[0] && row[0].toString().match(/^\d[a-f]:/)) {
+        const componentTitle = row[0].toString().trim();
+        console.log(`Processing component: ${componentTitle}`);
+        
         const component = {
-          title: row[0].toString().trim(), // Clean up any extra whitespace/tabs
+          title: componentTitle,
           developing: row[1] || '',
           basic: row[2] || '',
           proficient: row[3] || '',
@@ -131,25 +135,34 @@ function getSheetData() {
           bestPractices: []
         };
         
-        // Look for best practices in subsequent rows
-        i++; // Move to next row (should be "Best Practices Aligned..." header)
-        if (i < data.length && data[i][0] && data[i][0].toString().includes('Best Practices')) {
-          i++; // Move to the actual best practices content row
-          if (i < data.length && data[i][1]) { // Check column B (index 1)
-            const practicesText = data[i][1].toString().trim();
-            console.log(`Processing practices for ${component.title}: "${practicesText}"`);
+        // Extract just the component identifier (e.g., "1a:" from "1a: Applying Knowledge...")
+        const componentId = componentTitle.substring(0, 3); // Gets "1a:", "1b:", etc.
+        console.log(`Component ID extracted: "${componentId}" from "${componentTitle}"`);
+        
+        // Look up the best practices cell for this component
+        const practicesLocation = bestPracticesMap[componentId];
+        console.log(`Looking up practices location for "${componentId}":`, practicesLocation);
+        
+        if (practicesLocation && practicesLocation.row < data.length) {
+          const practicesText = data[practicesLocation.row][practicesLocation.col];
+          console.log(`Looking for best practices at row ${practicesLocation.row + 1}, column ${practicesLocation.col + 1} (${componentId})`);
+          console.log(`Found text: "${practicesText}"`);
+          
+          if (practicesText && practicesText.toString().trim()) {
+            // Split practices by line breaks/paragraphs
+            const practices = practicesText.toString().trim()
+              .split(/\r?\n|\r/) // Split on line breaks
+              .map(practice => practice.trim()) // Clean up whitespace
+              .filter(practice => practice.length > 0); // Remove empty lines
             
-            if (practicesText) {
-              // Split practices by line breaks/paragraphs
-              const practices = practicesText
-                .split(/\r?\n|\r/) // Split on line breaks (handles different line ending types)
-                .map(practice => practice.trim()) // Clean up whitespace
-                .filter(practice => practice.length > 0); // Remove empty lines
-              
-              component.bestPractices = practices;
-              console.log(`Found ${component.bestPractices.length} practices:`, component.bestPractices);
-            }
+            component.bestPractices = practices;
+            console.log(`Found ${component.bestPractices.length} practices for ${componentId}:`, component.bestPractices);
+          } else {
+            console.log(`No best practices text found for ${componentId} at expected location`);
           }
+        } else {
+          console.log(`No mapping found for component ID: "${componentId}"`);
+          console.log('Available mapping keys:', Object.keys(bestPracticesMap));
         }
         
         result.components.push(component);
@@ -158,6 +171,10 @@ function getSheetData() {
     }
     
     console.log('Parsed', result.components.length, 'components');
+    result.components.forEach((comp, index) => {
+      console.log(`Component ${index + 1}: ${comp.title} - ${comp.bestPractices.length} best practices`);
+    });
+    
     return result;
   } catch (error) {
     console.error('Error reading sheet data:', error);
@@ -175,7 +192,68 @@ function getSheetData() {
  */
 function testDataParsing() {
   const data = getSheetData();
+  console.log('=== FINAL PARSED DATA ===');
   console.log(JSON.stringify(data, null, 2));
+}
+
+/**
+ * Debug function to check what components are being found
+ */
+function debugComponentTitles() {
+  try {
+    const sheetId = getSheetId();
+    const sheet = SpreadsheetApp.openById(sheetId).getSheetByName(SHEET_NAME);
+    const data = sheet.getDataRange().getValues();
+    
+    console.log('=== COMPONENT TITLES FOUND ===');
+    let i = 4;
+    while (i < data.length) {
+      const row = data[i];
+      
+      if (row[0] && row[0].toString().match(/^\d[a-f]:/)) {
+        const componentTitle = row[0].toString().trim();
+        const componentId = componentTitle.substring(0, 3);
+        console.log(`Row ${i + 1}: Full title: "${componentTitle}"`);
+        console.log(`         Component ID: "${componentId}"`);
+      }
+      i++;
+    }
+    
+  } catch (error) {
+    console.error('Error in debugComponentTitles:', error);
+  }
+}
+
+/**
+ * Debug function to check specific cells
+ */
+function debugBestPracticesCells() {
+  try {
+    const sheetId = getSheetId();
+    const sheet = SpreadsheetApp.openById(sheetId).getSheetByName(SHEET_NAME);
+    
+    // Check the specific cells mentioned
+    const cellsToCheck = [
+      { name: '1a', row: 7, col: 2 },  // 7B (1-indexed)
+      { name: '1b', row: 10, col: 2 }, // 10B  
+      { name: '1c', row: 13, col: 2 }, // 13B
+      { name: '1d', row: 16, col: 2 }, // 16B
+      { name: '1e', row: 19, col: 2 }, // 19B
+      { name: '1f', row: 22, col: 2 }  // 22B
+    ];
+    
+    cellsToCheck.forEach(cell => {
+      try {
+        const value = sheet.getRange(cell.row, cell.col).getValue();
+        console.log(`Cell ${cell.row}${String.fromCharCode(64 + cell.col)} (${cell.name} best practices): "${value}"`);
+      } catch (e) {
+        console.log(`Error reading cell ${cell.row}${String.fromCharCode(64 + cell.col)}: ${e}`);
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error in debugBestPracticesCells:', error);
+  }
 }
 
 /**
