@@ -1,36 +1,37 @@
 /**
  * Google Apps Script Web App for Danielson Framework - All Domains
- * Reads data from Google Sheet tabs and generates styled HTML for all 4 domains
+ * Reads data from a single Google Sheet tab called "Teacher" with all domains
  */
 
 // Domain configurations with their sheet names, ranges and subdomain counts
+// All domains are now on a single "Teacher" sheet tab
 const DOMAIN_CONFIGS = {
   1: {
     name: 'Domain 1: Planning and Preparation',
-    sheetName: 'Domain 1: Planning and Preparation',
-    startRow: 3,  // 1-indexed (keeping original structure for Domain 1)
-    endRow: 22,   // 1-indexed  
+    sheetName: 'Teacher',
+    startRow: 3,   // 1-indexed - Domain 1 starts at row 3
+    endRow: 22,    // 1-indexed - estimated end row (adjust as needed)
     subdomains: ['1a:', '1b:', '1c:', '1d:', '1e:', '1f:']
   },
   2: {
     name: 'Domain 2: The Classroom Environment',
-    sheetName: 'Domain 2: The Classroom Environment', 
-    startRow: 3,  // 1-indexed (assuming same structure: title in A1, subtitle in A2, data starts A3)
-    endRow: 19,   // 1-indexed (adjusted for new layout)
+    sheetName: 'Teacher',
+    startRow: 23,  // 1-indexed - Domain 2 starts at row 23
+    endRow: 39,    // 1-indexed - estimated end row (adjust as needed)
     subdomains: ['2a:', '2b:', '2c:', '2d:', '2e:']
   },
   3: {
     name: 'Domain 3: Instruction',
-    sheetName: 'Domain 3: Instruction',
-    startRow: 3,  // 1-indexed 
-    endRow: 19,   // 1-indexed (adjusted for new layout)
+    sheetName: 'Teacher',
+    startRow: 40,  // 1-indexed - Domain 3 starts at row 40
+    endRow: 56,    // 1-indexed - estimated end row (adjust as needed)
     subdomains: ['3a:', '3b:', '3c:', '3d:', '3e:']
   },
   4: {
     name: 'Domain 4: Professional Responsibilities',
-    sheetName: 'Domain 4: Professional Responsibilities',
-    startRow: 3,  // 1-indexed
-    endRow: 22,   // 1-indexed (adjusted for new layout - Domain 4 has 6 components like Domain 1)
+    sheetName: 'Teacher',
+    startRow: 57,  // 1-indexed - Domain 4 starts at row 57
+    endRow: 76,    // 1-indexed - estimated end row (adjust as needed)
     subdomains: ['4a:', '4b:', '4c:', '4d:', '4e:', '4f:']
   }
 };
@@ -111,7 +112,7 @@ function doGet(e) {
           <ul>
             <li>Sheet ID is correctly set in Script Properties</li>
             <li>Sheet exists and is accessible</li>
-            <li>All domain sheet tabs exist with correct names</li>
+            <li>The "Teacher" sheet tab exists</li>
             <li>All domain ranges are correct</li>
           </ul>
           <p><a href="#" onclick="window.location.reload()">Try Again</a></p>
@@ -123,7 +124,7 @@ function doGet(e) {
 }
 
 /**
- * Reads and parses data from all domains across multiple sheet tabs
+ * Reads and parses data from all domains from the single "Teacher" sheet tab
  */
 function getAllDomainsData() {
   try {
@@ -132,43 +133,31 @@ function getAllDomainsData() {
     
     const spreadsheet = SpreadsheetApp.openById(sheetId);
     
-    // Get the title and subtitle from Domain 1 sheet (main sheet)
-    const domain1Sheet = getSheetByName(spreadsheet, DOMAIN_CONFIGS[1].sheetName);
-    if (!domain1Sheet) {
-      throw new Error('Domain 1 sheet not found');
+    // Get the "Teacher" sheet (single sheet containing all domains)
+    const teacherSheet = getSheetByName(spreadsheet, 'Teacher');
+    if (!teacherSheet) {
+      throw new Error('Teacher sheet not found - please make sure you have a sheet tab named "Teacher"');
     }
     
-    const domain1Data = domain1Sheet.getDataRange().getValues();
+    const sheetData = teacherSheet.getDataRange().getValues();
     
     const result = {
-      title: domain1Data[0][0] || "Danielson's Framework for Teaching",
-      subtitle: domain1Data[1][0] || "Best practices aligned with 5D+ and PELSB lookfors",
+      title: sheetData[0][0] || "Danielson's Framework for Teaching",
+      subtitle: sheetData[1][0] || "Best practices aligned with 5D+ and PELSB lookfors",
       domains: []
     };
     
-    // Process each domain from its respective sheet
+    // Process each domain from the single "Teacher" sheet
     Object.keys(DOMAIN_CONFIGS).forEach(domainNum => {
       const config = DOMAIN_CONFIGS[domainNum];
-      console.log(`Processing ${config.name} from sheet "${config.sheetName}"`);
+      console.log(`Processing ${config.name} from rows ${config.startRow} to ${config.endRow}`);
       
-      const sheet = getSheetByName(spreadsheet, config.sheetName);
-      if (sheet) {
-        const sheetData = sheet.getDataRange().getValues();
-        const domainData = processDomainData(sheetData, parseInt(domainNum), config);
-        result.domains.push(domainData);
-        console.log(`Successfully processed ${config.name}`);
-      } else {
-        console.warn(`Sheet "${config.sheetName}" not found, skipping domain ${domainNum}`);
-        // Add empty domain to maintain structure
-        result.domains.push({
-          number: parseInt(domainNum),
-          name: config.name,
-          components: []
-        });
-      }
+      const domainData = processDomainData(sheetData, parseInt(domainNum), config);
+      result.domains.push(domainData);
+      console.log(`Successfully processed ${config.name}`);
     });
     
-    console.log('Processed', result.domains.length, 'domains');
+    console.log('Processed', result.domains.length, 'domains from Teacher sheet');
     return result;
     
   } catch (error) {
@@ -182,7 +171,7 @@ function getAllDomainsData() {
 }
 
 /**
- * Process data for a specific domain from its sheet data
+ * Process data for a specific domain from the sheet data
  */
 function processDomainData(sheetData, domainNumber, config) {
   const domain = {
@@ -205,7 +194,7 @@ function processDomainData(sheetData, domainNumber, config) {
     // Check if this row contains a component for this domain
     if (row[0] && row[0].toString().match(new RegExp(`^${domainNumber}[a-f]:`))) {
       const componentTitle = row[0].toString().trim();
-      console.log(`Processing component: ${componentTitle}`);
+      console.log(`Processing component: ${componentTitle} at row ${i + 1}`);
       
       const component = {
         title: componentTitle,
@@ -247,7 +236,7 @@ function processDomainData(sheetData, domainNumber, config) {
 
 /**
  * Create best practices mapping for a specific domain
- * Based on the pattern: each component's best practices are 2 rows below the component
+ * Based on the pattern: each component's best practices are 4 rows below the component
  * and spaced 3 rows apart
  */
 function createBestPracticesMap(domainNumber, config) {
@@ -259,7 +248,7 @@ function createBestPracticesMap(domainNumber, config) {
   let componentRowIdx = startRowIdx;
   
   config.subdomains.forEach((subdomain, index) => {
-    // Best practices are 4 rows after the component row (changed from 2 to 4)
+    // Best practices are 4 rows after the component row
     const bestPracticesRowIdx = componentRowIdx + 4;
     
     map[subdomain] = {
@@ -293,17 +282,18 @@ function debugAllDomainComponents() {
     const sheetId = getSheetId();
     const spreadsheet = SpreadsheetApp.openById(sheetId);
     
+    const teacherSheet = getSheetByName(spreadsheet, 'Teacher');
+    if (!teacherSheet) {
+      console.log('Teacher sheet not found!');
+      return;
+    }
+    
+    const sheetData = teacherSheet.getDataRange().getValues();
+    
     Object.keys(DOMAIN_CONFIGS).forEach(domainNum => {
       const config = DOMAIN_CONFIGS[domainNum];
-      console.log(`\n=== ${config.name} ===`);
+      console.log(`\n=== ${config.name} (Rows ${config.startRow}-${config.endRow}) ===`);
       
-      const sheet = getSheetByName(spreadsheet, config.sheetName);
-      if (!sheet) {
-        console.log(`Sheet "${config.sheetName}" not found!`);
-        return;
-      }
-      
-      const sheetData = sheet.getDataRange().getValues();
       const startIdx = config.startRow - 1;
       const endIdx = config.endRow - 1;
       
@@ -330,22 +320,22 @@ function debugAllBestPracticesCells() {
     const sheetId = getSheetId();
     const spreadsheet = SpreadsheetApp.openById(sheetId);
     
+    const teacherSheet = getSheetByName(spreadsheet, 'Teacher');
+    if (!teacherSheet) {
+      console.log('Teacher sheet not found!');
+      return;
+    }
+    
     Object.keys(DOMAIN_CONFIGS).forEach(domainNum => {
       const config = DOMAIN_CONFIGS[domainNum];
       const bestPracticesMap = createBestPracticesMap(parseInt(domainNum), config);
       
       console.log(`\n=== ${config.name} Best Practices ===`);
       
-      const sheet = getSheetByName(spreadsheet, config.sheetName);
-      if (!sheet) {
-        console.log(`Sheet "${config.sheetName}" not found!`);
-        return;
-      }
-      
       Object.keys(bestPracticesMap).forEach(componentId => {
         const location = bestPracticesMap[componentId];
         try {
-          const value = sheet.getRange(location.row + 1, location.col + 1).getValue();
+          const value = teacherSheet.getRange(location.row + 1, location.col + 1).getValue();
           console.log(`${componentId} at ${location.row + 1}${String.fromCharCode(65 + location.col)}: "${value}"`);
         } catch (e) {
           console.log(`Error reading ${componentId}: ${e}`);
@@ -376,14 +366,16 @@ function checkScriptProperties() {
 }
 
 /**
- * Function to help set up new sheet structure
- * This will help you verify the expected sheet names match what you have
+ * Function to help verify the expected sheet structure
  */
-function listExpectedSheetNames() {
-  console.log('Expected sheet names for each domain:');
+function listExpectedSheetStructure() {
+  console.log('Expected single sheet structure:');
+  console.log('Sheet name: "Teacher"');
+  console.log('\nDomain ranges in the Teacher sheet:');
+  
   Object.keys(DOMAIN_CONFIGS).forEach(domainNum => {
     const config = DOMAIN_CONFIGS[domainNum];
-    console.log(`Domain ${domainNum}: "${config.sheetName}"`);
+    console.log(`${config.name}: Rows ${config.startRow}-${config.endRow}`);
   });
   
   // Also list actual sheets for comparison
@@ -394,7 +386,7 @@ function listExpectedSheetNames() {
     
     console.log('\nActual sheets in spreadsheet:');
     sheets.forEach((sheet, index) => {
-      console.log(`${index + 1}. "${sheet.getName()}"`);
+      console.log(`${index + 1}. "${sheet.getName()}" - ${sheet.getLastRow()} rows`);
     });
   } catch (error) {
     console.error('Error accessing spreadsheet:', error);
