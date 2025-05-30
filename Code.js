@@ -1,35 +1,37 @@
 /**
- * Google Apps Script Web App for Danielson Framework - All Domains
- * Reads data from a single Google Sheet tab called "Teacher" with all domains
+ * Code.js - Main Orchestrator (Refactored for Modular Architecture)
+ * Google Apps Script Web App for Danielson Framework - Multi-Role System
+ * 
+ * This file now orchestrates the modular services and maintains backward compatibility
+ * while adding support for multiple roles and user-specific content.
  */
 
-// Domain configurations with their sheet names, ranges and subdomain counts
-// All domains are now on a single "Teacher" sheet tab
+/**
+ * Legacy DOMAIN_CONFIGS for backward compatibility
+ * Kept in Code.js to avoid cross-file dependency issues
+ * @deprecated Use ConfigurationService.loadRoleConfiguration() instead
+ */
 const DOMAIN_CONFIGS = {
   1: {
     name: 'Domain 1: Planning and Preparation',
-    sheetName: 'Teacher',
     startRow: 3,   // 1-indexed - Domain 1 starts at row 3
     endRow: 22,    // 1-indexed - estimated end row (adjust as needed)
     subdomains: ['1a:', '1b:', '1c:', '1d:', '1e:', '1f:']
   },
   2: {
     name: 'Domain 2: The Classroom Environment',
-    sheetName: 'Teacher',
     startRow: 23,  // 1-indexed - Domain 2 starts at row 23
     endRow: 39,    // 1-indexed - estimated end row (adjust as needed)
     subdomains: ['2a:', '2b:', '2c:', '2d:', '2e:']
   },
   3: {
     name: 'Domain 3: Instruction',
-    sheetName: 'Teacher',
     startRow: 40,  // 1-indexed - Domain 3 starts at row 40
     endRow: 56,    // 1-indexed - estimated end row (adjust as needed)
     subdomains: ['3a:', '3b:', '3c:', '3d:', '3e:']
   },
   4: {
     name: 'Domain 4: Professional Responsibilities',
-    sheetName: 'Teacher',
     startRow: 57,  // 1-indexed - Domain 4 starts at row 57
     endRow: 76,    // 1-indexed - estimated end row (adjust as needed)
     subdomains: ['4a:', '4b:', '4c:', '4d:', '4e:', '4f:']
@@ -37,141 +39,168 @@ const DOMAIN_CONFIGS = {
 };
 
 /**
- * Gets the Sheet ID from Script Properties
- */
-function getSheetId() {
-  const sheetId = PropertiesService.getScriptProperties().getProperty('SHEET_ID');
-  if (!sheetId) {
-    throw new Error('SHEET_ID not found in Script Properties. Please set it in the Apps Script editor.');
-  }
-  
-  return sheetId.trim();
-}
-
-/**
- * Test function to check if Sheet ID is working and list all sheets
- */
-function testSheetAccess() {
-  try {
-    const sheetId = getSheetId();
-    console.log('Testing Sheet ID:', sheetId);
-    
-    const spreadsheet = SpreadsheetApp.openById(sheetId);
-    console.log('Spreadsheet opened successfully:', spreadsheet.getName());
-    
-    const sheets = spreadsheet.getSheets();
-    console.log('Found', sheets.length, 'sheets:');
-    
-    sheets.forEach((sheet, index) => {
-      console.log(`  ${index + 1}. "${sheet.getName()}" - ${sheet.getLastRow()} rows`);
-    });
-    
-    return 'Success - Found ' + sheets.length + ' sheets';
-  } catch (error) {
-    console.error('Error in testSheetAccess:', error);
-    return 'Error: ' + error.toString();
-  }
-}
-
-/**
- * Helper function to get a sheet by name
- */
-function getSheetByName(spreadsheet, sheetName) {
-  const sheet = spreadsheet.getSheetByName(sheetName);
-  if (!sheet) {
-    console.warn(`Sheet "${sheetName}" not found. Available sheets:`, 
-      spreadsheet.getSheets().map(s => s.getName()));
-    return null;
-  }
-  return sheet;
-}
-
-/**
  * Main function to serve the web app
+ * Enhanced to support user-specific role-based content
  */
 function doGet(e) {
+  const startTime = Date.now();
+  
   try {
+    // Create user context (handles authentication and role detection)
+    const userContext = createUserContext();
+    
+    debugLog('Web app request started', {
+      email: userContext.email,
+      role: userContext.role,
+      year: userContext.year,
+      isDefaultUser: userContext.isDefaultUser
+    });
+    
+    // Get role-specific rubric data
+    const rubricData = getAllDomainsData(userContext.role, userContext.year);
+    
+    // Add user context to the data for the HTML template
+    rubricData.userContext = {
+      email: userContext.email,
+      role: userContext.role,
+      year: userContext.year,
+      isAuthenticated: userContext.isAuthenticated,
+      displayName: userContext.email ? userContext.email.split('@')[0] : 'Guest'
+    };
+    
+    // Create and configure the HTML template
     const htmlTemplate = HtmlService.createTemplateFromFile('rubric');
-    htmlTemplate.data = getAllDomainsData();
+    htmlTemplate.data = rubricData;
     
     const htmlOutput = htmlTemplate.evaluate()
-      .setTitle('Danielson Framework - All Domains')
+      .setTitle(getPageTitle(userContext.role))
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
-      .addMetaTag('viewport', 'width=device-width, initial-scale=1.0');
+      .addMetaTag('viewport', HTML_SETTINGS.VIEWPORT_META);
+    
+    const executionTime = Date.now() - startTime;
+    logPerformanceMetrics('doGet', executionTime, {
+      role: userContext.role,
+      year: userContext.year,
+      domainCount: rubricData.domains ? rubricData.domains.length : 0,
+      isDefaultUser: userContext.isDefaultUser
+    });
+    
+    debugLog('Web app request completed successfully', {
+      role: userContext.role,
+      executionTime: executionTime
+    });
     
     return htmlOutput;
-  } catch (error) {
-    console.error('Error in doGet:', error);
     
-    const errorHtml = `
-      <html>
-        <body>
-          <h2>Error Loading Application</h2>
-          <p><strong>Error:</strong> ${error.toString()}</p>
-          <p>Please check the following:</p>
-          <ul>
-            <li>Sheet ID is correctly set in Script Properties</li>
-            <li>Sheet exists and is accessible</li>
-            <li>The "Teacher" sheet tab exists</li>
-            <li>All domain ranges are correct</li>
-          </ul>
-          <p><a href="#" onclick="window.location.reload()">Try Again</a></p>
-        </body>
-      </html>
-    `;
-    return HtmlService.createHtmlOutput(errorHtml);
+  } catch (error) {
+    console.error('Error in doGet:', formatErrorMessage(error, 'doGet'));
+    
+    // Return user-friendly error page
+    return createErrorPage(error);
   }
 }
 
 /**
- * Reads and parses data from all domains from the single "Teacher" sheet tab
+ * Enhanced function to get all domains data with role and year support
+ * Maintains backward compatibility when called without parameters
+ * @param {string} role - User's role (optional, defaults to Teacher)
+ * @param {number} year - User's observation year (optional, defaults to show all)
+ * @return {Object} Complete rubric data structure
  */
-function getAllDomainsData() {
+function getAllDomainsData(role = null, year = null) {
+  const startTime = Date.now();
+  
   try {
-    const sheetId = getSheetId();
-    console.log('Using Sheet ID:', sheetId);
+    // Use default role if none provided (backward compatibility)
+    const userRole = role || 'Teacher';
+    const userYear = year;
     
-    const spreadsheet = SpreadsheetApp.openById(sheetId);
+    debugLog('Loading domains data', { role: userRole, year: userYear });
     
-    // Get the "Teacher" sheet (single sheet containing all domains)
-    const teacherSheet = getSheetByName(spreadsheet, 'Teacher');
-    if (!teacherSheet) {
-      throw new Error('Teacher sheet not found - please make sure you have a sheet tab named "Teacher"');
+    // Get role-specific sheet data
+    const roleSheetData = getRoleSheetData(userRole);
+    if (!roleSheetData) {
+      throw new Error(`Unable to load data for role: ${userRole}`);
     }
     
-    const sheetData = teacherSheet.getDataRange().getValues();
-    
+    // Build result structure
     const result = {
-      title: sheetData[0][0] || "Danielson's Framework for Teaching",
-      subtitle: sheetData[1][0] || "Best practices aligned with 5D+ and PELSB lookfors",
+      title: roleSheetData.title || `${userRole} Framework`,
+      subtitle: roleSheetData.subtitle || "Professional practices and standards",
+      role: userRole,
+      year: userYear,
       domains: []
     };
     
-    // Process each domain from the single "Teacher" sheet
-    Object.keys(DOMAIN_CONFIGS).forEach(domainNum => {
-      const config = DOMAIN_CONFIGS[domainNum];
-      console.log(`Processing ${config.name} from rows ${config.startRow} to ${config.endRow}`);
-      
-      const domainData = processDomainData(sheetData, parseInt(domainNum), config);
-      result.domains.push(domainData);
-      console.log(`Successfully processed ${config.name}`);
+    // For Teacher role, use legacy processing for backward compatibility
+    if (userRole === 'Teacher') {
+      result.domains = processLegacyTeacherDomains(roleSheetData.data);
+    } else {
+      // Use dynamic processing for other roles (will be implemented in later phases)
+      result.domains = processRoleDomains(roleSheetData, userRole, userYear);
+    }
+    
+    // Apply year-based filtering if specified
+    if (userYear && userYear !== null) {
+      result.domains = applyYearFiltering(result.domains, userRole, userYear);
+    }
+    
+    const executionTime = Date.now() - startTime;
+    logPerformanceMetrics('getAllDomainsData', executionTime, {
+      role: userRole,
+      year: userYear,
+      domainCount: result.domains.length
     });
     
-    console.log('Processed', result.domains.length, 'domains from Teacher sheet');
+    debugLog('Domains data loaded successfully', {
+      role: userRole,
+      domainCount: result.domains.length,
+      totalComponents: result.domains.reduce((total, domain) => total + domain.components.length, 0)
+    });
+    
     return result;
     
   } catch (error) {
-    console.error('Error reading sheet data:', error);
+    console.error('Error reading sheet data:', formatErrorMessage(error, 'getAllDomainsData'));
+    
     return {
       title: "Error Loading Data",
-      subtitle: "Please check the sheet configuration: " + error.toString(),
+      subtitle: `Please check the configuration for role: ${role || 'default'}. Error: ${error.message}`,
+      role: role || 'Teacher',
+      year: year,
       domains: []
     };
   }
 }
 
 /**
- * Process data for a specific domain from the sheet data
+ * Legacy function to process Teacher domain data (maintains exact backward compatibility)
+ * @param {Array<Array>} sheetData - Raw sheet data
+ * @return {Array<Object>} Array of domain objects
+ */
+function processLegacyTeacherDomains(sheetData) {
+  const domains = [];
+  
+  // Process each domain using the original logic
+  Object.keys(DOMAIN_CONFIGS).forEach(domainNum => {
+    const config = DOMAIN_CONFIGS[domainNum];
+    debugLog(`Processing ${config.name} from rows ${config.startRow} to ${config.endRow}`);
+    
+    const domainData = processDomainData(sheetData, parseInt(domainNum), config);
+    domains.push(domainData);
+    debugLog(`Successfully processed ${config.name}`);
+  });
+  
+  return domains;
+}
+
+/**
+ * Process data for a specific domain from the sheet data (legacy implementation)
+ * This maintains the exact original logic for backward compatibility
+ * @param {Array<Array>} sheetData - Raw sheet data
+ * @param {number} domainNumber - Domain number (1-4)
+ * @param {Object} config - Domain configuration
+ * @return {Object} Domain object with components
  */
 function processDomainData(sheetData, domainNumber, config) {
   const domain = {
@@ -194,35 +223,31 @@ function processDomainData(sheetData, domainNumber, config) {
     // Check if this row contains a component for this domain
     if (row[0] && row[0].toString().match(new RegExp(`^${domainNumber}[a-f]:`))) {
       const componentTitle = row[0].toString().trim();
-      console.log(`Processing component: ${componentTitle} at row ${i + 1}`);
+      debugLog(`Processing component: ${componentTitle} at row ${i + 1}`);
       
       const component = {
         title: componentTitle,
-        developing: row[1] || '',
-        basic: row[2] || '',
-        proficient: row[3] || '',
-        distinguished: row[4] || '',
+        developing: sanitizeText(row[1]),
+        basic: sanitizeText(row[2]),
+        proficient: sanitizeText(row[3]),
+        distinguished: sanitizeText(row[4]),
         bestPractices: []
       };
       
       // Extract component identifier (e.g., "1a:", "2b:", etc.)
       const componentId = componentTitle.substring(0, 3);
-      console.log(`Component ID extracted: "${componentId}"`);
+      debugLog(`Component ID extracted: "${componentId}"`);
       
       // Look up best practices for this component
       const practicesLocation = bestPracticesMap[componentId];
       if (practicesLocation && practicesLocation.row < sheetData.length) {
         const practicesText = sheetData[practicesLocation.row][practicesLocation.col];
-        console.log(`Looking for best practices at row ${practicesLocation.row + 1}, column ${practicesLocation.col + 1}`);
+        debugLog(`Looking for best practices at row ${practicesLocation.row + 1}, column ${practicesLocation.col + 1}`);
         
         if (practicesText && practicesText.toString().trim()) {
-          const practices = practicesText.toString().trim()
-            .split(/\r?\n|\r/)
-            .map(practice => practice.trim())
-            .filter(practice => practice.length > 0);
-          
+          const practices = parseMultilineCell(practicesText.toString());
           component.bestPractices = practices;
-          console.log(`Found ${component.bestPractices.length} practices for ${componentId}`);
+          debugLog(`Found ${component.bestPractices.length} practices for ${componentId}`);
         }
       }
       
@@ -230,39 +255,150 @@ function processDomainData(sheetData, domainNumber, config) {
     }
   }
   
-  console.log(`Domain ${domainNumber}: Found ${domain.components.length} components`);
+  debugLog(`Domain ${domainNumber}: Found ${domain.components.length} components`);
   return domain;
 }
 
 /**
- * Create best practices mapping for a specific domain
- * Based on the pattern: each component's best practices are 4 rows below the component
- * and spaced 3 rows apart
+ * Create best practices mapping for a specific domain (legacy implementation)
+ * @param {number} domainNumber - Domain number
+ * @param {Object} config - Domain configuration
+ * @return {Object} Mapping of component IDs to best practices locations
  */
 function createBestPracticesMap(domainNumber, config) {
   const map = {};
   const startRowIdx = config.startRow - 1; // Convert to 0-indexed
   
   // Calculate component positions based on domain structure
-  // Assuming components start at the domain start row
   let componentRowIdx = startRowIdx;
   
   config.subdomains.forEach((subdomain, index) => {
     // Best practices are 4 rows after the component row
-    const bestPracticesRowIdx = componentRowIdx + 4;
+    const bestPracticesRowIdx = componentRowIdx + LEGACY_BEST_PRACTICES_OFFSET.ROW_OFFSET;
     
     map[subdomain] = {
       row: bestPracticesRowIdx,
-      col: 1 // Column B (0-indexed)
+      col: LEGACY_BEST_PRACTICES_OFFSET.COLUMN
     };
     
-    console.log(`Mapping ${subdomain} -> row ${bestPracticesRowIdx + 1}, col B`);
+    debugLog(`Mapping ${subdomain} -> row ${bestPracticesRowIdx + 1}, col B`);
     
     // Move to next component (typically 3 rows apart)
-    componentRowIdx += 3;
+    componentRowIdx += LEGACY_BEST_PRACTICES_OFFSET.ROW_SPACING;
   });
   
   return map;
+}
+
+/**
+ * Process role-specific domains (placeholder for future implementation)
+ * @param {Object} roleSheetData - Role sheet data
+ * @param {string} role - User role
+ * @param {number} year - User year
+ * @return {Array<Object>} Array of domain objects
+ */
+function processRoleDomains(roleSheetData, role, year) {
+  // For now, fall back to legacy processing
+  // This will be enhanced in Phase 2 with dynamic domain detection
+  debugLog(`Processing role domains for ${role} - falling back to legacy processing`);
+  return processLegacyTeacherDomains(roleSheetData.data);
+}
+
+/**
+ * Apply year-based filtering to domains (placeholder for future implementation)
+ * @param {Array<Object>} domains - Array of domain objects
+ * @param {string} role - User role
+ * @param {number} year - User year
+ * @return {Array<Object>} Filtered domains
+ */
+function applyYearFiltering(domains, role, year) {
+  // For now, return all domains (no filtering)
+  // This will be implemented in Phase 3
+  debugLog(`Year filtering not yet implemented - returning all domains for ${role}, year ${year}`);
+  return domains;
+}
+
+/**
+ * Get appropriate page title based on role
+ * @param {string} role - User role
+ * @return {string} Page title
+ */
+function getPageTitle(role) {
+  if (role === 'Teacher') {
+    return HTML_SETTINGS.DEFAULT_TITLE;
+  }
+  return `${role} Framework - Professional Standards`;
+}
+
+/**
+ * Create an error page for display to users
+ * @param {Error} error - Error object
+ * @return {HtmlOutput} Error page HTML
+ */
+function createErrorPage(error) {
+  const errorHtml = `
+    <html>
+      <head>
+        <title>Error Loading Application</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+          body { font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto; }
+          .error-container { background: #f8f9fa; border: 1px solid #dee2e6; padding: 20px; border-radius: 5px; }
+          .error-title { color: #dc3545; margin-bottom: 15px; }
+          .error-message { background: white; padding: 15px; border-radius: 3px; margin: 10px 0; }
+          .troubleshooting { margin-top: 20px; }
+          .troubleshooting ul { padding-left: 20px; }
+          .retry-button { background: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 3px; cursor: pointer; }
+        </style>
+      </head>
+      <body>
+        <div class="error-container">
+          <h2 class="error-title">Error Loading Application</h2>
+          <div class="error-message">
+            <strong>Error:</strong> ${error.toString()}
+          </div>
+          <div class="troubleshooting">
+            <h3>Troubleshooting Steps:</h3>
+            <ul>
+              <li>Check that the SHEET_ID is correctly set in Script Properties</li>
+              <li>Verify that the spreadsheet exists and is accessible</li>
+              <li>Ensure the required sheet tabs exist (Staff, Settings, Teacher)</li>
+              <li>Check that you have permission to access the spreadsheet</li>
+            </ul>
+          </div>
+          <button class="retry-button" onclick="window.location.reload()">Try Again</button>
+        </div>
+      </body>
+    </html>
+  `;
+  
+  return HtmlService.createHtmlOutput(errorHtml);
+}
+
+// ====================
+// LEGACY TEST FUNCTIONS (maintained for backward compatibility)
+// ====================
+
+/**
+ * Test function to check if Sheet ID is working and list all sheets
+ * @return {string} Test result message
+ */
+function testSheetAccess() {
+  try {
+    const connectivity = testSheetConnectivity();
+    
+    if (connectivity.spreadsheet.accessible) {
+      const available = Object.keys(connectivity.sheets).filter(sheet => 
+        connectivity.sheets[sheet].exists
+      );
+      return `Success - Spreadsheet accessible. Found ${available.length} sheets: ${available.join(', ')}`;
+    } else {
+      return `Error: ${connectivity.spreadsheet.error}`;
+    }
+  } catch (error) {
+    console.error('Error in testSheetAccess:', error);
+    return 'Error: ' + error.toString();
+  }
 }
 
 /**
@@ -279,16 +415,13 @@ function testAllDomainsDataParsing() {
  */
 function debugAllDomainComponents() {
   try {
-    const sheetId = getSheetId();
-    const spreadsheet = SpreadsheetApp.openById(sheetId);
-    
-    const teacherSheet = getSheetByName(spreadsheet, 'Teacher');
-    if (!teacherSheet) {
+    const roleSheetData = getRoleSheetData(DEFAULT_ROLE_CONFIG.role);
+    if (!roleSheetData) {
       console.log('Teacher sheet not found!');
       return;
     }
     
-    const sheetData = teacherSheet.getDataRange().getValues();
+    const sheetData = roleSheetData.data;
     
     Object.keys(DOMAIN_CONFIGS).forEach(domainNum => {
       const config = DOMAIN_CONFIGS[domainNum];
@@ -317,17 +450,14 @@ function debugAllDomainComponents() {
  */
 function debugAllBestPracticesCells() {
   try {
-    const sheetId = getSheetId();
-    const spreadsheet = SpreadsheetApp.openById(sheetId);
-    
-    const teacherSheet = getSheetByName(spreadsheet, 'Teacher');
-    if (!teacherSheet) {
+    const roleSheetData = getRoleSheetData(DEFAULT_ROLE_CONFIG.role);
+    if (!roleSheetData) {
       console.log('Teacher sheet not found!');
       return;
     }
     
-    Object.keys(DOMAIN_CONFIGS).forEach(domainNum => {
-      const config = DOMAIN_CONFIGS[domainNum];
+    Object.keys(TEACHER_DOMAIN_CONFIGS).forEach(domainNum => {
+      const config = TEACHER_DOMAIN_CONFIGS[domainNum];
       const bestPracticesMap = createBestPracticesMap(parseInt(domainNum), config);
       
       console.log(`\n=== ${config.name} Best Practices ===`);
@@ -335,8 +465,9 @@ function debugAllBestPracticesCells() {
       Object.keys(bestPracticesMap).forEach(componentId => {
         const location = bestPracticesMap[componentId];
         try {
-          const value = teacherSheet.getRange(location.row + 1, location.col + 1).getValue();
-          console.log(`${componentId} at ${location.row + 1}${String.fromCharCode(65 + location.col)}: "${value}"`);
+          const value = roleSheetData.data[location.row] ? 
+            roleSheetData.data[location.row][location.col] : 'N/A';
+          console.log(`${componentId} at ${location.row + 1}${columnIndexToLetter(location.col)}: "${value}"`);
         } catch (e) {
           console.log(`Error reading ${componentId}: ${e}`);
         }
@@ -369,8 +500,8 @@ function checkScriptProperties() {
  * Function to help verify the expected sheet structure
  */
 function listExpectedSheetStructure() {
-  console.log('Expected single sheet structure:');
-  console.log('Sheet name: "Teacher"');
+  console.log('Expected sheet structure:');
+  console.log('Required sheets: Staff, Settings, Teacher');
   console.log('\nDomain ranges in the Teacher sheet:');
   
   Object.keys(DOMAIN_CONFIGS).forEach(domainNum => {
@@ -380,13 +511,11 @@ function listExpectedSheetStructure() {
   
   // Also list actual sheets for comparison
   try {
-    const sheetId = getSheetId();
-    const spreadsheet = SpreadsheetApp.openById(sheetId);
-    const sheets = spreadsheet.getSheets();
-    
+    const connectivity = testSheetConnectivity();
     console.log('\nActual sheets in spreadsheet:');
-    sheets.forEach((sheet, index) => {
-      console.log(`${index + 1}. "${sheet.getName()}" - ${sheet.getLastRow()} rows`);
+    Object.keys(connectivity.sheets).forEach(sheetName => {
+      const sheet = connectivity.sheets[sheetName];
+      console.log(`"${sheetName}" - ${sheet.exists ? 'EXISTS' : 'MISSING'} - ${sheet.rowCount || 0} rows`);
     });
   } catch (error) {
     console.error('Error accessing spreadsheet:', error);
