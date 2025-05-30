@@ -1,9 +1,35 @@
 /**
- * Google Apps Script Web App for Danielson Framework
- * Reads data from Google Sheet and generates styled HTML
+ * Google Apps Script Web App for Danielson Framework - All Domains
+ * Reads data from Google Sheet and generates styled HTML for all 4 domains
  */
 
-const SHEET_NAME = 'Domain 1: Planning and Preparation';
+// Domain configurations with their ranges and subdomain counts
+const DOMAIN_CONFIGS = {
+  1: {
+    name: 'Domain 1: Planning and Preparation',
+    startRow: 3,  // 1-indexed
+    endRow: 22,   // 1-indexed  
+    subdomains: ['1a:', '1b:', '1c:', '1d:', '1e:', '1f:']
+  },
+  2: {
+    name: 'Domain 2: The Classroom Environment', 
+    startRow: 23, // 1-indexed
+    endRow: 39,   // 1-indexed
+    subdomains: ['2a:', '2b:', '2c:', '2d:', '2e:']
+  },
+  3: {
+    name: 'Domain 3: Instruction',
+    startRow: 40, // 1-indexed 
+    endRow: 56,   // 1-indexed
+    subdomains: ['3a:', '3b:', '3c:', '3d:', '3e:']
+  },
+  4: {
+    name: 'Domain 4: Professional Responsibilities',
+    startRow: 57, // 1-indexed
+    endRow: 76,   // 1-indexed
+    subdomains: ['4a:', '4b:', '4c:', '4d:', '4e:', '4f:']
+  }
+};
 
 /**
  * Gets the Sheet ID from Script Properties
@@ -28,13 +54,13 @@ function testSheetAccess() {
     const spreadsheet = SpreadsheetApp.openById(sheetId);
     console.log('Spreadsheet opened successfully:', spreadsheet.getName());
     
-    const sheet = spreadsheet.getSheetByName(SHEET_NAME);
+    // Check first sheet for now
+    const sheet = spreadsheet.getSheets()[0];
     if (sheet) {
-      console.log('Sheet found:', SHEET_NAME);
+      console.log('Sheet found:', sheet.getName());
       console.log('Sheet has', sheet.getLastRow(), 'rows');
     } else {
-      console.log('Sheet not found:', SHEET_NAME);
-      console.log('Available sheets:', spreadsheet.getSheets().map(s => s.getName()));
+      console.log('No sheets found');
     }
     
     return 'Success';
@@ -50,10 +76,10 @@ function testSheetAccess() {
 function doGet(e) {
   try {
     const htmlTemplate = HtmlService.createTemplateFromFile('rubric');
-    htmlTemplate.data = getSheetData();
+    htmlTemplate.data = getAllDomainsData();
     
     const htmlOutput = htmlTemplate.evaluate()
-      .setTitle('Danielson Framework - Domain 1')
+      .setTitle('Danielson Framework - All Domains')
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
       .addMetaTag('viewport', 'width=device-width, initial-scale=1.0');
     
@@ -70,7 +96,7 @@ function doGet(e) {
           <ul>
             <li>Sheet ID is correctly set in Script Properties</li>
             <li>Sheet exists and is accessible</li>
-            <li>Sheet name matches exactly: "${SHEET_NAME}"</li>
+            <li>All domain ranges are correct</li>
           </ul>
           <p><a href="#" onclick="window.location.reload()">Try Again</a></p>
         </body>
@@ -81,178 +107,215 @@ function doGet(e) {
 }
 
 /**
- * Reads and parses data from the Google Sheet
- * Now with correct best practices cell mapping
+ * Reads and parses data from all domains in the Google Sheet
  */
-function getSheetData() {
+function getAllDomainsData() {
   try {
     const sheetId = getSheetId();
     console.log('Using Sheet ID:', sheetId);
     
-    const sheet = SpreadsheetApp.openById(sheetId).getSheetByName(SHEET_NAME);
+    const spreadsheet = SpreadsheetApp.openById(sheetId);
+    const sheet = spreadsheet.getSheets()[0]; // Use first sheet
+    
     if (!sheet) {
-      throw new Error(`Sheet "${SHEET_NAME}" not found`);
+      throw new Error('No sheet found in spreadsheet');
     }
     
-    const data = sheet.getDataRange().getValues();
-    console.log('Retrieved', data.length, 'rows of data');
+    const allData = sheet.getDataRange().getValues();
+    console.log('Retrieved', allData.length, 'rows of data');
     
     const result = {
-      title: data[0][0] || "Danielson's Framework for Teaching",
-      subtitle: data[1][0] || "Best practices aligned with 5D+ and PELSB lookfors",
-      domain: data[2][0] || "Domain 1: Planning and Preparation",
-      components: []
+      title: allData[0][0] || "Danielson's Framework for Teaching",
+      subtitle: allData[1][0] || "Best practices aligned with 5D+ and PELSB lookfors",
+      domains: []
     };
     
-    // Define the mapping of components to their best practices cells
-    // Based on your description: 1a→7B, 1b→10B, 1c→13B, 1d→16B, 1e→19B, 1f→22B
-    // In 0-indexed arrays: 1a→[6,1], 1b→[9,1], 1c→[12,1], 1d→[15,1], 1e→[18,1], 1f→[21,1]
-    const bestPracticesMap = {
-      '1a:': { row: 6, col: 1 },   // Row 7, Column B
-      '1b:': { row: 9, col: 1 },   // Row 10, Column B  
-      '1c:': { row: 12, col: 1 },  // Row 13, Column B
-      '1d:': { row: 15, col: 1 },  // Row 16, Column B
-      '1e:': { row: 18, col: 1 },  // Row 19, Column B
-      '1f:': { row: 21, col: 1 }   // Row 22, Column B
-    };
-    
-    // Parse components starting from row 5 (index 4)
-    let i = 4;
-    while (i < data.length) {
-      const row = data[i];
+    // Process each domain
+    Object.keys(DOMAIN_CONFIGS).forEach(domainNum => {
+      const config = DOMAIN_CONFIGS[domainNum];
+      console.log(`Processing ${config.name}`);
       
-      // Check if this is a component row (has component title with number and colon)
-      if (row[0] && row[0].toString().match(/^\d[a-f]:/)) {
-        const componentTitle = row[0].toString().trim();
-        console.log(`Processing component: ${componentTitle}`);
-        
-        const component = {
-          title: componentTitle,
-          developing: row[1] || '',
-          basic: row[2] || '',
-          proficient: row[3] || '',
-          distinguished: row[4] || '',
-          bestPractices: []
-        };
-        
-        // Extract just the component identifier (e.g., "1a:" from "1a: Applying Knowledge...")
-        const componentId = componentTitle.substring(0, 3); // Gets "1a:", "1b:", etc.
-        console.log(`Component ID extracted: "${componentId}" from "${componentTitle}"`);
-        
-        // Look up the best practices cell for this component
-        const practicesLocation = bestPracticesMap[componentId];
-        console.log(`Looking up practices location for "${componentId}":`, practicesLocation);
-        
-        if (practicesLocation && practicesLocation.row < data.length) {
-          const practicesText = data[practicesLocation.row][practicesLocation.col];
-          console.log(`Looking for best practices at row ${practicesLocation.row + 1}, column ${practicesLocation.col + 1} (${componentId})`);
-          console.log(`Found text: "${practicesText}"`);
-          
-          if (practicesText && practicesText.toString().trim()) {
-            // Split practices by line breaks/paragraphs
-            const practices = practicesText.toString().trim()
-              .split(/\r?\n|\r/) // Split on line breaks
-              .map(practice => practice.trim()) // Clean up whitespace
-              .filter(practice => practice.length > 0); // Remove empty lines
-            
-            component.bestPractices = practices;
-            console.log(`Found ${component.bestPractices.length} practices for ${componentId}:`, component.bestPractices);
-          } else {
-            console.log(`No best practices text found for ${componentId} at expected location`);
-          }
-        } else {
-          console.log(`No mapping found for component ID: "${componentId}"`);
-          console.log('Available mapping keys:', Object.keys(bestPracticesMap));
-        }
-        
-        result.components.push(component);
-      }
-      i++;
-    }
-    
-    console.log('Parsed', result.components.length, 'components');
-    result.components.forEach((comp, index) => {
-      console.log(`Component ${index + 1}: ${comp.title} - ${comp.bestPractices.length} best practices`);
+      const domainData = processDomainData(allData, parseInt(domainNum), config);
+      result.domains.push(domainData);
     });
     
+    console.log('Processed', result.domains.length, 'domains');
     return result;
+    
   } catch (error) {
     console.error('Error reading sheet data:', error);
     return {
       title: "Error Loading Data",
       subtitle: "Please check the sheet configuration: " + error.toString(),
-      domain: "Domain 1: Planning and Preparation",
-      components: []
+      domains: []
     };
   }
 }
 
 /**
- * Test function to debug data parsing
+ * Process data for a specific domain
  */
-function testDataParsing() {
-  const data = getSheetData();
-  console.log('=== FINAL PARSED DATA ===');
+function processDomainData(allData, domainNumber, config) {
+  const domain = {
+    number: domainNumber,
+    name: config.name,
+    components: []
+  };
+  
+  // Create best practices mapping for this domain
+  const bestPracticesMap = createBestPracticesMap(domainNumber, config);
+  
+  // Convert 1-indexed row numbers to 0-indexed for array access
+  const startIdx = config.startRow - 1;
+  const endIdx = config.endRow - 1;
+  
+  // Look for components within the domain range
+  for (let i = startIdx; i <= endIdx && i < allData.length; i++) {
+    const row = allData[i];
+    
+    // Check if this row contains a component for this domain
+    if (row[0] && row[0].toString().match(new RegExp(`^${domainNumber}[a-f]:`))) {
+      const componentTitle = row[0].toString().trim();
+      console.log(`Processing component: ${componentTitle}`);
+      
+      const component = {
+        title: componentTitle,
+        developing: row[1] || '',
+        basic: row[2] || '',
+        proficient: row[3] || '',
+        distinguished: row[4] || '',
+        bestPractices: []
+      };
+      
+      // Extract component identifier (e.g., "1a:", "2b:", etc.)
+      const componentId = componentTitle.substring(0, 3);
+      console.log(`Component ID extracted: "${componentId}"`);
+      
+      // Look up best practices for this component
+      const practicesLocation = bestPracticesMap[componentId];
+      if (practicesLocation && practicesLocation.row < allData.length) {
+        const practicesText = allData[practicesLocation.row][practicesLocation.col];
+        console.log(`Looking for best practices at row ${practicesLocation.row + 1}, column ${practicesLocation.col + 1}`);
+        
+        if (practicesText && practicesText.toString().trim()) {
+          const practices = practicesText.toString().trim()
+            .split(/\r?\n|\r/)
+            .map(practice => practice.trim())
+            .filter(practice => practice.length > 0);
+          
+          component.bestPractices = practices;
+          console.log(`Found ${component.bestPractices.length} practices for ${componentId}`);
+        }
+      }
+      
+      domain.components.push(component);
+    }
+  }
+  
+  console.log(`Domain ${domainNumber}: Found ${domain.components.length} components`);
+  return domain;
+}
+
+/**
+ * Create best practices mapping for a specific domain
+ * Based on the pattern: each component's best practices are 2 rows below the component
+ * and spaced 3 rows apart
+ */
+function createBestPracticesMap(domainNumber, config) {
+  const map = {};
+  const startRowIdx = config.startRow - 1; // Convert to 0-indexed
+  
+  // Calculate component positions based on domain structure
+  // Assuming components start 2 rows after domain start
+  let componentRowIdx = startRowIdx + 2;
+  
+  config.subdomains.forEach((subdomain, index) => {
+    // Best practices are typically 2 rows after the component row
+    const bestPracticesRowIdx = componentRowIdx + 2;
+    
+    map[subdomain] = {
+      row: bestPracticesRowIdx,
+      col: 1 // Column B (0-indexed)
+    };
+    
+    console.log(`Mapping ${subdomain} -> row ${bestPracticesRowIdx + 1}, col B`);
+    
+    // Move to next component (typically 3 rows apart)
+    componentRowIdx += 3;
+  });
+  
+  return map;
+}
+
+/**
+ * Test function to debug all domains data parsing
+ */
+function testAllDomainsDataParsing() {
+  const data = getAllDomainsData();
+  console.log('=== ALL DOMAINS PARSED DATA ===');
   console.log(JSON.stringify(data, null, 2));
 }
 
 /**
- * Debug function to check what components are being found
+ * Debug function to check component mapping for all domains
  */
-function debugComponentTitles() {
+function debugAllDomainComponents() {
   try {
     const sheetId = getSheetId();
-    const sheet = SpreadsheetApp.openById(sheetId).getSheetByName(SHEET_NAME);
-    const data = sheet.getDataRange().getValues();
+    const spreadsheet = SpreadsheetApp.openById(sheetId);
+    const sheet = spreadsheet.getSheets()[0];
+    const allData = sheet.getDataRange().getValues();
     
-    console.log('=== COMPONENT TITLES FOUND ===');
-    let i = 4;
-    while (i < data.length) {
-      const row = data[i];
+    Object.keys(DOMAIN_CONFIGS).forEach(domainNum => {
+      const config = DOMAIN_CONFIGS[domainNum];
+      console.log(`\n=== ${config.name} ===`);
       
-      if (row[0] && row[0].toString().match(/^\d[a-f]:/)) {
-        const componentTitle = row[0].toString().trim();
-        const componentId = componentTitle.substring(0, 3);
-        console.log(`Row ${i + 1}: Full title: "${componentTitle}"`);
-        console.log(`         Component ID: "${componentId}"`);
-      }
-      i++;
-    }
-    
-  } catch (error) {
-    console.error('Error in debugComponentTitles:', error);
-  }
-}
-
-/**
- * Debug function to check specific cells
- */
-function debugBestPracticesCells() {
-  try {
-    const sheetId = getSheetId();
-    const sheet = SpreadsheetApp.openById(sheetId).getSheetByName(SHEET_NAME);
-    
-    // Check the specific cells mentioned
-    const cellsToCheck = [
-      { name: '1a', row: 7, col: 2 },  // 7B (1-indexed)
-      { name: '1b', row: 10, col: 2 }, // 10B  
-      { name: '1c', row: 13, col: 2 }, // 13B
-      { name: '1d', row: 16, col: 2 }, // 16B
-      { name: '1e', row: 19, col: 2 }, // 19B
-      { name: '1f', row: 22, col: 2 }  // 22B
-    ];
-    
-    cellsToCheck.forEach(cell => {
-      try {
-        const value = sheet.getRange(cell.row, cell.col).getValue();
-        console.log(`Cell ${cell.row}${String.fromCharCode(64 + cell.col)} (${cell.name} best practices): "${value}"`);
-      } catch (e) {
-        console.log(`Error reading cell ${cell.row}${String.fromCharCode(64 + cell.col)}: ${e}`);
+      const startIdx = config.startRow - 1;
+      const endIdx = config.endRow - 1;
+      
+      for (let i = startIdx; i <= endIdx && i < allData.length; i++) {
+        const row = allData[i];
+        
+        if (row[0] && row[0].toString().match(new RegExp(`^${domainNum}[a-f]:`))) {
+          const componentTitle = row[0].toString().trim();
+          console.log(`Row ${i + 1}: ${componentTitle}`);
+        }
       }
     });
     
   } catch (error) {
-    console.error('Error in debugBestPracticesCells:', error);
+    console.error('Error in debugAllDomainComponents:', error);
+  }
+}
+
+/**
+ * Debug function to check best practices cells for all domains
+ */
+function debugAllBestPracticesCells() {
+  try {
+    const sheetId = getSheetId();
+    const spreadsheet = SpreadsheetApp.openById(sheetId);
+    const sheet = spreadsheet.getSheets()[0];
+    
+    Object.keys(DOMAIN_CONFIGS).forEach(domainNum => {
+      const config = DOMAIN_CONFIGS[domainNum];
+      const bestPracticesMap = createBestPracticesMap(parseInt(domainNum), config);
+      
+      console.log(`\n=== ${config.name} Best Practices ===`);
+      
+      Object.keys(bestPracticesMap).forEach(componentId => {
+        const location = bestPracticesMap[componentId];
+        try {
+          const value = sheet.getRange(location.row + 1, location.col + 1).getValue();
+          console.log(`${componentId} at ${location.row + 1}${String.fromCharCode(65 + location.col)}: "${value}"`);
+        } catch (e) {
+          console.log(`Error reading ${componentId}: ${e}`);
+        }
+      });
+    });
+    
+  } catch (error) {
+    console.error('Error in debugAllBestPracticesCells:', error);
   }
 }
 
