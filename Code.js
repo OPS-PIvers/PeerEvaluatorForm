@@ -259,8 +259,8 @@ function createBestPracticesMap(domainNumber, config) {
   let componentRowIdx = startRowIdx;
   
   config.subdomains.forEach((subdomain, index) => {
-    // Best practices are typically 2 rows after the component row
-    const bestPracticesRowIdx = componentRowIdx + 2;
+    // Best practices are 4 rows after the component row (changed from 2 to 4)
+    const bestPracticesRowIdx = componentRowIdx + 4;
     
     map[subdomain] = {
       row: bestPracticesRowIdx,
