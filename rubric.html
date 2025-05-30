@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><?= data.title ?></title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f5f5f5;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #4a5568, #2d3748);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+        
+        .domain-header {
+            background: linear-gradient(135deg, #7c9ac5, #5a82b8);
+            color: white;
+            padding: 15px 20px;
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+        
+        .component-section {
+            border-bottom: 2px solid #e2e8f0;
+        }
+        
+        .sticky-headers {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: white;
+            border-bottom: 2px solid #e2e8f0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .performance-levels {
+            display: grid;
+            grid-template-columns: 200px 1fr 1fr 1fr 1fr;
+            min-height: 60px;
+        }
+        
+        .performance-levels-content {
+            display: grid;
+            grid-template-columns: 200px 1fr 1fr 1fr 1fr;
+            min-height: 120px;
+        }
+        
+        .level-header {
+            background: #e2e8f0;
+            padding: 15px;
+            font-weight: 600;
+            text-align: center;
+            border-bottom: 1px solid #cbd5e0;
+            color: #4a5568;
+        }
+        
+        .level-content {
+            padding: 20px;
+            border-right: 1px solid #e2e8f0;
+            border-bottom: 1px solid #e2e8f0;
+            background: white;
+            color: #4a5568;
+            font-size: 0.9rem;
+        }
+        
+        .level-content:last-child {
+            border-right: none;
+        }
+        
+        .row-label {
+            background: #64748b;
+            padding: 20px;
+            font-weight: 600;
+            color: white;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+            font-size: 0.9rem;
+        }
+        
+        .look-fors-section {
+            border-top: 1px solid #e2e8f0;
+        }
+        
+        .look-fors-header {
+            background: linear-gradient(135deg, #3182ce, #2b77cb);
+            color: white;
+            padding: 15px 20px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 600;
+            transition: background 0.3s ease;
+            font-size: 0.9rem;
+        }
+        
+        .look-fors-header:hover {
+            background: linear-gradient(135deg, #2b77cb, #2c5aa0);
+        }
+        
+        .chevron {
+            transition: transform 0.3s ease;
+            font-size: 1.2rem;
+        }
+        
+        .chevron.expanded {
+            transform: rotate(180deg);
+        }
+        
+        .look-fors-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+            background: #f8fafc;
+        }
+        
+        .look-fors-content.expanded {
+            max-height: 400px;
+        }
+        
+        .look-fors-grid {
+            padding: 20px;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 15px;
+        }
+        
+        .look-for-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 12px;
+            background: white;
+            border-radius: 6px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            border-left: 4px solid #3182ce;
+        }
+        
+        .look-for-item input[type="checkbox"] {
+            margin-top: 3px;
+            transform: scale(1.2);
+            accent-color: #3182ce;
+        }
+        
+        .look-for-item label {
+            cursor: pointer;
+            color: #4a5568;
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
+        
+        .refresh-info {
+            background: #e6fffa;
+            border: 1px solid #38d9a9;
+            color: #065f46;
+            padding: 10px 20px;
+            font-size: 0.8rem;
+            text-align: center;
+        }
+        
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+            
+            .performance-levels, .performance-levels-content {
+                grid-template-columns: 1fr;
+                gap: 1px;
+            }
+            
+            .level-header, .row-label, .level-content {
+                border-right: none;
+                padding: 15px;
+            }
+            
+            .level-header {
+                font-size: 0.9rem;
+            }
+            
+            .row-label {
+                font-size: 0.8rem;
+            }
+            
+            .level-content {
+                font-size: 0.8rem;
+            }
+            
+            .look-fors-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><?= data.title ?></h1>
+            <p><?= data.subtitle ?></p>
+        </div>
+        
+        <div class="domain-header">
+            <?= data.domain ?>
+        </div>
+        
+        <!-- Sticky column headers -->
+        <div class="sticky-headers">
+            <div class="performance-levels">
+                <div class="level-header"></div>
+                <div class="level-header">Developing</div>
+                <div class="level-header">Basic</div>
+                <div class="level-header">Proficient</div>
+                <div class="level-header">Distinguished</div>
+            </div>
+        </div>
+        
+        <? for (var i = 0; i < data.components.length; i++) { ?>
+            <div class="component-section">
+                <div class="performance-levels-content">
+                    <div class="row-label">
+                        <?= data.components[i].title ?>
+                    </div>
+                    <div class="level-content">
+                        <?= data.components[i].developing ?>
+                    </div>
+                    <div class="level-content">
+                        <?= data.components[i].basic ?>
+                    </div>
+                    <div class="level-content">
+                        <?= data.components[i].proficient ?>
+                    </div>
+                    <div class="level-content">
+                        <?= data.components[i].distinguished ?>
+                    </div>
+                </div>
+                
+                <? if (data.components[i].bestPractices && data.components[i].bestPractices.length > 0) { ?>
+                <div class="look-fors-section">
+                    <div class="look-fors-header" onclick="toggleLookFors('component-<?= i ?>')">
+                        <span>Best Practices aligned with 5D+ and PELSB Standards</span>
+                        <span class="chevron" id="chevron-<?= i ?>">▼</span>
+                    </div>
+                    <div class="look-fors-content" id="lookForsContent-<?= i ?>">
+                        <div class="look-fors-grid">
+                            <? for (var j = 0; j < data.components[i].bestPractices.length; j++) { ?>
+                                <div class="look-for-item">
+                                    <input type="checkbox" id="practice-<?= i ?>-<?= j ?>" name="practice-<?= i ?>-<?= j ?>">
+                                    <label for="practice-<?= i ?>-<?= j ?>"><?= data.components[i].bestPractices[j] ?></label>
+                                </div>
+                            <? } ?>
+                        </div>
+                    </div>
+                </div>
+                <? } ?>
+            </div>
+        <? } ?>
+        
+        <? if (!data.components || data.components.length === 0) { ?>
+        <div style="padding: 40px; text-align: center; color: #666;">
+            <h3>No components found</h3>
+            <p>Please check your Google Sheet data and try refreshing the page.</p>
+        </div>
+        <? } ?>
+    </div>
+
+    <script>
+        function toggleLookFors(componentId) {
+            var index = componentId.replace('component-', '');
+            var content = document.getElementById('lookForsContent-' + index);
+            var chevron = document.getElementById('chevron-' + index);
+            
+            if (content && chevron) {
+                content.classList.toggle('expanded');
+                chevron.classList.toggle('expanded');
+            }
+        }
+        
+        // Auto-refresh every 5 minutes to get latest data
+        setTimeout(function() {
+            window.location.reload();
+        }, 300000);
+    </script>
+</body>
+</html>
