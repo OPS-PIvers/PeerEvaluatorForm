@@ -45,31 +45,69 @@
             opacity: 0.9;
         }
         
+        .navigation {
+            background: #e2e8f0;
+            padding: 15px 20px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+            border-bottom: 1px solid #cbd5e0;
+        }
+        
+        .nav-button {
+            background: #4a5568;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: background 0.3s ease;
+        }
+        
+        .nav-button:hover {
+            background: #2d3748;
+        }
+        
+        .nav-button.active {
+            background: #3182ce;
+        }
+        
+        .domain-section {
+            border-bottom: 3px solid #e2e8f0;
+        }
+        
         .domain-header {
             background: linear-gradient(135deg, #7c9ac5, #5a82b8);
             color: white;
             padding: 15px 20px;
             font-size: 1.1rem;
             font-weight: 600;
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
         
         .component-section {
-            border-bottom: 2px solid #e2e8f0;
+            border-bottom: 1px solid #e2e8f0;
         }
         
-        .sticky-headers {
+        .performance-levels-header {
             position: sticky;
-            top: 0;
-            z-index: 100;
+            top: 56px;
+            z-index: 40;
             background: white;
             border-bottom: 2px solid #e2e8f0;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         }
         
         .performance-levels {
             display: grid;
             grid-template-columns: 200px 1fr 1fr 1fr 1fr;
-            min-height: 60px;
+            min-height: 50px;
         }
         
         .performance-levels-content {
@@ -80,11 +118,12 @@
         
         .level-header {
             background: #e2e8f0;
-            padding: 15px;
+            padding: 12px;
             font-weight: 600;
             text-align: center;
             border-bottom: 1px solid #cbd5e0;
             color: #4a5568;
+            font-size: 0.9rem;
         }
         
         .level-content {
@@ -183,18 +222,48 @@
             font-size: 0.9rem;
         }
         
-        .refresh-info {
-            background: #e6fffa;
-            border: 1px solid #38d9a9;
-            color: #065f46;
-            padding: 10px 20px;
-            font-size: 0.8rem;
-            text-align: center;
+        .back-to-top {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #3182ce;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            cursor: pointer;
+            font-size: 1.2rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            transition: all 0.3s ease;
+            opacity: 0;
+            visibility: hidden;
+        }
+        
+        .back-to-top.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .back-to-top:hover {
+            background: #2c5aa0;
+            transform: translateY(-2px);
         }
         
         @media (max-width: 768px) {
             body {
                 padding: 10px;
+            }
+            
+            .navigation {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .nav-button {
+                width: 100%;
+                max-width: 300px;
+                margin-bottom: 5px;
             }
             
             .performance-levels, .performance-levels-content {
@@ -208,7 +277,7 @@
             }
             
             .level-header {
-                font-size: 0.9rem;
+                font-size: 0.8rem;
             }
             
             .row-label {
@@ -219,8 +288,14 @@
                 font-size: 0.8rem;
             }
             
-            .look-fors-grid {
-                grid-template-columns: 1fr;
+            .domain-header {
+                position: relative;
+                top: auto;
+            }
+            
+            .performance-levels-header {
+                position: relative;
+                top: auto;
             }
         }
     </style>
@@ -232,81 +307,165 @@
             <p><?= data.subtitle ?></p>
         </div>
         
-        <div class="domain-header">
-            <?= data.domain ?>
+        <div class="navigation">
+            <? for (var d = 0; d < data.domains.length; d++) { ?>
+                <button class="nav-button" data-domain="<?= d ?>">
+                    Domain <?= data.domains[d].number ?>
+                </button>
+            <? } ?>
         </div>
         
-        <!-- Sticky column headers -->
-        <div class="sticky-headers">
-            <div class="performance-levels">
-                <div class="level-header"></div>
-                <div class="level-header">Developing</div>
-                <div class="level-header">Basic</div>
-                <div class="level-header">Proficient</div>
-                <div class="level-header">Distinguished</div>
-            </div>
-        </div>
-        
-        <? for (var i = 0; i < data.components.length; i++) { ?>
-            <div class="component-section">
-                <div class="performance-levels-content">
-                    <div class="row-label">
-                        <?= data.components[i].title ?>
-                    </div>
-                    <div class="level-content">
-                        <?= data.components[i].developing ?>
-                    </div>
-                    <div class="level-content">
-                        <?= data.components[i].basic ?>
-                    </div>
-                    <div class="level-content">
-                        <?= data.components[i].proficient ?>
-                    </div>
-                    <div class="level-content">
-                        <?= data.components[i].distinguished ?>
+        <? for (var domainIdx = 0; domainIdx < data.domains.length; domainIdx++) { ?>
+            <div class="domain-section" id="domain-<?= domainIdx ?>">
+                <div class="domain-header">
+                    <?= data.domains[domainIdx].name ?>
+                </div>
+                
+                <!-- Sticky column headers for this domain -->
+                <div class="performance-levels-header">
+                    <div class="performance-levels">
+                        <div class="level-header"></div>
+                        <div class="level-header">Developing</div>
+                        <div class="level-header">Basic</div>
+                        <div class="level-header">Proficient</div>
+                        <div class="level-header">Distinguished</div>
                     </div>
                 </div>
                 
-                <? if (data.components[i].bestPractices && data.components[i].bestPractices.length > 0) { ?>
-                <div class="look-fors-section">
-                    <div class="look-fors-header" onclick="toggleLookFors('component-<?= i ?>')">
-                        <span>Best Practices aligned with 5D+ and PELSB Standards</span>
-                        <span class="chevron" id="chevron-<?= i ?>">▼</span>
-                    </div>
-                    <div class="look-fors-content" id="lookForsContent-<?= i ?>">
-                        <div class="look-fors-grid">
-                            <? for (var j = 0; j < data.components[i].bestPractices.length; j++) { ?>
-                                <div class="look-for-item">
-                                    <input type="checkbox" id="practice-<?= i ?>-<?= j ?>" name="practice-<?= i ?>-<?= j ?>">
-                                    <label for="practice-<?= i ?>-<?= j ?>"><?= data.components[i].bestPractices[j] ?></label>
-                                </div>
-                            <? } ?>
+                <? for (var i = 0; i < data.domains[domainIdx].components.length; i++) { ?>
+                    <div class="component-section">
+                        <div class="performance-levels-content">
+                            <div class="row-label">
+                                <?= data.domains[domainIdx].components[i].title ?>
+                            </div>
+                            <div class="level-content">
+                                <?= data.domains[domainIdx].components[i].developing ?>
+                            </div>
+                            <div class="level-content">
+                                <?= data.domains[domainIdx].components[i].basic ?>
+                            </div>
+                            <div class="level-content">
+                                <?= data.domains[domainIdx].components[i].proficient ?>
+                            </div>
+                            <div class="level-content">
+                                <?= data.domains[domainIdx].components[i].distinguished ?>
+                            </div>
                         </div>
+                        
+                        <? if (data.domains[domainIdx].components[i].bestPractices && data.domains[domainIdx].components[i].bestPractices.length > 0) { ?>
+                        <div class="look-fors-section">
+                            <div class="look-fors-header" onclick="toggleLookFors('domain-<?= domainIdx ?>-component-<?= i ?>')">
+                                <span>Best Practices aligned with 5D+ and PELSB Standards</span>
+                                <span class="chevron" id="chevron-<?= domainIdx ?>-<?= i ?>">▼</span>
+                            </div>
+                            <div class="look-fors-content" id="lookForsContent-<?= domainIdx ?>-<?= i ?>">
+                                <div class="look-fors-grid">
+                                    <? for (var j = 0; j < data.domains[domainIdx].components[i].bestPractices.length; j++) { ?>
+                                        <div class="look-for-item">
+                                            <input type="checkbox" id="practice-<?= domainIdx ?>-<?= i ?>-<?= j ?>" name="practice-<?= domainIdx ?>-<?= i ?>-<?= j ?>">
+                                            <label for="practice-<?= domainIdx ?>-<?= i ?>-<?= j ?>"><?= data.domains[domainIdx].components[i].bestPractices[j] ?></label>
+                                        </div>
+                                    <? } ?>
+                                </div>
+                            </div>
+                        </div>
+                        <? } ?>
                     </div>
+                <? } ?>
+                
+                <? if (!data.domains[domainIdx].components || data.domains[domainIdx].components.length === 0) { ?>
+                <div style="padding: 40px; text-align: center; color: #666;">
+                    <h3>No components found for <?= data.domains[domainIdx].name ?></h3>
+                    <p>Please check your Google Sheet data.</p>
                 </div>
                 <? } ?>
             </div>
         <? } ?>
         
-        <? if (!data.components || data.components.length === 0) { ?>
+        <? if (!data.domains || data.domains.length === 0) { ?>
         <div style="padding: 40px; text-align: center; color: #666;">
-            <h3>No components found</h3>
+            <h3>No domains found</h3>
             <p>Please check your Google Sheet data and try refreshing the page.</p>
         </div>
         <? } ?>
     </div>
 
+    <button class="back-to-top" id="backToTop" onclick="scrollToTop()">↑</button>
+
     <script>
         function toggleLookFors(componentId) {
-            var index = componentId.replace('component-', '');
-            var content = document.getElementById('lookForsContent-' + index);
-            var chevron = document.getElementById('chevron-' + index);
+            var parts = componentId.split('-');
+            var domainIdx = parts[1];
+            var componentIdx = parts[3];
+            
+            var content = document.getElementById('lookForsContent-' + domainIdx + '-' + componentIdx);
+            var chevron = document.getElementById('chevron-' + domainIdx + '-' + componentIdx);
             
             if (content && chevron) {
                 content.classList.toggle('expanded');
                 chevron.classList.toggle('expanded');
             }
         }
+        
+        function scrollToDomain(domainIdx) {
+            var element = document.getElementById('domain-' + domainIdx);
+            if (element) {
+                element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
+        
+        function scrollToTop() {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+        
+        // Handle navigation button clicks using event delegation
+        document.addEventListener('DOMContentLoaded', function() {
+            var navigation = document.querySelector('.navigation');
+            if (navigation) {
+                navigation.addEventListener('click', function(e) {
+                    if (e.target.classList.contains('nav-button')) {
+                        var domainIdx = e.target.getAttribute('data-domain');
+                        if (domainIdx !== null) {
+                            scrollToDomain(parseInt(domainIdx));
+                        }
+                    }
+                });
+            }
+        });
+        
+        // Show/hide back to top button
+        window.addEventListener('scroll', function() {
+            var backToTop = document.getElementById('backToTop');
+            if (backToTop) {
+                if (window.scrollY > 300) {
+                    backToTop.classList.add('visible');
+                } else {
+                    backToTop.classList.remove('visible');
+                }
+            }
+        });
+        
+        // Highlight active navigation button
+        window.addEventListener('scroll', function() {
+            var navButtons = document.querySelectorAll('.nav-button');
+            var domainSections = document.querySelectorAll('.domain-section');
+            
+            var currentDomain = -1;
+            for (var i = 0; i < domainSections.length; i++) {
+                var rect = domainSections[i].getBoundingClientRect();
+                if (rect.top <= 100 && rect.bottom > 0) {
+                    currentDomain = i;
+                }
+            }
+            
+            navButtons.forEach(function(button, index) {
+                if (index === currentDomain) {
+                    button.classList.add('active');
+                } else {
+                    button.classList.remove('active');
+                }
+            });
+        });
         
         // Auto-refresh every 5 minutes to get latest data
         setTimeout(function() {
