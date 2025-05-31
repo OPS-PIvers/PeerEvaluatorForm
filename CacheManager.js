@@ -18,6 +18,9 @@ const CACHE_DEPENDENCIES = {
   'role_sheet_*': [] // Role sheets have no dependencies
 };
 
+// Script-scoped cache for the master cache version
+let scriptScopedMasterCacheVersion = null;
+
 /**
  * Enhanced cache key generator with versioning
  * @param {string} baseKey - Base cache key (e.g., 'user', 'role_sheet')
@@ -56,19 +59,31 @@ function generateCacheKey(baseKey, params = {}) {
  */
 function getMasterCacheVersion() {
   try {
+    // Check script-scoped cache first
+    if (scriptScopedMasterCacheVersion !== null) {
+      // debugLog('Master cache version retrieved from script scope', { version: scriptScopedMasterCacheVersion });
+      return scriptScopedMasterCacheVersion;
+    }
+
     const properties = PropertiesService.getScriptProperties();
     let version = properties.getProperty('MASTER_CACHE_VERSION');
 
     if (!version) {
       version = `${CACHE_VERSION}_${Date.now()}`;
       properties.setProperty('MASTER_CACHE_VERSION', version);
-      debugLog('Created new master cache version', { version });
+      debugLog('Created new master cache version and stored in properties', { version });
+    } else {
+      // debugLog('Master cache version fetched from properties', { version });
     }
 
+    scriptScopedMasterCacheVersion = version; // Store in script-scoped cache
     return version;
   } catch (error) {
     console.error('Error getting master cache version:', error);
-    return `${CACHE_VERSION}_${Date.now()}`;
+    // Fallback to a dynamic version for this execution only if properties fail
+    // Ensure the script-scoped cache is null on error.
+    scriptScopedMasterCacheVersion = null;
+    return `${CACHE_VERSION}_${Date.now()}`; // Fallback
   }
 }
 
@@ -81,15 +96,21 @@ function incrementMasterCacheVersion() {
     const properties = PropertiesService.getScriptProperties();
     properties.setProperty('MASTER_CACHE_VERSION', newVersion);
 
-    debugLog('Master cache version incremented', { newVersion });
+    scriptScopedMasterCacheVersion = newVersion; // Update script-scoped cache
 
-    // Also clear all existing caches since version changed
-    const cache = CacheService.getScriptCache();
-    cache.removeAll();
+    debugLog('Master cache version incremented', { newVersion });
+    // By changing the MASTER_CACHE_VERSION, all previously generated cache keys
+    // (which include this version) will effectively become stale.
+    // New calls to generateCacheKey() will use the newVersion,
+    // thus fetching or storing fresh data against new keys.
+    // A full cache.removeAll() is therefore not strictly necessary if all
+    // relevant cached items are versioned, and can be a performance overhead.
 
     return true; // Indicate success
   } catch (error) {
     console.error('Error incrementing master cache version:', error);
+    // On error, invalidate the script-scoped cache to force re-fetch on next getMasterCacheVersion
+    scriptScopedMasterCacheVersion = null;
     return false; // Indicate failure
   }
 }
@@ -151,28 +172,31 @@ function setCachedDataEnhanced(baseKey, params = {}, data, ttl = CACHE_SETTINGS.
 
 /**
  * Clear caches based on dependency map
- * @param {string} changedKey - The cache key that changed
+ * @param {string} changedKey - The base cache key that changed
  */
 function invalidateDependentCaches(changedKey) {
   try {
-    debugLog('Invalidating dependent caches', { changedKey });
+    debugLog('Invalidating dependent caches based on changed key', { changedKey });
 
     const cache = CacheService.getScriptCache();
     const dependencies = CACHE_DEPENDENCIES[changedKey] || [];
 
     dependencies.forEach(dependentPattern => {
       if (dependentPattern.includes('*')) {
-        // Handle wildcard patterns
+        // If a changed key (e.g., 'staff_data') has a wildcard dependency (e.g., 'user_*'),
+        // it triggers a master version increment. This is because the specific instance
+        // of the wildcard (e.g., which user) is not known at this level of dependency processing.
+        // Callers with specific context (e.g., a specific userEmail) should handle
+        // direct, targeted invalidation *before* calling this function if they want to avoid
+        // a global invalidation for that specific wildcard instance.
         const basePattern = dependentPattern.replace('*', '');
-        debugLog('Clearing wildcard pattern', { pattern: basePattern });
-
-        // For wildcard patterns, we need to increment master version
-        // since we can't easily enumerate all matching keys
+        debugLog('Global invalidation for wildcard dependency', { changedKey, dependentPattern: dependentPattern, basePattern });
         incrementMasterCacheVersion();
       } else {
-        // Clear specific key
-        cache.remove(dependentPattern);
-        debugLog('Cleared specific cache', { key: dependentPattern });
+        // For non-wildcard dependencies, remove the specific versioned key.
+        const fullKeyToRemove = generateCacheKey(dependentPattern);
+        cache.remove(fullKeyToRemove);
+        debugLog('Cleared specific dependent cache (versioned)', { changedKey, baseKey: dependentPattern, fullKey: fullKeyToRemove });
       }
     });
 
