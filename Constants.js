@@ -193,3 +193,25 @@ const SYSTEM_INFO = {
   AUTHOR: 'Apps Script Multi-Role Implementation',
   LAST_UPDATED: new Date().toISOString()
 };
+
+/**
+ * Auto-trigger system settings
+ */
+const AUTO_TRIGGER_SETTINGS = {
+  ENABLED: true,
+  MAX_PROCESSING_TIME: 10000, // 10 seconds max for trigger processing
+  RETRY_ATTEMPTS: 2,
+  LOG_ALL_EDITS: false, // Set to true for debugging
+  BATCH_PROCESSING: true, // Process multiple role changes efficiently
+  WARM_CACHE_ON_CHANGE: true // Pre-load new role data
+};
+
+/**
+ * Trigger monitoring settings
+ */
+const TRIGGER_MONITORING = {
+  LOG_SUCCESSFUL_CHANGES: true,
+  LOG_IGNORED_EDITS: false, // Set to true for debugging
+  ALERT_ON_ERRORS: true,
+  TRACK_PERFORMANCE: true
+};
