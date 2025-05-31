@@ -253,7 +253,7 @@ function generateDataHash(data) {
     // Convert data to string and generate simple hash
     const dataString = JSON.stringify(data);
     const hash = Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, dataString);
-    return Utilities.base64Encode(hash).substring(0, 16); // First 16 chars
+    return Utilities.base64Encode(hash); // Full Base64 encoded MD5 hash
   } catch (error) {
     console.error('Error generating data hash:', error);
     return Date.now().toString(); // Fallback to timestamp
