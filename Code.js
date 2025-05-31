@@ -76,27 +76,329 @@ function clearCachesForRoleChange(userEmail = null) {
 }
 
 /**
- * Main function to serve the web app
- * Enhanced to support user-specific role-based content
+ * ADD THESE TESTING FUNCTIONS to Code.js
+ * Test Phase 3 implementation
+ */
+
+/**
+ * Test Phase 3 user context enhancement
+ */
+function testPhase3UserContextEnhancement() {
+  console.log('=== TESTING PHASE 3 USER CONTEXT ENHANCEMENT ===');
+
+  try {
+    const sessionUser = getUserFromSession();
+    if (!sessionUser || !sessionUser.email) {
+      console.log('❌ No session user found for testing');
+      return;
+    }
+
+    const userEmail = sessionUser.email;
+    console.log(`Testing with user: ${userEmail}`);
+
+    // Test 1: Session management
+    console.log('
+Test 1: Session Management');
+    const session = getUserSession(userEmail);
+    console.log('✓ Session created/retrieved:', {
+      sessionId: session.sessionId,
+      isActive: session.isActive,
+      accessCount: session.accessCount
+    });
+
+    // Test 2: State detection
+    console.log('
+Test 2: State Detection');
+    const currentUser = getUserByEmail(userEmail);
+    const changeDetection = detectUserStateChanges(userEmail, {
+      role: currentUser.role,
+      year: currentUser.year,
+      name: currentUser.name,
+      email: userEmail
+    });
+    console.log('✓ State detection result:', {
+      hasChanged: changeDetection.hasChanged,
+      changes: changeDetection.changes.length,
+      isNewUser: changeDetection.isNewUser
+    });
+
+    // Test 3: Enhanced user context
+    console.log('
+Test 3: Enhanced User Context');
+    const context = createUserContext(userEmail);
+    console.log('✓ Enhanced context created:', {
+      role: context.role,
+      roleChangeDetected: context.roleChangeDetected,
+      stateChanges: context.stateChanges.length,
+      sessionId: context.metadata.sessionId,
+      contextVersion: context.metadata.contextVersion
+    });
+
+    // Test 4: Role change history
+    console.log('
+Test 4: Role Change History');
+    const history = getRoleChangeHistory(userEmail);
+    console.log('✓ Role change history:', {
+      totalChanges: history.length,
+      recentChanges: history.slice(0, 3)
+    });
+
+    // Test 5: User dashboard
+    console.log('
+Test 5: User Dashboard');
+    const dashboard = getUserDashboardData(userEmail);
+    console.log('✓ Dashboard data generated:', {
+      currentRole: dashboard.user?.currentRole,
+      sessionActive: dashboard.session?.isActive,
+      totalRoleChanges: dashboard.roleChanges?.total
+    });
+
+    console.log('
+✅ Phase 3 user context enhancement test completed successfully');
+
+  } catch (error) {
+    console.error('❌ Error testing Phase 3:', error);
+  }
+}
+
+/**
+ * Test role change detection and automatic cache clearing
+ */
+function testRoleChangeDetection(testEmail, newRole) {
+  console.log('=== TESTING ROLE CHANGE DETECTION ===');
+  console.log(`Test Email: ${testEmail}`);
+  console.log(`New Role: ${newRole}`);
+
+  try {
+    // Step 1: Get current state
+    console.log('
+Step 1: Getting current state...');
+    const currentState = getStoredUserState(testEmail);
+    console.log('Current stored state:', currentState);
+
+    // Step 2: Simulate role change in Staff sheet
+    console.log('
+Step 2: Simulating role change...');
+    console.log('ℹ️  In real usage, you would change the role in the Staff sheet');
+    console.log('ℹ️  For this test, we'll manually trigger detection');
+
+    // Step 3: Test change detection
+    console.log('
+Step 3: Testing change detection...');
+    const mockNewState = {
+      role: newRole,
+      year: currentState?.year || 1,
+      name: currentState?.name || 'Test User',
+      email: testEmail
+    };
+
+    const changeDetection = detectUserStateChanges(testEmail, mockNewState);
+    console.log('Change detection result:', {
+      hasChanged: changeDetection.hasChanged,
+      changes: changeDetection.changes,
+      reason: changeDetection.reason
+    });
+
+    // Step 4: Test proactive cache clearing
+    if (changeDetection.hasChanged) {
+      console.log('
+Step 4: Testing proactive cache clearing...');
+
+      const roleChange = changeDetection.changes.find(change => change.field === 'role');
+      if (roleChange) {
+        addRoleChangeToHistory(testEmail, roleChange.oldValue, roleChange.newValue);
+        clearCachesForRoleChange(testEmail);
+        console.log('✓ Role change processed and caches cleared');
+      }
+    }
+
+    // Step 5: Test cache warming
+    console.log('
+Step 5: Testing cache warming...');
+    warmCacheForRoleChange(testEmail, newRole);
+    console.log('✓ Cache warming completed');
+
+    // Step 6: Generate URLs for the new role
+    console.log('
+Step 6: Generating URLs for new role...');
+    const urls = getUrlForRoleChange(newRole, testEmail);
+    console.log('✓ Role change URL generated');
+
+    console.log('
+✅ Role change detection test completed');
+    console.log('
+📋 To complete the test:');
+    console.log('1. Change the user's role in the Staff sheet');
+    console.log('2. Use the generated URL above');
+    console.log('3. Role change should be detected automatically');
+
+  } catch (error) {
+    console.error('❌ Error testing role change detection:', error);
+  }
+}
+
+/**
+ * Test proactive monitoring for all users
+ */
+function testProactiveMonitoring() {
+  console.log('=== TESTING PROACTIVE MONITORING ===');
+
+  try {
+    // Test 1: Check all users for role changes
+    console.log('Test 1: Checking all users for role changes...');
+    const changeResults = checkAllUsersForRoleChanges();
+    console.log('✓ Change check results:', {
+      totalUsers: changeResults.totalUsers,
+      usersChecked: changeResults.usersChecked,
+      changesDetected: changeResults.changesDetected,
+      roleChanges: changeResults.roleChanges?.length || 0
+    });
+
+    // Test 2: Session cleanup
+    console.log('
+Test 2: Testing session cleanup...');
+    const cleanupCount = cleanupExpiredSessions();
+    console.log('✓ Cleanup completed:', {
+      itemsCleaned: cleanupCount
+    });
+
+    // Test 3: Enhanced validation
+    console.log('
+Test 3: Testing enhanced user validation...');
+    const sessionUser = getUserFromSession();
+    if (sessionUser && sessionUser.email) {
+      const validation = validateUserWithStateTracking(sessionUser.email);
+      console.log('✓ Enhanced validation result:', {
+        valid: validation.hasAccess,
+        role: validation.role,
+        sessionActive: validation.sessionActive,
+        totalRoleChanges: validation.totalRoleChanges
+      });
+    } else {
+      console.log('⚠️  No session user for validation test');
+    }
+
+    console.log('
+✅ Proactive monitoring test completed successfully');
+
+  } catch (error) {
+    console.error('❌ Error testing proactive monitoring:', error);
+  }
+}
+
+/**
+ * Complete Phase 3 integration test
+ */
+function testCompletePhase3Integration() {
+  console.log('=== COMPLETE PHASE 3 INTEGRATION TEST ===');
+
+  try {
+    const sessionUser = getUserFromSession();
+    if (!sessionUser || !sessionUser.email) {
+      console.log('❌ No session user found - cannot run integration test');
+      return;
+    }
+
+    const userEmail = sessionUser.email;
+    console.log(`Running integration test for: ${userEmail}`);
+
+    // Phase 1: Test enhanced cache system
+    console.log('
+🔧 Testing Phase 1 (Enhanced Cache System)...');
+    testEnhancedCacheSystem();
+
+    // Phase 2: Test cache busting
+    console.log('
+🌐 Testing Phase 2 (Cache Busting)...');
+    testPhase2CacheBusting();
+
+    // Phase 3: Test user context enhancement
+    console.log('
+👤 Testing Phase 3 (User Context Enhancement)...');
+    testPhase3UserContextEnhancement();
+
+    // Integration: Test complete workflow
+    console.log('
+🔄 Testing Complete Integration Workflow...');
+    const dashboard = getUserDashboardData(userEmail);
+
+    if (dashboard.error) {
+      console.log('❌ Dashboard generation failed:', dashboard.error);
+      return;
+    }
+
+    console.log('✅ INTEGRATION TEST RESULTS:');
+    console.log('User Info:', {
+      email: dashboard.user.email,
+      role: dashboard.user.currentRole,
+      year: dashboard.user.currentYear,
+      hasStaffRecord: dashboard.user.hasStaffRecord
+    });
+
+    console.log('Session Info:', {
+      sessionId: dashboard.session.sessionId,
+      isActive: dashboard.session.isActive,
+      accessCount: dashboard.session.accessCount
+    });
+
+    console.log('Role Changes:', {
+      total: dashboard.roleChanges.total,
+      lastChange: dashboard.roleChanges.lastChange
+    });
+
+    console.log('URLs Generated:', {
+      standard: !!dashboard.urls.standard,
+      debug: !!dashboard.urls.debug,
+      roleSpecific: Object.keys(dashboard.urls.roleSpecific || {}).length
+    });
+
+    console.log('
+🎯 RECOMMENDED NEXT STEPS:');
+    console.log('1. Change your role in the Staff sheet');
+    console.log('2. Run: testRoleChangeDetection("' + userEmail + '", "Administrator")');
+    console.log('3. Use generated URL to test immediate role switching');
+    console.log('4. Verify proactive cache clearing works');
+
+    console.log('
+✅ COMPLETE PHASE 3 INTEGRATION TEST PASSED');
+
+    return dashboard;
+
+  } catch (error) {
+    console.error('❌ Integration test failed:', error);
+    return { error: error.message };
+  }
+}
+
+/**
+ * REPLACE THIS FUNCTION in Code.js
+ * Enhanced doGet function with proactive role change detection
  */
 function doGet(e) {
   const startTime = Date.now();
   const requestId = generateUniqueId('request');
   
   try {
+    // Clean up expired sessions periodically (10% chance)
+    if (Math.random() < 0.1) {
+      cleanupExpiredSessions();
+    }
+
     // Parse URL parameters for cache control
     const params = e.parameter || {};
     const forceRefresh = params.refresh === 'true' || params.nocache === 'true';
     const debugMode = params.debug === 'true';
     const urlTimestamp = params.t || null;
     const urlRole = params.role || null;
+    const proactiveCheck = params.proactive !== 'false'; // Default to true
 
-    debugLog('Web app request received', {
+    debugLog('Enhanced web app request received', {
       requestId: requestId,
       forceRefresh: forceRefresh,
       debugMode: debugMode,
       urlTimestamp: urlTimestamp,
       urlRole: urlRole,
+      proactiveCheck: proactiveCheck,
       userAgent: e.userAgent || 'Unknown'
     });
 
@@ -107,15 +409,12 @@ function doGet(e) {
       const sessionUser = getUserFromSession();
       if (sessionUser && sessionUser.email) {
         clearCachesForRoleChange(sessionUser.email);
-        debugLog('Cleared caches for user', { email: sessionUser.email, requestId });
       } else {
-        // Clear all caches if no specific user
         forceCleanAllCaches();
-        debugLog('Performed global cache clear', { requestId });
       }
     }
 
-    // Create user context with enhanced cache handling
+    // Create enhanced user context with proactive role change detection
     const userContext = createUserContext();
     
     // Override role if specified in URL (for testing)
@@ -129,35 +428,62 @@ function doGet(e) {
       userContext.isRoleOverride = true;
     }
 
-    debugLog('User context created', {
+    // Warm cache for the current role if role change was detected
+    if (userContext.roleChangeDetected && userContext.email) {
+      warmCacheForRoleChange(userContext.email, userContext.role);
+    }
+
+    debugLog('Enhanced user context created', {
       email: userContext.email,
       role: userContext.role,
       year: userContext.year,
       isDefaultUser: userContext.isDefaultUser,
+      roleChangeDetected: userContext.roleChangeDetected,
+      stateChanges: userContext.stateChanges.length,
       isRoleOverride: userContext.isRoleOverride || false,
+      sessionId: userContext.metadata.sessionId,
       requestId: requestId
     });
     
     // Get role-specific rubric data
     const rubricData = getAllDomainsData(userContext.role, userContext.year);
     
-    // Generate response metadata for cache busting
+    // Generate enhanced response metadata
     const responseMetadata = generateResponseMetadata(userContext, requestId, debugMode);
 
-    // Add enhanced user context to the data for the HTML template
+    // Add comprehensive user context to the data for the HTML template
     rubricData.userContext = {
+      // Basic user info
       email: userContext.email,
       role: userContext.role,
       year: userContext.year,
       isAuthenticated: userContext.isAuthenticated,
       displayName: userContext.email ? userContext.email.split('@')[0] : 'Guest',
+
+      // Request context
       requestId: requestId,
       timestamp: Date.now(),
       forceRefresh: forceRefresh,
       debugMode: debugMode,
       isRoleOverride: userContext.isRoleOverride || false,
-      cacheVersion: getMasterCacheVersion(),
-      responseMetadata: responseMetadata
+
+      // State tracking
+      roleChangeDetected: userContext.roleChangeDetected,
+      stateChanges: userContext.stateChanges,
+      isNewUser: userContext.isNewUser,
+      previousRole: userContext.previousState?.role || null,
+
+      // Session info
+      sessionId: userContext.metadata.sessionId,
+      sessionActive: userContext.sessionInfo?.isActive || false,
+
+      // Cache info
+      cacheVersion: userContext.metadata.cacheVersion,
+      responseMetadata: responseMetadata,
+
+      // Enhanced metadata
+      contextVersion: userContext.metadata.contextVersion,
+      hasStaffRecord: userContext.hasStaffRecord
     };
     
     // Create and configure the HTML template
@@ -172,9 +498,10 @@ function doGet(e) {
     // Add comprehensive cache-busting headers
     addCacheBustingHeaders(htmlOutput, responseMetadata);
 
-    // Add debug headers if requested
+    // Add enhanced debug headers if requested
     if (debugMode) {
       addDebugHeaders(htmlOutput, userContext, responseMetadata);
+      addStateTrackingHeaders(htmlOutput, userContext);
     }
     
     const executionTime = Date.now() - startTime;
@@ -184,23 +511,56 @@ function doGet(e) {
       domainCount: rubricData.domains ? rubricData.domains.length : 0,
       isDefaultUser: userContext.isDefaultUser,
       forceRefresh: forceRefresh,
+      roleChangeDetected: userContext.roleChangeDetected,
+      stateChanges: userContext.stateChanges.length,
       requestId: requestId
     });
     
-    debugLog('Web app request completed successfully', {
+    debugLog('Enhanced web app request completed successfully', {
       role: userContext.role,
       executionTime: executionTime,
       requestId: requestId,
-      responseETag: responseMetadata.etag
+      responseETag: responseMetadata.etag,
+      roleChangeDetected: userContext.roleChangeDetected
     });
     
     return htmlOutput;
     
   } catch (error) {
-    console.error('Error in doGet:', formatErrorMessage(error, 'doGet'));
+    console.error('Error in enhanced doGet:', formatErrorMessage(error, 'doGet'));
     
     // Return enhanced error page with cache busting
     return createEnhancedErrorPage(error, requestId);
+  }
+}
+
+/**
+ * ADD THIS FUNCTION to Code.js
+ * Add state tracking headers for debugging
+ */
+function addStateTrackingHeaders(htmlOutput, userContext) {
+  try {
+    if (userContext.roleChangeDetected) {
+      htmlOutput.addMetaTag('x-role-change-detected', 'true');
+      htmlOutput.addMetaTag('x-previous-role', userContext.previousState?.role || 'unknown');
+      htmlOutput.addMetaTag('x-state-changes', userContext.stateChanges.length.toString());
+    }
+
+    if (userContext.isNewUser) {
+      htmlOutput.addMetaTag('x-new-user', 'true');
+    }
+
+    htmlOutput.addMetaTag('x-session-id', userContext.metadata.sessionId);
+    htmlOutput.addMetaTag('x-context-version', userContext.metadata.contextVersion);
+    htmlOutput.addMetaTag('x-has-staff-record', userContext.hasStaffRecord.toString());
+
+    debugLog('State tracking headers added', {
+      roleChangeDetected: userContext.roleChangeDetected,
+      sessionId: userContext.metadata.sessionId
+    });
+
+  } catch (error) {
+    console.error('Error adding state tracking headers:', error);
   }
 }
 
@@ -261,6 +621,269 @@ function generateResponseMetadata(userContext, requestId, debugMode = false) {
       etag: 'error-' + Date.now(),
       error: error.message
     };
+  }
+}
+
+/**
+ * ADD THESE MONITORING FUNCTIONS to Code.js
+ * Proactive role change monitoring and state management
+ */
+
+/**
+ * Check for role changes across all active users
+ * @return {Object} Summary of detected changes
+ */
+function checkAllUsersForRoleChanges() {
+  console.log('=== CHECKING ALL USERS FOR ROLE CHANGES ===');
+
+  try {
+    const startTime = Date.now();
+    const staffData = getStaffData();
+
+    if (!staffData || !staffData.users) {
+      debugLog('No staff data available for role change checking');
+      return { error: 'No staff data available' };
+    }
+
+    const results = {
+      totalUsers: staffData.users.length,
+      usersChecked: 0,
+      changesDetected: 0,
+      roleChanges: [],
+      errors: []
+    };
+
+    staffData.users.forEach(user => {
+      try {
+        if (!user.email || !isValidEmail(user.email)) {
+          return;
+        }
+
+        results.usersChecked++;
+
+        const changeDetection = detectUserStateChanges(user.email, {
+          role: user.role,
+          year: user.year,
+          name: user.name,
+          email: user.email
+        });
+
+        if (changeDetection.hasChanged && !changeDetection.isNewUser) {
+          results.changesDetected++;
+
+          const roleChange = changeDetection.changes.find(change => change.field === 'role');
+          if (roleChange) {
+            results.roleChanges.push({
+              email: user.email,
+              name: user.name,
+              oldRole: roleChange.oldValue,
+              newRole: roleChange.newValue,
+              timestamp: Date.now()
+            });
+
+            // Proactively clear caches for this user
+            clearCachesForRoleChange(user.email);
+
+            debugLog('Proactive role change detected and processed', {
+              email: user.email,
+              oldRole: roleChange.oldValue,
+              newRole: roleChange.newValue
+            });
+          }
+        }
+
+      } catch (userError) {
+        results.errors.push({
+          email: user.email,
+          error: userError.message
+        });
+      }
+    });
+
+    const executionTime = Date.now() - startTime;
+
+    logPerformanceMetrics('checkAllUsersForRoleChanges', executionTime, {
+      totalUsers: results.totalUsers,
+      usersChecked: results.usersChecked,
+      changesDetected: results.changesDetected,
+      roleChanges: results.roleChanges.length
+    });
+
+    if (results.roleChanges.length > 0) {
+      console.log(`✅ Detected and processed ${results.roleChanges.length} role changes:`);
+      results.roleChanges.forEach(change => {
+        console.log(`  - ${change.email}: ${change.oldRole} → ${change.newRole}`);
+      });
+    } else {
+      console.log('✅ No role changes detected');
+    }
+
+    debugLog('Role change check completed', results);
+    return results;
+
+  } catch (error) {
+    console.error('Error checking users for role changes:', error);
+    return { error: error.message };
+  }
+}
+
+/**
+ * Proactive cache warming for role changes
+ * @param {string} userEmail - User email to warm cache for
+ * @param {string} newRole - New role to warm cache for
+ */
+function warmCacheForRoleChange(userEmail, newRole) {
+  if (!userEmail || !newRole) {
+    return;
+  }
+
+  try {
+    debugLog('Warming cache for role change', { userEmail, newRole });
+
+    // Validate role exists
+    if (!AVAILABLE_ROLES.includes(newRole)) {
+      console.warn(`Cannot warm cache for invalid role: ${newRole}`);
+      return;
+    }
+
+    // Pre-load role sheet data
+    const roleSheetData = getRoleSheetData(newRole);
+    if (roleSheetData) {
+      debugLog('Role sheet data warmed', { role: newRole, title: roleSheetData.title });
+    }
+
+    // Pre-load user data with new role context
+    const userContext = createUserContext(userEmail);
+    if (userContext) {
+      debugLog('User context warmed', {
+        email: userEmail,
+        role: userContext.role
+      });
+    }
+
+    debugLog('Cache warming completed', { userEmail, newRole });
+
+  } catch (error) {
+    console.error('Error warming cache for role change:', error);
+  }
+}
+
+/**
+ * Enhanced user validation with state tracking
+ * @param {string} userEmail - User email to validate
+ * @return {Object} Enhanced validation result
+ */
+function validateUserWithStateTracking(userEmail) {
+  if (!userEmail) {
+    return { valid: false, reason: 'No email provided' };
+  }
+
+  try {
+    debugLog('Validating user with state tracking', { userEmail });
+
+    // Basic validation
+    const basicValidation = validateUserAccess(userEmail);
+
+    // Get session info
+    const session = getUserSession(userEmail);
+
+    // Get stored state
+    const storedState = getStoredUserState(userEmail);
+
+    // Get role change history
+    const roleHistory = getRoleChangeHistory(userEmail);
+
+    const validation = {
+      ...basicValidation,
+      sessionInfo: session,
+      storedState: storedState,
+      roleHistory: roleHistory,
+      lastRoleChange: roleHistory.length > 0 ? roleHistory[0] : null,
+      totalRoleChanges: roleHistory.length,
+      sessionActive: session && session.isActive,
+      sessionExpiry: session ? new Date(session.expiresAt).toISOString() : null
+    };
+
+    debugLog('Enhanced user validation completed', {
+      userEmail: userEmail,
+      valid: validation.hasAccess,
+      role: validation.role,
+      sessionActive: validation.sessionActive,
+      roleChanges: validation.totalRoleChanges
+    });
+
+    return validation;
+
+  } catch (error) {
+    console.error('Error in enhanced user validation:', error);
+    return {
+      valid: false,
+      reason: 'Validation error: ' + error.message,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * Get comprehensive user dashboard data
+ * @param {string} userEmail - User email
+ * @return {Object} Dashboard data
+ */
+function getUserDashboardData(userEmail) {
+  if (!userEmail) {
+    return { error: 'No email provided' };
+  }
+
+  try {
+    const validation = validateUserWithStateTracking(userEmail);
+    const context = createUserContext(userEmail);
+
+    const dashboard = {
+      user: {
+        email: userEmail,
+        name: validation.storedState?.name || 'Unknown',
+        currentRole: context.role,
+        currentYear: context.year,
+        isAuthenticated: context.isAuthenticated,
+        hasStaffRecord: context.hasStaffRecord
+      },
+      session: {
+        sessionId: context.sessionInfo?.sessionId || 'No session',
+        createdAt: context.sessionInfo?.createdAt ? new Date(context.sessionInfo.createdAt).toISOString() : null,
+        lastAccessed: context.sessionInfo?.lastAccessedAt ? new Date(context.sessionInfo.lastAccessedAt).toISOString() : null,
+        accessCount: context.sessionInfo?.accessCount || 0,
+        isActive: context.sessionInfo?.isActive || false
+      },
+      roleChanges: {
+        recent: validation.roleHistory.slice(0, 5),
+        total: validation.totalRoleChanges,
+        lastChange: validation.lastRoleChange ? {
+          timestamp: new Date(validation.lastRoleChange.timestamp).toISOString(),
+          from: validation.lastRoleChange.oldRole,
+          to: validation.lastRoleChange.newRole
+        } : null
+      },
+      state: {
+        changeDetected: context.roleChangeDetected,
+        changes: context.stateChanges,
+        isNewUser: context.isNewUser,
+        cacheVersion: context.metadata.cacheVersion
+      },
+      urls: generateAllUrlVariations(context)
+    };
+
+    debugLog('User dashboard data generated', {
+      userEmail: userEmail,
+      currentRole: dashboard.user.currentRole,
+      roleChanges: dashboard.roleChanges.total,
+      sessionActive: dashboard.session.isActive
+    });
+
+    return dashboard;
+
+  } catch (error) {
+    console.error('Error generating user dashboard data:', error);
+    return { error: error.message };
   }
 }
 

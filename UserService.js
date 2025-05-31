@@ -166,9 +166,8 @@ function validateUserAccess(email) {
 }
 
 /**
- * Creates a comprehensive user context object for the current session
- * @param {string} email - User's email address (optional, will try to get from session)
- * @return {Object} Complete user context with all relevant information
+ * REPLACE THIS FUNCTION in UserService.js
+ * Enhanced createUserContext function with proactive role change detection
  */
 function createUserContext(email = null) {
   const startTime = Date.now();
@@ -181,7 +180,9 @@ function createUserContext(email = null) {
       userEmail = sessionUser ? sessionUser.email : null;
     }
     
-    // Create context object
+    debugLog('Creating enhanced user context', { userEmail: userEmail });
+
+    // Create base context object
     const context = {
       email: userEmail,
       role: null,
@@ -189,54 +190,135 @@ function createUserContext(email = null) {
       isAuthenticated: false,
       isDefaultUser: false,
       hasStaffRecord: false,
+      sessionInfo: null,
+      roleChangeDetected: false,
+      stateChanges: [],
+      previousState: null,
       permissions: {
         canAccessRubric: false,
         canSeeAllDomains: false
       },
       metadata: {
         createdAt: new Date().toISOString(),
-        sessionId: generateUniqueId('session'),
-        userAgent: getUserAgent()
+        sessionId: generateUniqueId('context'),
+        userAgent: getUserAgent(),
+        cacheVersion: getMasterCacheVersion(),
+        contextVersion: '3.0'
       }
     };
     
+    // Handle anonymous users
     if (!userEmail) {
+      debugLog('No email available - using default context');
       context.role = 'Teacher';
       context.year = 1;
       context.isDefaultUser = true;
       context.permissions.canAccessRubric = true;
       context.permissions.canSeeAllDomains = true;
       
-      debugLog('User context created for anonymous user', context);
       return context;
     }
     
-    // Validate user access
-    const validation = validateUserAccess(userEmail);
-    context.isAuthenticated = validation.hasAccess;
-    context.role = validation.role;
-    context.year = validation.year;
-    context.isDefaultUser = validation.isDefaultUser;
-    context.hasStaffRecord = !validation.isDefaultUser;
+    // Get or create user session
+    const session = getUserSession(userEmail);
+    context.sessionInfo = session;
+    context.metadata.sessionId = session ? session.sessionId : context.metadata.sessionId;
+
+    // Get current user data from Staff sheet
+    const currentUser = getUserByEmail(userEmail);
+
+    if (!currentUser) {
+      debugLog('User not found in Staff sheet - using default settings', { userEmail });
+      context.role = 'Teacher';
+      context.year = 1;
+      context.isDefaultUser = true;
+      context.hasStaffRecord = false;
+      context.permissions.canAccessRubric = true;
+      context.permissions.canSeeAllDomains = true;
+
+      return context;
+    }
+
+    // Set user data
+    context.isAuthenticated = true;
+    context.role = currentUser.role || 'Teacher';
+    context.year = currentUser.year || 1;
+    context.hasStaffRecord = true;
+    context.isDefaultUser = false;
+    context.permissions.canAccessRubric = true;
+    context.permissions.canSeeAllDomains = false; // Authenticated users see role-specific content
+
+    // Detect state changes
+    const changeDetection = detectUserStateChanges(userEmail, {
+      role: context.role,
+      year: context.year,
+      name: currentUser.name,
+      email: userEmail,
+      sessionId: context.metadata.sessionId
+    });
+
+    context.roleChangeDetected = changeDetection.hasChanged;
+    context.stateChanges = changeDetection.changes;
+    context.previousState = changeDetection.storedState;
+    context.isNewUser = changeDetection.isNewUser || false;
     
-    // Set permissions
-    context.permissions.canAccessRubric = validation.hasAccess;
-    context.permissions.canSeeAllDomains = validation.isDefaultUser; // Default users see all domains
+    // Handle role changes
+    if (changeDetection.hasChanged && !changeDetection.isNewUser) {
+      debugLog('Role/state change detected - triggering cache invalidation', {
+        userEmail: userEmail,
+        changes: changeDetection.changes
+      });
+
+      // Find role changes specifically
+      const roleChange = changeDetection.changes.find(change => change.field === 'role');
+      if (roleChange) {
+        // Add to role change history
+        addRoleChangeToHistory(userEmail, roleChange.oldValue, roleChange.newValue);
+
+        // Clear relevant caches proactively
+        clearCachesForRoleChange(userEmail);
+
+        debugLog('Role change processed', {
+          userEmail: userEmail,
+          oldRole: roleChange.oldValue,
+          newRole: roleChange.newValue
+        });
+      }
+    }
+
+    // Store current state for future comparisons
+    storeUserState(userEmail, {
+      role: context.role,
+      year: context.year,
+      name: currentUser.name,
+      email: userEmail,
+      sessionId: context.metadata.sessionId
+    });
     
     const executionTime = Date.now() - startTime;
     logPerformanceMetrics('createUserContext', executionTime, {
       email: userEmail,
       role: context.role,
-      isDefaultUser: context.isDefaultUser
+      roleChangeDetected: context.roleChangeDetected,
+      isNewUser: context.isNewUser,
+      stateChangeCount: context.stateChanges.length
+    });
+
+    debugLog('Enhanced user context created successfully', {
+      email: userEmail,
+      role: context.role,
+      year: context.year,
+      roleChangeDetected: context.roleChangeDetected,
+      stateChanges: context.stateChanges.length,
+      sessionId: context.metadata.sessionId
     });
     
-    debugLog('User context created successfully', context);
     return context;
     
   } catch (error) {
-    console.error('Error creating user context:', formatErrorMessage(error, 'createUserContext'));
+    console.error('Error creating enhanced user context:', formatErrorMessage(error, 'createUserContext'));
     
-    // Return default context on error
+    // Return safe default context on error
     return {
       email: email,
       role: 'Teacher',
@@ -244,14 +326,17 @@ function createUserContext(email = null) {
       isAuthenticated: false,
       isDefaultUser: true,
       hasStaffRecord: false,
+      roleChangeDetected: false,
+      stateChanges: [],
       permissions: {
         canAccessRubric: true,
         canSeeAllDomains: true
       },
       metadata: {
         createdAt: new Date().toISOString(),
-        sessionId: generateUniqueId('session'),
-        error: error.message
+        sessionId: generateUniqueId('error_context'),
+        error: error.message,
+        contextVersion: '3.0'
       }
     };
   }
