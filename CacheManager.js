@@ -278,7 +278,9 @@ function forceCleanAllCaches() {
     const properties = PropertiesService.getScriptProperties();
     const allProperties = properties.getProperties();
     Object.keys(allProperties).forEach(key => {
-      if (key.startsWith('SHEET_HASH_') || key.startsWith('CACHE_')) {
+      // CACHE_ prefixed properties are no longer used or set by the current caching system,
+      // making their explicit deletion redundant.
+      if (key.startsWith('SHEET_HASH_')) {
         properties.deleteProperty(key);
       }
     });
