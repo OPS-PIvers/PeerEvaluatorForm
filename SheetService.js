@@ -317,54 +317,163 @@ function getSettingsData() {
 
 /**
  * REPLACE THIS FUNCTION in SheetService.js
- * Enhanced getRoleSheetData function with change detection
+ * Enhanced getRoleSheetData function with comprehensive validation and fallback
  */
 function getRoleSheetData(roleName) {
-  if (!roleName || !isValidRole(roleName)) {
-    console.warn('Invalid role name provided to getRoleSheetData:', roleName);
-    return null;
-  }
+  const operationId = generateUniqueId('get_role_sheet');
   
   try {
+    debugLog('Getting role sheet data with enhanced validation', {
+      roleName: roleName,
+      operationId: operationId
+    });
+
+    // Validate role first
+    const roleValidation = validateRole(roleName);
+
+    if (!roleValidation.isValid) {
+      console.warn('Role validation failed', {
+        roleName: roleName,
+        issues: roleValidation.issues,
+        severity: roleValidation.severity,
+        operationId: operationId
+      });
+
+      // Handle different failure scenarios
+      if (roleValidation.severity === VALIDATION_SEVERITY.CRITICAL) {
+        // Critical failure - try fallback role
+        const fallbackRole = roleValidation.fallbackRole || 'Teacher';
+
+        debugLog('Attempting fallback to role', {
+          originalRole: roleName,
+          fallbackRole: fallbackRole,
+          operationId: operationId
+        });
+
+        // Recursive call with fallback role (prevent infinite recursion)
+        if (fallbackRole !== roleName && fallbackRole === 'Teacher') {
+          return getRoleSheetData(fallbackRole);
+        } else {
+          // Can't fallback - return error data
+          return createErrorRoleSheetData(roleName, roleValidation, operationId);
+        }
+      }
+    }
+
     // Check enhanced cache with role-specific parameters
     const cacheParams = { role: roleName };
     const cachedData = getCachedDataEnhanced('role_sheet', cacheParams);
 
     if (cachedData && cachedData.data) {
-      debugLog(`Role sheet data for ${roleName} retrieved from enhanced cache`);
-      return cachedData.data;
+      debugLog(`Role sheet data for ${roleName} retrieved from enhanced cache`, {
+        operationId: operationId
+      });
+
+      // Validate cached data integrity
+      const dataValidation = validateRoleSheetData(cachedData.data);
+      if (dataValidation.isValid) {
+        return cachedData.data;
+      } else {
+        debugLog('Cached data validation failed - reloading', {
+          roleName: roleName,
+          issues: dataValidation.issues,
+          operationId: operationId
+        });
+        // Clear invalid cached data
+        clearCachedData(generateCacheKey('role_sheet', cacheParams));
+      }
     }
     
     const startTime = Date.now();
-    const spreadsheet = openSpreadsheet();
-    const sheet = getSheetByName(spreadsheet, roleName);
+
+    // Enhanced spreadsheet access with error handling
+    let spreadsheet, sheet;
+    try {
+      spreadsheet = openSpreadsheet();
+      sheet = getSheetByName(spreadsheet, roleName);
+    } catch (accessError) {
+      console.error('Spreadsheet access error', {
+        error: accessError.message,
+        roleName: roleName,
+        operationId: operationId
+      });
+
+      return createErrorRoleSheetData(roleName, {
+        issues: [{
+          type: VALIDATION_ERROR_TYPES.PERMISSION_ERROR,
+          message: 'Cannot access spreadsheet: ' + accessError.message,
+          severity: VALIDATION_SEVERITY.CRITICAL
+        }]
+      }, operationId);
+    }
     
     if (!sheet) {
-      console.warn(`Role sheet "${roleName}" not found`);
-      // If it's not the Teacher sheet, try to fall back to Teacher
+      console.warn(`Role sheet "${roleName}" not found`, { operationId: operationId });
+
+      // Try fallback to Teacher sheet if this isn't already Teacher
       if (roleName !== 'Teacher') {
-        debugLog(`Falling back to Teacher sheet for role: ${roleName}`);
+        debugLog(`Falling back to Teacher sheet for role: ${roleName}`, {
+          operationId: operationId
+        });
         return getRoleSheetData('Teacher');
       }
-      return null;
+
+      // No fallback available
+      return createErrorRoleSheetData(roleName, {
+        issues: [{
+          type: VALIDATION_ERROR_TYPES.MISSING_SHEET,
+          message: `Sheet "${roleName}" does not exist`,
+          severity: VALIDATION_SEVERITY.CRITICAL
+        }]
+      }, operationId);
     }
     
     const lastRow = sheet.getLastRow();
     const lastColumn = sheet.getLastColumn();
     
     if (lastRow < 1 || lastColumn < 1) {
-      console.warn(`Role sheet "${roleName}" appears to be empty`);
-      return null;
+      console.warn(`Role sheet "${roleName}" appears to be empty`, {
+        rowCount: lastRow,
+        columnCount: lastColumn,
+        operationId: operationId
+      });
+
+      return createErrorRoleSheetData(roleName, {
+        issues: [{
+          type: VALIDATION_ERROR_TYPES.DATA_CORRUPTION,
+          message: `Sheet "${roleName}" is empty`,
+          severity: VALIDATION_SEVERITY.ERROR
+        }]
+      }, operationId);
     }
     
-    // Read all sheet data
-    const range = sheet.getRange(1, 1, lastRow, lastColumn);
-    const values = range.getValues();
+    // Read all sheet data with error handling
+    let values;
+    try {
+      const range = sheet.getRange(1, 1, lastRow, lastColumn);
+      values = range.getValues();
+    } catch (readError) {
+      console.error('Error reading sheet data', {
+        error: readError.message,
+        roleName: roleName,
+        operationId: operationId
+      });
+
+      return createErrorRoleSheetData(roleName, {
+        issues: [{
+          type: VALIDATION_ERROR_TYPES.PERMISSION_ERROR,
+          message: 'Cannot read sheet data: ' + readError.message,
+          severity: VALIDATION_SEVERITY.CRITICAL
+        }]
+      }, operationId);
+    }
     
     // Check if data has changed
     const dataChanged = hasSheetDataChanged(roleName, values);
     if (dataChanged) {
-      debugLog(`Role sheet data change detected for ${roleName} - invalidating related caches`);
+      debugLog(`Role sheet data change detected for ${roleName} - invalidating related caches`, {
+        operationId: operationId
+      });
       invalidateDependentCaches('role_sheet_*');
     }
 
@@ -377,9 +486,29 @@ function getRoleSheetData(roleName) {
       lastUpdated: new Date().toISOString(),
       title: values[0] ? sanitizeText(values[0][0]) : '',
       subtitle: values[1] ? sanitizeText(values[1][0]) : '',
-      dataHash: generateDataHash(values) // Add hash for verification
+      dataHash: generateDataHash(values),
+      operationId: operationId,
+      validation: {
+        isValid: true,
+        issues: [],
+        loadedSuccessfully: true
+      }
     };
     
+    // Validate the loaded data
+    const dataValidation = validateRoleSheetData(roleSheetData);
+    roleSheetData.validation = dataValidation;
+
+    if (!dataValidation.isValid) {
+      console.warn('Loaded role sheet data has validation issues', {
+        roleName: roleName,
+        issues: dataValidation.issues,
+        operationId: operationId
+      });
+
+      // Still cache and return the data, but with validation warnings
+    }
+
     // Cache with enhanced system
     setCachedDataEnhanced('role_sheet', cacheParams, roleSheetData, CACHE_SETTINGS.SHEET_DATA_TTL);
     
@@ -388,27 +517,226 @@ function getRoleSheetData(roleName) {
       roleName: roleName,
       rowCount: lastRow,
       columnCount: lastColumn,
-      dataChanged: dataChanged
+      dataChanged: dataChanged,
+      validationPassed: dataValidation.isValid,
+      operationId: operationId
     });
     
     debugLog(`Role sheet data loaded for ${roleName}`, {
       rowCount: lastRow,
       columnCount: lastColumn,
-      dataChanged: dataChanged
+      dataChanged: dataChanged,
+      validationIssues: dataValidation.issues.length,
+      operationId: operationId
     });
     
     return roleSheetData;
     
   } catch (error) {
-    console.error(`Error reading role sheet "${roleName}":`, formatErrorMessage(error, 'getRoleSheetData'));
+    console.error(`Critical error reading role sheet "${roleName}":`, formatErrorMessage(error, 'getRoleSheetData'));
     
     // Try fallback to Teacher sheet if this isn't already Teacher
     if (roleName !== 'Teacher') {
-      debugLog(`Attempting fallback to Teacher sheet due to error`);
+      debugLog(`Attempting Teacher fallback due to critical error`, {
+        originalRole: roleName,
+        error: error.message,
+        operationId: operationId
+      });
       return getRoleSheetData('Teacher');
     }
     
-    return null;
+    // Return error data if Teacher sheet also fails
+    return createErrorRoleSheetData(roleName, {
+      issues: [{
+        type: VALIDATION_ERROR_TYPES.CONFIGURATION_ERROR,
+        message: 'Critical system error: ' + error.message,
+        severity: VALIDATION_SEVERITY.CRITICAL
+      }]
+    }, operationId);
+  }
+}
+
+/**
+ * ADD THESE HELPER FUNCTIONS to SheetService.js
+ * Helper functions for error handling and validation
+ */
+
+/**
+ * Create error role sheet data for graceful degradation
+ * @param {string} roleName - Role name that failed
+ * @param {Object} validationResult - Validation result with issues
+ * @param {string} operationId - Operation identifier
+ * @return {Object} Error role sheet data structure
+ */
+function createErrorRoleSheetData(roleName, validationResult, operationId) {
+  return {
+    roleName: roleName,
+    sheetName: 'ERROR',
+    data: createErrorSheetContent(roleName, validationResult),
+    rowCount: 3,
+    columnCount: 5,
+    lastUpdated: new Date().toISOString(),
+    title: `Error: ${roleName} Framework Not Available`,
+    subtitle: `Please contact your administrator to set up the ${roleName} rubric`,
+    dataHash: 'error',
+    operationId: operationId,
+    validation: {
+      isValid: false,
+      issues: validationResult.issues || [],
+      loadedSuccessfully: false,
+      isErrorData: true
+    },
+    error: {
+      type: 'ROLE_SHEET_ERROR',
+      issues: validationResult.issues || [],
+      recommendedActions: validationResult.recommendedActions || [],
+      fallbackUsed: false
+    }
+  };
+}
+
+/**
+ * Create error sheet content for display
+ * @param {string} roleName - Role name that failed
+ * @param {Object} validationResult - Validation result
+ * @return {Array<Array>} Error sheet content
+ */
+function createErrorSheetContent(roleName, validationResult) {
+  const issues = validationResult.issues || [];
+  const primaryIssue = issues.length > 0 ? issues[0] : { message: 'Unknown error' };
+
+  return [
+    [`Error: ${roleName} Framework Not Available`],
+    [`The ${roleName} rubric is not properly configured`],
+    [
+      'Error Details',
+      primaryIssue.message,
+      'Please contact your system administrator',
+      'to set up the role-specific rubric.',
+      'Teacher rubric will be used as fallback.'
+    ]
+  ];
+}
+
+/**
+ * Validate role sheet data integrity
+ * @param {Object} roleSheetData - Role sheet data to validate
+ * @return {Object} Validation result
+ */
+function validateRoleSheetData(roleSheetData) {
+  const validationId = generateUniqueId('role_sheet_validation');
+
+  try {
+    const result = {
+      validationId: validationId,
+      isValid: false,
+      issues: [],
+      severity: VALIDATION_SEVERITY.INFO,
+      componentCount: 0,
+      hasTitle: false,
+      hasComponents: false
+    };
+
+    if (!roleSheetData || !roleSheetData.data) {
+      result.issues.push({
+        type: VALIDATION_ERROR_TYPES.DATA_CORRUPTION,
+        message: 'Role sheet data is null or missing',
+        severity: VALIDATION_SEVERITY.CRITICAL
+      });
+      result.severity = VALIDATION_SEVERITY.CRITICAL;
+      return result;
+    }
+
+    const data = roleSheetData.data;
+
+    // Check if data is an array
+    if (!Array.isArray(data)) {
+      result.issues.push({
+        type: VALIDATION_ERROR_TYPES.DATA_CORRUPTION,
+        message: 'Role sheet data is not in expected array format',
+        severity: VALIDATION_SEVERITY.CRITICAL
+      });
+      result.severity = VALIDATION_SEVERITY.CRITICAL;
+      return result;
+    }
+
+    // Check if has content
+    if (data.length < 3) {
+      result.issues.push({
+        type: VALIDATION_ERROR_TYPES.DATA_CORRUPTION,
+        message: 'Role sheet has insufficient content (less than 3 rows)',
+        severity: VALIDATION_SEVERITY.ERROR
+      });
+      result.severity = VALIDATION_SEVERITY.ERROR;
+    }
+
+    // Check title
+    if (data.length > 0 && data[0][0]) {
+      result.hasTitle = true;
+    } else {
+      result.issues.push({
+        type: VALIDATION_ERROR_TYPES.DATA_CORRUPTION,
+        message: 'Role sheet missing title',
+        severity: VALIDATION_SEVERITY.WARNING
+      });
+      result.severity = Math.max(result.severity, VALIDATION_SEVERITY.WARNING);
+    }
+
+    // Count components (cells that match component pattern)
+    let componentCount = 0;
+    for (let i = 0; i < data.length; i++) {
+      const cellValue = data[i][0];
+      if (cellValue && VALIDATION_PATTERNS.COMPONENT_ID.test(cellValue.toString())) {
+        componentCount++;
+      }
+    }
+
+    result.componentCount = componentCount;
+    result.hasComponents = componentCount > 0;
+
+    if (componentCount === 0) {
+      result.issues.push({
+        type: VALIDATION_ERROR_TYPES.DATA_CORRUPTION,
+        message: 'Role sheet contains no valid components (no cells matching pattern like "1a:", "2b:", etc.)',
+        severity: VALIDATION_SEVERITY.ERROR
+      });
+      result.severity = Math.max(result.severity, VALIDATION_SEVERITY.ERROR);
+    } else if (componentCount < 10) {
+      result.issues.push({
+        type: VALIDATION_ERROR_TYPES.DATA_CORRUPTION,
+        message: `Role sheet has only ${componentCount} components (expected 15-25 for complete rubric)`,
+        severity: VALIDATION_SEVERITY.WARNING
+      });
+      result.severity = Math.max(result.severity, VALIDATION_SEVERITY.WARNING);
+    }
+
+    // Overall validation
+    result.isValid = result.severity !== VALIDATION_SEVERITY.CRITICAL;
+
+    debugLog('Role sheet data validation completed', {
+      validationId: validationId,
+      roleName: roleSheetData.roleName,
+      isValid: result.isValid,
+      componentCount: componentCount,
+      issueCount: result.issues.length,
+      severity: result.severity
+    });
+
+    return result;
+
+  } catch (error) {
+    console.error('Error validating role sheet data:', error);
+    return {
+      validationId: validationId,
+      isValid: false,
+      issues: [{
+        type: VALIDATION_ERROR_TYPES.CONFIGURATION_ERROR,
+        message: 'Validation error: ' + error.message,
+        severity: VALIDATION_SEVERITY.CRITICAL
+      }],
+      severity: VALIDATION_SEVERITY.CRITICAL,
+      error: error.message
+    };
   }
 }
 

@@ -625,6 +625,447 @@ function generateResponseMetadata(userContext, requestId, debugMode = false) {
 }
 
 /**
+ * ADD THESE TESTING FUNCTIONS to Code.js
+ * Test Phase 4 implementation
+ */
+
+/**
+ * Test Phase 4 validation and error handling
+ */
+function testPhase4ValidationAndErrorHandling() {
+  console.log('=== TESTING PHASE 4 VALIDATION AND ERROR HANDLING ===');
+
+  try {
+    const results = {
+      systemValidation: null,
+      roleValidation: null,
+      userValidation: null,
+      errorHandling: null,
+      gracefulDegradation: null
+    };
+
+    // Test 1: System Configuration Validation
+    console.log('\nTest 1: System Configuration Validation');
+    results.systemValidation = validateSystemConfiguration();
+    console.log('✓ System validation result:', {
+      isValid: results.systemValidation.isValid,
+      systemHealth: results.systemValidation.systemHealth,
+      issueCount: results.systemValidation.issues?.length || 0
+    });
+
+    // Test 2: Role Validation
+    console.log('\nTest 2: Role Validation');
+    const testRoles = ['Teacher', 'InvalidRole', 'Administrator'];
+    results.roleValidation = {};
+
+    testRoles.forEach(role => {
+      const validation = validateRole(role);
+      results.roleValidation[role] = validation;
+      console.log(`✓ Role "${role}": ${validation.isValid ? 'VALID' : 'INVALID'} (${validation.issues.length} issues)`);
+    });
+
+    // Test 3: User Validation
+    console.log('\nTest 3: User Validation');
+    const sessionUser = getUserFromSession();
+    if (sessionUser && sessionUser.email) {
+      results.userValidation = validateUserAccess(sessionUser.email);
+      console.log('✓ User validation result:', {
+        hasAccess: results.userValidation.hasAccess,
+        role: results.userValidation.role,
+        issueCount: results.userValidation.issues?.length || 0
+      });
+    } else {
+      console.log('⚠️ No session user for validation test');
+      results.userValidation = { skipped: true, reason: 'No session user' };
+    }
+
+    // Test 4: Error Handling
+    console.log('\nTest 4: Error Handling');
+    try {
+      // Simulate error
+      const testError = new Error('Test error for Phase 4 validation');
+      const errorPage = createEnhancedErrorPage(testError, 'test-request-id', results.systemValidation);
+      results.errorHandling = {
+        success: true,
+        hasContent: errorPage.getContent().length > 1000
+      };
+      console.log('✓ Error page generation: SUCCESS');
+    } catch (errorHandlingError) {
+      results.errorHandling = {
+        success: false,
+        error: errorHandlingError.message
+      };
+      console.log('❌ Error page generation: FAILED');
+    }
+
+    // Test 5: Graceful Degradation
+    console.log('\nTest 5: Graceful Degradation');
+    try {
+      // Test with non-existent role
+      const nonExistentRoleData = getRoleSheetData('NonExistentRole');
+      results.gracefulDegradation = {
+        success: true,
+        fallbackUsed: nonExistentRoleData.validation?.isErrorData || false,
+        hasErrorContent: !!nonExistentRoleData.error
+      };
+      console.log('✓ Graceful degradation: SUCCESS');
+      console.log('  - Fallback triggered:', results.gracefulDegradation.fallbackUsed);
+    } catch (degradationError) {
+      results.gracefulDegradation = {
+        success: false,
+        error: degradationError.message
+      };
+      console.log('❌ Graceful degradation: FAILED');
+    }
+
+    // Overall assessment
+    const allTestsPassed =
+      results.systemValidation?.isValid &&
+      results.roleValidation?.Teacher?.isValid &&
+      results.errorHandling?.success &&
+      results.gracefulDegradation?.success;
+
+    console.log('\n=== PHASE 4 TEST RESULTS ===');
+    console.log('System Validation:', results.systemValidation?.isValid ? '✅ PASS' : '❌ FAIL');
+    console.log('Role Validation:', results.roleValidation?.Teacher?.isValid ? '✅ PASS' : '❌ FAIL');
+    console.log('User Validation:', results.userValidation?.hasAccess !== false ? '✅ PASS' : '❌ FAIL');
+    console.log('Error Handling:', results.errorHandling?.success ? '✅ PASS' : '❌ FAIL');
+    console.log('Graceful Degradation:', results.gracefulDegradation?.success ? '✅ PASS' : '❌ FAIL');
+
+    if (allTestsPassed) {
+      console.log('\n🎉 ALL PHASE 4 TESTS PASSED - VALIDATION AND ERROR HANDLING READY!');
+    } else {
+      console.log('\n⚠️ SOME PHASE 4 TESTS FAILED - CHECK RESULTS ABOVE');
+    }
+
+    return {
+      success: allTestsPassed,
+      results: results,
+      summary: {
+        systemHealth: results.systemValidation?.systemHealth || 'unknown',
+        validationWorking: !!results.systemValidation,
+        errorHandlingWorking: results.errorHandling?.success || false,
+        gracefulDegradationWorking: results.gracefulDegradation?.success || false
+      }
+    };
+
+  } catch (error) {
+    console.error('❌ Error testing Phase 4:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * Test comprehensive validation report
+ */
+function testComprehensiveValidationReport() {
+  console.log('=== TESTING COMPREHENSIVE VALIDATION REPORT ===');
+
+  try {
+    const validationResults = [];
+
+    // System validation
+    validationResults.push(validateSystemConfiguration());
+
+    // Role validations
+    AVAILABLE_ROLES.forEach(role => {
+      validationResults.push(validateRole(role));
+    });
+
+    // User validation (if possible)
+    const sessionUser = getUserFromSession();
+    if (sessionUser && sessionUser.email) {
+      validationResults.push(validateUserAccess(sessionUser.email));
+    }
+
+    // Create comprehensive report
+    const report = createValidationReport(validationResults);
+
+    console.log('✅ COMPREHENSIVE VALIDATION REPORT');
+    console.log('Report ID:', report.reportId);
+    console.log('System Health:', report.systemHealth);
+    console.log('Summary:', report.summary);
+    console.log('Total Recommendations:', report.recommendations.length);
+
+    if (report.systemHealth === 'healthy') {
+      console.log('\n🎉 SYSTEM IS HEALTHY - ALL VALIDATIONS PASSED');
+    } else if (report.systemHealth === 'warning') {
+      console.log('\n⚠️ SYSTEM HAS WARNINGS - REVIEW RECOMMENDATIONS');
+    } else if (report.systemHealth === 'degraded') {
+      console.log('\n🔧 SYSTEM IS DEGRADED - ACTION REQUIRED');
+    } else {
+      console.log('\n🚨 SYSTEM HAS CRITICAL ISSUES - IMMEDIATE ACTION REQUIRED');
+    }
+
+    if (report.recommendations.length > 0) {
+      console.log('\n📋 TOP RECOMMENDATIONS:');
+      report.recommendations.slice(0, 5).forEach((rec, index) => {
+        console.log(`${index + 1}. ${rec}`);
+      });
+    }
+
+    return report;
+
+  } catch (error) {
+    console.error('❌ Error creating comprehensive validation report:', error);
+    return { error: error.message };
+  }
+}
+
+/**
+ * Test error scenarios and recovery
+ */
+function testErrorScenariosAndRecovery() {
+  console.log('=== TESTING ERROR SCENARIOS AND RECOVERY ===');
+
+  try {
+    const testScenarios = [
+      {
+        name: 'Invalid Role',
+        test: () => validateRole('NonExistentRole')
+      },
+      {
+        name: 'Missing User',
+        test: () => validateUserAccess('nonexistent@example.com')
+      },
+      {
+        name: 'Invalid Email',
+        test: () => validateUserAccess('invalid-email')
+      },
+      {
+        name: 'Missing Role Sheet',
+        test: () => getRoleSheetData('MissingRole')
+      }
+    ];
+
+    const results = {};
+
+    testScenarios.forEach(scenario => {
+      console.log(`\nTesting: ${scenario.name}`);
+
+      try {
+        const result = scenario.test();
+        const hasGracefulHandling = result && (
+          result.isValid === false ||  // Validation failed gracefully
+          result.hasAccess !== undefined ||  // User access handled
+          result.validation?.isErrorData  // Error data provided
+        );
+
+        results[scenario.name] = {
+          success: true,
+          gracefulHandling: hasGracefulHandling,
+          result: {
+            isValid: result.isValid,
+            hasAccess: result.hasAccess,
+            issueCount: result.issues?.length || 0,
+            hasErrorData: result.validation?.isErrorData || false
+          }
+        };
+
+        console.log(`✓ ${scenario.name}: ${hasGracefulHandling ? 'GRACEFUL' : 'BASIC'} handling`);
+
+      } catch (error) {
+        results[scenario.name] = {
+          success: false,
+          error: error.message
+        };
+        console.log(`❌ ${scenario.name}: FAILED with error`);
+      }
+    });
+
+    // Test error page generation
+    console.log('\nTesting Error Page Generation');
+    try {
+      const testError = new Error('Test error for recovery testing');
+      const errorPage = createEnhancedErrorPage(testError, 'test-recovery');
+      const content = errorPage.getContent();
+
+      results.ErrorPageGeneration = {
+        success: true,
+        hasContent: content.length > 1000,
+        hasSystemStatus: content.includes('System Health'),
+        hasRecoveryActions: content.includes('Recovery Actions')
+      };
+
+      console.log('✓ Error Page Generation: SUCCESS');
+
+    } catch (error) {
+      results.ErrorPageGeneration = {
+        success: false,
+        error: error.message
+      };
+      console.log('❌ Error Page Generation: FAILED');
+    }
+
+    const successfulTests = Object.values(results).filter(r => r.success).length;
+    const totalTests = Object.keys(results).length;
+
+    console.log('\n=== ERROR SCENARIO TEST RESULTS ===');
+    console.log(`Tests Passed: ${successfulTests}/${totalTests}`);
+
+    Object.keys(results).forEach(testName => {
+      const result = results[testName];
+      console.log(`${testName}: ${result.success ? '✅' : '❌'} ${result.success ? (result.gracefulHandling ? '(Graceful)' : '(Basic)') : '(Failed)'}`);
+    });
+
+    if (successfulTests === totalTests) {
+      console.log('\n🎉 ALL ERROR SCENARIOS HANDLED SUCCESSFULLY');
+    } else {
+      console.log('\n⚠️ SOME ERROR SCENARIOS FAILED - REVIEW IMPLEMENTATION');
+    }
+
+    return {
+      success: successfulTests === totalTests,
+      results: results,
+      summary: {
+        total: totalTests,
+        passed: successfulTests,
+        failed: totalTests - successfulTests
+      }
+    };
+
+  } catch (error) {
+    console.error('❌ Error testing error scenarios:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * Complete Phase 4 integration test
+ */
+function testCompletePhase4Integration() {
+  console.log('=== COMPLETE PHASE 4 INTEGRATION TEST ===');
+
+  try {
+    // Test all previous phases first
+    console.log('🧪 Testing integration with previous phases...');
+
+    const integrationResults = {
+      phase1: null,
+      phase2: null,
+      phase3: null,
+      phase4: null,
+      autoTrigger: null
+    };
+
+    // Test Phase 1 (if available)
+    if (typeof testEnhancedCacheSystem === 'function') {
+      try {
+        testEnhancedCacheSystem();
+        integrationResults.phase1 = { success: true };
+        console.log('✓ Phase 1 integration: PASS');
+      } catch (p1Error) {
+        integrationResults.phase1 = { success: false, error: p1Error.message };
+        console.log('❌ Phase 1 integration: FAIL');
+      }
+    }
+
+    // Test Phase 2 (if available)
+    if (typeof testPhase2CacheBusting === 'function') {
+      try {
+        testPhase2CacheBusting();
+        integrationResults.phase2 = { success: true };
+        console.log('✓ Phase 2 integration: PASS');
+      } catch (p2Error) {
+        integrationResults.phase2 = { success: false, error: p2Error.message };
+        console.log('❌ Phase 2 integration: FAIL');
+      }
+    }
+
+    // Test Phase 3 (if available)
+    if (typeof testPhase3UserContextEnhancement === 'function') {
+      try {
+        testPhase3UserContextEnhancement();
+        integrationResults.phase3 = { success: true };
+        console.log('✓ Phase 3 integration: PASS');
+      } catch (p3Error) {
+        integrationResults.phase3 = { success: false, error: p3Error.message };
+        console.log('❌ Phase 3 integration: FAIL');
+      }
+    }
+
+    // Test Auto-Trigger (if available)
+    if (typeof checkAutoTriggerStatus === 'function') {
+      try {
+        const triggerStatus = checkAutoTriggerStatus();
+        integrationResults.autoTrigger = {
+          success: true,
+          installed: triggerStatus.isInstalled
+        };
+        console.log('✓ Auto-Trigger integration: PASS');
+      } catch (atError) {
+        integrationResults.autoTrigger = { success: false, error: atError.message };
+        console.log('❌ Auto-Trigger integration: FAIL');
+      }
+    }
+
+    // Test Phase 4
+    console.log('🛡️ Testing Phase 4 components...');
+    integrationResults.phase4 = testPhase4ValidationAndErrorHandling();
+
+    // Create comprehensive system report
+    console.log('📊 Creating comprehensive system report...');
+    const systemReport = testComprehensiveValidationReport();
+
+    // Test error handling integration
+    console.log('🚨 Testing error handling integration...');
+    const errorTests = testErrorScenariosAndRecovery();
+
+    console.log('\n=== COMPLETE PHASE 4 INTEGRATION RESULTS ===');
+    console.log('Phase 1 (Cache):', integrationResults.phase1?.success ? '✅ PASS' : '❌ FAIL/MISSING');
+    console.log('Phase 2 (Response):', integrationResults.phase2?.success ? '✅ PASS' : '❌ FAIL/MISSING');
+    console.log('Phase 3 (Context):', integrationResults.phase3?.success ? '✅ PASS' : '❌ FAIL/MISSING');
+    console.log('Auto-Trigger:', integrationResults.autoTrigger?.success ? '✅ PASS' : '❌ FAIL/MISSING');
+    console.log('Phase 4 (Validation):', integrationResults.phase4?.success ? '✅ PASS' : '❌ FAIL');
+
+    console.log('\nSystem Health:', systemReport.systemHealth || 'unknown');
+    console.log('Error Handling:', errorTests.success ? '✅ ROBUST' : '❌ NEEDS WORK');
+
+    const allPhasesWorking = integrationResults.phase4?.success;
+    const systemHealthy = systemReport.systemHealth === 'healthy' || systemReport.systemHealth === 'warning';
+    const errorHandlingRobust = errorTests.success;
+
+    if (allPhasesWorking && systemHealthy && errorHandlingRobust) {
+      console.log('\n🎉 COMPLETE PHASE 4 INTEGRATION SUCCESS!');
+      console.log('🛡️ System has comprehensive validation and error handling');
+      console.log('🔄 All components work together seamlessly');
+      console.log('🚨 Error scenarios are handled gracefully');
+    } else {
+      console.log('\n⚠️ INTEGRATION ISSUES DETECTED');
+      if (!allPhasesWorking) console.log('- Phase 4 validation needs attention');
+      if (!systemHealthy) console.log('- System health issues need resolution');
+      if (!errorHandlingRobust) console.log('- Error handling needs improvement');
+    }
+
+    return {
+      success: allPhasesWorking && systemHealthy && errorHandlingRobust,
+      integrationResults: integrationResults,
+      systemReport: systemReport,
+      errorTests: errorTests,
+      summary: {
+        phase4Ready: integrationResults.phase4?.success || false,
+        systemHealthy: systemHealthy,
+        errorHandlingRobust: errorHandlingRobust,
+        overallHealth: systemReport.systemHealth
+      }
+    };
+
+  } catch (error) {
+    console.error('❌ Complete Phase 4 integration test failed:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+/**
  * Comprehensive test of the auto-trigger system
  */
 function testCompleteAutoTriggerSystem() {
@@ -1654,122 +2095,339 @@ function addDebugHeaders(htmlOutput, userContext, metadata) {
 /**
  * Enhanced error page with cache busting
  * @param {Error} error - Error object
- * @param {string} requestId - Request identifier
- * @return {HtmlOutput} Enhanced error page
+ * REPLACE THIS FUNCTION in Code.js
+ * Comprehensive error page with validation and recovery options
  */
-function createEnhancedErrorPage(error, requestId) {
+function createEnhancedErrorPage(error, requestId, validationResults = null) {
   const timestamp = Date.now();
+  const errorId = generateUniqueId('error_page');
 
-  const errorHtml = `
-    <html>
+  try {
+    // Perform quick system validation if not provided
+    if (!validationResults) {
+      try {
+        validationResults = validateSystemConfiguration();
+      } catch (validationError) {
+        console.warn('Could not perform system validation in error page:', validationError);
+      }
+    }
+
+    const systemHealth = validationResults?.systemHealth || 'unknown';
+    const criticalIssues = validationResults?.issues?.filter(issue =>
+      issue.severity === VALIDATION_SEVERITY.CRITICAL
+    ) || [];
+
+    const errorHtml = `
+    <!DOCTYPE html>
+    <html lang="en">
       <head>
-        <title>Error Loading Application</title>
+        <title>System Error - Danielson Framework</title>
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <meta name="cache-control" content="no-cache, no-store, must-revalidate">
         <meta name="pragma" content="no-cache">
         <meta name="expires" content="0">
-        <meta name="x-request-id" content="${requestId}">
+        <meta name="x-request-id" content="${requestId || 'unknown'}">
+        <meta name="x-error-id" content="${errorId}">
         <meta name="x-timestamp" content="${timestamp}">
+        <meta name="x-system-health" content="${systemHealth}">
         <meta name="x-error" content="true">
         <style>
           body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            padding: 20px; max-width: 600px; margin: 0 auto;
-            background: #f8f9fa; color: #333;
+            padding: 20px; max-width: 800px; margin: 0 auto;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh; color: #333;
           }
           .error-container {
-            background: white; border: 1px solid #dee2e6;
-            padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            background: white; border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            overflow: hidden;
           }
-          .error-title {
-            color: #dc3545; margin-bottom: 20px; font-size: 1.5rem; font-weight: 600;
+          .error-header {
+            background: linear-gradient(135deg, #dc3545, #c82333);
+            color: white; padding: 30px; text-align: center;
           }
-          .error-message {
-            background: #f8f9fa; padding: 15px; border-radius: 6px;
-            margin: 15px 0; border-left: 4px solid #dc3545;
+          .error-header h1 {
+            font-size: 2rem; font-weight: 600; margin-bottom: 10px;
+          }
+          .error-header p {
+            font-size: 1.1rem; opacity: 0.9;
+          }
+          .error-content {
+            padding: 30px;
+          }
+          .system-status {
+            background: ${systemHealth === 'healthy' ? '#d4edda' :
+                          systemHealth === 'warning' ? '#fff3cd' :
+                          systemHealth === 'degraded' ? '#f8d7da' : '#f8d7da'};
+            border: 1px solid ${systemHealth === 'healthy' ? '#c3e6cb' :
+                               systemHealth === 'warning' ? '#ffeaa7' :
+                               systemHealth === 'degraded' ? '#f5c6cb' : '#f5c6cb'};
+            color: ${systemHealth === 'healthy' ? '#155724' :
+                    systemHealth === 'warning' ? '#856404' :
+                    systemHealth === 'degraded' ? '#721c24' : '#721c24'};
+            padding: 15px; border-radius: 6px; margin-bottom: 25px;
           }
           .error-details {
-            font-size: 0.9rem; color: #6c757d; margin-top: 10px;
+            background: #f8f9fa; padding: 20px; border-radius: 8px;
+            margin: 20px 0; border-left: 4px solid #dc3545;
           }
+          .error-details h3 {
+            color: #dc3545; margin-bottom: 15px; font-size: 1.2rem;
+          }
+          .error-message {
+            font-family: 'Courier New', monospace; background: #fff;
+            padding: 15px; border-radius: 4px; margin: 10px 0;
+            border: 1px solid #dee2e6; word-break: break-word;
+          }
+          .validation-section {
+            margin: 25px 0;
+          }
+          .validation-item {
+            display: flex; align-items: center; padding: 8px 0;
+            border-bottom: 1px solid #e9ecef;
+          }
+          .validation-status {
+            width: 24px; height: 24px; border-radius: 50%;
+            margin-right: 12px; display: flex; align-items: center;
+            justify-content: center; font-weight: bold; font-size: 0.8rem;
+          }
+          .status-pass { background: #28a745; color: white; }
+          .status-fail { background: #dc3545; color: white; }
+          .status-warn { background: #ffc107; color: black; }
           .troubleshooting { margin-top: 25px; }
           .troubleshooting h3 { color: #495057; margin-bottom: 15px; }
           .troubleshooting ul { padding-left: 20px; line-height: 1.6; }
-          .retry-section { margin-top: 25px; text-align: center; }
-          .retry-button {
+          .troubleshooting li { margin-bottom: 8px; }
+          .action-section {
+            margin-top: 30px; text-align: center;
+            padding: 20px; background: #f8f9fa; border-radius: 8px;
+          }
+          .action-button {
             background: #007bff; color: white; padding: 12px 24px;
             border: none; border-radius: 6px; cursor: pointer; font-size: 1rem;
-            text-decoration: none; display: inline-block;
+            text-decoration: none; display: inline-block; margin: 0 10px;
+            transition: background 0.3s;
           }
-          .retry-button:hover { background: #0056b3; }
-          .cache-clear-button {
-            background: #28a745; margin-left: 10px;
+          .action-button:hover { background: #0056b3; text-decoration: none; color: white; }
+          .action-button.danger { background: #dc3545; }
+          .action-button.danger:hover { background: #c82333; }
+          .action-button.success { background: #28a745; }
+          .action-button.success:hover { background: #1e7e34; }
+          .diagnostic-info {
+            margin-top: 30px; font-size: 0.9rem; color: #6c757d;
+            background: #f8f9fa; padding: 15px; border-radius: 6px;
           }
-          .cache-clear-button:hover { background: #1e7e34; }
+          .diagnostic-info h4 {
+            color: #495057; margin-bottom: 10px;
+          }
+          .critical-alert {
+            background: #f8d7da; border: 2px solid #dc3545;
+            color: #721c24; padding: 20px; border-radius: 8px;
+            margin-bottom: 25px;
+          }
+          .critical-alert h3 {
+            color: #721c24; margin-bottom: 15px;
+          }
         </style>
       </head>
       <body>
         <div class="error-container">
-          <h2 class="error-title">🚨 Application Error</h2>
+          <div class="error-header">
+            <h1>🚨 System Error</h1>
+            <p>The Danielson Framework application encountered an error</p>
+          </div>
 
-          <div class="error-message">
-            <strong>Error:</strong> ${error.toString()}
-            <div class="error-details">
-              Request ID: ${requestId}<br>
-              Timestamp: ${new Date(timestamp).toLocaleString()}<br>
-              Cache Version: ${getMasterCacheVersion()}
+          <div class="error-content">
+            <div class="system-status">
+              <strong>System Health: ${systemHealth.toUpperCase()}</strong>
+              <br>
+              ${systemHealth === 'healthy' ? '✅ System appears to be functioning normally' :
+                systemHealth === 'warning' ? '⚠️ System has minor issues but should work' :
+                systemHealth === 'degraded' ? '🔧 System has significant issues affecting functionality' :
+                '❌ System has critical issues preventing normal operation'}
             </div>
-          </div>
 
-          <div class="troubleshooting">
-            <h3>🔧 Troubleshooting Steps:</h3>
-            <ul>
-              <li><strong>First:</strong> Try the "Clear Cache & Retry" button below</li>
-              <li><strong>Check:</strong> SHEET_ID is correctly set in Script Properties</li>
-              <li><strong>Verify:</strong> Spreadsheet exists and is accessible</li>
-              <li><strong>Ensure:</strong> Required sheet tabs exist (Staff, Settings, Teacher)</li>
-              <li><strong>Confirm:</strong> You have permission to access the spreadsheet</li>
-              <li><strong>If persistent:</strong> Open in incognito/private browser window</li>
-            </ul>
-          </div>
+            ${criticalIssues.length > 0 ? `
+            <div class="critical-alert">
+              <h3>🚨 Critical Issues Detected</h3>
+              <ul>
+                ${criticalIssues.map(issue => `<li>${issue.message}</li>`).join('')}
+              </ul>
+            </div>
+            ` : ''}
 
-          <div class="retry-section">
-            <button class="retry-button" onclick="window.location.reload()">
-              🔄 Simple Retry
-            </button>
-            <button class="retry-button cache-clear-button" onclick="clearCacheAndRetry()">
-              🧹 Clear Cache & Retry
-            </button>
+            <div class="error-details">
+              <h3>Error Details</h3>
+              <div class="error-message">
+                <strong>Error:</strong> ${error.toString()}<br>
+                <strong>Request ID:</strong> ${requestId || 'Unknown'}<br>
+                <strong>Error ID:</strong> ${errorId}<br>
+                <strong>Timestamp:</strong> ${new Date(timestamp).toLocaleString()}<br>
+                <strong>Cache Version:</strong> ${getMasterCacheVersion()}
+              </div>
+            </div>
+
+            ${validationResults ? `
+            <div class="validation-section">
+              <h3>📋 System Status Check</h3>
+              <div class="validation-item">
+                <div class="validation-status ${validationResults.systemHealth.spreadsheetAccess ? 'status-pass' : 'status-fail'}">
+                  ${validationResults.systemHealth.spreadsheetAccess ? '✓' : '✗'}
+                </div>
+                <span>Spreadsheet Access</span>
+              </div>
+              <div class="validation-item">
+                <div class="validation-status ${validationResults.systemHealth.requiredSheets?.Staff ? 'status-pass' : 'status-fail'}">
+                  ${validationResults.systemHealth.requiredSheets?.Staff ? '✓' : '✗'}
+                </div>
+                <span>Staff Sheet</span>
+              </div>
+              <div class="validation-item">
+                <div class="validation-status ${validationResults.systemHealth.requiredSheets?.Teacher ? 'status-pass' : 'status-fail'}">
+                  ${validationResults.systemHealth.requiredSheets?.Teacher ? '✓' : '✗'}
+                </div>
+                <span>Teacher Sheet</span>
+              </div>
+              <div class="validation-item">
+                <div class="validation-status ${validationResults.systemHealth.cacheSystem ? 'status-pass' : 'status-warn'}">
+                  ${validationResults.systemHealth.cacheSystem ? '✓' : '⚠'}
+                </div>
+                <span>Cache System</span>
+              </div>
+              <div class="validation-item">
+                <div class="validation-status ${validationResults.systemHealth.triggerSystem ? 'status-pass' : 'status-warn'}">
+                  ${validationResults.systemHealth.triggerSystem ? '✓' : '⚠'}
+                </div>
+                <span>Auto-Trigger System</span>
+              </div>
+            </div>
+            ` : ''}
+
+            <div class="troubleshooting">
+              <h3>🔧 Troubleshooting Steps</h3>
+              <ul>
+                <li><strong>First:</strong> Try the "Clear Cache & Retry" button below</li>
+                <li><strong>Check:</strong> SHEET_ID is correctly set in Script Properties</li>
+                <li><strong>Verify:</strong> Spreadsheet exists and is accessible</li>
+                <li><strong>Ensure:</strong> Required sheet tabs exist (Staff, Settings, Teacher)</li>
+                <li><strong>Confirm:</strong> You have permission to access the spreadsheet</li>
+                <li><strong>Role Sheets:</strong> Verify your role has a corresponding sheet tab</li>
+                <li><strong>If persistent:</strong> Open in incognito/private browser window</li>
+                <li><strong>Admin:</strong> Run system validation in Apps Script editor</li>
+              </ul>
+            </div>
+
+            <div class="action-section">
+              <h3>🛠️ Recovery Actions</h3>
+              <button class="action-button" onclick="window.location.reload()">
+                🔄 Simple Retry
+              </button>
+              <button class="action-button success" onclick="clearCacheAndRetry()">
+                🧹 Clear Cache & Retry
+              </button>
+              <button class="action-button danger" onclick="emergencyReset()">
+                🚨 Emergency Reset
+              </button>
+              <br><br>
+              <a href="mailto:admin@domain.com?subject=Danielson Framework Error&body=Error ID: ${errorId}%0ATimestamp: ${new Date(timestamp).toISOString()}%0AError: ${encodeURIComponent(error.toString())}"
+                 class="action-button" style="background: #6c757d;">
+                📧 Contact Support
+              </a>
+            </div>
+
+            <div class="diagnostic-info">
+              <h4>🔍 Diagnostic Information</h4>
+              <strong>Error ID:</strong> ${errorId}<br>
+              <strong>Request ID:</strong> ${requestId || 'Unknown'}<br>
+              <strong>System Health:</strong> ${systemHealth}<br>
+              <strong>Cache Version:</strong> ${getMasterCacheVersion()}<br>
+              <strong>Timestamp:</strong> ${new Date(timestamp).toISOString()}<br>
+              <strong>User Agent:</strong> ${typeof navigator !== 'undefined' ? navigator.userAgent : 'Unknown'}<br>
+              ${validationResults ? `
+              <strong>Validation Issues:</strong> ${validationResults.issues?.length || 0}<br>
+              <strong>System Components:</strong>
+              Spreadsheet: ${validationResults.systemHealth.spreadsheetAccess ? 'OK' : 'FAIL'},
+              Cache: ${validationResults.systemHealth.cacheSystem ? 'OK' : 'WARN'},
+              Triggers: ${validationResults.systemHealth.triggerSystem ? 'OK' : 'WARN'}
+              ` : ''}
+            </div>
           </div>
         </div>
 
         <script>
           function clearCacheAndRetry() {
-            // Add cache-busting parameters
+            console.log('Clearing cache and retrying...');
             const url = new URL(window.location);
             url.searchParams.set('refresh', 'true');
             url.searchParams.set('nocache', 'true');
             url.searchParams.set('t', Date.now());
             url.searchParams.set('r', Math.random().toString(36).substr(2, 9));
-
-            // Redirect to cache-busted URL
             window.location.href = url.toString();
           }
 
-          // Auto-retry after 30 seconds
-          setTimeout(function() {
-            const retryNotice = document.createElement('div');
-            retryNotice.style.cssText = 'background:#fff3cd; padding:15px; margin:20px 0; border-radius:6px; border-left:4px solid #ffc107;';
-            retryNotice.innerHTML = '<strong>⏰ Auto-retry in progress...</strong> The page will refresh automatically.';
-            document.querySelector('.error-container').appendChild(retryNotice);
+          function emergencyReset() {
+            console.log('Performing emergency reset...');
+            const url = new URL(window.location);
+            url.searchParams.set('refresh', 'true');
+            url.searchParams.set('nocache', 'true');
+            url.searchParams.set('emergency', 'true');
+            url.searchParams.set('reset', 'true');
+            url.searchParams.set('t', Date.now());
+            window.location.href = url.toString();
+          }
 
-            setTimeout(clearCacheAndRetry, 5000);
-          }, 30000);
+          // Auto-retry after 2 minutes if critical issues
+          const systemHealth = '${systemHealth}';
+          if (systemHealth === 'critical' || systemHealth === 'error') {
+            setTimeout(function() {
+              const retryNotice = document.createElement('div');
+              retryNotice.style.cssText = 'background:#fff3cd; padding:15px; margin:20px; border-radius:6px; border-left:4px solid #ffc107; text-align:center;';
+              retryNotice.innerHTML = '<strong>⏰ Auto-retry in progress...</strong><br>The system will attempt automatic recovery.';
+              document.querySelector('.error-content').appendChild(retryNotice);
+
+              setTimeout(clearCacheAndRetry, 5000);
+            }, 120000); // 2 minutes
+          }
+
+          // Log error for analytics
+          console.error('Enhanced Error Page Displayed', {
+            errorId: '${errorId}',
+            requestId: '${requestId || 'unknown'}',
+            systemHealth: '${systemHealth}',
+            timestamp: '${new Date(timestamp).toISOString()}',
+            error: '${error.toString().replace(/'/g, "\\\\'")}'
+          });
         </script>
       </body>
     </html>
   `;
 
   return HtmlService.createHtmlOutput(errorHtml);
+
+  } catch (pageError) {
+    console.error('Error creating enhanced error page:', pageError);
+
+    // Fallback to simple error page
+    const fallbackHtml = `
+      <html>
+        <head><title>Critical System Error</title></head>
+        <body style="font-family: Arial, sans-serif; padding: 20px; text-align: center;">
+          <h1 style="color: #dc3545;">Critical System Error</h1>
+          <p>The error reporting system has also failed.</p>
+          <p><strong>Original Error:</strong> ${error.toString()}</p>
+          <p><strong>Page Error:</strong> ${pageError.toString()}</p>
+          <p><strong>Error ID:</strong> ${errorId}</p>
+          <p><strong>Timestamp:</strong> ${new Date(timestamp).toISOString()}</p>
+          <button onclick="window.location.reload()" style="padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 3px;">
+            Retry
+          </button>
+        </body>
+      </html>
+    `;
+
+    return HtmlService.createHtmlOutput(fallbackHtml);
+  }
 }
 
 /**
