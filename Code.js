@@ -1231,7 +1231,9 @@ function installRoleChangeAutoTrigger(forceReinstall = false) {
     if (forceReinstall && editTriggers.length > 0) {
       console.log(`Removing ${editTriggers.length} existing edit triggers...`);
       editTriggers.forEach(trigger => {
-        ScriptApp.deleteTrigger(trigger);
+        if (trigger.getHandlerFunction() === 'onEditTrigger') {
+          ScriptApp.deleteTrigger(trigger);
+        }
       });
       console.log('✓ Existing triggers removed');
     }
@@ -1359,35 +1361,41 @@ function removeAutoTrigger() {
     const existingTriggers = ScriptApp.getProjectTriggers();
     const editTriggers = existingTriggers.filter(trigger =>
       trigger.getEventType() === ScriptApp.EventType.ON_EDIT &&
-      trigger.getTriggerSource() === ScriptApp.TriggerSource.SPREADSHEETS &&
-      trigger.getHandlerFunction() === 'onEditTrigger'
+      trigger.getTriggerSource() === ScriptApp.TriggerSource.SPREADSHEETS
+      // Removed specific handler function filter here to match existing logic more broadly,
+      // but will add it in the loop for targeted deletion.
     );
 
     if (editTriggers.length === 0) {
-      console.log('No onEditTrigger triggers found to remove');
+      console.log('No edit triggers found to remove'); // Broader message
       return {
         success: true,
-        message: 'No onEditTrigger triggers to remove',
+        message: 'No edit triggers to remove',
         removed: 0
       };
     }
 
-    console.log(`Removing ${editTriggers.length} onEditTrigger triggers...`);
+    let removedCount = 0;
+    console.log(`Found ${editTriggers.length} edit triggers. Filtering for 'onEditTrigger' handler...`);
     editTriggers.forEach(trigger => {
-      ScriptApp.deleteTrigger(trigger);
+      if (trigger.getHandlerFunction() === 'onEditTrigger') {
+        ScriptApp.deleteTrigger(trigger);
+        removedCount++;
+      }
     });
+    console.log(`Removed ${removedCount} 'onEditTrigger' triggers.`);
 
     // Clear stored trigger info
     const properties = PropertiesService.getScriptProperties();
     properties.deleteProperty('AUTO_TRIGGER_INFO');
 
-    console.log('✅ Auto-trigger for onEditTrigger removed successfully');
-    console.log('Role changes will no longer automatically clear caches via this trigger');
+    console.log(`✅ Auto-trigger(s) for 'onEditTrigger' removed successfully. Total checked: ${editTriggers.length}, removed: ${removedCount}`);
+    console.log('Role changes will no longer automatically clear caches via these specific triggers');
 
     return {
       success: true,
-      message: 'Auto-trigger for onEditTrigger removed successfully',
-      removed: editTriggers.length
+      message: `Auto-trigger(s) for 'onEditTrigger' removed successfully. Checked ${editTriggers.length}, removed ${removedCount}.`,
+      removed: removedCount
     };
 
   } catch (error) {
@@ -1747,12 +1755,6 @@ function clearCachesForSpecificUser(userEmail, oldRole, newRole, triggerId) {
     // Clear staff data cache to ensure fresh user data
     cache.remove('staff_data');
     cache.remove(generateCacheKey('staff_data'));
-
-    // Increment master cache version to invalidate any remaining caches
-    if (typeof incrementMasterCacheVersion === 'function') {
-      incrementMasterCacheVersion();
-      debugLog('Master cache version incremented', { triggerId: triggerId });
-    }
 
     debugLog('Cache clearing completed for user', {
       userEmail: userEmail,

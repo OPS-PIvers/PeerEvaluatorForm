@@ -380,7 +380,7 @@ function getRoleSheetData(roleName) {
           operationId: operationId
         });
         // Clear invalid cached data
-        clearCachedData(generateCacheKey('role_sheet', cacheParams));
+        CacheService.getScriptCache().remove(generateCacheKey('role_sheet', cacheParams));
       }
     }
     
