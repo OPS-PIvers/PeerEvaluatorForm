@@ -3,8 +3,46 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?= data.title ?></title>
+
+    <!-- Cache Control Headers -->
+    <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate, max-age=0">
+    <meta http-equiv="pragma" content="no-cache">
+    <meta http-equiv="expires" content="0">
+
+    <!-- App Metadata -->
+    <meta name="application-name" content="Danielson Framework">
+    <meta name="author" content="<?= SYSTEM_INFO.AUTHOR ?>">
+    <meta name="generator" content="Google Apps Script">
+    <meta name="robots" content="noindex, nofollow">
+
+    <!-- Response Metadata (from server) -->
+    <? if (data.userContext && data.userContext.responseMetadata) { ?>
+        <meta name="x-request-id" content="<?= data.userContext.responseMetadata.requestId ?>">
+        <meta name="x-timestamp" content="<?= data.userContext.responseMetadata.timestamp ?>">
+        <meta name="x-cache-version" content="<?= data.userContext.responseMetadata.cacheVersion ?>">
+        <meta name="x-etag" content="<?= data.userContext.responseMetadata.etag ?>">
+        <meta name="x-role" content="<?= data.userContext.role ?>">
+        <meta name="x-year" content="<?= data.userContext.year ?>">
+
+        <? if (data.userContext.debugMode) { ?>
+            <meta name="x-debug-mode" content="true">
+            <meta name="x-user-email" content="<?= data.userContext.email || 'anonymous' ?>">
+            <meta name="x-user-authenticated" content="<?= data.userContext.isAuthenticated ?>">
+            <meta name="x-role-override" content="<?= data.userContext.isRoleOverride || false ?>">
+        <? } ?>
+    <? } ?>
+
+    <!-- Dynamic Title -->
+    <title><?= data.title ?> - <?= data.userContext ? data.userContext.role : 'Framework' ?></title>
+
+    <!-- Prevent browser back/forward cache -->
+    <meta name="turbo-cache-control" content="no-cache">
+
+    <!-- Add cache-busting to any external resources if needed -->
+
+    <!-- Your existing styles here - keep all the existing CSS -->
     <style>
+        /* Keep all your existing CSS exactly as it is */
         * {
             margin: 0;
             padding: 0;
@@ -299,9 +337,52 @@
                 top: auto;
             }
         }
+        /* ... (keep all your existing styles) ... */
+
+        /* Add debug info styles if in debug mode */
+        <? if (data.userContext && data.userContext.debugMode) { ?>
+        .debug-info {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-family: monospace;
+            z-index: 9999;
+            max-width: 300px;
+            word-break: break-all;
+        }
+
+        .debug-info h4 {
+            margin-bottom: 8px;
+            color: #ffc107;
+        }
+
+        .debug-info div {
+            margin-bottom: 4px;
+        }
+        <? } ?>
     </style>
 </head>
 <body>
+    <!-- Debug Information (only visible in debug mode) -->
+    <? if (data.userContext && data.userContext.debugMode) { ?>
+    <div class="debug-info">
+        <h4>🐛 DEBUG INFO</h4>
+        <div><strong>Role:</strong> <?= data.userContext.role ?></div>
+        <div><strong>Year:</strong> <?= data.userContext.year ?></div>
+        <div><strong>Email:</strong> <?= data.userContext.email || 'Anonymous' ?></div>
+        <div><strong>Cache Ver:</strong> <?= data.userContext.cacheVersion ?></div>
+        <div><strong>Request ID:</strong> <?= data.userContext.requestId ?></div>
+        <div><strong>Timestamp:</strong> <?= new Date(data.userContext.timestamp).toLocaleTimeString() ?></div>
+        <? if (data.userContext.isRoleOverride) { ?>
+        <div style="color: #ffc107;"><strong>⚠️ ROLE OVERRIDE ACTIVE</strong></div>
+        <? } ?>
+    </div>
+    <? } ?>
     <div class="container">
         <div class="header">
             <h1><?= data.title ?></h1>
@@ -394,6 +475,24 @@
     <button class="back-to-top" id="backToTop" onclick="scrollToTop()">↑</button>
 
     <script>
+        // Enhanced cache busting and page management
+
+        // Prevent browser caching of this page
+        if (window.performance && window.performance.navigation.type === window.performance.navigation.TYPE_BACK_FORWARD) {
+            console.log('Detected back/forward navigation - forcing reload');
+            window.location.reload(true);
+        }
+
+        // Store page load info for debugging
+        window.pageLoadInfo = {
+            timestamp: Date.now(),
+            userAgent: navigator.userAgent,
+            role: '<?= data.userContext ? data.userContext.role : "unknown" ?>',
+            cacheVersion: '<?= data.userContext ? data.userContext.cacheVersion : "unknown" ?>',
+            requestId: '<?= data.userContext ? data.userContext.requestId : "unknown" ?>'
+        };
+
+        // Enhanced toggle function with state persistence
         function toggleLookFors(componentId) {
             var parts = componentId.split('-');
             var domainIdx = parts[1];
@@ -405,6 +504,51 @@
             if (content && chevron) {
                 content.classList.toggle('expanded');
                 chevron.classList.toggle('expanded');
+
+                // Store state in sessionStorage for this session
+                try {
+                    var storageKey = 'lookFors_' + componentId + '_' + window.pageLoadInfo.cacheVersion;
+                    var isExpanded = content.classList.contains('expanded');
+                    sessionStorage.setItem(storageKey, isExpanded.toString());
+                } catch (e) {
+                    console.log('SessionStorage not available:', e);
+                }
+            }
+        }
+
+        // Restore look-fors state on page load
+        function restoreLookForsState() {
+            try {
+                var expandedSections = [];
+                for (var i = 0; i < sessionStorage.length; i++) {
+                    var key = sessionStorage.key(i);
+                    if (key && key.startsWith('lookFors_') && key.endsWith('_' + window.pageLoadInfo.cacheVersion)) {
+                        var isExpanded = sessionStorage.getItem(key) === 'true';
+                        if (isExpanded) {
+                            var componentId = key.replace('lookFors_', '').replace('_' + window.pageLoadInfo.cacheVersion, '');
+                            expandedSections.push(componentId);
+                        }
+                    }
+                }
+
+                // Restore expanded state
+                expandedSections.forEach(function(componentId) {
+                    var parts = componentId.split('-');
+                    var domainIdx = parts[1];
+                    var componentIdx = parts[3];
+
+                    var content = document.getElementById('lookForsContent-' + domainIdx + '-' + componentIdx);
+                    var chevron = document.getElementById('chevron-' + domainIdx + '-' + componentIdx);
+
+                    if (content && chevron) {
+                        content.classList.add('expanded');
+                        chevron.classList.add('expanded');
+                    }
+                });
+
+                console.log('Restored state for', expandedSections.length, 'expanded sections');
+            } catch (e) {
+                console.log('Error restoring look-fors state:', e);
             }
         }
         
@@ -419,8 +563,27 @@
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
         
-        // Handle navigation button clicks using event delegation
+        // Enhanced page refresh with cache busting
+        function forcePageRefresh() {
+            console.log('Forcing page refresh with cache busting');
+
+            var url = new URL(window.location);
+            url.searchParams.set('refresh', 'true');
+            url.searchParams.set('nocache', 'true');
+            url.searchParams.set('t', Date.now());
+            url.searchParams.set('r', Math.random().toString(36).substr(2, 9));
+
+            window.location.href = url.toString();
+        }
+
+        // Enhanced DOMContentLoaded handler
         document.addEventListener('DOMContentLoaded', function() {
+            console.log('Page loaded:', window.pageLoadInfo);
+
+            // Restore look-fors state
+            restoreLookForsState();
+
+            // Handle navigation button clicks
             var navigation = document.querySelector('.navigation');
             if (navigation) {
                 navigation.addEventListener('click', function(e) {
@@ -432,6 +595,21 @@
                     }
                 });
             }
+
+            // Add keyboard shortcuts
+            document.addEventListener('keydown', function(e) {
+                // Ctrl+R or Cmd+R for force refresh
+                if ((e.ctrlKey || e.metaKey) && e.key === 'r') {
+                    e.preventDefault();
+                    forcePageRefresh();
+                }
+
+                // F5 for force refresh
+                if (e.key === 'F5') {
+                    e.preventDefault();
+                    forcePageRefresh();
+                }
+            });
         });
         
         // Show/hide back to top button
@@ -468,10 +646,63 @@
             });
         });
         
-        // Auto-refresh every 5 minutes to get latest data
+        // Enhanced auto-refresh with cache version checking
+        var autoRefreshInterval = <?= data.userContext && data.userContext.debugMode ? 300000 : 600000 ?>; // 5 min debug, 10 min normal
+
         setTimeout(function() {
-            window.location.reload();
-        }, 300000);
+            console.log('Auto-refresh triggered');
+
+            // In debug mode, show notification
+            <? if (data.userContext && data.userContext.debugMode) { ?>
+            var notice = document.createElement('div');
+            notice.style.cssText = 'position:fixed; top:50px; right:10px; background:#007bff; color:white; padding:10px; border-radius:6px; z-index:9998; font-size:0.9rem;';
+            notice.textContent = '🔄 Auto-refreshing to get latest data...';
+            document.body.appendChild(notice);
+
+            setTimeout(function() {
+                forcePageRefresh();
+            }, 2000);
+            <? } else { ?>
+            forcePageRefresh();
+            <? } ?>
+
+        }, autoRefreshInterval);
+
+        // Performance monitoring
+        window.addEventListener('load', function() {
+            setTimeout(function() {
+                if (window.performance && window.performance.timing) {
+                    var timing = window.performance.timing;
+                    var loadTime = timing.loadEventEnd - timing.navigationStart;
+                    console.log('Page load time:', loadTime + 'ms');
+
+                    // Report slow loads
+                    if (loadTime > 5000) {
+                        console.warn('Slow page load detected. Consider force refresh.');
+                    }
+                }
+            }, 0);
+        });
+
+        // Expose utility functions globally for debugging
+        window.debugUtils = {
+            forceRefresh: forcePageRefresh,
+            pageInfo: window.pageLoadInfo,
+            clearState: function() {
+                try {
+                    sessionStorage.clear();
+                    console.log('Session state cleared');
+                } catch (e) {
+                    console.log('Error clearing session state:', e);
+                }
+            }
+        };
+
+        console.log('Enhanced Danielson Framework app loaded successfully');
+        <? if (data.userContext && data.userContext.debugMode) { ?>
+        console.log('🐛 DEBUG MODE ACTIVE - Check debug info panel in top-right corner');
+        console.log('Available debug commands: window.debugUtils.forceRefresh(), window.debugUtils.clearState()');
+        <? } ?>
     </script>
 </body>
 </html>
