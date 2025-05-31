@@ -158,7 +158,7 @@ function validateUserAccess(email) {
     // Email validation
     if (!email || !isValidEmail(email)) {
       result.issues.push({
-        type: VALIDATION_ERROR_TYPES.INVALID_ROLE,
+        type: VALIDATION_ERROR_TYPES.INVALID_EMAIL,
         message: 'Invalid or missing email address',
         severity: VALIDATION_SEVERITY.ERROR
       });
