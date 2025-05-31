@@ -32,8 +32,8 @@ function getUserFromSession() {
 
 /**
  * Gets user information by email from the Staff sheet
- * @param {string} email - User's email address
- * @return {Object|null} User object with name, email, role, and year, or null if not found
+ * REPLACE THIS FUNCTION in UserService.js
+ * Enhanced getUserByEmail function with cache versioning
  */
 function getUserByEmail(email) {
   if (!email || !isValidEmail(email)) {
@@ -42,14 +42,17 @@ function getUserByEmail(email) {
   }
   
   try {
-    // Check cache first
-    const cacheKey = `user_${email}`;
-    const cachedUser = getCachedData(cacheKey);
-    if (cachedUser) {
-      debugLog('User data retrieved from cache', { email: email });
-      return cachedUser;
+    // Use enhanced cache with role-specific key
+    const cacheParams = { email: email.toLowerCase().trim() };
+    const cachedUser = getCachedDataEnhanced('user', cacheParams);
+
+    if (cachedUser && cachedUser.data) {
+      debugLog('User data retrieved from enhanced cache', { email: email });
+      return cachedUser.data;
     }
     
+    debugLog('Loading fresh user data', { email: email });
+
     const staffData = getStaffData();
     if (!staffData || !staffData.users) {
       debugLog('No staff data available');
@@ -58,19 +61,24 @@ function getUserByEmail(email) {
     
     // Find user by email (case-insensitive)
     const normalizedEmail = email.toLowerCase().trim();
-    const user = staffData.users.find(u => 
-      u.email && u.email.toLowerCase().trim() === normalizedEmail
-    );
+    const user = staffData.users.find(u => {
+      const userEmail = u.email ? u.email.toLowerCase().trim() : '';
+      return userEmail === normalizedEmail;
+    });
     
     if (!user) {
-      debugLog('User not found in staff data', { email: email });
+      debugLog('User not found in staff data', {
+        email: email,
+        searchedEmail: normalizedEmail,
+        availableEmails: staffData.users.map(u => u.email).slice(0, 5) // First 5 for debugging
+      });
       return null;
     }
     
-    // Cache the user data
-    setCachedData(cacheKey, user, CACHE_SETTINGS.USER_DATA_TTL);
+    // Cache with enhanced system
+    setCachedDataEnhanced('user', cacheParams, user, CACHE_SETTINGS.USER_DATA_TTL);
     
-    debugLog('User found in staff data', { 
+    debugLog('User found and cached', {
       email: user.email, 
       role: user.role, 
       year: user.year 

@@ -120,18 +120,16 @@ function validateSheetExists(sheetName, expectedHeaders = []) {
 }
 
 /**
- * Reads data from the Staff sheet
- * @return {Object|null} Staff data with parsed users array
+ * REPLACE THIS FUNCTION in SheetService.js
+ * Enhanced getStaffData function with change detection
  */
 function getStaffData() {
-  const cacheKey = 'staff_data';
-  
   try {
-    // Check cache first
-    const cachedData = getCachedData(cacheKey);
-    if (cachedData) {
-      debugLog('Staff data retrieved from cache');
-      return cachedData;
+    // Check enhanced cache first
+    const cachedData = getCachedDataEnhanced('staff_data');
+    if (cachedData && cachedData.data) {
+      debugLog('Staff data retrieved from enhanced cache');
+      return cachedData.data;
     }
     
     const startTime = Date.now();
@@ -149,13 +147,20 @@ function getStaffData() {
       return { users: [], lastUpdated: new Date().toISOString() };
     }
     
-    // Read all data (assuming row 1 has headers)
-    const range = sheet.getRange(2, 1, lastRow - 1, 4); // Rows 2 to end, columns A-D
+    // Read all data
+    const range = sheet.getRange(2, 1, lastRow - 1, 4);
     const values = range.getValues();
     
+    // Check if data has changed
+    const dataChanged = hasSheetDataChanged('Staff', values);
+    if (dataChanged) {
+      debugLog('Staff sheet data change detected - invalidating related caches');
+      invalidateDependentCaches('staff_data');
+    }
+
     const users = [];
     values.forEach((row, index) => {
-      const rowNumber = index + 2; // Actual row number in sheet
+      const rowNumber = index + 2;
       
       // Skip empty rows
       if (!row[STAFF_COLUMNS.NAME] && !row[STAFF_COLUMNS.EMAIL]) {
@@ -193,21 +198,24 @@ function getStaffData() {
       users: users,
       lastUpdated: new Date().toISOString(),
       rowCount: lastRow - 1,
-      validUsers: users.length
+      validUsers: users.length,
+      dataHash: generateDataHash(values) // Add hash for verification
     };
     
-    // Cache the data
-    setCachedData(cacheKey, staffData, CACHE_SETTINGS.SHEET_DATA_TTL);
+    // Cache with enhanced system
+    setCachedDataEnhanced('staff_data', {}, staffData, CACHE_SETTINGS.SHEET_DATA_TTL);
     
     const executionTime = Date.now() - startTime;
     logPerformanceMetrics('getStaffData', executionTime, {
       userCount: users.length,
-      rowsProcessed: lastRow - 1
+      rowsProcessed: lastRow - 1,
+      dataChanged: dataChanged
     });
     
     debugLog('Staff data loaded successfully', {
       userCount: users.length,
-      validUsers: users.length
+      validUsers: users.length,
+      dataChanged: dataChanged
     });
     
     return staffData;
@@ -308,9 +316,8 @@ function getSettingsData() {
 }
 
 /**
- * Reads data from a role-specific sheet (e.g., Teacher, Nurse, etc.)
- * @param {string} roleName - Name of the role (should match sheet name)
- * @return {Object|null} Role sheet data
+ * REPLACE THIS FUNCTION in SheetService.js
+ * Enhanced getRoleSheetData function with change detection
  */
 function getRoleSheetData(roleName) {
   if (!roleName || !isValidRole(roleName)) {
@@ -318,14 +325,14 @@ function getRoleSheetData(roleName) {
     return null;
   }
   
-  const cacheKey = `role_sheet_${roleName}`;
-  
   try {
-    // Check cache first
-    const cachedData = getCachedData(cacheKey);
-    if (cachedData) {
-      debugLog(`Role sheet data for ${roleName} retrieved from cache`);
-      return cachedData;
+    // Check enhanced cache with role-specific parameters
+    const cacheParams = { role: roleName };
+    const cachedData = getCachedDataEnhanced('role_sheet', cacheParams);
+
+    if (cachedData && cachedData.data) {
+      debugLog(`Role sheet data for ${roleName} retrieved from enhanced cache`);
+      return cachedData.data;
     }
     
     const startTime = Date.now();
@@ -354,6 +361,13 @@ function getRoleSheetData(roleName) {
     const range = sheet.getRange(1, 1, lastRow, lastColumn);
     const values = range.getValues();
     
+    // Check if data has changed
+    const dataChanged = hasSheetDataChanged(roleName, values);
+    if (dataChanged) {
+      debugLog(`Role sheet data change detected for ${roleName} - invalidating related caches`);
+      invalidateDependentCaches('role_sheet_*');
+    }
+
     const roleSheetData = {
       roleName: roleName,
       sheetName: sheet.getName(),
@@ -362,22 +376,25 @@ function getRoleSheetData(roleName) {
       columnCount: lastColumn,
       lastUpdated: new Date().toISOString(),
       title: values[0] ? sanitizeText(values[0][0]) : '',
-      subtitle: values[1] ? sanitizeText(values[1][0]) : ''
+      subtitle: values[1] ? sanitizeText(values[1][0]) : '',
+      dataHash: generateDataHash(values) // Add hash for verification
     };
     
-    // Cache the data
-    setCachedData(cacheKey, roleSheetData, CACHE_SETTINGS.SHEET_DATA_TTL);
+    // Cache with enhanced system
+    setCachedDataEnhanced('role_sheet', cacheParams, roleSheetData, CACHE_SETTINGS.SHEET_DATA_TTL);
     
     const executionTime = Date.now() - startTime;
     logPerformanceMetrics('getRoleSheetData', executionTime, {
       roleName: roleName,
       rowCount: lastRow,
-      columnCount: lastColumn
+      columnCount: lastColumn,
+      dataChanged: dataChanged
     });
     
     debugLog(`Role sheet data loaded for ${roleName}`, {
       rowCount: lastRow,
-      columnCount: lastColumn
+      columnCount: lastColumn,
+      dataChanged: dataChanged
     });
     
     return roleSheetData;
