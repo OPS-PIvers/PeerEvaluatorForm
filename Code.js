@@ -53,24 +53,36 @@ function clearCachesForRoleChange(userEmail = null) {
     }
 
     if (userEmail) {
-      debugLog('Clearing caches for user role change', { userEmail });
+      debugLog('Performing targeted cache invalidation for user role change', { userEmail });
+      const cache = CacheService.getScriptCache();
+      const trimmedEmail = userEmail.toLowerCase().trim();
 
-      // Clear user-specific cache
-      invalidateDependentCaches('user_*');
+      // Clear direct user-specific caches
+      const userKey = generateCacheKey('user', { email: trimmedEmail });
+      cache.remove(userKey);
+      debugLog('Cleared specific user cache for role change', { userEmail, key: userKey });
 
-      // Clear role sheet caches (since user might switch between roles)
-      invalidateDependentCaches('role_sheet_*');
+      const userContextKey = generateCacheKey('user_context', { email: trimmedEmail });
+      cache.remove(userContextKey);
+      debugLog('Cleared specific user_context cache for role change', { userEmail, key: userContextKey });
+
+      // Decision: This function will NOT call incrementMasterCacheVersion itself.
+      // It focuses on clearing only the specific user's direct data.
+      // If a role change was detected by the caller (e.g., createUserContext),
+      // the caller might take further specific actions regarding role sheets
+      // or rely on the user data change to propagate.
+      // This keeps clearCachesForRoleChange highly focused on the user's direct caches.
 
     } else {
-      debugLog('No user email - performing global cache clear');
+      debugLog('No user email provided to clearCachesForRoleChange - performing global cache clear via forceCleanAllCaches');
       forceCleanAllCaches();
     }
 
-    console.log('✅ Enhanced cache clearing completed');
+    console.log('✅ Cache clearing for role change process completed');
 
   } catch (error) {
-    console.error('Error in enhanced cache clearing:', error);
-    // Fallback to force clear
+    console.error('Error in clearCachesForRoleChange:', error);
+    // Fallback to force clear to ensure system stability
     forceCleanAllCaches();
   }
 }

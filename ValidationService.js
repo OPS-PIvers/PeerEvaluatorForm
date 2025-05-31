@@ -6,16 +6,16 @@
 /**
  * Validation error types
  */
-const VALIDATION_ERROR_TYPES = {
-  MISSING_SHEET: 'missing_sheet',
-  INVALID_ROLE: 'invalid_role',
-  MISSING_USER: 'missing_user',
-  DATA_CORRUPTION: 'data_corruption',
-  PERMISSION_ERROR: 'permission_error',
-  CONFIGURATION_ERROR: 'configuration_error',
-  NETWORK_ERROR: 'network_error',
-  TIMEOUT_ERROR: 'timeout_error'
-};
+// const VALIDATION_ERROR_TYPES = {
+//   MISSING_SHEET: 'missing_sheet',
+//   INVALID_ROLE: 'invalid_role',
+//   MISSING_USER: 'missing_user',
+//   DATA_CORRUPTION: 'data_corruption',
+//   PERMISSION_ERROR: 'permission_error',
+//   CONFIGURATION_ERROR: 'configuration_error',
+//   NETWORK_ERROR: 'network_error',
+//   TIMEOUT_ERROR: 'timeout_error'
+// };
 
 /**
  * Validation severity levels
