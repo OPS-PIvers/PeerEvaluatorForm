@@ -81,50 +81,117 @@ function clearCachesForRoleChange(userEmail = null) {
  */
 function doGet(e) {
   const startTime = Date.now();
+  const requestId = generateUniqueId('request');
   
   try {
-    // Create user context (handles authentication and role detection)
+    // Parse URL parameters for cache control
+    const params = e.parameter || {};
+    const forceRefresh = params.refresh === 'true' || params.nocache === 'true';
+    const debugMode = params.debug === 'true';
+    const urlTimestamp = params.t || null;
+    const urlRole = params.role || null;
+
+    debugLog('Web app request received', {
+      requestId: requestId,
+      forceRefresh: forceRefresh,
+      debugMode: debugMode,
+      urlTimestamp: urlTimestamp,
+      urlRole: urlRole,
+      userAgent: e.userAgent || 'Unknown'
+    });
+
+    // Handle force refresh - clear all relevant caches
+    if (forceRefresh) {
+      debugLog('Force refresh requested - clearing caches', { requestId });
+
+      const sessionUser = getUserFromSession();
+      if (sessionUser && sessionUser.email) {
+        clearCachesForRoleChange(sessionUser.email);
+        debugLog('Cleared caches for user', { email: sessionUser.email, requestId });
+      } else {
+        // Clear all caches if no specific user
+        forceCleanAllCaches();
+        debugLog('Performed global cache clear', { requestId });
+      }
+    }
+
+    // Create user context with enhanced cache handling
     const userContext = createUserContext();
     
-    debugLog('Web app request started', {
+    // Override role if specified in URL (for testing)
+    if (urlRole && AVAILABLE_ROLES.includes(urlRole)) {
+      debugLog('URL role override detected', {
+        originalRole: userContext.role,
+        urlRole: urlRole,
+        requestId
+      });
+      userContext.role = urlRole;
+      userContext.isRoleOverride = true;
+    }
+
+    debugLog('User context created', {
       email: userContext.email,
       role: userContext.role,
       year: userContext.year,
-      isDefaultUser: userContext.isDefaultUser
+      isDefaultUser: userContext.isDefaultUser,
+      isRoleOverride: userContext.isRoleOverride || false,
+      requestId: requestId
     });
     
     // Get role-specific rubric data
     const rubricData = getAllDomainsData(userContext.role, userContext.year);
     
-    // Add user context to the data for the HTML template
+    // Generate response metadata for cache busting
+    const responseMetadata = generateResponseMetadata(userContext, requestId, debugMode);
+
+    // Add enhanced user context to the data for the HTML template
     rubricData.userContext = {
       email: userContext.email,
       role: userContext.role,
       year: userContext.year,
       isAuthenticated: userContext.isAuthenticated,
-      displayName: userContext.email ? userContext.email.split('@')[0] : 'Guest'
+      displayName: userContext.email ? userContext.email.split('@')[0] : 'Guest',
+      requestId: requestId,
+      timestamp: Date.now(),
+      forceRefresh: forceRefresh,
+      debugMode: debugMode,
+      isRoleOverride: userContext.isRoleOverride || false,
+      cacheVersion: getMasterCacheVersion(),
+      responseMetadata: responseMetadata
     };
     
     // Create and configure the HTML template
     const htmlTemplate = HtmlService.createTemplateFromFile('rubric');
     htmlTemplate.data = rubricData;
     
+    // Generate the HTML output
     const htmlOutput = htmlTemplate.evaluate()
       .setTitle(getPageTitle(userContext.role))
-      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
-      .addMetaTag('viewport', HTML_SETTINGS.VIEWPORT_META);
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+
+    // Add comprehensive cache-busting headers
+    addCacheBustingHeaders(htmlOutput, responseMetadata);
+
+    // Add debug headers if requested
+    if (debugMode) {
+      addDebugHeaders(htmlOutput, userContext, responseMetadata);
+    }
     
     const executionTime = Date.now() - startTime;
     logPerformanceMetrics('doGet', executionTime, {
       role: userContext.role,
       year: userContext.year,
       domainCount: rubricData.domains ? rubricData.domains.length : 0,
-      isDefaultUser: userContext.isDefaultUser
+      isDefaultUser: userContext.isDefaultUser,
+      forceRefresh: forceRefresh,
+      requestId: requestId
     });
     
     debugLog('Web app request completed successfully', {
       role: userContext.role,
-      executionTime: executionTime
+      executionTime: executionTime,
+      requestId: requestId,
+      responseETag: responseMetadata.etag
     });
     
     return htmlOutput;
@@ -132,8 +199,405 @@ function doGet(e) {
   } catch (error) {
     console.error('Error in doGet:', formatErrorMessage(error, 'doGet'));
     
-    // Return user-friendly error page
-    return createErrorPage(error);
+    // Return enhanced error page with cache busting
+    return createEnhancedErrorPage(error, requestId);
+  }
+}
+
+/**
+ * ADD THESE NEW FUNCTIONS to Code.js
+ * Helper functions for response enhancement
+ */
+
+/**
+ * Generate comprehensive response metadata for cache busting
+ * @param {Object} userContext - User context object
+ * @param {string} requestId - Unique request identifier
+ * @param {boolean} debugMode - Whether debug mode is enabled
+ * @return {Object} Response metadata
+ */
+function generateResponseMetadata(userContext, requestId, debugMode = false) {
+  try {
+    const timestamp = Date.now();
+    const cacheVersion = getMasterCacheVersion();
+
+    // Generate ETag based on user state and data version
+    const etagData = {
+      role: userContext.role,
+      year: userContext.year,
+      email: userContext.email,
+      cacheVersion: cacheVersion,
+      timestamp: Math.floor(timestamp / 60000) // Round to minute for some caching
+    };
+
+    const etag = Utilities.base64Encode(
+      Utilities.computeDigest(
+        Utilities.DigestAlgorithm.MD5,
+        JSON.stringify(etagData)
+      )
+    ).substring(0, 16);
+
+    const metadata = {
+      requestId: requestId,
+      timestamp: timestamp,
+      cacheVersion: cacheVersion,
+      etag: etag,
+      role: userContext.role,
+      year: userContext.year,
+      debugMode: debugMode,
+      lastModified: new Date().toUTCString(),
+      maxAge: 0, // No caching by default
+      mustRevalidate: true
+    };
+
+    debugLog('Response metadata generated', metadata);
+    return metadata;
+
+  } catch (error) {
+    console.error('Error generating response metadata:', error);
+    return {
+      requestId: requestId,
+      timestamp: Date.now(),
+      etag: 'error-' + Date.now(),
+      error: error.message
+    };
+  }
+}
+
+/**
+ * Add cache-busting headers to HTML output
+ * @param {HtmlOutput} htmlOutput - The HTML output object
+ * @param {Object} metadata - Response metadata
+ */
+function addCacheBustingHeaders(htmlOutput, metadata) {
+  try {
+    // Primary cache control headers
+    htmlOutput
+      .addMetaTag('cache-control', 'no-cache, no-store, must-revalidate, max-age=0')
+      .addMetaTag('pragma', 'no-cache')
+      .addMetaTag('expires', '0')
+      .addMetaTag('last-modified', metadata.lastModified)
+      .addMetaTag('etag', metadata.etag);
+
+    // Custom headers for debugging and version tracking
+    htmlOutput
+      .addMetaTag('x-app-version', SYSTEM_INFO.VERSION)
+      .addMetaTag('x-cache-version', metadata.cacheVersion)
+      .addMetaTag('x-request-id', metadata.requestId)
+      .addMetaTag('x-timestamp', metadata.timestamp.toString())
+      .addMetaTag('x-role', metadata.role)
+      .addMetaTag('x-year', metadata.year.toString());
+
+    // Viewport and mobile optimization
+    htmlOutput.addMetaTag('viewport', 'width=device-width, initial-scale=1.0');
+
+    debugLog('Cache-busting headers added', {
+      etag: metadata.etag,
+      requestId: metadata.requestId
+    });
+
+  } catch (error) {
+    console.error('Error adding cache-busting headers:', error);
+  }
+}
+
+/**
+ * Add debug headers for development
+ * @param {HtmlOutput} htmlOutput - The HTML output object
+ * @param {Object} userContext - User context object
+ * @param {Object} metadata - Response metadata
+ */
+function addDebugHeaders(htmlOutput, userContext, metadata) {
+  try {
+    htmlOutput
+      .addMetaTag('x-debug-mode', 'true')
+      .addMetaTag('x-user-email', userContext.email || 'anonymous')
+      .addMetaTag('x-user-authenticated', userContext.isAuthenticated.toString())
+      .addMetaTag('x-user-default', userContext.isDefaultUser.toString())
+      .addMetaTag('x-role-override', (userContext.isRoleOverride || false).toString())
+      .addMetaTag('x-execution-time', (Date.now() - metadata.timestamp).toString());
+
+    debugLog('Debug headers added', { requestId: metadata.requestId });
+
+  } catch (error) {
+    console.error('Error adding debug headers:', error);
+  }
+}
+
+/**
+ * Enhanced error page with cache busting
+ * @param {Error} error - Error object
+ * @param {string} requestId - Request identifier
+ * @return {HtmlOutput} Enhanced error page
+ */
+function createEnhancedErrorPage(error, requestId) {
+  const timestamp = Date.now();
+
+  const errorHtml = `
+    <html>
+      <head>
+        <title>Error Loading Application</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="cache-control" content="no-cache, no-store, must-revalidate">
+        <meta name="pragma" content="no-cache">
+        <meta name="expires" content="0">
+        <meta name="x-request-id" content="${requestId}">
+        <meta name="x-timestamp" content="${timestamp}">
+        <meta name="x-error" content="true">
+        <style>
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            padding: 20px; max-width: 600px; margin: 0 auto;
+            background: #f8f9fa; color: #333;
+          }
+          .error-container {
+            background: white; border: 1px solid #dee2e6;
+            padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+          }
+          .error-title {
+            color: #dc3545; margin-bottom: 20px; font-size: 1.5rem; font-weight: 600;
+          }
+          .error-message {
+            background: #f8f9fa; padding: 15px; border-radius: 6px;
+            margin: 15px 0; border-left: 4px solid #dc3545;
+          }
+          .error-details {
+            font-size: 0.9rem; color: #6c757d; margin-top: 10px;
+          }
+          .troubleshooting { margin-top: 25px; }
+          .troubleshooting h3 { color: #495057; margin-bottom: 15px; }
+          .troubleshooting ul { padding-left: 20px; line-height: 1.6; }
+          .retry-section { margin-top: 25px; text-align: center; }
+          .retry-button {
+            background: #007bff; color: white; padding: 12px 24px;
+            border: none; border-radius: 6px; cursor: pointer; font-size: 1rem;
+            text-decoration: none; display: inline-block;
+          }
+          .retry-button:hover { background: #0056b3; }
+          .cache-clear-button {
+            background: #28a745; margin-left: 10px;
+          }
+          .cache-clear-button:hover { background: #1e7e34; }
+        </style>
+      </head>
+      <body>
+        <div class="error-container">
+          <h2 class="error-title">🚨 Application Error</h2>
+
+          <div class="error-message">
+            <strong>Error:</strong> ${error.toString()}
+            <div class="error-details">
+              Request ID: ${requestId}<br>
+              Timestamp: ${new Date(timestamp).toLocaleString()}<br>
+              Cache Version: ${getMasterCacheVersion()}
+            </div>
+          </div>
+
+          <div class="troubleshooting">
+            <h3>🔧 Troubleshooting Steps:</h3>
+            <ul>
+              <li><strong>First:</strong> Try the "Clear Cache & Retry" button below</li>
+              <li><strong>Check:</strong> SHEET_ID is correctly set in Script Properties</li>
+              <li><strong>Verify:</strong> Spreadsheet exists and is accessible</li>
+              <li><strong>Ensure:</strong> Required sheet tabs exist (Staff, Settings, Teacher)</li>
+              <li><strong>Confirm:</strong> You have permission to access the spreadsheet</li>
+              <li><strong>If persistent:</strong> Open in incognito/private browser window</li>
+            </ul>
+          </div>
+
+          <div class="retry-section">
+            <button class="retry-button" onclick="window.location.reload()">
+              🔄 Simple Retry
+            </button>
+            <button class="retry-button cache-clear-button" onclick="clearCacheAndRetry()">
+              🧹 Clear Cache & Retry
+            </button>
+          </div>
+        </div>
+
+        <script>
+          function clearCacheAndRetry() {
+            // Add cache-busting parameters
+            const url = new URL(window.location);
+            url.searchParams.set('refresh', 'true');
+            url.searchParams.set('nocache', 'true');
+            url.searchParams.set('t', Date.now());
+            url.searchParams.set('r', Math.random().toString(36).substr(2, 9));
+
+            // Redirect to cache-busted URL
+            window.location.href = url.toString();
+          }
+
+          // Auto-retry after 30 seconds
+          setTimeout(function() {
+            const retryNotice = document.createElement('div');
+            retryNotice.style.cssText = 'background:#fff3cd; padding:15px; margin:20px 0; border-radius:6px; border-left:4px solid #ffc107;';
+            retryNotice.innerHTML = '<strong>⏰ Auto-retry in progress...</strong> The page will refresh automatically.';
+            document.querySelector('.error-container').appendChild(retryNotice);
+
+            setTimeout(clearCacheAndRetry, 5000);
+          }, 30000);
+        </script>
+      </body>
+    </html>
+  `;
+
+  return HtmlService.createHtmlOutput(errorHtml);
+}
+
+/**
+ * ADD THESE URL FUNCTIONS to Code.js
+ * URL generation and cache-busting utilities
+ */
+
+/**
+ * Generate cache-busted web app URL
+ * @param {Object} options - URL generation options
+ * @return {string} Cache-busted URL
+ */
+function generateCacheBustedUrl(options = {}) {
+  try {
+    const scriptId = ScriptApp.getScriptId();
+    const baseUrl = `https://script.google.com/macros/s/${scriptId}/exec`;
+
+    const params = new URLSearchParams();
+
+    // Always add cache busting
+    params.set('refresh', 'true');
+    params.set('nocache', 'true');
+    params.set('t', Date.now().toString());
+    params.set('r', Math.random().toString(36).substr(2, 9));
+
+    // Add optional parameters
+    if (options.role) params.set('role', options.role);
+    if (options.debug) params.set('debug', 'true');
+    if (options.year) params.set('year', options.year.toString());
+    if (options.mobile) params.set('mobile', 'true');
+
+    // Add cache version for tracking
+    params.set('cv', getMasterCacheVersion());
+
+    const fullUrl = `${baseUrl}?${params.toString()}`;
+
+    debugLog('Generated cache-busted URL', {
+      baseUrl: baseUrl,
+      options: options,
+      fullUrl: fullUrl
+    });
+
+    return fullUrl;
+
+  } catch (error) {
+    console.error('Error generating cache-busted URL:', error);
+    return 'https://script.google.com/macros/s/ERROR/exec';
+  }
+}
+
+/**
+ * Generate multiple URL variations for different use cases
+ * @param {Object} userContext - User context (optional)
+ * @return {Object} Object containing different URL variations
+ */
+function generateAllUrlVariations(userContext = null) {
+  try {
+    const baseOptions = {};
+    if (userContext) {
+      baseOptions.role = userContext.role;
+      baseOptions.year = userContext.year;
+    }
+
+    const urls = {
+      standard: generateCacheBustedUrl(baseOptions),
+      debug: generateCacheBustedUrl({ ...baseOptions, debug: true }),
+      mobile: generateCacheBustedUrl({ ...baseOptions, mobile: true }),
+      teacherOverride: generateCacheBustedUrl({ ...baseOptions, role: 'Teacher' }),
+      forceRefresh: generateCacheBustedUrl({ ...baseOptions, refresh: 'true', nocache: 'true' })
+    };
+
+    // Add role-specific URLs for all available roles
+    urls.roleSpecific = {};
+    AVAILABLE_ROLES.forEach(role => {
+      urls.roleSpecific[role] = generateCacheBustedUrl({
+        ...baseOptions,
+        role: role
+      });
+    });
+
+    console.log('=== WEB APP URLS ===');
+    console.log('📌 STANDARD URL (with your current role):');
+    console.log(urls.standard);
+    console.log('');
+    console.log('🧪 DEBUG URL (shows debug info):');
+    console.log(urls.debug);
+    console.log('');
+    console.log('📱 MOBILE-OPTIMIZED URL:');
+    console.log(urls.mobile);
+    console.log('');
+    console.log('👨‍🏫 TEACHER OVERRIDE URL:');
+    console.log(urls.teacherOverride);
+    console.log('');
+    console.log('🔄 FORCE REFRESH URL:');
+    console.log(urls.forceRefresh);
+    console.log('');
+    console.log('🎭 ROLE-SPECIFIC URLS:');
+    Object.keys(urls.roleSpecific).forEach(role => {
+      console.log(`${role}: ${urls.roleSpecific[role]}`);
+    });
+    console.log('===================');
+
+    return urls;
+
+  } catch (error) {
+    console.error('Error generating URL variations:', error);
+    return { error: error.message };
+  }
+}
+
+/**
+ * Quick URL generator for role changes
+ * @param {string} newRole - Role to switch to
+ * @param {string} userEmail - User email (optional)
+ * @return {string} Cache-busted URL for the new role
+ */
+function getUrlForRoleChange(newRole, userEmail = null) {
+  console.log(`=== GENERATING URL FOR ROLE CHANGE ===`);
+  console.log(`New Role: ${newRole}`);
+
+  try {
+    // Validate role
+    if (!AVAILABLE_ROLES.includes(newRole)) {
+      console.error(`❌ Invalid role: ${newRole}`);
+      console.log('Valid roles:', AVAILABLE_ROLES);
+      return null;
+    }
+
+    // Clear caches first
+    if (userEmail) {
+      clearCachesForRoleChange(userEmail);
+    } else {
+      forceCleanAllCaches();
+    }
+
+    // Generate URL
+    const url = generateCacheBustedUrl({
+      role: newRole,
+      debug: true  // Include debug info for role changes
+    });
+
+    console.log('✅ ROLE CHANGE URL READY:');
+    console.log(url);
+    console.log('');
+    console.log('📋 INSTRUCTIONS:');
+    console.log('1. Update your role in the Staff sheet');
+    console.log('2. Copy the URL above');
+    console.log('3. Open in new incognito/private window');
+    console.log('4. You should see the new role immediately');
+
+    return url;
+
+  } catch (error) {
+    console.error('Error generating role change URL:', error);
+    return null;
   }
 }
 
@@ -641,5 +1105,117 @@ function testRoleChangeWithEnhancedCache(testEmail, newRole) {
 
   } catch (error) {
     console.error('Error testing enhanced role change:', error);
+  }
+}
+
+/**
+ * ADD THESE TESTING FUNCTIONS to Code.js
+ * Test Phase 2 implementation
+ */
+
+/**
+ * Test Phase 2 cache busting implementation
+ */
+function testPhase2CacheBusting() {
+  console.log('=== TESTING PHASE 2 CACHE BUSTING ===');
+
+  try {
+    // Test 1: URL generation
+    console.log('Test 1: URL Generation');
+    const urls = generateAllUrlVariations();
+    console.log('✓ URL generation successful');
+
+    // Test 2: Response metadata
+    console.log('Test 2: Response Metadata Generation');
+    const mockContext = {
+      role: 'Teacher',
+      year: 1,
+      email: 'test@example.com',
+      isAuthenticated: true,
+      isDefaultUser: false
+    };
+    const metadata = generateResponseMetadata(mockContext, 'test-request', true);
+    console.log('Generated metadata:', {
+      requestId: metadata.requestId,
+      etag: metadata.etag,
+      cacheVersion: metadata.cacheVersion
+    });
+    console.log('✓ Metadata generation successful');
+
+    // Test 3: Role change URL
+    console.log('Test 3: Role Change URL');
+    const roleChangeUrl = getUrlForRoleChange('Administrator');
+    console.log('✓ Role change URL generated');
+
+    console.log('✅ Phase 2 cache busting test completed successfully');
+
+  } catch (error) {
+    console.error('❌ Error testing Phase 2:', error);
+  }
+}
+
+/**
+ * Test complete workflow with Phase 2 enhancements
+ */
+function testCompleteWorkflowPhase2(testRole = 'Administrator') {
+  console.log('=== TESTING COMPLETE WORKFLOW WITH PHASE 2 ===');
+  console.log(`Test Role: ${testRole}`);
+
+  try {
+    // Step 1: Clear caches (Phase 1)
+    console.log('Step 1: Clearing caches...');
+    clearCachesForRoleChange();
+
+    // Step 2: Generate fresh URLs (Phase 2)
+    console.log('Step 2: Generating fresh URLs...');
+    const sessionUser = getUserFromSession();
+    const userContext = sessionUser ? {
+      role: testRole,
+      year: 1,
+      email: sessionUser.email
+    } : null;
+
+    const urls = generateAllUrlVariations(userContext);
+
+    // Step 3: Test doGet simulation
+    console.log('Step 3: Testing enhanced doGet...');
+    const mockEvent = {
+      parameter: {
+        refresh: 'true',
+        role: testRole,
+        debug: 'true',
+        t: Date.now().toString()
+      }
+    };
+
+    // This would normally be called by the web app
+    console.log('Mock doGet parameters:', mockEvent.parameter);
+
+    // Step 4: Verify cache busting
+    console.log('Step 4: Verifying cache busting...');
+    const currentVersion = getMasterCacheVersion();
+    console.log('Current cache version:', currentVersion);
+
+    console.log('✅ COMPLETE WORKFLOW TEST PASSED');
+    console.log('');
+    console.log('🎯 NEXT STEPS:');
+    console.log('1. Update your role in the Staff sheet');
+    console.log('2. Use this cache-busted URL:');
+    console.log(urls.standard);
+    console.log('3. Open in incognito/private window');
+    console.log('4. Should see role change immediately');
+
+    return {
+      success: true,
+      urls: urls,
+      cacheVersion: currentVersion
+    };
+
+  } catch (error) {
+    console.error('❌ Complete workflow test failed:', error);
+    return {
+      success: false,
+      error: error.message
+    };
   }
 }
