@@ -87,9 +87,10 @@ function incrementMasterCacheVersion() {
     const cache = CacheService.getScriptCache();
     cache.removeAll();
 
-    return newVersion;
+    return true; // Indicate success
   } catch (error) {
     console.error('Error incrementing master cache version:', error);
+    return false; // Indicate failure
   }
 }
 
