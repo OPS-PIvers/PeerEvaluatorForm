@@ -625,6 +625,710 @@ function generateResponseMetadata(userContext, requestId, debugMode = false) {
 }
 
 /**
+ * Comprehensive test of the auto-trigger system
+ */
+function testCompleteAutoTriggerSystem() {
+  console.log('=== COMPREHENSIVE AUTO-TRIGGER SYSTEM TEST ===');
+
+  try {
+    const results = {
+      triggerInstallation: null,
+      triggerStatus: null,
+      systemTest: null,
+      userValidation: null,
+      cacheTest: null
+    };
+
+    // Test 1: Trigger Installation
+    console.log('\n1. Testing trigger installation...');
+    // Assuming installRoleChangeAutoTrigger is defined from previous steps
+    results.triggerInstallation = installRoleChangeAutoTrigger(true); // Force reinstall
+    console.log('✓ Installation result:', results.triggerInstallation.success ? 'SUCCESS' : 'FAILED');
+
+    // Test 2: Trigger Status Check
+    console.log('\n2. Checking trigger status...');
+    // Assuming checkAutoTriggerStatus is defined from previous steps
+    results.triggerStatus = checkAutoTriggerStatus();
+    console.log('✓ Status check result:', results.triggerStatus.isInstalled ? 'ACTIVE' : 'INACTIVE');
+
+    // Test 3: System Test
+    console.log('\n3. Testing system functionality...');
+    // Assuming testAutoTriggerSystem is defined from previous steps
+    results.systemTest = testAutoTriggerSystem(); // Uses session user by default if available
+    console.log('✓ System test result:', results.systemTest.success ? 'PASSED' : 'FAILED');
+
+    // Test 4: User Validation (Basic check for session user and staff data)
+    console.log('\n4. Testing user validation...');
+    const sessionUser = getUserFromSession(); // Assumed to exist
+    if (sessionUser && sessionUser.email) {
+      const staffUser = getUserByEmail(sessionUser.email); // Assumed to exist
+      results.userValidation = {
+        hasSessionUser: true,
+        email: sessionUser.email,
+        userFoundInStaff: !!staffUser,
+        role: staffUser ? staffUser.role : 'N/A'
+      };
+    } else {
+      results.userValidation = {
+        hasSessionUser: false,
+        error: 'No session user found for validation part of the test.'
+      };
+    }
+    console.log('✓ User validation result:', results.userValidation.hasSessionUser ? (results.userValidation.userFoundInStaff ? 'VALID' : 'SESSION USER NOT IN STAFF') : 'NO SESSION USER');
+
+    // Test 5: Cache System Test (Check if related cache functions exist)
+    console.log('\n5. Testing cache system integration (basic check)...');
+    if (typeof CacheService !== 'undefined' && typeof CacheService.getScriptCache === 'function' &&
+        typeof generateCacheKey === 'function' &&
+        typeof incrementMasterCacheVersion === 'function' &&
+        typeof clearCachesForSpecificUser === 'function') { // clearCachesForSpecificUser added in Step 1
+      results.cacheTest = { integrated: true, message: 'Core cache functions seem available.' };
+      console.log('✓ Cache system integration: SEEMS ACTIVE (core functions present)');
+    } else {
+      results.cacheTest = { integrated: false, error: 'One or more core cache functions (CacheService, generateCacheKey, incrementMasterCacheVersion, clearCachesForSpecificUser) not found.' };
+      console.log('⚠️ Cache system integration: CORE FUNCTIONS MISSING');
+    }
+
+    // Overall result
+    const allTestsPassed =
+      results.triggerInstallation?.success &&
+      results.triggerStatus?.isInstalled &&
+      results.systemTest?.success &&
+      results.userValidation?.hasSessionUser &&
+      results.userValidation?.userFoundInStaff && // Added this condition
+      results.cacheTest?.integrated; // Simplified this condition
+
+    console.log('\n=== COMPREHENSIVE TEST RESULTS ===');
+    console.log('Trigger Installation:', results.triggerInstallation?.success ? '✅ PASS' : '❌ FAIL');
+    console.log('Trigger Status:', results.triggerStatus?.isInstalled ? '✅ ACTIVE' : '❌ INACTIVE');
+    console.log('System Test:', results.systemTest?.success ? '✅ PASS' : '❌ FAIL', results.systemTest?.message || '');
+    console.log('User Validation:', results.userValidation?.hasSessionUser && results.userValidation?.userFoundInStaff ? '✅ VALID' : '❌ INVALID/INCOMPLETE', results.userValidation?.error || '');
+    console.log('Cache Integration:', results.cacheTest?.integrated ? '✅ ACTIVE' : '❌ MISSING/FAIL', results.cacheTest?.error || results.cacheTest?.message || '');
+
+    if (allTestsPassed) {
+      console.log('\n🎉 ALL ESSENTIAL TESTS PASSED - AUTO-TRIGGER SYSTEM IS LIKELY READY!');
+      console.log('\n📋 NEXT STEPS:');
+      console.log('1. Go to your Staff sheet');
+      console.log('2. Change any user\'s role');
+      console.log('3. Check Apps Script logs for automatic processing (View > Executions)');
+      console.log('4. Access web app - role change should be immediate');
+      console.log('\n🔄 REAL-TIME MONITORING:');
+      console.log('- All role changes are now automatically detected');
+      console.log('- Caches are cleared immediately upon role changes');
+      console.log('- No manual intervention required');
+    } else {
+      console.log('\n⚠️ SOME TESTS FAILED - CHECK RESULTS ABOVE');
+      console.log('\nTROUBLESHOOTING:');
+      if (!results.triggerInstallation?.success) {
+        console.log('- Trigger installation failed - check permissions or errors in installRoleChangeAutoTrigger logs.');
+      }
+      if (!results.triggerStatus?.isInstalled) {
+        console.log('- Trigger not active - run installRoleChangeAutoTrigger() manually and check logs.');
+      }
+       if (!results.systemTest?.success) {
+        console.log('- System test failed - check errors in testAutoTriggerSystem logs.');
+      }
+      if (!results.userValidation?.hasSessionUser || !results.userValidation?.userFoundInStaff) {
+        console.log('- User validation failed - ensure you are running the script as a user who is listed in the Staff sheet or provide a valid test email to testAutoTriggerSystem.');
+      }
+      if (!results.cacheTest?.integrated) {
+        console.log('- Cache integration failed - ensure `CacheService` is available and `generateCacheKey`, `incrementMasterCacheVersion`, `clearCachesForSpecificUser` functions are correctly defined and accessible.');
+      }
+    }
+
+    return {
+      success: allTestsPassed,
+      results: results,
+      summary: {
+        triggerActive: results.triggerStatus?.isInstalled || false,
+        systemReady: allTestsPassed,
+        requiresAttention: !allTestsPassed // General flag if anything failed
+      }
+    };
+
+  } catch (error) {
+    console.error('Error in comprehensive auto-trigger test:', formatErrorMessage(error, 'testCompleteAutoTriggerSystem'));
+    return {
+      success: false,
+      error: error.message,
+      message: 'The comprehensive test itself encountered an unhandled error.'
+    };
+  }
+}
+
+/**
+ * Install the automatic role change trigger
+ * @param {boolean} forceReinstall - Whether to reinstall if trigger already exists
+ * @return {Object} Installation result
+ */
+function installRoleChangeAutoTrigger(forceReinstall = false) {
+  console.log('=== INSTALLING ROLE CHANGE AUTO-TRIGGER ===');
+
+  try {
+    const spreadsheet = openSpreadsheet();
+
+    // Check for existing triggers
+    const existingTriggers = ScriptApp.getProjectTriggers();
+    const editTriggers = existingTriggers.filter(trigger =>
+      trigger.getEventType() === ScriptApp.EventType.ON_EDIT &&
+      trigger.getTriggerSource() === ScriptApp.TriggerSource.SPREADSHEETS
+    );
+
+    console.log(`Found ${editTriggers.length} existing edit triggers`);
+
+    if (editTriggers.length > 0 && !forceReinstall) {
+      console.log('✅ Edit trigger already installed');
+      return {
+        success: true,
+        message: 'Trigger already exists',
+        existingTriggers: editTriggers.length,
+        reinstalled: false
+      };
+    }
+
+    // Remove existing triggers if force reinstall
+    if (forceReinstall && editTriggers.length > 0) {
+      console.log(`Removing ${editTriggers.length} existing edit triggers...`);
+      editTriggers.forEach(trigger => {
+        ScriptApp.deleteTrigger(trigger);
+      });
+      console.log('✓ Existing triggers removed');
+    }
+
+    // Create new trigger
+    console.log('Creating new edit trigger...');
+    const trigger = ScriptApp.newTrigger('onEditTrigger')
+      .forSpreadsheet(spreadsheet) // Ensure it's for the correct spreadsheet
+      .onEdit()
+      .create();
+
+    const triggerId = trigger.getUniqueId();
+
+    // Store trigger info in properties for monitoring
+    const properties = PropertiesService.getScriptProperties();
+    const triggerInfo = {
+      triggerId: triggerId,
+      installedAt: Date.now(),
+      installedBy: 'installRoleChangeAutoTrigger',
+      version: '1.0', // You can update this version as needed
+      spreadsheetId: spreadsheet.getId()
+    };
+
+    properties.setProperty('AUTO_TRIGGER_INFO', JSON.stringify(triggerInfo));
+
+    console.log('✅ ROLE CHANGE AUTO-TRIGGER INSTALLED SUCCESSFULLY');
+    console.log(`Trigger ID: ${triggerId}`);
+    console.log('The system will now automatically clear caches when roles are changed in the Staff sheet.');
+
+    debugLog('Auto-trigger installed', triggerInfo);
+
+    return {
+      success: true,
+      message: 'Trigger installed successfully',
+      triggerId: triggerId,
+      installedAt: new Date(triggerInfo.installedAt).toISOString(),
+      reinstalled: forceReinstall
+    };
+
+  } catch (error) {
+    console.error('Error installing auto-trigger:', formatErrorMessage(error, 'installRoleChangeAutoTrigger'));
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * Check the status of the auto-trigger
+ * @return {Object} Trigger status information
+ */
+function checkAutoTriggerStatus() {
+  console.log('=== CHECKING AUTO-TRIGGER STATUS ===');
+
+  try {
+    const existingTriggers = ScriptApp.getProjectTriggers();
+    const editTriggers = existingTriggers.filter(trigger =>
+      trigger.getEventType() === ScriptApp.EventType.ON_EDIT &&
+      trigger.getTriggerSource() === ScriptApp.TriggerSource.SPREADSHEETS &&
+      trigger.getHandlerFunction() === 'onEditTrigger'
+    );
+
+    const properties = PropertiesService.getScriptProperties();
+    const triggerInfoString = properties.getProperty('AUTO_TRIGGER_INFO');
+    let triggerInfo = null;
+
+    if (triggerInfoString) {
+      try {
+        triggerInfo = JSON.parse(triggerInfoString);
+      } catch (e) {
+        console.warn('Could not parse AUTO_TRIGGER_INFO from properties', e);
+        triggerInfo = {}; // Initialize to empty object if parsing fails
+      }
+    } else {
+        triggerInfo = {}; // Initialize to empty object if property doesn't exist
+    }
+
+    const status = {
+      isInstalled: editTriggers.length > 0,
+      triggerCount: editTriggers.length,
+      installedAt: triggerInfo?.installedAt ? new Date(triggerInfo.installedAt).toISOString() : null,
+      triggerIdStored: triggerInfo?.triggerId || null, // ID from properties
+      spreadsheetIdStored: triggerInfo?.spreadsheetId || null, // Spreadsheet ID from properties
+      triggers: editTriggers.map(trigger => ({
+        id: trigger.getUniqueId(),
+        handlerFunction: trigger.getHandlerFunction(),
+        enabled: trigger.isDisabled ? !trigger.isDisabled() : true // Check isDisabled if it exists
+      }))
+    };
+
+    console.log('Trigger Status:', {
+      installed: status.isInstalled,
+      count: status.triggerCount,
+      installedAt: status.installedAt,
+      storedId: status.triggerIdStored
+    });
+
+    if (status.isInstalled) {
+      console.log('✅ Auto-trigger is active and monitoring role changes for onEditTrigger');
+    } else {
+      console.log('❌ Auto-trigger for onEditTrigger is not installed');
+      console.log('Run: installRoleChangeAutoTrigger()');
+    }
+
+    return status;
+
+  } catch (error) {
+    console.error('Error checking auto-trigger status:', formatErrorMessage(error, 'checkAutoTriggerStatus'));
+    return {
+      isInstalled: false,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * Remove the auto-trigger
+ * @return {Object} Removal result
+ */
+function removeAutoTrigger() {
+  console.log('=== REMOVING AUTO-TRIGGER ===');
+
+  try {
+    const existingTriggers = ScriptApp.getProjectTriggers();
+    const editTriggers = existingTriggers.filter(trigger =>
+      trigger.getEventType() === ScriptApp.EventType.ON_EDIT &&
+      trigger.getTriggerSource() === ScriptApp.TriggerSource.SPREADSHEETS &&
+      trigger.getHandlerFunction() === 'onEditTrigger'
+    );
+
+    if (editTriggers.length === 0) {
+      console.log('No onEditTrigger triggers found to remove');
+      return {
+        success: true,
+        message: 'No onEditTrigger triggers to remove',
+        removed: 0
+      };
+    }
+
+    console.log(`Removing ${editTriggers.length} onEditTrigger triggers...`);
+    editTriggers.forEach(trigger => {
+      ScriptApp.deleteTrigger(trigger);
+    });
+
+    // Clear stored trigger info
+    const properties = PropertiesService.getScriptProperties();
+    properties.deleteProperty('AUTO_TRIGGER_INFO');
+
+    console.log('✅ Auto-trigger for onEditTrigger removed successfully');
+    console.log('Role changes will no longer automatically clear caches via this trigger');
+
+    return {
+      success: true,
+      message: 'Auto-trigger for onEditTrigger removed successfully',
+      removed: editTriggers.length
+    };
+
+  } catch (error) {
+    console.error('Error removing auto-trigger:', formatErrorMessage(error, 'removeAutoTrigger'));
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * Test the auto-trigger system
+ * @param {string} testEmail - Email to test with (optional)
+ * @return {Object} Test result
+ */
+function testAutoTriggerSystem(testEmail = null) {
+  console.log('=== TESTING AUTO-TRIGGER SYSTEM ===');
+
+  try {
+    // Check if trigger is installed
+    const status = checkAutoTriggerStatus();
+    if (!status.isInstalled) {
+      console.log('❌ Auto-trigger not installed. Installing now...');
+      const installResult = installRoleChangeAutoTrigger();
+      if (!installResult.success) {
+        return {
+          success: false,
+          message: 'Failed to install trigger during test',
+          error: installResult.error
+        };
+      }
+      // Re-check status after installation attempt
+      const newStatus = checkAutoTriggerStatus();
+      if (!newStatus.isInstalled) {
+          return {
+              success: false,
+              message: 'Trigger installation failed, cannot proceed with test.',
+              error: 'Post-installation check failed.'
+          };
+      }
+    }
+
+    // Get test user
+    let currentTestEmail = testEmail;
+    if (!currentTestEmail) {
+      const sessionUser = getUserFromSession(); // Assumed to exist
+      currentTestEmail = sessionUser ? sessionUser.email : null;
+    }
+
+    if (!currentTestEmail) {
+      console.warn('No test email available. Please provide an email or ensure you have an active session.');
+      return {
+        success: false,
+        message: 'No test email available for trigger system test.',
+        error: 'No test email provided or found in session.'
+      };
+    }
+
+    console.log(`Testing with email: ${currentTestEmail}`);
+
+    // Get current user data
+    const staffData = getStaffData(); // Assumed to exist
+    const user = staffData?.users?.find(u =>
+      u.email?.toLowerCase() === currentTestEmail.toLowerCase()
+    );
+
+    if (!user) {
+      console.warn(`Test user ${currentTestEmail} not found in Staff sheet.`);
+      return {
+        success: false,
+        message: `Test user ${currentTestEmail} not found in Staff sheet.`,
+        error: 'Test user not found'
+      };
+    }
+
+    console.log('Current user data:', {
+      email: user.email,
+      role: user.role,
+      year: user.year,
+      rowNumber: user.rowNumber // Assuming getStaffData adds rowNumber
+    });
+
+    // Simulate trigger execution
+    console.log('Simulating trigger execution...');
+    const mockOldRole = user.role === 'Teacher' ? 'Administrator' : 'Teacher'; // Example roles
+    const triggerId = generateUniqueId('test_trigger'); // Assumed to exist
+
+    // Test the trigger processing function
+    const spreadsheet = openSpreadsheet(); // Assumed to exist
+    const staffSheet = getSheetByName(spreadsheet, SHEET_NAMES.STAFF); // Assumed to exist
+
+    if (!staffSheet) {
+        console.error('Staff sheet not found during test.');
+        return {
+            success: false,
+            message: 'Staff sheet not found, cannot simulate trigger.',
+            error: 'Staff sheet missing'
+        };
+    }
+
+    // Call processRoleChangeFromTrigger which should exist from Step 1
+    processRoleChangeFromTrigger(
+      staffSheet,
+      user.rowNumber, // Make sure user object has rowNumber
+      user.role,
+      mockOldRole,
+      triggerId
+    );
+
+    console.log('✅ Auto-trigger system test completed (simulation)');
+    console.log('');
+    console.log('🧪 TO TEST REAL TRIGGER:');
+    console.log('1. Go to your Staff sheet');
+    console.log(`2. Change ${user.email}'s role in row ${user.rowNumber}`);
+    console.log('3. Check Apps Script logs for automatic processing');
+    console.log('4. Access web app - should show new role immediately');
+
+    return {
+      success: true,
+      message: 'Auto-trigger system test simulation passed',
+      testUser: {
+        email: user.email,
+        currentRole: user.role,
+        rowNumber: user.rowNumber
+      },
+      triggerId: triggerId
+    };
+
+  } catch (error) {
+    console.error('Error testing auto-trigger system:', formatErrorMessage(error, 'testAutoTriggerSystem'));
+    return {
+      success: false,
+      message: 'Error during auto-trigger system test.',
+      error: error.message
+    };
+  }
+}
+
+/**
+ * Main trigger function that handles sheet edits
+ * This function is automatically called when the spreadsheet is edited
+ * @param {Object} e - Edit event object
+ */
+function onEditTrigger(e) {
+  const startTime = Date.now();
+  const triggerId = generateUniqueId('trigger');
+
+  try {
+    // Validate event object
+    if (!e || !e.range) {
+      debugLog('Invalid edit event received', { triggerId });
+      return;
+    }
+
+    const range = e.range;
+    const sheet = range.getSheet();
+    const sheetName = sheet.getName();
+    const editedRow = range.getRow();
+    const editedColumn = range.getColumn();
+    const newValue = e.value;
+    const oldValue = e.oldValue;
+
+    debugLog('Edit trigger fired', {
+      triggerId: triggerId,
+      sheetName: sheetName,
+      row: editedRow,
+      column: editedColumn,
+      newValue: newValue,
+      oldValue: oldValue
+    });
+
+    // Only process edits to the Staff sheet
+    if (sheetName !== SHEET_NAMES.STAFF) {
+      debugLog('Edit not in Staff sheet - ignoring', {
+        sheetName: sheetName,
+        triggerId: triggerId
+      });
+      return;
+    }
+
+    // Only process edits to the Role column (Column C = index 3)
+    if (editedColumn !== STAFF_COLUMNS.ROLE + 1) { // +1 because columns are 1-indexed in triggers
+      debugLog('Edit not in Role column - ignoring', {
+        column: editedColumn,
+        expectedColumn: STAFF_COLUMNS.ROLE + 1,
+        triggerId: triggerId
+      });
+      return;
+    }
+
+    // Skip header row
+    if (editedRow === 1) {
+      debugLog('Edit in header row - ignoring', { triggerId: triggerId });
+      return;
+    }
+
+    // Process the role change
+    processRoleChangeFromTrigger(sheet, editedRow, newValue, oldValue, triggerId);
+
+    const executionTime = Date.now() - startTime;
+    logPerformanceMetrics('onEditTrigger', executionTime, {
+      triggerId: triggerId,
+      sheetName: sheetName,
+      row: editedRow,
+      column: editedColumn
+    });
+
+  } catch (error) {
+    console.error('Error in onEditTrigger:', formatErrorMessage(error, 'onEditTrigger'));
+
+    // Log error but don't throw - triggers should be resilient
+    debugLog('Trigger error handled gracefully', {
+      triggerId: triggerId || 'unknown',
+      error: error.message
+    });
+  }
+}
+
+/**
+ * Process a role change detected by the trigger
+ * @param {Sheet} sheet - The Staff sheet
+ * @param {number} editedRow - Row number that was edited
+ * @param {string} newRole - New role value
+ * @param {string} oldRole - Previous role value
+ * @param {string} triggerId - Trigger execution ID
+ */
+function processRoleChangeFromTrigger(sheet, editedRow, newRole, oldRole, triggerId) {
+  try {
+    debugLog('Processing role change from trigger', {
+      triggerId: triggerId,
+      row: editedRow,
+      newRole: newRole,
+      oldRole: oldRole
+    });
+
+    // Get user email from the same row
+    const emailCell = sheet.getRange(editedRow, STAFF_COLUMNS.EMAIL + 1); // +1 for 1-indexed
+    const userEmail = emailCell.getValue();
+
+    if (!userEmail || !isValidEmail(userEmail)) {
+      console.warn('Invalid email found in row during trigger processing:', {
+        row: editedRow,
+        email: userEmail,
+        triggerId: triggerId
+      });
+      return;
+    }
+
+    // Get user name for logging
+    const nameCell = sheet.getRange(editedRow, STAFF_COLUMNS.NAME + 1);
+    const userName = nameCell.getValue() || 'Unknown';
+
+    // Validate new role
+    if (newRole && !AVAILABLE_ROLES.includes(newRole)) {
+      console.warn('Invalid new role detected in trigger:', {
+        userEmail: userEmail,
+        newRole: newRole,
+        availableRoles: AVAILABLE_ROLES,
+        triggerId: triggerId
+      });
+      // Don't return - still clear caches in case of role correction
+    }
+
+    debugLog('Role change details extracted', {
+      triggerId: triggerId,
+      userEmail: userEmail,
+      userName: userName,
+      oldRole: oldRole,
+      newRole: newRole
+    });
+
+    // Clear caches for this specific user
+    clearCachesForSpecificUser(userEmail, oldRole, newRole, triggerId);
+
+    // Add to role change history if we have the session manager
+    if (typeof addRoleChangeToHistory === 'function') {
+      addRoleChangeToHistory(userEmail, oldRole, newRole);
+      debugLog('Role change added to history', {
+        userEmail: userEmail,
+        triggerId: triggerId
+      });
+    }
+
+    // Warm cache for new role if valid
+    if (newRole && AVAILABLE_ROLES.includes(newRole)) {
+      if (typeof warmCacheForRoleChange === 'function') {
+        warmCacheForRoleChange(userEmail, newRole);
+        debugLog('Cache warmed for new role', {
+          userEmail: userEmail,
+          newRole: newRole,
+          triggerId: triggerId
+        });
+      }
+    }
+
+    // Log successful processing
+    console.log(`✅ AUTOMATIC ROLE CHANGE PROCESSED: ${userName} (${userEmail}) changed from "${oldRole}" to "${newRole}"`);
+
+  } catch (error) {
+    console.error('Error processing role change from trigger:', {
+      error: formatErrorMessage(error, 'processRoleChangeFromTrigger'),
+      triggerId: triggerId,
+      row: editedRow,
+      newRole: newRole,
+      oldRole: oldRole
+    });
+  }
+}
+
+/**
+ * Enhanced cache clearing for specific user triggered by sheet edit
+ * @param {string} userEmail - User whose role changed
+ * @param {string} oldRole - Previous role
+ * @param {string} newRole - New role
+ * @param {string} triggerId - Trigger execution ID
+ */
+function clearCachesForSpecificUser(userEmail, oldRole, newRole, triggerId) {
+  try {
+    debugLog('Clearing caches for specific user via trigger', {
+      userEmail: userEmail,
+      oldRole: oldRole,
+      newRole: newRole,
+      triggerId: triggerId
+    });
+
+    const cache = CacheService.getScriptCache();
+
+    // Clear user-specific cache
+    const userCacheKeys = [
+      `user_${userEmail}`,
+      generateCacheKey('user', { email: userEmail.toLowerCase().trim() })
+    ];
+
+    userCacheKeys.forEach(key => {
+      cache.remove(key);
+      debugLog('Cleared user cache key', { key: key, triggerId: triggerId });
+    });
+
+    // Clear role sheet caches for both old and new roles
+    const rolesToClear = [oldRole, newRole].filter(role =>
+      role && AVAILABLE_ROLES.includes(role)
+    );
+
+    rolesToClear.forEach(role => {
+      const roleKeys = [
+        `role_sheet_${role}`,
+        generateCacheKey('role_sheet', { role: role })
+      ];
+
+      roleKeys.forEach(key => {
+        cache.remove(key);
+        debugLog('Cleared role cache key', { key: key, role: role, triggerId: triggerId });
+      });
+    });
+
+    // Clear staff data cache to ensure fresh user data
+    cache.remove('staff_data');
+    cache.remove(generateCacheKey('staff_data'));
+
+    // Increment master cache version to invalidate any remaining caches
+    if (typeof incrementMasterCacheVersion === 'function') {
+      incrementMasterCacheVersion();
+      debugLog('Master cache version incremented', { triggerId: triggerId });
+    }
+
+    debugLog('Cache clearing completed for user', {
+      userEmail: userEmail,
+      rolesCleared: rolesToClear,
+      triggerId: triggerId
+    });
+
+  } catch (error) {
+    console.error('Error clearing caches for specific user:', {
+      error: formatErrorMessage(error, 'clearCachesForSpecificUser'),
+      userEmail: userEmail,
+      triggerId: triggerId
+    });
+  }
+}
+
+/**
  * ADD THESE MONITORING FUNCTIONS to Code.js
  * Proactive role change monitoring and state management
  */
