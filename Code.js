@@ -1719,7 +1719,8 @@ function processRoleChangeFromTrigger(sheet, editedRow, newRole, oldRole, trigge
 }
 
 /**
- * Enhanced cache clearing for specific user triggered by sheet edit
+ * Enhanced cache clearing for specific user triggered by sheet edit.
+ * This function now exclusively clears versioned cache keys.
  * @param {string} userEmail - User whose role changed
  * @param {string} oldRole - Previous role
  * @param {string} newRole - New role
@@ -1727,7 +1728,7 @@ function processRoleChangeFromTrigger(sheet, editedRow, newRole, oldRole, trigge
  */
 function clearCachesForSpecificUser(userEmail, oldRole, newRole, triggerId) {
   try {
-    debugLog('Clearing caches for specific user via trigger', {
+    debugLog('Clearing versioned caches for specific user via trigger', {
       userEmail: userEmail,
       oldRole: oldRole,
       newRole: newRole,
@@ -1735,40 +1736,34 @@ function clearCachesForSpecificUser(userEmail, oldRole, newRole, triggerId) {
     });
 
     const cache = CacheService.getScriptCache();
+    const trimmedEmail = userEmail.toLowerCase().trim();
 
-    // Clear user-specific cache
-    const userCacheKeys = [
-      `user_${userEmail}`,
-      generateCacheKey('user', { email: userEmail.toLowerCase().trim() })
-    ];
+    // Clear versioned user-specific cache
+    const userKey = generateCacheKey('user', { email: trimmedEmail });
+    cache.remove(userKey);
+    debugLog('Cleared versioned user cache key', { key: userKey, triggerId: triggerId });
 
-    userCacheKeys.forEach(key => {
-      cache.remove(key);
-      debugLog('Cleared user cache key', { key: key, triggerId: triggerId });
-    });
+    const userContextKey = generateCacheKey('user_context', { email: trimmedEmail });
+    cache.remove(userContextKey);
+    debugLog('Cleared versioned user_context cache key', { key: userContextKey, triggerId: triggerId });
 
-    // Clear role sheet caches for both old and new roles
+    // Clear versioned role sheet caches for both old and new roles
     const rolesToClear = [oldRole, newRole].filter(role =>
       role && AVAILABLE_ROLES.includes(role)
     );
 
     rolesToClear.forEach(role => {
-      const roleKeys = [
-        `role_sheet_${role}`,
-        generateCacheKey('role_sheet', { role: role })
-      ];
-
-      roleKeys.forEach(key => {
-        cache.remove(key);
-        debugLog('Cleared role cache key', { key: key, role: role, triggerId: triggerId });
-      });
+      const versionedRoleKey = generateCacheKey('role_sheet', { role: role });
+      cache.remove(versionedRoleKey);
+      debugLog('Cleared versioned role_sheet cache key', { key: versionedRoleKey, role: role, triggerId: triggerId });
     });
 
-    // Clear staff data cache to ensure fresh user data
-    cache.remove('staff_data');
-    cache.remove(generateCacheKey('staff_data'));
+    // Clear versioned staff data cache to ensure fresh user data
+    const staffDataKey = generateCacheKey('staff_data');
+    cache.remove(staffDataKey);
+    debugLog('Cleared versioned staff_data cache key', { key: staffDataKey, triggerId: triggerId });
 
-    debugLog('Cache clearing completed for user', {
+    debugLog('Versioned cache clearing completed for user', {
       userEmail: userEmail,
       rolesCleared: rolesToClear,
       triggerId: triggerId
@@ -2140,10 +2135,10 @@ function createEnhancedErrorPage(error, requestId, validationResults = null) {
         <meta name="cache-control" content="no-cache, no-store, must-revalidate">
         <meta name="pragma" content="no-cache">
         <meta name="expires" content="0">
-        <meta name="x-request-id" content="${requestId || 'unknown'}">
-        <meta name="x-error-id" content="${errorId}">
-        <meta name="x-timestamp" content="${timestamp}">
-        <meta name="x-system-health" content="${systemHealth}">
+        <meta name="x-request-id" content="${Utilities.encodeHtml(requestId || 'unknown')}">
+        <meta name="x-error-id" content="${Utilities.encodeHtml(errorId)}">
+        <meta name="x-timestamp" content="${Utilities.encodeHtml(timestamp.toString())}">
+        <meta name="x-system-health" content="${Utilities.encodeHtml(systemHealth)}">
         <meta name="x-error" content="true">
         <style>
           body {
@@ -2274,11 +2269,11 @@ function createEnhancedErrorPage(error, requestId, validationResults = null) {
             <div class="error-details">
               <h3>Error Details</h3>
               <div class="error-message">
-                <strong>Error:</strong> ${error.toString()}<br>
-                <strong>Request ID:</strong> ${requestId || 'Unknown'}<br>
-                <strong>Error ID:</strong> ${errorId}<br>
-                <strong>Timestamp:</strong> ${new Date(timestamp).toLocaleString()}<br>
-                <strong>Cache Version:</strong> ${getMasterCacheVersion()}
+                <strong>Error:</strong> ${Utilities.encodeHtml(error.toString())}<br>
+                <strong>Request ID:</strong> ${Utilities.encodeHtml(requestId || 'Unknown')}<br>
+                <strong>Error ID:</strong> ${Utilities.encodeHtml(errorId)}<br>
+                <strong>Timestamp:</strong> ${Utilities.encodeHtml(new Date(timestamp).toLocaleString())}<br>
+                <strong>Cache Version:</strong> ${Utilities.encodeHtml(getMasterCacheVersion())}
               </div>
             </div>
 
@@ -2344,7 +2339,7 @@ function createEnhancedErrorPage(error, requestId, validationResults = null) {
                 🚨 Emergency Reset
               </button>
               <br><br>
-              <a href="mailto:admin@domain.com?subject=Danielson Framework Error&body=Error ID: ${errorId}%0ATimestamp: ${new Date(timestamp).toISOString()}%0AError: ${encodeURIComponent(error.toString())}"
+              <a href="mailto:admin@domain.com?subject=Danielson Framework Error&body=Error ID: ${Utilities.encodeHtml(errorId)}%0ATimestamp: ${Utilities.encodeHtml(new Date(timestamp).toISOString())}%0AError: ${encodeURIComponent(error.toString())}"
                  class="action-button" style="background: #6c757d;">
                 📧 Contact Support
               </a>
@@ -2352,14 +2347,14 @@ function createEnhancedErrorPage(error, requestId, validationResults = null) {
 
             <div class="diagnostic-info">
               <h4>🔍 Diagnostic Information</h4>
-              <strong>Error ID:</strong> ${errorId}<br>
-              <strong>Request ID:</strong> ${requestId || 'Unknown'}<br>
-              <strong>System Health:</strong> ${systemHealth}<br>
-              <strong>Cache Version:</strong> ${getMasterCacheVersion()}<br>
-              <strong>Timestamp:</strong> ${new Date(timestamp).toISOString()}<br>
-              <strong>User Agent:</strong> ${typeof navigator !== 'undefined' ? navigator.userAgent : 'Unknown'}<br>
+              <strong>Error ID:</strong> ${Utilities.encodeHtml(errorId)}<br>
+              <strong>Request ID:</strong> ${Utilities.encodeHtml(requestId || 'Unknown')}<br>
+              <strong>System Health:</strong> ${Utilities.encodeHtml(systemHealth)}<br>
+              <strong>Cache Version:</strong> ${Utilities.encodeHtml(getMasterCacheVersion())}<br>
+              <strong>Timestamp:</strong> ${Utilities.encodeHtml(new Date(timestamp).toISOString())}<br>
+              <strong>User Agent:</strong> ${typeof navigator !== 'undefined' ? Utilities.encodeHtml(navigator.userAgent) : 'Unknown'}<br>
               ${validationResults ? `
-              <strong>Validation Issues:</strong> ${validationResults.issues?.length || 0}<br>
+              <strong>Validation Issues:</strong> ${Utilities.encodeHtml((validationResults.issues?.length || 0).toString())}<br>
               <strong>System Components:</strong>
               Spreadsheet: ${validationResults.systemHealth.spreadsheetAccess ? 'OK' : 'FAIL'},
               Cache: ${validationResults.systemHealth.cacheSystem ? 'OK' : 'WARN'},
@@ -2406,11 +2401,11 @@ function createEnhancedErrorPage(error, requestId, validationResults = null) {
 
           // Log error for analytics
           console.error('Enhanced Error Page Displayed', {
-            errorId: '${errorId}',
-            requestId: '${requestId || 'unknown'}',
-            systemHealth: '${systemHealth}',
-            timestamp: '${new Date(timestamp).toISOString()}',
-            error: '${error.toString().replace(/'/g, "\\\\'")}'
+            errorId: '${Utilities.encodeHtml(errorId)}',
+            requestId: '${Utilities.encodeHtml(requestId || 'unknown')}',
+            systemHealth: '${Utilities.encodeHtml(systemHealth)}',
+            timestamp: '${Utilities.encodeHtml(new Date(timestamp).toISOString())}',
+            error: '${Utilities.encodeHtml(error.toString()).replace(/'/g, "\\\\'")}'
           });
         </script>
       </body>
@@ -2429,10 +2424,10 @@ function createEnhancedErrorPage(error, requestId, validationResults = null) {
         <body style="font-family: Arial, sans-serif; padding: 20px; text-align: center;">
           <h1 style="color: #dc3545;">Critical System Error</h1>
           <p>The error reporting system has also failed.</p>
-          <p><strong>Original Error:</strong> ${error.toString()}</p>
-          <p><strong>Page Error:</strong> ${pageError.toString()}</p>
-          <p><strong>Error ID:</strong> ${errorId}</p>
-          <p><strong>Timestamp:</strong> ${new Date(timestamp).toISOString()}</p>
+          <p><strong>Original Error:</strong> ${Utilities.encodeHtml(error.toString())}</p>
+          <p><strong>Page Error:</strong> ${Utilities.encodeHtml(pageError.toString())}</p>
+          <p><strong>Error ID:</strong> ${Utilities.encodeHtml(errorId)}</p>
+          <p><strong>Timestamp:</strong> ${Utilities.encodeHtml(new Date(timestamp).toISOString())}</p>
           <button onclick="window.location.reload()" style="padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 3px;">
             Retry
           </button>
