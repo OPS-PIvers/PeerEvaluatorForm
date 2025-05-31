@@ -195,6 +195,13 @@ const SYSTEM_INFO = {
 };
 
 /**
+ * Contact settings
+ */
+const CONTACT_SETTINGS = {
+  SUPPORT_EMAIL: 'admin@example.com'
+};
+
+/**
  * Auto-trigger system settings
  */
 const AUTO_TRIGGER_SETTINGS = {
