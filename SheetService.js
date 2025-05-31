@@ -155,6 +155,9 @@ function getStaffData() {
     const dataChanged = hasSheetDataChanged('Staff', values);
     if (dataChanged) {
       debugLog('Staff sheet data change detected - invalidating related caches');
+      // staff_data change implies potential user changes.
+      // invalidateDependentCaches will handle its dependencies,
+      // incrementing master version for wildcards like 'user_*'.
       invalidateDependentCaches('staff_data');
     }
 
@@ -471,9 +474,18 @@ function getRoleSheetData(roleName) {
     // Check if data has changed
     const dataChanged = hasSheetDataChanged(roleName, values);
     if (dataChanged) {
-      debugLog(`Role sheet data change detected for ${roleName} - invalidating related caches`, {
-        operationId: operationId
+      debugLog(`Role sheet data change detected for ${roleName}. Performing direct invalidation and then handling dependencies.`, {
+        operationId: operationId,
+        roleName: roleName
       });
+      // Directly remove the specific cache for this role sheet first.
+      const specificRoleKey = generateCacheKey('role_sheet', { role: roleName });
+      CacheService.getScriptCache().remove(specificRoleKey);
+      debugLog('Cleared specific cache for changed role sheet', { roleName: roleName, key: specificRoleKey, operationId: operationId });
+
+      // Now, call invalidateDependentCaches for 'role_sheet_*'.
+      // Since CACHE_DEPENDENCIES['role_sheet_*'] is [], this currently does nothing.
+      // If dependencies were added later, it would handle them (likely by incrementing master version).
       invalidateDependentCaches('role_sheet_*');
     }
 
