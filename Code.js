@@ -542,7 +542,7 @@ function doGet(e) {
     console.error('Error in enhanced doGet:', formatErrorMessage(error, 'doGet'));
     
     // Return enhanced error page with cache busting
-    return createEnhancedErrorPage(error, requestId);
+    return createEnhancedErrorPage(error, requestId, null, e.userAgent);
   }
 }
 
@@ -2104,10 +2104,13 @@ function addDebugHeaders(htmlOutput, userContext, metadata) {
 /**
  * Enhanced error page with cache busting
  * @param {Error} error - Error object
+ * @param {string} requestId - The request ID
+ * @param {Object} validationResults - Optional validation results
+ * @param {string} userAgentString - The User Agent string
  * REPLACE THIS FUNCTION in Code.js
  * Comprehensive error page with validation and recovery options
  */
-function createEnhancedErrorPage(error, requestId, validationResults = null) {
+function createEnhancedErrorPage(error, requestId, validationResults = null, userAgentString) {
   const timestamp = Date.now();
   const errorId = generateUniqueId('error_page');
 
@@ -2352,7 +2355,7 @@ function createEnhancedErrorPage(error, requestId, validationResults = null) {
               <strong>System Health:</strong> ${Utilities.encodeHtml(systemHealth)}<br>
               <strong>Cache Version:</strong> ${Utilities.encodeHtml(getMasterCacheVersion())}<br>
               <strong>Timestamp:</strong> ${Utilities.encodeHtml(new Date(timestamp).toISOString())}<br>
-              <strong>User Agent:</strong> ${typeof navigator !== 'undefined' ? Utilities.encodeHtml(navigator.userAgent) : 'Unknown'}<br>
+              <strong>User Agent:</strong> ${userAgentString ? Utilities.encodeHtml(userAgentString) : 'Unknown'}<br>
               ${validationResults ? `
               <strong>Validation Issues:</strong> ${Utilities.encodeHtml((validationResults.issues?.length || 0).toString())}<br>
               <strong>System Components:</strong>
