@@ -39,6 +39,43 @@ const DOMAIN_CONFIGS = {
 };
 
 /**
+ * ADD THIS NEW FUNCTION to Code.js
+ * Enhanced cache clearing for role changes
+ */
+function clearCachesForRoleChange(userEmail = null) {
+  console.log('=== CLEARING CACHES FOR ROLE CHANGE (Enhanced) ===');
+
+  try {
+    // Get user email if not provided
+    if (!userEmail) {
+      const sessionUser = getUserFromSession();
+      userEmail = sessionUser ? sessionUser.email : null;
+    }
+
+    if (userEmail) {
+      debugLog('Clearing caches for user role change', { userEmail });
+
+      // Clear user-specific cache
+      invalidateDependentCaches('user_*');
+
+      // Clear role sheet caches (since user might switch between roles)
+      invalidateDependentCaches('role_sheet_*');
+
+    } else {
+      debugLog('No user email - performing global cache clear');
+      forceCleanAllCaches();
+    }
+
+    console.log('✅ Enhanced cache clearing completed');
+
+  } catch (error) {
+    console.error('Error in enhanced cache clearing:', error);
+    // Fallback to force clear
+    forceCleanAllCaches();
+  }
+}
+
+/**
  * Main function to serve the web app
  * Enhanced to support user-specific role-based content
  */
@@ -519,5 +556,90 @@ function listExpectedSheetStructure() {
     });
   } catch (error) {
     console.error('Error accessing spreadsheet:', error);
+  }
+}
+
+/**
+ * ADD THESE TESTING FUNCTIONS to Code.js
+ * Test the enhanced cache system
+ */
+
+/**
+ * Test enhanced cache system
+ */
+function testEnhancedCacheSystem() {
+  console.log('=== TESTING ENHANCED CACHE SYSTEM ===');
+
+  try {
+    // Test 1: Cache versioning
+    console.log('Test 1: Cache versioning');
+    const version1 = getMasterCacheVersion();
+    console.log('Current version:', version1);
+
+    // Test 2: Cache key generation
+    console.log('Test 2: Cache key generation');
+    const userKey = generateCacheKey('user', { email: 'test@example.com' });
+    const roleKey = generateCacheKey('role_sheet', { role: 'Teacher' });
+    console.log('User cache key:', userKey);
+    console.log('Role cache key:', roleKey);
+
+    // Test 3: Data change detection
+    console.log('Test 3: Data change detection');
+    const testData = [['Test', 'Data'], ['Row', '2']];
+    const hasChanged = hasSheetDataChanged('TestSheet', testData);
+    console.log('Data changed:', hasChanged);
+
+    // Test 4: Cache invalidation
+    console.log('Test 4: Cache invalidation');
+    invalidateDependentCaches('staff_data');
+    console.log('Cache invalidation completed');
+
+    console.log('✅ Enhanced cache system test completed');
+
+  } catch (error) {
+    console.error('Error testing enhanced cache system:', error);
+  }
+}
+
+/**
+ * Test complete role change workflow with enhanced caching
+ */
+function testRoleChangeWithEnhancedCache(testEmail, newRole) {
+  console.log('=== TESTING ROLE CHANGE WITH ENHANCED CACHE ===');
+  console.log(`Email: ${testEmail}, New Role: ${newRole}`);
+
+  try {
+    // Step 1: Clear caches
+    console.log('Step 1: Clearing caches...');
+    clearCachesForRoleChange(testEmail);
+
+    // Step 2: Test user lookup
+    console.log('Step 2: Testing user lookup...');
+    const user = getUserByEmail(testEmail);
+    console.log('User found:', user ? {
+      email: user.email,
+      role: user.role,
+      year: user.year
+    } : 'NOT FOUND');
+
+    // Step 3: Test role sheet loading
+    console.log('Step 3: Testing role sheet loading...');
+    const roleSheet = getRoleSheetData(newRole);
+    console.log('Role sheet loaded:', {
+      exists: !!roleSheet,
+      title: roleSheet?.title,
+      rowCount: roleSheet?.rowCount
+    });
+
+    // Step 4: Test cache effectiveness
+    console.log('Step 4: Testing cache effectiveness...');
+    const cachedUser = getUserByEmail(testEmail); // Should hit cache
+    const cachedRoleSheet = getRoleSheetData(newRole); // Should hit cache
+    console.log('Cache hits successful:', !!cachedUser && !!cachedRoleSheet);
+
+    console.log('✅ Enhanced role change test completed');
+
+  } catch (error) {
+    console.error('Error testing enhanced role change:', error);
   }
 }
