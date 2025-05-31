@@ -125,44 +125,190 @@ function getUserYear(email) {
 }
 
 /**
- * Validates if a user has access to the system
- * @param {string} email - User's email address
- * @return {Object} Validation result with access status and details
+ * REPLACE THIS FUNCTION in UserService.js
+ * Enhanced validateUserAccess function with comprehensive validation
  */
 function validateUserAccess(email) {
-  const result = {
-    hasAccess: false,
-    email: email,
-    role: null,
-    year: null,
-    isDefaultUser: false,
-    message: ''
-  };
+  const validationId = generateUniqueId('user_access_validation');
   
-  if (!email || !isValidEmail(email)) {
-    result.message = ERROR_MESSAGES.INVALID_EMAIL;
-    return result;
-  }
-  
-  const user = getUserByEmail(email);
-  
-  if (!user) {
-    // User not found, but we'll allow access with default settings
+  try {
+    const result = {
+      validationId: validationId,
+      hasAccess: false,
+      email: email,
+      role: null,
+      year: null,
+      isDefaultUser: false,
+      message: '',
+      validation: {
+        emailValid: false,
+        userFound: false,
+        roleValid: false,
+        sheetExists: false
+      },
+      issues: [],
+      recommendedActions: []
+    };
+
+    debugLog('Enhanced user access validation started', {
+      email: email,
+      validationId: validationId
+    });
+
+    // Email validation
+    if (!email || !isValidEmail(email)) {
+      result.issues.push({
+        type: VALIDATION_ERROR_TYPES.INVALID_ROLE,
+        message: 'Invalid or missing email address',
+        severity: VALIDATION_SEVERITY.ERROR
+      });
+      result.message = ERROR_MESSAGES.INVALID_EMAIL;
+      result.recommendedActions.push('Provide valid email address');
+
+      // Still allow access with default settings
+      result.hasAccess = true;
+      result.role = 'Teacher';
+      result.year = 1;
+      result.isDefaultUser = true;
+      result.message = 'Using default Teacher role due to invalid email';
+
+      return result;
+    }
+
+    result.validation.emailValid = true;
+
+    // User lookup with validation
+    const user = getUserByEmail(email);
+
+    if (!user) {
+      result.issues.push({
+        type: VALIDATION_ERROR_TYPES.MISSING_USER,
+        message: 'User not found in Staff sheet',
+        severity: VALIDATION_SEVERITY.WARNING
+      });
+      result.recommendedActions.push('Add user to Staff sheet');
+      result.recommendedActions.push('Or use default Teacher role');
+
+      // Allow access with default settings
+      result.hasAccess = true;
+      result.role = 'Teacher';
+      result.year = 1;
+      result.isDefaultUser = true;
+      result.message = ERROR_MESSAGES.USER_NOT_FOUND;
+
+      debugLog('User not found - using defaults', {
+        email: email,
+        defaultRole: result.role,
+        validationId: validationId
+      });
+
+      return result;
+    }
+
+    result.validation.userFound = true;
+
+    // Validate user data
+    const userValidation = validateUserData(user);
+
+    if (!userValidation.isValid) {
+      result.issues.push(...userValidation.issues);
+      result.recommendedActions.push(...userValidation.recommendedActions);
+
+      if (userValidation.severity === VALIDATION_SEVERITY.CRITICAL) {
+        result.hasAccess = false;
+        result.message = 'Critical user data issues prevent access';
+        return result;
+      }
+
+      // Use sanitized user data if available
+      const userData = userValidation.sanitizedUser || user;
+      result.role = userData.role;
+      result.year = userData.year;
+    } else {
+      result.role = user.role || 'Teacher';
+      result.year = user.year || 1;
+    }
+
+    result.validation.roleValid = AVAILABLE_ROLES.includes(result.role);
+
+    // Validate role and role sheet
+    const roleValidation = validateRole(result.role);
+
+    if (!roleValidation.isValid) {
+      result.issues.push(...roleValidation.issues);
+      result.recommendedActions.push(...roleValidation.recommendedActions);
+
+      // Use fallback role if available
+      if (roleValidation.fallbackRole) {
+        const originalRole = result.role;
+        result.role = roleValidation.fallbackRole;
+        result.message = `Role "${originalRole}" not available, using "${result.role}"`;
+
+        debugLog('Using fallback role', {
+          email: email,
+          originalRole: originalRole,
+          fallbackRole: result.role,
+          validationId: validationId
+        });
+      }
+    }
+
+    result.validation.sheetExists = roleValidation.sheetExists;
+
+    // Final access decision
     result.hasAccess = true;
-    result.role = 'Teacher';
-    result.year = 1;
-    result.isDefaultUser = true;
-    result.message = ERROR_MESSAGES.USER_NOT_FOUND;
-  } else {
-    result.hasAccess = true;
-    result.role = user.role || 'Teacher';
-    result.year = user.year || 1;
     result.isDefaultUser = false;
-    result.message = 'User access validated successfully';
+
+    if (result.issues.length === 0) {
+      result.message = 'User access validated successfully';
+    } else {
+      const criticalIssues = result.issues.filter(issue =>
+        issue.severity === VALIDATION_SEVERITY.CRITICAL
+      ).length;
+
+      if (criticalIssues > 0) {
+        result.hasAccess = false;
+        result.message = 'Critical validation issues prevent access';
+      } else {
+        result.message = `Access granted with ${result.issues.length} validation warnings`;
+      }
+    }
+
+    debugLog('Enhanced user access validation completed', {
+      email: email,
+      hasAccess: result.hasAccess,
+      role: result.role,
+      issueCount: result.issues.length,
+      validationId: validationId
+    });
+
+    return result;
+
+  } catch (error) {
+    console.error('Error in enhanced user access validation:', formatErrorMessage(error, 'validateUserAccess'));
+
+    return {
+      validationId: validationId,
+      hasAccess: true,
+      email: email,
+      role: 'Teacher',
+      year: 1,
+      isDefaultUser: true,
+      message: 'Validation error - using default access: ' + error.message,
+      validation: {
+        emailValid: false,
+        userFound: false,
+        roleValid: false,
+        sheetExists: false
+      },
+      issues: [{
+        type: VALIDATION_ERROR_TYPES.CONFIGURATION_ERROR,
+        message: 'User access validation error: ' + error.message,
+        severity: VALIDATION_SEVERITY.CRITICAL
+      }],
+      error: error.message
+    };
   }
-  
-  debugLog('User access validation completed', result);
-  return result;
 }
 
 /**
