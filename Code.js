@@ -2339,7 +2339,7 @@ function createEnhancedErrorPage(error, requestId, validationResults = null) {
                 🚨 Emergency Reset
               </button>
               <br><br>
-              <a href="mailto:admin@domain.com?subject=Danielson Framework Error&body=Error ID: ${Utilities.encodeHtml(errorId)}%0ATimestamp: ${Utilities.encodeHtml(new Date(timestamp).toISOString())}%0AError: ${encodeURIComponent(error.toString())}"
+              <a href="mailto:${CONTACT_SETTINGS.SUPPORT_EMAIL}?subject=Danielson Framework Error&body=Error ID: ${Utilities.encodeHtml(errorId)}%0ATimestamp: ${Utilities.encodeHtml(new Date(timestamp).toISOString())}%0AError: ${encodeURIComponent(error.toString())}"
                  class="action-button" style="background: #6c757d;">
                 📧 Contact Support
               </a>
