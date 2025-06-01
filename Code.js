@@ -46,6 +46,13 @@ function clearCachesForRoleChange(userEmail = null) {
   console.log('=== CLEARING CACHES FOR ROLE CHANGE (Enhanced) ===');
 
   try {
+    // Validate email if provided
+    if (userEmail && !isValidEmail(userEmail)) { // Assuming isValidEmail is globally available
+      console.warn('Invalid email provided to clearCachesForRoleChange: ' + userEmail);
+      debugLog('Invalid email format in clearCachesForRoleChange, aborting.', { userEmail });
+      return; // Exit if email is provided but invalid
+    }
+
     // Get user email if not provided
     if (!userEmail) {
       const sessionUser = getUserFromSession();

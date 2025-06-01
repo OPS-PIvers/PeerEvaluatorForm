@@ -153,12 +153,17 @@ function getStaffData() {
     
     // Check if data has changed
     const dataChanged = hasSheetDataChanged('Staff', values);
-    if (dataChanged) {
-      debugLog('Staff sheet data change detected - invalidating related caches');
-      // staff_data change implies potential user changes.
-      // invalidateDependentCaches will handle its dependencies,
-      // incrementing master version for wildcards like 'user_*'.
-      invalidateDependentCaches('staff_data');
+    if (dataChanged) { // Check if dataChanged is true first
+      if (typeof invalidateDependentCaches === 'function') {
+        debugLog('Staff sheet data change detected - invalidating related caches');
+        // staff_data change implies potential user changes.
+        // invalidateDependentCaches will handle its dependencies,
+        // incrementing master version for wildcards like 'user_*'.
+        invalidateDependentCaches('staff_data');
+      } else {
+        console.warn('invalidateDependentCaches is not a function, skipping cache invalidation for Staff data change.');
+        debugLog('invalidateDependentCaches not found, cannot invalidate for Staff data change.');
+      }
     }
 
     const users = [];
@@ -354,7 +359,7 @@ function getRoleSheetData(roleName) {
         });
 
         // Recursive call with fallback role (prevent infinite recursion)
-        if (fallbackRole !== roleName && fallbackRole === 'Teacher') {
+        if (fallbackRole === 'Teacher' && roleName !== 'Teacher') {
           return getRoleSheetData(fallbackRole);
         } else {
           // Can't fallback - return error data
