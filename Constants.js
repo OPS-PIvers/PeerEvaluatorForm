@@ -193,3 +193,64 @@ const SYSTEM_INFO = {
   AUTHOR: 'Apps Script Multi-Role Implementation',
   LAST_UPDATED: new Date().toISOString()
 };
+
+/**
+ * Contact settings
+ */
+const CONTACT_SETTINGS = {
+  SUPPORT_EMAIL: 'admin@example.com'
+};
+
+/**
+ * Auto-trigger system settings
+ */
+const AUTO_TRIGGER_SETTINGS = {
+  ENABLED: true,
+  MAX_PROCESSING_TIME: 10000, // 10 seconds max for trigger processing
+  RETRY_ATTEMPTS: 2,
+  LOG_ALL_EDITS: false, // Set to true for debugging
+  BATCH_PROCESSING: true, // Process multiple role changes efficiently
+  WARM_CACHE_ON_CHANGE: true // Pre-load new role data
+};
+
+/**
+ * Trigger monitoring settings
+ */
+const TRIGGER_MONITORING = {
+  LOG_SUCCESSFUL_CHANGES: true,
+  LOG_IGNORED_EDITS: false, // Set to true for debugging
+  ALERT_ON_ERRORS: true,
+  TRACK_PERFORMANCE: true
+};
+
+/**
+ * Validation error types for consistent error reporting
+ */
+const VALIDATION_ERROR_TYPES = {
+  // General Configuration and Access
+  CONFIGURATION_ERROR: 'configuration_error', // Generic configuration issue
+  PERMISSION_ERROR: 'permission_error',       // Errors related to script/user permissions
+  SHEET_ID_MISSING: 'sheet_id_missing',       // SHEET_ID not set in properties
+  SPREADSHEET_NOT_FOUND: 'spreadsheet_not_found', // Cannot open spreadsheet by ID
+  SHEET_NOT_FOUND: 'sheet_not_found',           // A required sheet (e.g., Staff, Settings) is missing
+
+  // Data Integrity and Format
+  DATA_CORRUPTION: 'data_corruption',     // General data format or integrity issue
+  INVALID_EMAIL: 'invalid_email',         // Email format is incorrect
+  INVALID_ROLE: 'invalid_role',           // Role is not in AVAILABLE_ROLES
+  INVALID_YEAR: 'invalid_year',           // Year is not in OBSERVATION_YEARS
+  MISSING_HEADER: 'missing_header',       // Expected header not found in a sheet
+  UNEXPECTED_FORMAT: 'unexpected_format', // Data doesn't match expected structure
+
+  // User and Role Specific
+  MISSING_USER: 'missing_user',           // User not found in Staff sheet
+  ROLE_SHEET_MISSING: 'role_sheet_missing', // Specific role sheet (e.g., Nurse) not found
+  ROLE_CONFIG_INVALID: 'role_config_invalid', // Role configuration (e.g. in Settings) is bad
+
+  // Cache and Session
+  CACHE_ERROR: 'cache_error',             // Problem with caching service
+  SESSION_ERROR: 'session_error',         // Problem with user session
+
+  // Trigger and Automation
+  TRIGGER_ERROR: 'trigger_error'          // Error within an automated trigger
+};
