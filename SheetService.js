@@ -359,7 +359,7 @@ function getRoleSheetData(roleName) {
         });
 
         // Recursive call with fallback role (prevent infinite recursion)
-        if (fallbackRole !== roleName && fallbackRole === 'Teacher' && roleName !== 'Teacher') {
+        if (fallbackRole === 'Teacher' && roleName !== 'Teacher') {
           return getRoleSheetData(fallbackRole);
         } else {
           // Can't fallback - return error data
