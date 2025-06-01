@@ -32,8 +32,8 @@ function getUserFromSession() {
 
 /**
  * Gets user information by email from the Staff sheet
- * @param {string} email - User's email address
- * @return {Object|null} User object with name, email, role, and year, or null if not found
+ * REPLACE THIS FUNCTION in UserService.js
+ * Enhanced getUserByEmail function with cache versioning
  */
 function getUserByEmail(email) {
   if (!email || !isValidEmail(email)) {
@@ -42,14 +42,17 @@ function getUserByEmail(email) {
   }
   
   try {
-    // Check cache first
-    const cacheKey = `user_${email}`;
-    const cachedUser = getCachedData(cacheKey);
-    if (cachedUser) {
-      debugLog('User data retrieved from cache', { email: email });
-      return cachedUser;
+    // Use enhanced cache with role-specific key
+    const cacheParams = { email: email.toLowerCase().trim() };
+    const cachedUser = getCachedDataEnhanced('user', cacheParams);
+
+    if (cachedUser && cachedUser.data) {
+      debugLog('User data retrieved from enhanced cache', { email: email });
+      return cachedUser.data;
     }
     
+    debugLog('Loading fresh user data', { email: email });
+
     const staffData = getStaffData();
     if (!staffData || !staffData.users) {
       debugLog('No staff data available');
@@ -58,19 +61,24 @@ function getUserByEmail(email) {
     
     // Find user by email (case-insensitive)
     const normalizedEmail = email.toLowerCase().trim();
-    const user = staffData.users.find(u => 
-      u.email && u.email.toLowerCase().trim() === normalizedEmail
-    );
+    const user = staffData.users.find(u => {
+      const userEmail = u.email ? u.email.toLowerCase().trim() : '';
+      return userEmail === normalizedEmail;
+    });
     
     if (!user) {
-      debugLog('User not found in staff data', { email: email });
+      debugLog('User not found in staff data', {
+        email: email,
+        searchedEmail: normalizedEmail,
+        availableEmails: staffData.users.map(u => u.email).slice(0, 5) // First 5 for debugging
+      });
       return null;
     }
     
-    // Cache the user data
-    setCachedData(cacheKey, user, CACHE_SETTINGS.USER_DATA_TTL);
+    // Cache with enhanced system
+    setCachedDataEnhanced('user', cacheParams, user, CACHE_SETTINGS.USER_DATA_TTL);
     
-    debugLog('User found in staff data', { 
+    debugLog('User found and cached', {
       email: user.email, 
       role: user.role, 
       year: user.year 
@@ -117,50 +125,195 @@ function getUserYear(email) {
 }
 
 /**
- * Validates if a user has access to the system
- * @param {string} email - User's email address
- * @return {Object} Validation result with access status and details
+ * REPLACE THIS FUNCTION in UserService.js
+ * Enhanced validateUserAccess function with comprehensive validation
  */
 function validateUserAccess(email) {
-  const result = {
-    hasAccess: false,
-    email: email,
-    role: null,
-    year: null,
-    isDefaultUser: false,
-    message: ''
-  };
+  const validationId = generateUniqueId('user_access_validation');
   
-  if (!email || !isValidEmail(email)) {
-    result.message = ERROR_MESSAGES.INVALID_EMAIL;
-    return result;
-  }
-  
-  const user = getUserByEmail(email);
-  
-  if (!user) {
-    // User not found, but we'll allow access with default settings
+  try {
+    const result = {
+      validationId: validationId,
+      hasAccess: false,
+      email: email,
+      role: null,
+      year: null,
+      isDefaultUser: false,
+      message: '',
+      validation: {
+        emailValid: false,
+        userFound: false,
+        roleValid: false,
+        sheetExists: false
+      },
+      issues: [],
+      recommendedActions: []
+    };
+
+    debugLog('Enhanced user access validation started', {
+      email: email,
+      validationId: validationId
+    });
+
+    // Email validation
+    if (!email || !isValidEmail(email)) {
+      result.issues.push({
+        type: VALIDATION_ERROR_TYPES.INVALID_EMAIL,
+        message: 'Invalid or missing email address',
+        severity: VALIDATION_SEVERITY.ERROR
+      });
+      result.message = ERROR_MESSAGES.INVALID_EMAIL;
+      result.recommendedActions.push('Provide valid email address');
+
+      // Still allow access with default settings
+      result.hasAccess = true;
+      result.role = 'Teacher';
+      result.year = 1;
+      result.isDefaultUser = true;
+      result.message = 'Using default Teacher role due to invalid email';
+
+      return result;
+    }
+
+    result.validation.emailValid = true;
+
+    // User lookup with validation
+    const user = getUserByEmail(email);
+
+    if (!user) {
+      result.issues.push({
+        type: VALIDATION_ERROR_TYPES.MISSING_USER,
+        message: 'User not found in Staff sheet',
+        severity: VALIDATION_SEVERITY.WARNING
+      });
+      result.recommendedActions.push('Add user to Staff sheet');
+      result.recommendedActions.push('Or use default Teacher role');
+
+      // Allow access with default settings
+      result.hasAccess = true;
+      result.role = 'Teacher';
+      result.year = 1;
+      result.isDefaultUser = true;
+      result.message = ERROR_MESSAGES.USER_NOT_FOUND;
+
+      debugLog('User not found - using defaults', {
+        email: email,
+        defaultRole: result.role,
+        validationId: validationId
+      });
+
+      return result;
+    }
+
+    result.validation.userFound = true;
+
+    // Validate user data
+    const userValidation = validateUserData(user);
+
+    if (!userValidation.isValid) {
+      result.issues.push(...userValidation.issues);
+      result.recommendedActions.push(...userValidation.recommendedActions);
+
+      if (userValidation.severity === VALIDATION_SEVERITY.CRITICAL) {
+        result.hasAccess = false;
+        result.message = 'Critical user data issues prevent access';
+        return result;
+      }
+
+      // Use sanitized user data if available
+      const userData = userValidation.sanitizedUser || user;
+      result.role = userData.role;
+      result.year = userData.year;
+    } else {
+      result.role = user.role || 'Teacher';
+      result.year = user.year || 1;
+    }
+
+    result.validation.roleValid = AVAILABLE_ROLES.includes(result.role);
+
+    // Validate role and role sheet
+    const roleValidation = validateRole(result.role);
+
+    if (!roleValidation.isValid) {
+      result.issues.push(...roleValidation.issues);
+      result.recommendedActions.push(...roleValidation.recommendedActions);
+
+      // Use fallback role if available
+      if (roleValidation.fallbackRole) {
+        const originalRole = result.role;
+        result.role = roleValidation.fallbackRole;
+        result.message = `Role "${originalRole}" not available, using "${result.role}"`;
+
+        debugLog('Using fallback role', {
+          email: email,
+          originalRole: originalRole,
+          fallbackRole: result.role,
+          validationId: validationId
+        });
+      }
+    }
+
+    result.validation.sheetExists = roleValidation.sheetExists;
+
+    // Final access decision
     result.hasAccess = true;
-    result.role = 'Teacher';
-    result.year = 1;
-    result.isDefaultUser = true;
-    result.message = ERROR_MESSAGES.USER_NOT_FOUND;
-  } else {
-    result.hasAccess = true;
-    result.role = user.role || 'Teacher';
-    result.year = user.year || 1;
     result.isDefaultUser = false;
-    result.message = 'User access validated successfully';
+
+    if (result.issues.length === 0) {
+      result.message = 'User access validated successfully';
+    } else {
+      const criticalIssues = result.issues.filter(issue =>
+        issue.severity === VALIDATION_SEVERITY.CRITICAL
+      ).length;
+
+      if (criticalIssues > 0) {
+        result.hasAccess = false;
+        result.message = 'Critical validation issues prevent access';
+      } else {
+        result.message = `Access granted with ${result.issues.length} validation warnings`;
+      }
+    }
+
+    debugLog('Enhanced user access validation completed', {
+      email: email,
+      hasAccess: result.hasAccess,
+      role: result.role,
+      issueCount: result.issues.length,
+      validationId: validationId
+    });
+
+    return result;
+
+  } catch (error) {
+    console.error('Error in enhanced user access validation:', formatErrorMessage(error, 'validateUserAccess'));
+
+    return {
+      validationId: validationId,
+      hasAccess: true,
+      email: email,
+      role: 'Teacher',
+      year: 1,
+      isDefaultUser: true,
+      message: 'Validation error - using default access: ' + error.message,
+      validation: {
+        emailValid: false,
+        userFound: false,
+        roleValid: false,
+        sheetExists: false
+      },
+      issues: [{
+        type: VALIDATION_ERROR_TYPES.CONFIGURATION_ERROR,
+        message: 'User access validation error: ' + error.message,
+        severity: VALIDATION_SEVERITY.CRITICAL
+      }],
+      error: error.message
+    };
   }
-  
-  debugLog('User access validation completed', result);
-  return result;
 }
 
 /**
- * Creates a comprehensive user context object for the current session
- * @param {string} email - User's email address (optional, will try to get from session)
- * @return {Object} Complete user context with all relevant information
+ * REPLACE THIS FUNCTION in UserService.js
+ * Enhanced createUserContext function with proactive role change detection
  */
 function createUserContext(email = null) {
   const startTime = Date.now();
@@ -173,7 +326,9 @@ function createUserContext(email = null) {
       userEmail = sessionUser ? sessionUser.email : null;
     }
     
-    // Create context object
+    debugLog('Creating enhanced user context', { userEmail: userEmail });
+
+    // Create base context object
     const context = {
       email: userEmail,
       role: null,
@@ -181,54 +336,135 @@ function createUserContext(email = null) {
       isAuthenticated: false,
       isDefaultUser: false,
       hasStaffRecord: false,
+      sessionInfo: null,
+      roleChangeDetected: false,
+      stateChanges: [],
+      previousState: null,
       permissions: {
         canAccessRubric: false,
         canSeeAllDomains: false
       },
       metadata: {
         createdAt: new Date().toISOString(),
-        sessionId: generateUniqueId('session'),
-        userAgent: getUserAgent()
+        sessionId: generateUniqueId('context'),
+        userAgent: getUserAgent(),
+        cacheVersion: getMasterCacheVersion(),
+        contextVersion: '3.0'
       }
     };
     
+    // Handle anonymous users
     if (!userEmail) {
+      debugLog('No email available - using default context');
       context.role = 'Teacher';
       context.year = 1;
       context.isDefaultUser = true;
       context.permissions.canAccessRubric = true;
       context.permissions.canSeeAllDomains = true;
       
-      debugLog('User context created for anonymous user', context);
       return context;
     }
     
-    // Validate user access
-    const validation = validateUserAccess(userEmail);
-    context.isAuthenticated = validation.hasAccess;
-    context.role = validation.role;
-    context.year = validation.year;
-    context.isDefaultUser = validation.isDefaultUser;
-    context.hasStaffRecord = !validation.isDefaultUser;
+    // Get or create user session
+    const session = getUserSession(userEmail);
+    context.sessionInfo = session;
+    context.metadata.sessionId = session ? session.sessionId : context.metadata.sessionId;
+
+    // Get current user data from Staff sheet
+    const currentUser = getUserByEmail(userEmail);
+
+    if (!currentUser) {
+      debugLog('User not found in Staff sheet - using default settings', { userEmail });
+      context.role = 'Teacher';
+      context.year = 1;
+      context.isDefaultUser = true;
+      context.hasStaffRecord = false;
+      context.permissions.canAccessRubric = true;
+      context.permissions.canSeeAllDomains = true;
+
+      return context;
+    }
+
+    // Set user data
+    context.isAuthenticated = true;
+    context.role = currentUser.role || 'Teacher';
+    context.year = currentUser.year || 1;
+    context.hasStaffRecord = true;
+    context.isDefaultUser = false;
+    context.permissions.canAccessRubric = true;
+    context.permissions.canSeeAllDomains = false; // Authenticated users see role-specific content
+
+    // Detect state changes
+    const changeDetection = detectUserStateChanges(userEmail, {
+      role: context.role,
+      year: context.year,
+      name: currentUser.name,
+      email: userEmail,
+      sessionId: context.metadata.sessionId
+    });
+
+    context.roleChangeDetected = changeDetection.hasChanged;
+    context.stateChanges = changeDetection.changes;
+    context.previousState = changeDetection.storedState;
+    context.isNewUser = changeDetection.isNewUser || false;
     
-    // Set permissions
-    context.permissions.canAccessRubric = validation.hasAccess;
-    context.permissions.canSeeAllDomains = validation.isDefaultUser; // Default users see all domains
+    // Handle role changes
+    if (changeDetection.hasChanged && !changeDetection.isNewUser) {
+      debugLog('Role/state change detected - triggering cache invalidation', {
+        userEmail: userEmail,
+        changes: changeDetection.changes
+      });
+
+      // Find role changes specifically
+      const roleChange = changeDetection.changes.find(change => change.field === 'role');
+      if (roleChange) {
+        // Add to role change history
+        addRoleChangeToHistory(userEmail, roleChange.oldValue, roleChange.newValue);
+
+        // Clear relevant caches proactively
+        clearCachesForRoleChange(userEmail);
+
+        debugLog('Role change processed', {
+          userEmail: userEmail,
+          oldRole: roleChange.oldValue,
+          newRole: roleChange.newValue
+        });
+      }
+    }
+
+    // Store current state for future comparisons
+    storeUserState(userEmail, {
+      role: context.role,
+      year: context.year,
+      name: currentUser.name,
+      email: userEmail,
+      sessionId: context.metadata.sessionId
+    });
     
     const executionTime = Date.now() - startTime;
     logPerformanceMetrics('createUserContext', executionTime, {
       email: userEmail,
       role: context.role,
-      isDefaultUser: context.isDefaultUser
+      roleChangeDetected: context.roleChangeDetected,
+      isNewUser: context.isNewUser,
+      stateChangeCount: context.stateChanges.length
+    });
+
+    debugLog('Enhanced user context created successfully', {
+      email: userEmail,
+      role: context.role,
+      year: context.year,
+      roleChangeDetected: context.roleChangeDetected,
+      stateChanges: context.stateChanges.length,
+      sessionId: context.metadata.sessionId
     });
     
-    debugLog('User context created successfully', context);
     return context;
     
   } catch (error) {
-    console.error('Error creating user context:', formatErrorMessage(error, 'createUserContext'));
+    console.error('Error creating enhanced user context:', formatErrorMessage(error, 'createUserContext'));
     
-    // Return default context on error
+    // Return safe default context on error
     return {
       email: email,
       role: 'Teacher',
@@ -236,14 +472,17 @@ function createUserContext(email = null) {
       isAuthenticated: false,
       isDefaultUser: true,
       hasStaffRecord: false,
+      roleChangeDetected: false,
+      stateChanges: [],
       permissions: {
         canAccessRubric: true,
         canSeeAllDomains: true
       },
       metadata: {
         createdAt: new Date().toISOString(),
-        sessionId: generateUniqueId('session'),
-        error: error.message
+        sessionId: generateUniqueId('error_context'),
+        error: error.message,
+        contextVersion: '3.0'
       }
     };
   }
