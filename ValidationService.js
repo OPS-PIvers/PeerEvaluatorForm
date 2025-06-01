@@ -28,20 +28,6 @@ const VALIDATION_SEVERITY = {
 };
 
 /**
- * Validates an email address.
- * @param {string} email The email address to validate.
- * @return {boolean} True if the email is valid, false otherwise.
- */
-function isValidEmail(email) {
-  if (!email || typeof email !== 'string') {
-    return false;
-  }
-  // Basic email validation regex
-  const emailRegex = /^[^\s@]+@[^\s@.-]+\.[a-zA-Z]{2,}$/;
-  return emailRegex.test(email);
-}
-
-/**
  * Comprehensive role validation
  * @param {string} role - Role to validate
  * @return {Object} Validation result
