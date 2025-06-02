@@ -531,33 +531,21 @@ function doGet(e) {
 }
 
 /**
- * ADD THIS FUNCTION to Code.js
- * Add state tracking headers for debugging
+ * REPLACE addStateTrackingHeaders function with this version
+ * State tracking info is passed through data object, not meta tags
  */
 function addStateTrackingHeaders(htmlOutput, userContext) {
   try {
-    if (userContext.roleChangeDetected) {
-      htmlOutput.addMetaTag('x-role-change-detected', 'true');
-      htmlOutput.addMetaTag('x-previous-role', userContext.previousState?.role || 'unknown');
-      htmlOutput.addMetaTag('x-state-changes', userContext.stateChanges.length.toString());
-    }
-
-    if (userContext.isNewUser) {
-      htmlOutput.addMetaTag('x-new-user', 'true');
-    }
-
-    htmlOutput.addMetaTag('x-session-id', userContext.metadata.sessionId);
-    htmlOutput.addMetaTag('x-context-version', userContext.metadata.contextVersion);
-    htmlOutput.addMetaTag('x-has-staff-record', userContext.hasStaffRecord.toString());
-
-    debugLog('State tracking headers added successfully', {
+    // State tracking information is available in the HTML template
+    // via the userContext object - no meta tags needed
+    
+    debugLog('State tracking handled via data object', {
       roleChangeDetected: userContext.roleChangeDetected,
       sessionId: userContext.metadata.sessionId
     });
 
   } catch (error) {
-    console.error('Error adding state tracking headers:', error);
-    // Continue execution gracefully
+    console.error('Error in addStateTrackingHeaders:', error);
   }
 }
 
@@ -2027,32 +2015,23 @@ function getUserDashboardData(userEmail) {
 }
 
 /**
- * Add cache-busting headers to HTML output
- * @param {HtmlOutput} htmlOutput - The HTML output object
- * @param {Object} metadata - Response metadata
+ * REPLACE addCacheBustingHeaders function with this version
+ * Moves all metadata to HTML template via data object instead of meta tags
  */
 function addCacheBustingHeaders(htmlOutput, metadata) {
   try {
-    // Only add custom headers that are allowed by Google Apps Script
-    // Note: cache-control, pragma, expires are already in the HTML template
+    // Don't add any meta tags programmatically - Google Apps Script rejects them
+    // All cache control headers are handled in the HTML template
+    // Metadata is passed through the data object to the template
     
-    htmlOutput
-      .addMetaTag('x-app-version', SYSTEM_INFO.VERSION)
-      .addMetaTag('x-cache-version', metadata.cacheVersion)
-      .addMetaTag('x-request-id', metadata.requestId)
-      .addMetaTag('x-timestamp', metadata.timestamp.toString())
-      .addMetaTag('x-role', metadata.role)
-      .addMetaTag('x-year', metadata.year.toString());
-
-    debugLog('Cache-busting headers added successfully', {
+    debugLog('Cache-busting handled via HTML template', {
       requestId: metadata.requestId,
       cacheVersion: metadata.cacheVersion
     });
 
   } catch (error) {
-    console.error('Error adding cache-busting headers:', error);
-    // Don't let header errors break the entire response
-    debugLog('Header error handled gracefully', { 
+    console.error('Error in addCacheBustingHeaders:', error);
+    debugLog('Header function error handled gracefully', { 
       error: error.message,
       requestId: metadata.requestId 
     });
@@ -2060,27 +2039,21 @@ function addCacheBustingHeaders(htmlOutput, metadata) {
 }
 
 /**
- * Add debug headers for development
- * @param {HtmlOutput} htmlOutput - The HTML output object
- * @param {Object} userContext - User context object
- * @param {Object} metadata - Response metadata
+ * REPLACE addDebugHeaders function with this version
+ * Debug info is handled in HTML template, not via meta tags
  */
 function addDebugHeaders(htmlOutput, userContext, metadata) {
   try {
-    // Only add allowed debug meta tags
-    htmlOutput
-      .addMetaTag('x-debug-mode', 'true')
-      .addMetaTag('x-user-email', userContext.email || 'anonymous')
-      .addMetaTag('x-user-authenticated', userContext.isAuthenticated.toString())
-      .addMetaTag('x-user-default', userContext.isDefaultUser.toString())
-      .addMetaTag('x-role-override', (userContext.isRoleOverride || false).toString())
-      .addMetaTag('x-execution-time', (Date.now() - metadata.timestamp).toString());
-
-    debugLog('Debug headers added successfully', { requestId: metadata.requestId });
+    // Debug information is passed through the data object to HTML template
+    // No programmatic meta tags needed
+    
+    debugLog('Debug headers handled via HTML template', { 
+      requestId: metadata.requestId,
+      debugMode: metadata.debugMode 
+    });
 
   } catch (error) {
-    console.error('Error adding debug headers:', error);
-    // Continue execution even if debug headers fail
+    console.error('Error in addDebugHeaders:', error);
   }
 }
 
@@ -2093,8 +2066,6 @@ function addDebugHeaders(htmlOutput, userContext, metadata) {
  * REPLACE THIS FUNCTION in Code.js
  * Comprehensive error page with validation and recovery options
  */
-
-
 function createEnhancedErrorPage(error, requestId, validationResults = null, userAgentString) {
   const timestamp = Date.now();
   const errorId = generateUniqueId('error_page');
