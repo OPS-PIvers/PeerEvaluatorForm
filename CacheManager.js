@@ -270,21 +270,22 @@ function forceCleanAllCaches() {
     // Increment master version (invalidates all versioned caches)
     incrementMasterCacheVersion();
 
-    // Note: We don't need to explicitly clear the cache service since incrementing
-    // the master version effectively invalidates all versioned cache keys.
-    // The old cache entries will naturally expire or become unused.
+    // Clear the cache service entirely
+    const cache = CacheService.getScriptCache();
+    cache.removeAll();
 
-    // Clear stored hashes to force fresh data detection
+    // Clear stored hashes
     const properties = PropertiesService.getScriptProperties();
     const allProperties = properties.getProperties();
     Object.keys(allProperties).forEach(key => {
-      // Clear sheet hash properties to force data change detection
+      // CACHE_ prefixed properties are no longer used or set by the current caching system,
+      // making their explicit deletion redundant.
       if (key.startsWith('SHEET_HASH_')) {
         properties.deleteProperty(key);
       }
     });
 
-    debugLog('All caches force cleared via master version increment');
+    debugLog('All caches force cleared');
 
   } catch (error) {
     console.error('Error force clearing caches:', error);
