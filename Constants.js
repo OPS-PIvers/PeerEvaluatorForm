@@ -155,9 +155,19 @@ const DOMAIN_TEMPLATE = {
 };
 
 /**
+ * String identifier for probationary status
+ */
+const PROBATIONARY_STATUS_STRING = 'probationary';
+
+/**
+ * Numeric representation for probationary observation year
+ */
+const PROBATIONARY_OBSERVATION_YEAR = 0;
+
+/**
  * Default years for observation cycle
  */
-const OBSERVATION_YEARS = [1, 2, 3, 0];
+const OBSERVATION_YEARS = [1, 2, 3, PROBATIONARY_OBSERVATION_YEAR];
 
 /**
  * Special access roles that can filter and view other users' data

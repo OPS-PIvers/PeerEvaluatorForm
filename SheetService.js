@@ -184,10 +184,18 @@ function getStaffData() {
       };
       
       const yearValue = row[STAFF_COLUMNS.YEAR];
-      if (typeof yearValue === 'string' && yearValue.toLowerCase() === 'probationary') {
-        user.year = 0;
+
+      if (typeof yearValue === 'string' && yearValue.toLowerCase() === PROBATIONARY_STATUS_STRING) {
+        user.year = PROBATIONARY_OBSERVATION_YEAR;
       } else {
-        user.year = parseInt(yearValue) || 1; // Default to 1 if not 'Probationary' and parsing fails
+        const parsedNumericYear = parseInt(yearValue);
+        if (OBSERVATION_YEARS.includes(parsedNumericYear)) {
+          user.year = parsedNumericYear;
+        } else {
+          // Default to 1 if parsing fails, year is not a string 'probationary', 
+          // or the parsed year is not in the allowed OBSERVATION_YEARS list
+          user.year = 1; 
+        }
       }
       
       // Validate required fields
