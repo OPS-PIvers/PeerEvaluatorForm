@@ -531,21 +531,32 @@ function doGet(e) {
 }
 
 /**
- * REPLACE addStateTrackingHeaders function with this version
- * State tracking info is passed through data object, not meta tags
+ * ADD THIS FUNCTION to Code.js
+ * Add state tracking headers for debugging
  */
 function addStateTrackingHeaders(htmlOutput, userContext) {
   try {
-    // State tracking information is available in the HTML template
-    // via the userContext object - no meta tags needed
-    
-    debugLog('State tracking handled via data object', {
+    if (userContext.roleChangeDetected) {
+      htmlOutput.addMetaTag('x-role-change-detected', 'true');
+      htmlOutput.addMetaTag('x-previous-role', userContext.previousState?.role || 'unknown');
+      htmlOutput.addMetaTag('x-state-changes', userContext.stateChanges.length.toString());
+    }
+
+    if (userContext.isNewUser) {
+      htmlOutput.addMetaTag('x-new-user', 'true');
+    }
+
+    htmlOutput.addMetaTag('x-session-id', userContext.metadata.sessionId);
+    htmlOutput.addMetaTag('x-context-version', userContext.metadata.contextVersion);
+    htmlOutput.addMetaTag('x-has-staff-record', userContext.hasStaffRecord.toString());
+
+    debugLog('State tracking headers added', {
       roleChangeDetected: userContext.roleChangeDetected,
       sessionId: userContext.metadata.sessionId
     });
 
   } catch (error) {
-    console.error('Error in addStateTrackingHeaders:', error);
+    console.error('Error adding state tracking headers:', error);
   }
 }
 
@@ -2015,45 +2026,62 @@ function getUserDashboardData(userEmail) {
 }
 
 /**
- * REPLACE addCacheBustingHeaders function with this version
- * Moves all metadata to HTML template via data object instead of meta tags
+ * Add cache-busting headers to HTML output
+ * @param {HtmlOutput} htmlOutput - The HTML output object
+ * @param {Object} metadata - Response metadata
  */
 function addCacheBustingHeaders(htmlOutput, metadata) {
   try {
-    // Don't add any meta tags programmatically - Google Apps Script rejects them
-    // All cache control headers are handled in the HTML template
-    // Metadata is passed through the data object to the template
-    
-    debugLog('Cache-busting handled via HTML template', {
-      requestId: metadata.requestId,
-      cacheVersion: metadata.cacheVersion
+    // Primary cache control headers
+    htmlOutput
+      .addMetaTag('cache-control', 'no-cache, no-store, must-revalidate, max-age=0')
+      .addMetaTag('pragma', 'no-cache')
+      .addMetaTag('expires', '0')
+      .addMetaTag('last-modified', metadata.lastModified)
+      .addMetaTag('etag', metadata.etag);
+
+    // Custom headers for debugging and version tracking
+    htmlOutput
+      .addMetaTag('x-app-version', SYSTEM_INFO.VERSION)
+      .addMetaTag('x-cache-version', metadata.cacheVersion)
+      .addMetaTag('x-request-id', metadata.requestId)
+      .addMetaTag('x-timestamp', metadata.timestamp.toString())
+      .addMetaTag('x-role', metadata.role)
+      .addMetaTag('x-year', metadata.year.toString());
+
+    // Viewport and mobile optimization
+    htmlOutput.addMetaTag('viewport', 'width=device-width, initial-scale=1.0');
+
+    debugLog('Cache-busting headers added', {
+      etag: metadata.etag,
+      requestId: metadata.requestId
     });
 
   } catch (error) {
-    console.error('Error in addCacheBustingHeaders:', error);
-    debugLog('Header function error handled gracefully', { 
-      error: error.message,
-      requestId: metadata.requestId 
-    });
+    console.error('Error adding cache-busting headers:', error);
   }
 }
 
 /**
- * REPLACE addDebugHeaders function with this version
- * Debug info is handled in HTML template, not via meta tags
+ * Add debug headers for development
+ * @param {HtmlOutput} htmlOutput - The HTML output object
+ * @param {Object} userContext - User context object
+ * @param {Object} metadata - Response metadata
  */
 function addDebugHeaders(htmlOutput, userContext, metadata) {
   try {
-    // Debug information is passed through the data object to HTML template
-    // No programmatic meta tags needed
-    
-    debugLog('Debug headers handled via HTML template', { 
-      requestId: metadata.requestId,
-      debugMode: metadata.debugMode 
-    });
+    htmlOutput
+      .addMetaTag('x-debug-mode', 'true')
+      .addMetaTag('x-user-email', userContext.email || 'anonymous')
+      .addMetaTag('x-user-authenticated', userContext.isAuthenticated.toString())
+      .addMetaTag('x-user-default', userContext.isDefaultUser.toString())
+      .addMetaTag('x-role-override', (userContext.isRoleOverride || false).toString())
+      .addMetaTag('x-execution-time', (Date.now() - metadata.timestamp).toString());
+
+    debugLog('Debug headers added', { requestId: metadata.requestId });
 
   } catch (error) {
-    console.error('Error in addDebugHeaders:', error);
+    console.error('Error adding debug headers:', error);
   }
 }
 
@@ -2094,10 +2122,10 @@ function createEnhancedErrorPage(error, requestId, validationResults = null, use
         <meta name="cache-control" content="no-cache, no-store, must-revalidate">
         <meta name="pragma" content="no-cache">
         <meta name="expires" content="0">
-        <meta name="x-request-id" content="${Utilities.htmlEncode(requestId || 'unknown')}">
-        <meta name="x-error-id" content="${Utilities.htmlEncode(errorId)}">
-        <meta name="x-timestamp" content="${Utilities.htmlEncode(timestamp.toString())}">
-        <meta name="x-system-health" content="${Utilities.htmlEncode(systemHealth)}">
+        <meta name="x-request-id" content="${Utilities.encodeHtml(requestId || 'unknown')}">
+        <meta name="x-error-id" content="${Utilities.encodeHtml(errorId)}">
+        <meta name="x-timestamp" content="${Utilities.encodeHtml(timestamp.toString())}">
+        <meta name="x-system-health" content="${Utilities.encodeHtml(systemHealth)}">
         <meta name="x-error" content="true">
         <style>
           body {
@@ -2148,6 +2176,25 @@ function createEnhancedErrorPage(error, requestId, validationResults = null, use
             padding: 15px; border-radius: 4px; margin: 10px 0;
             border: 1px solid #dee2e6; word-break: break-word;
           }
+          .validation-section {
+            margin: 25px 0;
+          }
+          .validation-item {
+            display: flex; align-items: center; padding: 8px 0;
+            border-bottom: 1px solid #e9ecef;
+          }
+          .validation-status {
+            width: 24px; height: 24px; border-radius: 50%;
+            margin-right: 12px; display: flex; align-items: center;
+            justify-content: center; font-weight: bold; font-size: 0.8rem;
+          }
+          .status-pass { background: #28a745; color: white; }
+          .status-fail { background: #dc3545; color: white; }
+          .status-warn { background: #ffc107; color: black; }
+          .troubleshooting { margin-top: 25px; }
+          .troubleshooting h3 { color: #495057; margin-bottom: 15px; }
+          .troubleshooting ul { padding-left: 20px; line-height: 1.6; }
+          .troubleshooting li { margin-bottom: 8px; }
           .action-section {
             margin-top: 30px; text-align: center;
             padding: 20px; background: #f8f9fa; border-radius: 8px;
@@ -2159,12 +2206,24 @@ function createEnhancedErrorPage(error, requestId, validationResults = null, use
             transition: background 0.3s;
           }
           .action-button:hover { background: #0056b3; text-decoration: none; color: white; }
+          .action-button.danger { background: #dc3545; }
+          .action-button.danger:hover { background: #c82333; }
+          .action-button.success { background: #28a745; }
+          .action-button.success:hover { background: #1e7e34; }
           .diagnostic-info {
             margin-top: 30px; font-size: 0.9rem; color: #6c757d;
             background: #f8f9fa; padding: 15px; border-radius: 6px;
           }
           .diagnostic-info h4 {
             color: #495057; margin-bottom: 10px;
+          }
+          .critical-alert {
+            background: #f8d7da; border: 2px solid #dc3545;
+            color: #721c24; padding: 20px; border-radius: 8px;
+            margin-bottom: 25px;
+          }
+          .critical-alert h3 {
+            color: #721c24; margin-bottom: 15px;
           }
         </style>
       </head>
@@ -2185,15 +2244,74 @@ function createEnhancedErrorPage(error, requestId, validationResults = null, use
                 '❌ System has critical issues preventing normal operation'}
             </div>
 
+            ${criticalIssues.length > 0 ? `
+            <div class="critical-alert">
+              <h3>🚨 Critical Issues Detected</h3>
+              <ul>
+                ${criticalIssues.map(issue => `<li>${issue.message}</li>`).join('')}
+              </ul>
+            </div>
+            ` : ''}
+
             <div class="error-details">
               <h3>Error Details</h3>
               <div class="error-message">
-                <strong>Error:</strong> ${Utilities.htmlEncode(error.toString())}<br>
-                <strong>Request ID:</strong> ${Utilities.htmlEncode(requestId || 'Unknown')}<br>
-                <strong>Error ID:</strong> ${Utilities.htmlEncode(errorId)}<br>
-                <strong>Timestamp:</strong> ${Utilities.htmlEncode(new Date(timestamp).toLocaleString())}<br>
-                <strong>Cache Version:</strong> ${Utilities.htmlEncode(getMasterCacheVersion())}
+                <strong>Error:</strong> ${Utilities.encodeHtml(error.toString())}<br>
+                <strong>Request ID:</strong> ${Utilities.encodeHtml(requestId || 'Unknown')}<br>
+                <strong>Error ID:</strong> ${Utilities.encodeHtml(errorId)}<br>
+                <strong>Timestamp:</strong> ${Utilities.encodeHtml(new Date(timestamp).toLocaleString())}<br>
+                <strong>Cache Version:</strong> ${Utilities.encodeHtml(getMasterCacheVersion())}
               </div>
+            </div>
+
+            ${validationResults ? `
+            <div class="validation-section">
+              <h3>📋 System Status Check</h3>
+              <div class="validation-item">
+                <div class="validation-status ${validationResults.systemHealth.spreadsheetAccess ? 'status-pass' : 'status-fail'}">
+                  ${validationResults.systemHealth.spreadsheetAccess ? '✓' : '✗'}
+                </div>
+                <span>Spreadsheet Access</span>
+              </div>
+              <div class="validation-item">
+                <div class="validation-status ${validationResults.systemHealth.requiredSheets?.Staff ? 'status-pass' : 'status-fail'}">
+                  ${validationResults.systemHealth.requiredSheets?.Staff ? '✓' : '✗'}
+                </div>
+                <span>Staff Sheet</span>
+              </div>
+              <div class="validation-item">
+                <div class="validation-status ${validationResults.systemHealth.requiredSheets?.Teacher ? 'status-pass' : 'status-fail'}">
+                  ${validationResults.systemHealth.requiredSheets?.Teacher ? '✓' : '✗'}
+                </div>
+                <span>Teacher Sheet</span>
+              </div>
+              <div class="validation-item">
+                <div class="validation-status ${validationResults.systemHealth.cacheSystem ? 'status-pass' : 'status-warn'}">
+                  ${validationResults.systemHealth.cacheSystem ? '✓' : '⚠'}
+                </div>
+                <span>Cache System</span>
+              </div>
+              <div class="validation-item">
+                <div class="validation-status ${validationResults.systemHealth.triggerSystem ? 'status-pass' : 'status-warn'}">
+                  ${validationResults.systemHealth.triggerSystem ? '✓' : '⚠'}
+                </div>
+                <span>Auto-Trigger System</span>
+              </div>
+            </div>
+            ` : ''}
+
+            <div class="troubleshooting">
+              <h3>🔧 Troubleshooting Steps</h3>
+              <ul>
+                <li><strong>First:</strong> Try the "Clear Cache & Retry" button below</li>
+                <li><strong>Check:</strong> SHEET_ID is correctly set in Script Properties</li>
+                <li><strong>Verify:</strong> Spreadsheet exists and is accessible</li>
+                <li><strong>Ensure:</strong> Required sheet tabs exist (Staff, Settings, Teacher)</li>
+                <li><strong>Confirm:</strong> You have permission to access the spreadsheet</li>
+                <li><strong>Role Sheets:</strong> Verify your role has a corresponding sheet tab</li>
+                <li><strong>If persistent:</strong> Open in incognito/private browser window</li>
+                <li><strong>Admin:</strong> Run system validation in Apps Script editor</li>
+              </ul>
             </div>
 
             <div class="action-section">
@@ -2201,19 +2319,34 @@ function createEnhancedErrorPage(error, requestId, validationResults = null, use
               <button class="action-button" onclick="window.location.reload()">
                 🔄 Simple Retry
               </button>
-              <button class="action-button" onclick="clearCacheAndRetry()">
+              <button class="action-button success" onclick="clearCacheAndRetry()">
                 🧹 Clear Cache & Retry
               </button>
+              <button class="action-button danger" onclick="emergencyReset()">
+                🚨 Emergency Reset
+              </button>
+              <br><br>
+              <a href="mailto:${CONTACT_SETTINGS.SUPPORT_EMAIL}?subject=Danielson Framework Error&body=Error ID: ${Utilities.encodeHtml(errorId)}%0ATimestamp: ${Utilities.encodeHtml(new Date(timestamp).toISOString())}%0AError: ${encodeURIComponent(error.toString())}"
+                 class="action-button" style="background: #6c757d;">
+                📧 Contact Support
+              </a>
             </div>
 
             <div class="diagnostic-info">
               <h4>🔍 Diagnostic Information</h4>
-              <strong>Error ID:</strong> ${Utilities.htmlEncode(errorId)}<br>
-              <strong>Request ID:</strong> ${Utilities.htmlEncode(requestId || 'Unknown')}<br>
-              <strong>System Health:</strong> ${Utilities.htmlEncode(systemHealth)}<br>
-              <strong>Cache Version:</strong> ${Utilities.htmlEncode(getMasterCacheVersion())}<br>
-              <strong>Timestamp:</strong> ${Utilities.htmlEncode(new Date(timestamp).toISOString())}<br>
-              <strong>User Agent:</strong> ${userAgentString ? Utilities.htmlEncode(userAgentString) : 'Unknown'}<br>
+              <strong>Error ID:</strong> ${Utilities.encodeHtml(errorId)}<br>
+              <strong>Request ID:</strong> ${Utilities.encodeHtml(requestId || 'Unknown')}<br>
+              <strong>System Health:</strong> ${Utilities.encodeHtml(systemHealth)}<br>
+              <strong>Cache Version:</strong> ${Utilities.encodeHtml(getMasterCacheVersion())}<br>
+              <strong>Timestamp:</strong> ${Utilities.encodeHtml(new Date(timestamp).toISOString())}<br>
+              <strong>User Agent:</strong> ${userAgentString ? Utilities.encodeHtml(userAgentString) : 'Unknown'}<br>
+              ${validationResults ? `
+              <strong>Validation Issues:</strong> ${Utilities.encodeHtml((validationResults.issues?.length || 0).toString())}<br>
+              <strong>System Components:</strong>
+              Spreadsheet: ${validationResults.systemHealth.spreadsheetAccess ? 'OK' : 'FAIL'},
+              Cache: ${validationResults.systemHealth.cacheSystem ? 'OK' : 'WARN'},
+              Triggers: ${validationResults.systemHealth.triggerSystem ? 'OK' : 'WARN'}
+              ` : ''}
             </div>
           </div>
         </div>
@@ -2229,12 +2362,37 @@ function createEnhancedErrorPage(error, requestId, validationResults = null, use
             window.location.href = url.toString();
           }
 
+          function emergencyReset() {
+            console.log('Performing emergency reset...');
+            const url = new URL(window.location);
+            url.searchParams.set('refresh', 'true');
+            url.searchParams.set('nocache', 'true');
+            url.searchParams.set('emergency', 'true');
+            url.searchParams.set('reset', 'true');
+            url.searchParams.set('t', Date.now());
+            window.location.href = url.toString();
+          }
+
+          // Auto-retry after 2 minutes if critical issues
+          const systemHealth = '${systemHealth}';
+          if (systemHealth === 'critical' || systemHealth === 'error') {
+            setTimeout(function() {
+              const retryNotice = document.createElement('div');
+              retryNotice.style.cssText = 'background:#fff3cd; padding:15px; margin:20px; border-radius:6px; border-left:4px solid #ffc107; text-align:center;';
+              retryNotice.innerHTML = '<strong>⏰ Auto-retry in progress...</strong><br>The system will attempt automatic recovery.';
+              document.querySelector('.error-content').appendChild(retryNotice);
+
+              setTimeout(clearCacheAndRetry, 5000);
+            }, 120000); // 2 minutes
+          }
+
+          // Log error for analytics
           console.error('Enhanced Error Page Displayed', {
-            errorId: '${Utilities.htmlEncode(errorId)}',
-            requestId: '${Utilities.htmlEncode(requestId || 'unknown')}',
-            systemHealth: '${Utilities.htmlEncode(systemHealth)}',
-            timestamp: '${Utilities.htmlEncode(new Date(timestamp).toISOString())}',
-            error: '${Utilities.htmlEncode(error.toString()).replace(/'/g, "\\\\'")}'
+            errorId: '${Utilities.encodeHtml(errorId)}',
+            requestId: '${Utilities.encodeHtml(requestId || 'unknown')}',
+            systemHealth: '${Utilities.encodeHtml(systemHealth)}',
+            timestamp: '${Utilities.encodeHtml(new Date(timestamp).toISOString())}',
+            error: '${Utilities.encodeHtml(error.toString()).replace(/'/g, "\\\\'")}'
           });
         </script>
       </body>
@@ -2253,10 +2411,10 @@ function createEnhancedErrorPage(error, requestId, validationResults = null, use
         <body style="font-family: Arial, sans-serif; padding: 20px; text-align: center;">
           <h1 style="color: #dc3545;">Critical System Error</h1>
           <p>The error reporting system has also failed.</p>
-          <p><strong>Original Error:</strong> ${Utilities.htmlEncode(error.toString())}</p>
-          <p><strong>Page Error:</strong> ${Utilities.htmlEncode(pageError.toString())}</p>
-          <p><strong>Error ID:</strong> ${Utilities.htmlEncode(errorId)}</p>
-          <p><strong>Timestamp:</strong> ${Utilities.htmlEncode(new Date(timestamp).toISOString())}</p>
+          <p><strong>Original Error:</strong> ${Utilities.encodeHtml(error.toString())}</p>
+          <p><strong>Page Error:</strong> ${Utilities.encodeHtml(pageError.toString())}</p>
+          <p><strong>Error ID:</strong> ${Utilities.encodeHtml(errorId)}</p>
+          <p><strong>Timestamp:</strong> ${Utilities.encodeHtml(new Date(timestamp).toISOString())}</p>
           <button onclick="window.location.reload()" style="padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 3px;">
             Retry
           </button>
@@ -2655,329 +2813,6 @@ function getPageTitle(role) {
 }
 
 /**
- * Dynamically detect and process domains from any role sheet
- * @param {Array<Array>} sheetData - Raw sheet data
- * @param {string} role - Role name for logging
- * @return {Array<Object>} Array of domain objects
- */
-function processDynamicDomains(sheetData, role) {
-  debugLog(`Starting dynamic domain detection for ${role}`);
-  
-  const domains = [];
-  const domainMap = detectDomainStructure(sheetData);
-  
-  debugLog(`Detected domain structure for ${role}:`, domainMap);
-  
-  // Process each detected domain
-  Object.keys(domainMap).sort().forEach(domainNumber => {
-    const domainInfo = domainMap[domainNumber];
-    debugLog(`Processing ${domainInfo.name} (rows ${domainInfo.startRow}-${domainInfo.endRow})`);
-    
-    const domain = {
-      number: parseInt(domainNumber),
-      name: domainInfo.name,
-      components: []
-    };
-    
-    // Find components within this domain
-    const components = findComponentsInDomain(sheetData, domainInfo);
-    domain.components = components;
-    
-    debugLog(`Found ${components.length} components in ${domainInfo.name}`);
-    domains.push(domain);
-  });
-  
-  debugLog(`Dynamic domain processing completed for ${role}. Found ${domains.length} domains.`);
-  return domains;
-}
-
-/**
- * Detect the structure of domains in a sheet by scanning for domain headers
- * @param {Array<Array>} sheetData - Raw sheet data
- * @return {Object} Map of domain numbers to their info
- */
-function detectDomainStructure(sheetData) {
-  const domainMap = {};
-  const domainPattern = /^domain\s+([1-4])[:\s]?\s*(.+)/i;
-  
-  for (let rowIndex = 0; rowIndex < sheetData.length; rowIndex++) {
-    const row = sheetData[rowIndex];
-    const cellValue = row[0] ? row[0].toString().trim() : '';
-    
-    const match = cellValue.match(domainPattern);
-    if (match) {
-      const domainNumber = match[1];
-      const domainTitle = match[2] || `Domain ${domainNumber}`;
-      
-      debugLog(`Found domain header at row ${rowIndex + 1}: "${cellValue}"`);
-      
-      domainMap[domainNumber] = {
-        number: parseInt(domainNumber),
-        name: `Domain ${domainNumber}: ${domainTitle}`,
-        headerRow: rowIndex,
-        startRow: rowIndex + 1, // Start looking for components after the header
-        endRow: null // Will be set when we find the next domain or end of data
-      };
-    }
-  }
-  
-  // Set end rows for each domain
-  const domainNumbers = Object.keys(domainMap).sort();
-  for (let i = 0; i < domainNumbers.length; i++) {
-    const currentDomain = domainNumbers[i];
-    const nextDomain = domainNumbers[i + 1];
-    
-    if (nextDomain) {
-      // End this domain where the next one starts
-      domainMap[currentDomain].endRow = domainMap[nextDomain].headerRow - 1;
-    } else {
-      // Last domain goes to end of data
-      domainMap[currentDomain].endRow = sheetData.length - 1;
-    }
-  }
-  
-  return domainMap;
-}
-
-/**
- * Find all components within a specific domain
- * @param {Array<Array>} sheetData - Raw sheet data
- * @param {Object} domainInfo - Domain information from detectDomainStructure
- * @return {Array<Object>} Array of component objects
- */
-function findComponentsInDomain(sheetData, domainInfo) {
-  const components = [];
-  const componentPattern = new RegExp(`^${domainInfo.number}[a-z][:\s]`, 'i');
-  
-  debugLog(`Looking for components in domain ${domainInfo.number} (rows ${domainInfo.startRow}-${domainInfo.endRow})`);
-  
-  for (let rowIndex = domainInfo.startRow; rowIndex <= domainInfo.endRow && rowIndex < sheetData.length; rowIndex++) {
-    const row = sheetData[rowIndex];
-    const cellValue = row[0] ? row[0].toString().trim() : '';
-    
-    if (componentPattern.test(cellValue)) {
-      debugLog(`Found component at row ${rowIndex + 1}: "${cellValue}"`);
-      
-      const component = {
-        title: cellValue,
-        developing: sanitizeText(row[1]) || '',
-        basic: sanitizeText(row[2]) || '',
-        proficient: sanitizeText(row[3]) || '',
-        distinguished: sanitizeText(row[4]) || '',
-        bestPractices: []
-      };
-      
-      // Find best practices for this component
-      const practices = findBestPracticesForComponent(sheetData, cellValue, rowIndex, domainInfo);
-      component.bestPractices = practices;
-      
-      components.push(component);
-      debugLog(`Component processed: ${cellValue} with ${practices.length} best practices`);
-    }
-  }
-  
-  return components;
-}
-
-/**
- * Find best practices for a specific component using multiple search strategies
- * @param {Array<Array>} sheetData - Raw sheet data
- * @param {string} componentTitle - Component title (e.g., "1a: ...")
- * @param {number} componentRow - Row where component was found
- * @param {Object} domainInfo - Domain information
- * @return {Array<string>} Array of best practice strings
- */
-function findBestPracticesForComponent(sheetData, componentTitle, componentRow, domainInfo) {
-  const componentId = extractComponentId(componentTitle); // e.g., "1a:"
-  
-  if (!componentId) {
-    debugLog(`Could not extract component ID from: ${componentTitle}`);
-    return [];
-  }
-  
-  debugLog(`Looking for best practices for component: ${componentId}`);
-  
-  // Strategy 1: Look in the same pattern as Teacher sheet (4 rows down, column B)
-  let practices = searchBestPracticesStrategy1(sheetData, componentRow);
-  if (practices.length > 0) {
-    debugLog(`Found ${practices.length} practices using Strategy 1 (Teacher pattern)`);
-    return practices;
-  }
-  
-  // Strategy 2: Search for "best practices" header near this component
-  practices = searchBestPracticesStrategy2(sheetData, componentRow, domainInfo);
-  if (practices.length > 0) {
-    debugLog(`Found ${practices.length} practices using Strategy 2 (header search)`);
-    return practices;
-  }
-  
-  // Strategy 3: Look for practices in nearby cells (scan around the component)
-  practices = searchBestPracticesStrategy3(sheetData, componentRow, componentId);
-  if (practices.length > 0) {
-    debugLog(`Found ${practices.length} practices using Strategy 3 (nearby search)`);
-    return practices;
-  }
-  
-  // Strategy 4: Search for the component ID in other columns
-  practices = searchBestPracticesStrategy4(sheetData, componentId, domainInfo);
-  if (practices.length > 0) {
-    debugLog(`Found ${practices.length} practices using Strategy 4 (column search)`);
-    return practices;
-  }
-  
-  debugLog(`No best practices found for component: ${componentId}`);
-  return [];
-}
-
-/**
- * Strategy 1: Use the same pattern as Teacher sheet (4 rows down, column B)
- */
-function searchBestPracticesStrategy1(sheetData, componentRow) {
-  const practicesRow = componentRow + 4; // Same offset as Teacher sheet
-  const practicesCol = 1; // Column B (0-indexed)
-  
-  if (practicesRow >= sheetData.length) {
-    return [];
-  }
-  
-  const practicesCell = sheetData[practicesRow][practicesCol];
-  if (practicesCell && practicesCell.toString().trim()) {
-    return parseMultilineCell(practicesCell.toString());
-  }
-  
-  return [];
-}
-
-/**
- * Strategy 2: Search for "best practices" header within the domain
- */
-function searchBestPracticesStrategy2(sheetData, componentRow, domainInfo) {
-  const searchStart = Math.max(0, componentRow - 2);
-  const searchEnd = Math.min(sheetData.length - 1, componentRow + 10);
-  
-  for (let rowIndex = searchStart; rowIndex <= searchEnd; rowIndex++) {
-    const row = sheetData[rowIndex];
-    
-    for (let colIndex = 0; colIndex < Math.min(6, row.length); colIndex++) {
-      const cellValue = row[colIndex] ? row[colIndex].toString().toLowerCase() : '';
-      
-      if (cellValue.includes('best') && cellValue.includes('practice')) {
-        debugLog(`Found "best practices" header at row ${rowIndex + 1}, col ${colIndex + 1}`);
-        
-        // Look for practices in nearby cells
-        const practices = extractPracticesNearHeader(sheetData, rowIndex, colIndex);
-        if (practices.length > 0) {
-          return practices;
-        }
-      }
-    }
-  }
-  
-  return [];
-}
-
-/**
- * Strategy 3: Search in nearby cells around the component
- */
-function searchBestPracticesStrategy3(sheetData, componentRow, componentId) {
-  const searchOffsets = [
-    { row: 1, col: 1 }, { row: 2, col: 1 }, { row: 3, col: 1 }, { row: 4, col: 1 }, { row: 5, col: 1 },
-    { row: 1, col: 0 }, { row: 2, col: 0 }, { row: 3, col: 0 }, { row: 4, col: 0 }, { row: 5, col: 0 },
-    { row: 0, col: 1 }, { row: 0, col: 2 }, { row: 0, col: 3 }, { row: 0, col: 4 }, { row: 0, col: 5 }
-  ];
-  
-  for (const offset of searchOffsets) {
-    const checkRow = componentRow + offset.row;
-    const checkCol = offset.col;
-    
-    if (checkRow < sheetData.length && checkCol < sheetData[checkRow].length) {
-      const cellValue = sheetData[checkRow][checkCol];
-      
-      if (cellValue && cellValue.toString().trim()) {
-        const cellText = cellValue.toString();
-        
-        // Check if this cell contains multiple lines (likely practices)
-        if (cellText.includes('\n') || cellText.includes('\r')) {
-          const practices = parseMultilineCell(cellText);
-          if (practices.length > 2) { // Likely practices if multiple items
-            debugLog(`Found practices in nearby cell at row ${checkRow + 1}, col ${checkCol + 1}`);
-            return practices;
-          }
-        }
-        
-        // Check if cell mentions the component ID
-        if (cellText.toLowerCase().includes(componentId.toLowerCase().replace(':', ''))) {
-          const practices = parseMultilineCell(cellText);
-          if (practices.length > 0) {
-            debugLog(`Found practices mentioning component ${componentId} at row ${checkRow + 1}, col ${checkCol + 1}`);
-            return practices;
-          }
-        }
-      }
-    }
-  }
-  
-  return [];
-}
-
-/**
- * Strategy 4: Search for component ID references in other columns
- */
-function searchBestPracticesStrategy4(sheetData, componentId, domainInfo) {
-  const searchStart = domainInfo.startRow;
-  const searchEnd = domainInfo.endRow;
-  
-  for (let rowIndex = searchStart; rowIndex <= searchEnd && rowIndex < sheetData.length; rowIndex++) {
-    const row = sheetData[rowIndex];
-    
-    for (let colIndex = 1; colIndex < Math.min(10, row.length); colIndex++) {
-      const cellValue = row[colIndex] ? row[colIndex].toString() : '';
-      
-      // Look for cells that reference this component ID
-      if (cellValue.toLowerCase().includes(componentId.toLowerCase().replace(':', ''))) {
-        const practices = parseMultilineCell(cellValue);
-        if (practices.length > 1) {
-          debugLog(`Found practices for ${componentId} at row ${rowIndex + 1}, col ${colIndex + 1}`);
-          return practices;
-        }
-      }
-    }
-  }
-  
-  return [];
-}
-
-/**
- * Extract practices from cells near a "best practices" header
- */
-function extractPracticesNearHeader(sheetData, headerRow, headerCol) {
-  const searchCells = [
-    { row: headerRow + 1, col: headerCol },     // Directly below header
-    { row: headerRow, col: headerCol + 1 },     // Right of header
-    { row: headerRow + 1, col: headerCol + 1 }, // Diagonal from header
-    { row: headerRow + 2, col: headerCol },     // Two rows below
-    { row: headerRow + 1, col: headerCol - 1 }, // Below and left
-  ];
-  
-  for (const cell of searchCells) {
-    if (cell.row >= 0 && cell.row < sheetData.length && 
-        cell.col >= 0 && cell.col < sheetData[cell.row].length) {
-      
-      const cellValue = sheetData[cell.row][cell.col];
-      if (cellValue && cellValue.toString().trim()) {
-        const practices = parseMultilineCell(cellValue.toString());
-        if (practices.length > 0) {
-          debugLog(`Extracted ${practices.length} practices from cell at row ${cell.row + 1}, col ${cell.col + 1}`);
-          return practices;
-        }
-      }
-    }
-  }
-  
-  return [];
-}
-
-/**
  * Create an error page for display to users
  * @param {Error} error - Error object
  * @return {HtmlOutput} Error page HTML
@@ -3363,27 +3198,5 @@ function testCompleteWorkflowPhase2(testRole = 'Administrator') {
       success: false,
       error: error.message
     };
-  }
-}
-
-// Add this temporary test function to Code.js for testing
-function testBasicImplementation() {
-  console.log('=== TESTING BASIC IMPLEMENTATION ===');
-  
-  try {
-    // Test with Teacher role first (should use legacy processing)
-    console.log('Testing Teacher role (legacy)...');
-    const teacherData = getAllDomainsData('Teacher', 1);
-    console.log('✓ Teacher role works:', teacherData.domains.length + ' domains');
-    
-    // Test with another role (should use dynamic processing)
-    console.log('Testing Nurse role (dynamic)...');
-    const nurseData = getAllDomainsData('Nurse', 1);
-    console.log('✓ Nurse role works:', nurseData.domains.length + ' domains');
-    
-    console.log('✅ Basic implementation test passed');
-    
-  } catch (error) {
-    console.error('❌ Basic implementation test failed:', error);
   }
 }
