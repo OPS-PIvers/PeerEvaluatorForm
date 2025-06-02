@@ -1,6 +1,6 @@
 /**
  * Code.js - Main Orchestrator (Clean Production Version)
- * Google Apps Script Web App for Danielson Framework - Dynamic Multi-Role System
+ * Google Apps Script Web App for Danielson Framework - Multi-Role Rubric System
  * 
  * This file orchestrates the modular services and maintains backward compatibility
  * while adding support for multiple roles and automatic cache management.
