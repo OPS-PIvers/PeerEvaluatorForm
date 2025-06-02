@@ -46,7 +46,10 @@ const AVAILABLE_ROLES = [
   'Early Childhood',
   'Parent Educator',
   'Social Worker',
-  'Sp.Ed.'
+  'Sp.Ed.',
+  'Peer Evaluator',
+  'Administrator',
+  'Full Access'
 ];
 
 /**
@@ -91,7 +94,8 @@ const DEFAULT_ROLE_CONFIG = {
 const VALIDATION_PATTERNS = {
   EMAIL: /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
   COMPONENT_ID: /^[1-4][a-f]:/, // Matches patterns like "1a:", "2b:", etc.
-  SUBDOMAIN_PATTERN: /^[1-4][a-f]:/
+  SUBDOMAIN_PATTERN: /^[1-4][a-f]:/,
+  SUBDOMAIN_LIST: /^[1-4][a-f](,\s*[1-4][a-f])*$/ // Matches "1a, 1c, 1f"
 };
 
 /**
@@ -153,7 +157,34 @@ const DOMAIN_TEMPLATE = {
 /**
  * Default years for observation cycle
  */
-const OBSERVATION_YEARS = [1, 2, 3];
+const OBSERVATION_YEARS = [1, 2, 3, 'Probationary'];
+
+/**
+ * Special access roles that can filter and view other users' data
+ */
+const SPECIAL_ACCESS_ROLES = [
+  'Peer Evaluator',
+  'Administrator', 
+  'Full Access'
+];
+
+/**
+ * View modes for rubric display
+ */
+const VIEW_MODES = {
+  FULL: 'full',
+  ASSIGNED: 'assigned'
+};
+
+/**
+ * Filter types for special access roles
+ */
+const FILTER_TYPES = {
+  ROLE: 'role',
+  YEAR: 'year', 
+  STAFF: 'staff',
+  PROBATIONARY: 'probationary'
+};
 
 /**
  * Default best practices offset (for legacy Teacher sheet compatibility)
