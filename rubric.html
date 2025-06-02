@@ -32,13 +32,52 @@
         <? } ?>
     <? } ?>
 
+    <!-- OPTIONAL: Add this to the <head> section of rubric.html for complete debugging info -->
+    <? if (data.userContext && data.userContext.responseMetadata) { ?>
+        <!-- Response Metadata (Enhanced) -->
+        <meta name="x-app-version" content="<?= SYSTEM_INFO.VERSION ?>">
+        <meta name="x-request-id" content="<?= data.userContext.responseMetadata.requestId ?>">
+        <meta name="x-timestamp" content="<?= data.userContext.responseMetadata.timestamp ?>">
+        <meta name="x-cache-version" content="<?= data.userContext.responseMetadata.cacheVersion ?>">
+        <meta name="x-etag" content="<?= data.userContext.responseMetadata.etag ?>">
+        <meta name="x-role" content="<?= data.userContext.role ?>">
+        <meta name="x-year" content="<?= data.userContext.year ?>">
+
+        <? if (data.userContext.debugMode) { ?>
+            <!-- Debug Headers -->
+            <meta name="x-debug-mode" content="true">
+            <meta name="x-user-email" content="<?= data.userContext.email || 'anonymous' ?>">
+            <meta name="x-user-authenticated" content="<?= data.userContext.isAuthenticated ?>">
+            <meta name="x-role-override" content="<?= data.userContext.isRoleOverride || false %>">
+            
+            <? if (data.userContext.roleChangeDetected) { ?>
+            <!-- State Tracking Headers -->
+            <meta name="x-role-change-detected" content="true">
+            <meta name="x-previous-role" content="<?= data.userContext.previousState?.role || 'unknown' ?>">
+            <meta name="x-state-changes" content="<?= data.userContext.stateChanges.length ?>">
+            <? } ?>
+            
+            <? if (data.userContext.isNewUser) { ?>
+            <meta name="x-new-user" content="true">
+            <? } ?>
+            
+            <meta name="x-session-id" content="<?= data.userContext.metadata.sessionId ?>">
+            <meta name="x-context-version" content="<?= data.userContext.metadata.contextVersion ?>">
+            <meta name="x-has-staff-record" content="<?= data.userContext.hasStaffRecord ?>">
+        <? } ?>
+    <? } ?>
+
     <!-- Dynamic Title -->
     <title><?= data.title ?> - <?= data.userContext ? data.userContext.role : 'Framework' ?></title>
 
     <!-- Prevent browser back/forward cache -->
     <meta name="turbo-cache-control" content="no-cache">
 
+    <!-- Add cache-busting to any external resources if needed -->
+
+    <!-- Your existing styles here - keep all the existing CSS -->
     <style>
+        /* Keep all your existing CSS exactly as it is */
         * {
             margin: 0;
             padding: 0;
@@ -191,14 +230,14 @@
         .look-fors-header {
             background: linear-gradient(135deg, #3182ce, #2b77cb);
             color: white;
-            padding: 10px 20px;
+            padding: 10px 20px; /* Reduced from 15px 20px */
             cursor: pointer;
             display: flex;
             justify-content: space-between;
             align-items: center;
             font-weight: 600;
             transition: background 0.3s ease;
-            font-size: 0.85rem;
+            font-size: 0.85rem; /* Reduced from 0.9rem */
         }
         
         .look-fors-header:hover {
@@ -207,7 +246,7 @@
         
         .chevron {
             transition: transform 0.3s ease;
-            font-size: 1rem;
+            font-size: 1rem; /* Reduced from 1.2rem */
         }
         
         .chevron.expanded {
@@ -226,26 +265,26 @@
         }
         
         .look-fors-grid {
-            padding: 12px 20px;
+            padding: 12px 20px; /* Reduced from 20px */
             display: grid;
             grid-template-columns: 1fr;
-            gap: 8px;
+            gap: 8px; /* Reduced from 15px */
         }
         
         .look-for-item {
             display: flex;
             align-items: flex-start;
-            gap: 8px;
-            padding: 8px 12px;
+            gap: 8px; /* Reduced from 10px */
+            padding: 8px 12px; /* Reduced from 12px */
             background: white;
-            border-radius: 4px;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.08);
-            border-left: 3px solid #3182ce;
+            border-radius: 4px; /* Reduced from 6px */
+            box-shadow: 0 1px 2px rgba(0,0,0,0.08); /* Lighter shadow */
+            border-left: 3px solid #3182ce; /* Reduced from 4px */
         }
         
         .look-for-item input[type="checkbox"] {
-            margin-top: 2px;
-            transform: scale(1.1);
+            margin-top: 2px; /* Reduced from 3px */
+            transform: scale(1.1); /* Reduced from 1.2 */
             accent-color: #3182ce;
         }
         
@@ -253,8 +292,8 @@
             cursor: pointer;
             color: #4a5568;
             font-weight: 500;
-            font-size: 0.85rem;
-            line-height: 1.4;
+            font-size: 0.85rem; /* Reduced from 0.9rem */
+            line-height: 1.4; /* Added for tighter line spacing */
         }
         
         .back-to-top {
@@ -333,8 +372,9 @@
                 top: auto;
             }
         }
+        /* ... (keep all your existing styles) ... */
 
-        /* Debug info styles (only visible in debug mode) */
+        /* Add debug info styles if in debug mode */
         <? if (data.userContext && data.userContext.debugMode) { ?>
         .debug-info {
             position: fixed;
