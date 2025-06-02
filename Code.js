@@ -550,13 +550,14 @@ function addStateTrackingHeaders(htmlOutput, userContext) {
     htmlOutput.addMetaTag('x-context-version', userContext.metadata.contextVersion);
     htmlOutput.addMetaTag('x-has-staff-record', userContext.hasStaffRecord.toString());
 
-    debugLog('State tracking headers added', {
+    debugLog('State tracking headers added successfully', {
       roleChangeDetected: userContext.roleChangeDetected,
       sessionId: userContext.metadata.sessionId
     });
 
   } catch (error) {
     console.error('Error adding state tracking headers:', error);
+    // Continue execution gracefully
   }
 }
 
@@ -2032,15 +2033,9 @@ function getUserDashboardData(userEmail) {
  */
 function addCacheBustingHeaders(htmlOutput, metadata) {
   try {
-    // Primary cache control headers
-    htmlOutput
-      .addMetaTag('cache-control', 'no-cache, no-store, must-revalidate, max-age=0')
-      .addMetaTag('pragma', 'no-cache')
-      .addMetaTag('expires', '0')
-      .addMetaTag('last-modified', metadata.lastModified)
-      .addMetaTag('etag', metadata.etag);
-
-    // Custom headers for debugging and version tracking
+    // Only add custom headers that are allowed by Google Apps Script
+    // Note: cache-control, pragma, expires are already in the HTML template
+    
     htmlOutput
       .addMetaTag('x-app-version', SYSTEM_INFO.VERSION)
       .addMetaTag('x-cache-version', metadata.cacheVersion)
@@ -2049,16 +2044,18 @@ function addCacheBustingHeaders(htmlOutput, metadata) {
       .addMetaTag('x-role', metadata.role)
       .addMetaTag('x-year', metadata.year.toString());
 
-    // Viewport and mobile optimization
-    htmlOutput.addMetaTag('viewport', 'width=device-width, initial-scale=1.0');
-
-    debugLog('Cache-busting headers added', {
-      etag: metadata.etag,
-      requestId: metadata.requestId
+    debugLog('Cache-busting headers added successfully', {
+      requestId: metadata.requestId,
+      cacheVersion: metadata.cacheVersion
     });
 
   } catch (error) {
     console.error('Error adding cache-busting headers:', error);
+    // Don't let header errors break the entire response
+    debugLog('Header error handled gracefully', { 
+      error: error.message,
+      requestId: metadata.requestId 
+    });
   }
 }
 
@@ -2070,6 +2067,7 @@ function addCacheBustingHeaders(htmlOutput, metadata) {
  */
 function addDebugHeaders(htmlOutput, userContext, metadata) {
   try {
+    // Only add allowed debug meta tags
     htmlOutput
       .addMetaTag('x-debug-mode', 'true')
       .addMetaTag('x-user-email', userContext.email || 'anonymous')
@@ -2078,10 +2076,11 @@ function addDebugHeaders(htmlOutput, userContext, metadata) {
       .addMetaTag('x-role-override', (userContext.isRoleOverride || false).toString())
       .addMetaTag('x-execution-time', (Date.now() - metadata.timestamp).toString());
 
-    debugLog('Debug headers added', { requestId: metadata.requestId });
+    debugLog('Debug headers added successfully', { requestId: metadata.requestId });
 
   } catch (error) {
     console.error('Error adding debug headers:', error);
+    // Continue execution even if debug headers fail
   }
 }
 
@@ -2094,6 +2093,8 @@ function addDebugHeaders(htmlOutput, userContext, metadata) {
  * REPLACE THIS FUNCTION in Code.js
  * Comprehensive error page with validation and recovery options
  */
+
+
 function createEnhancedErrorPage(error, requestId, validationResults = null, userAgentString) {
   const timestamp = Date.now();
   const errorId = generateUniqueId('error_page');
