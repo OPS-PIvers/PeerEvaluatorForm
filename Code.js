@@ -1734,20 +1734,25 @@ function findBestPracticesForComponent(sheetData, componentTitle, componentRow, 
 }
 
 /**
- * ADD THIS NEW FUNCTION to Code.js
  * Search for best practices using Strategy 1: Look in the same pattern as Teacher sheet (4 rows down, column B)
  * @param {Array<Array>} sheetData - Raw sheet data
  * @param {number} componentRow - Row where component was found
  * @return {Array<string>} Array of best practice strings
  */
 function searchBestPracticesStrategy1(sheetData, componentRow) {
-  // Implementation for Strategy 1
-  // This is just a placeholder
-  return [];
+  const practices = [];
+  const practiceRowIndex = componentRow + DYNAMIC_BEST_PRACTICES_OFFSET.ROW_OFFSET;
+
+  if (practiceRowIndex < sheetData.length) {
+    const practiceCell = sheetData[practiceRowIndex][DYNAMIC_BEST_PRACTICES_OFFSET.COLUMN];
+    if (practiceCell && practiceCell.toString().trim()) {
+      practices.push(...parseMultilineCell(practiceCell.toString()));
+    }
+  }
+  return practices;
 }
 
 /**
- * ADD THIS NEW FUNCTION to Code.js
  * Search for best practices using Strategy 2: Search for "best practices" header near this component
  * @param {Array<Array>} sheetData - Raw sheet data
  * @param {number} componentRow - Row where component was found
@@ -1755,13 +1760,23 @@ function searchBestPracticesStrategy1(sheetData, componentRow) {
  * @return {Array<string>} Array of best practice strings
  */
 function searchBestPracticesStrategy2(sheetData, componentRow, domainInfo) {
-  // Implementation for Strategy 2
-  // This is just a placeholder
-  return [];
+  const practices = [];
+  const searchStartRow = Math.max(0, componentRow - 5);
+  const searchEndRow = Math.min(sheetData.length, componentRow + 5);
+
+  for (let i = searchStartRow; i < searchEndRow; i++) {
+    for (let j = 0; j < sheetData[i].length; j++) {
+      const cellValue = sheetData[i][j] ? sheetData[i][j].toString().toLowerCase() : '';
+      if (cellValue.includes('best practices') || cellValue.includes('examples')) {
+        // Header found, extract practices from nearby cells
+        return extractPracticesNearHeader(sheetData, i, j);
+      }
+    }
+  }
+  return practices;
 }
 
 /**
- * ADD THIS NEW FUNCTION to Code.js
  * Search for best practices using Strategy 3: Look for practices in nearby cells (scan around the component)
  * @param {Array<Array>} sheetData - Raw sheet data
  * @param {number} componentRow - Row where component was found
@@ -1769,13 +1784,23 @@ function searchBestPracticesStrategy2(sheetData, componentRow, domainInfo) {
  * @return {Array<string>} Array of best practice strings
  */
 function searchBestPracticesStrategy3(sheetData, componentRow, componentId) {
-  // Implementation for Strategy 3
-  // This is just a placeholder
-  return [];
+  const practices = [];
+  // Search in columns C, D, E (indices 2, 3, 4) of the component's row and next few rows
+  for (let i = componentRow; i < Math.min(sheetData.length, componentRow + 3); i++) {
+    for (let j = 2; j <= 4; j++) {
+      if (sheetData[i] && sheetData[i][j] && sheetData[i][j].toString().trim()) {
+        const cellText = sheetData[i][j].toString();
+        // Avoid adding proficiency level descriptions if they are too long
+        if (cellText.length < 200) { // Heuristic: actual practices are usually shorter
+            practices.push(...parseMultilineCell(cellText));
+        }
+      }
+    }
+  }
+  return practices;
 }
 
 /**
- * ADD THIS NEW FUNCTION to Code.js
  * Search for best practices using Strategy 4: Search for the component ID in other columns
  * @param {Array<Array>} sheetData - Raw sheet data
  * @param {string} componentId - Component ID (e.g., "1a:")
@@ -1783,13 +1808,26 @@ function searchBestPracticesStrategy3(sheetData, componentRow, componentId) {
  * @return {Array<string>} Array of best practice strings
  */
 function searchBestPracticesStrategy4(sheetData, componentId, domainInfo) {
-  // Implementation for Strategy 4
-  // This is just a placeholder
-  return [];
+  const practices = [];
+  // Search within the current domain's rows
+  for (let i = domainInfo.startRow; i <= domainInfo.endRow; i++) {
+    if (sheetData[i]) {
+      for (let j = 1; j < sheetData[i].length; j++) { // Start from col B
+        const cellValue = sheetData[i][j] ? sheetData[i][j].toString() : '';
+        if (cellValue.includes(componentId)) {
+          // If componentId is found, check adjacent cells for practices
+          // This is a basic heuristic, might need refinement
+          if (j + 1 < sheetData[i].length && sheetData[i][j+1] && sheetData[i][j+1].toString().trim()) {
+            practices.push(...parseMultilineCell(sheetData[i][j+1].toString()));
+          }
+        }
+      }
+    }
+  }
+  return practices;
 }
 
 /**
- * ADD THIS NEW FUNCTION to Code.js
  * Extract practices from cells near a specific header text
  * @param {Array<Array>} sheetData - Raw sheet data
  * @param {number} headerRow - Row index of the header
@@ -1797,9 +1835,23 @@ function searchBestPracticesStrategy4(sheetData, componentId, domainInfo) {
  * @return {Array<string>} Array of best practice strings
  */
 function extractPracticesNearHeader(sheetData, headerRow, headerCol) {
-  // Implementation for extracting practices near a header
-  // This is just a placeholder
-  return [];
+  const practices = [];
+  // Look in the cell to the right of the header, and cells below it
+  for (let i = headerRow; i < Math.min(sheetData.length, headerRow + 5); i++) {
+    // Check cell to the right of the header (if not the header row itself for that column)
+    if (i === headerRow && headerCol + 1 < sheetData[i].length && sheetData[i][headerCol + 1]) {
+      practices.push(...parseMultilineCell(sheetData[i][headerCol + 1].toString()));
+    }
+    // Check cell directly below the header
+    if (i > headerRow && sheetData[i][headerCol] && sheetData[i][headerCol].toString().trim()) {
+       practices.push(...parseMultilineCell(sheetData[i][headerCol].toString()));
+    }
+     // Check cell to the right and below
+    if (i > headerRow && headerCol + 1 < sheetData[i].length && sheetData[i][headerCol+1] && sheetData[i][headerCol+1].toString().trim()){
+        practices.push(...parseMultilineCell(sheetData[i][headerCol+1].toString()));
+    }
+  }
+  return practices.filter(p => p.length > 5); // Basic filter for very short strings
 }
 
 /**
