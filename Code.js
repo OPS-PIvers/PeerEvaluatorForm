@@ -1734,6 +1734,75 @@ function findBestPracticesForComponent(sheetData, componentTitle, componentRow, 
 }
 
 /**
+ * ADD THIS NEW FUNCTION to Code.js
+ * Search for best practices using Strategy 1: Look in the same pattern as Teacher sheet (4 rows down, column B)
+ * @param {Array<Array>} sheetData - Raw sheet data
+ * @param {number} componentRow - Row where component was found
+ * @return {Array<string>} Array of best practice strings
+ */
+function searchBestPracticesStrategy1(sheetData, componentRow) {
+  // Implementation for Strategy 1
+  // This is just a placeholder
+  return [];
+}
+
+/**
+ * ADD THIS NEW FUNCTION to Code.js
+ * Search for best practices using Strategy 2: Search for "best practices" header near this component
+ * @param {Array<Array>} sheetData - Raw sheet data
+ * @param {number} componentRow - Row where component was found
+ * @param {Object} domainInfo - Domain information
+ * @return {Array<string>} Array of best practice strings
+ */
+function searchBestPracticesStrategy2(sheetData, componentRow, domainInfo) {
+  // Implementation for Strategy 2
+  // This is just a placeholder
+  return [];
+}
+
+/**
+ * ADD THIS NEW FUNCTION to Code.js
+ * Search for best practices using Strategy 3: Look for practices in nearby cells (scan around the component)
+ * @param {Array<Array>} sheetData - Raw sheet data
+ * @param {number} componentRow - Row where component was found
+ * @param {string} componentId - Component ID (e.g., "1a:")
+ * @return {Array<string>} Array of best practice strings
+ */
+function searchBestPracticesStrategy3(sheetData, componentRow, componentId) {
+  // Implementation for Strategy 3
+  // This is just a placeholder
+  return [];
+}
+
+/**
+ * ADD THIS NEW FUNCTION to Code.js
+ * Search for best practices using Strategy 4: Search for the component ID in other columns
+ * @param {Array<Array>} sheetData - Raw sheet data
+ * @param {string} componentId - Component ID (e.g., "1a:")
+ * @param {Object} domainInfo - Domain information
+ * @return {Array<string>} Array of best practice strings
+ */
+function searchBestPracticesStrategy4(sheetData, componentId, domainInfo) {
+  // Implementation for Strategy 4
+  // This is just a placeholder
+  return [];
+}
+
+/**
+ * ADD THIS NEW FUNCTION to Code.js
+ * Extract practices from cells near a specific header text
+ * @param {Array<Array>} sheetData - Raw sheet data
+ * @param {number} headerRow - Row index of the header
+ * @param {number} headerCol - Column index of the header
+ * @return {Array<string>} Array of best practice strings
+ */
+function extractPracticesNearHeader(sheetData, headerRow, headerCol) {
+  // Implementation for extracting practices near a header
+  // This is just a placeholder
+  return [];
+}
+
+/**
  * Main trigger function that handles sheet edits
  * This function is automatically called when the spreadsheet is edited
  * @param {Object} e - Edit event object
