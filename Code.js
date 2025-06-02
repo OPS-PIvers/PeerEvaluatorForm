@@ -2094,10 +2094,10 @@ function createEnhancedErrorPage(error, requestId, validationResults = null, use
         <meta name="cache-control" content="no-cache, no-store, must-revalidate">
         <meta name="pragma" content="no-cache">
         <meta name="expires" content="0">
-        <meta name="x-request-id" content="${Utilities.encodeHtml(requestId || 'unknown')}">
-        <meta name="x-error-id" content="${Utilities.encodeHtml(errorId)}">
-        <meta name="x-timestamp" content="${Utilities.encodeHtml(timestamp.toString())}">
-        <meta name="x-system-health" content="${Utilities.encodeHtml(systemHealth)}">
+        <meta name="x-request-id" content="${Utilities.htmlEncode(requestId || 'unknown')}">
+        <meta name="x-error-id" content="${Utilities.htmlEncode(errorId)}">
+        <meta name="x-timestamp" content="${Utilities.htmlEncode(timestamp.toString())}">
+        <meta name="x-system-health" content="${Utilities.htmlEncode(systemHealth)}">
         <meta name="x-error" content="true">
         <style>
           body {
@@ -2228,11 +2228,11 @@ function createEnhancedErrorPage(error, requestId, validationResults = null, use
             <div class="error-details">
               <h3>Error Details</h3>
               <div class="error-message">
-                <strong>Error:</strong> ${Utilities.encodeHtml(error.toString())}<br>
-                <strong>Request ID:</strong> ${Utilities.encodeHtml(requestId || 'Unknown')}<br>
-                <strong>Error ID:</strong> ${Utilities.encodeHtml(errorId)}<br>
-                <strong>Timestamp:</strong> ${Utilities.encodeHtml(new Date(timestamp).toLocaleString())}<br>
-                <strong>Cache Version:</strong> ${Utilities.encodeHtml(getMasterCacheVersion())}
+                <strong>Error:</strong> ${Utilities.htmlEncode(error.toString())}<br>
+                <strong>Request ID:</strong> ${Utilities.htmlEncode(requestId || 'Unknown')}<br>
+                <strong>Error ID:</strong> ${Utilities.htmlEncode(errorId)}<br>
+                <strong>Timestamp:</strong> ${Utilities.htmlEncode(new Date(timestamp).toLocaleString())}<br>
+                <strong>Cache Version:</strong> ${Utilities.htmlEncode(getMasterCacheVersion())}
               </div>
             </div>
 
@@ -2298,7 +2298,7 @@ function createEnhancedErrorPage(error, requestId, validationResults = null, use
                 🚨 Emergency Reset
               </button>
               <br><br>
-              <a href="mailto:${CONTACT_SETTINGS.SUPPORT_EMAIL}?subject=Danielson Framework Error&body=Error ID: ${Utilities.encodeHtml(errorId)}%0ATimestamp: ${Utilities.encodeHtml(new Date(timestamp).toISOString())}%0AError: ${encodeURIComponent(error.toString())}"
+              <a href="mailto:${CONTACT_SETTINGS.SUPPORT_EMAIL}?subject=Danielson Framework Error&body=Error ID: ${Utilities.htmlEncode(errorId)}%0ATimestamp: ${Utilities.htmlEncode(new Date(timestamp).toISOString())}%0AError: ${encodeURIComponent(error.toString())}"
                  class="action-button" style="background: #6c757d;">
                 📧 Contact Support
               </a>
@@ -2306,14 +2306,14 @@ function createEnhancedErrorPage(error, requestId, validationResults = null, use
 
             <div class="diagnostic-info">
               <h4>🔍 Diagnostic Information</h4>
-              <strong>Error ID:</strong> ${Utilities.encodeHtml(errorId)}<br>
-              <strong>Request ID:</strong> ${Utilities.encodeHtml(requestId || 'Unknown')}<br>
-              <strong>System Health:</strong> ${Utilities.encodeHtml(systemHealth)}<br>
-              <strong>Cache Version:</strong> ${Utilities.encodeHtml(getMasterCacheVersion())}<br>
-              <strong>Timestamp:</strong> ${Utilities.encodeHtml(new Date(timestamp).toISOString())}<br>
-              <strong>User Agent:</strong> ${userAgentString ? Utilities.encodeHtml(userAgentString) : 'Unknown'}<br>
+              <strong>Error ID:</strong> ${Utilities.htmlEncode(errorId)}<br>
+              <strong>Request ID:</strong> ${Utilities.htmlEncode(requestId || 'Unknown')}<br>
+              <strong>System Health:</strong> ${Utilities.htmlEncode(systemHealth)}<br>
+              <strong>Cache Version:</strong> ${Utilities.htmlEncode(getMasterCacheVersion())}<br>
+              <strong>Timestamp:</strong> ${Utilities.htmlEncode(new Date(timestamp).toISOString())}<br>
+              <strong>User Agent:</strong> ${userAgentString ? Utilities.htmlEncode(userAgentString) : 'Unknown'}<br>
               ${validationResults ? `
-              <strong>Validation Issues:</strong> ${Utilities.encodeHtml((validationResults.issues?.length || 0).toString())}<br>
+              <strong>Validation Issues:</strong> ${Utilities.htmlEncode((validationResults.issues?.length || 0).toString())}<br>
               <strong>System Components:</strong>
               Spreadsheet: ${validationResults.systemHealth.spreadsheetAccess ? 'OK' : 'FAIL'},
               Cache: ${validationResults.systemHealth.cacheSystem ? 'OK' : 'WARN'},
@@ -2360,11 +2360,11 @@ function createEnhancedErrorPage(error, requestId, validationResults = null, use
 
           // Log error for analytics
           console.error('Enhanced Error Page Displayed', {
-            errorId: '${Utilities.encodeHtml(errorId)}',
-            requestId: '${Utilities.encodeHtml(requestId || 'unknown')}',
-            systemHealth: '${Utilities.encodeHtml(systemHealth)}',
-            timestamp: '${Utilities.encodeHtml(new Date(timestamp).toISOString())}',
-            error: '${Utilities.encodeHtml(error.toString()).replace(/'/g, "\\\\'")}'
+            errorId: '${Utilities.htmlEncode(errorId)}',
+            requestId: '${Utilities.htmlEncode(requestId || 'unknown')}',
+            systemHealth: '${Utilities.htmlEncode(systemHealth)}',
+            timestamp: '${Utilities.htmlEncode(new Date(timestamp).toISOString())}',
+            error: '${Utilities.htmlEncode(error.toString()).replace(/'/g, "\\\\'")}'
           });
         </script>
       </body>
@@ -2383,10 +2383,10 @@ function createEnhancedErrorPage(error, requestId, validationResults = null, use
         <body style="font-family: Arial, sans-serif; padding: 20px; text-align: center;">
           <h1 style="color: #dc3545;">Critical System Error</h1>
           <p>The error reporting system has also failed.</p>
-          <p><strong>Original Error:</strong> ${Utilities.encodeHtml(error.toString())}</p>
-          <p><strong>Page Error:</strong> ${Utilities.encodeHtml(pageError.toString())}</p>
-          <p><strong>Error ID:</strong> ${Utilities.encodeHtml(errorId)}</p>
-          <p><strong>Timestamp:</strong> ${Utilities.encodeHtml(new Date(timestamp).toISOString())}</p>
+          <p><strong>Original Error:</strong> ${Utilities.htmlEncode(error.toString())}</p>
+          <p><strong>Page Error:</strong> ${Utilities.htmlEncode(pageError.toString())}</p>
+          <p><strong>Error ID:</strong> ${Utilities.htmlEncode(errorId)}</p>
+          <p><strong>Timestamp:</strong> ${Utilities.htmlEncode(new Date(timestamp).toISOString())}</p>
           <button onclick="window.location.reload()" style="padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 3px;">
             Retry
           </button>
