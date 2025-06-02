@@ -2148,25 +2148,6 @@ function createEnhancedErrorPage(error, requestId, validationResults = null, use
             padding: 15px; border-radius: 4px; margin: 10px 0;
             border: 1px solid #dee2e6; word-break: break-word;
           }
-          .validation-section {
-            margin: 25px 0;
-          }
-          .validation-item {
-            display: flex; align-items: center; padding: 8px 0;
-            border-bottom: 1px solid #e9ecef;
-          }
-          .validation-status {
-            width: 24px; height: 24px; border-radius: 50%;
-            margin-right: 12px; display: flex; align-items: center;
-            justify-content: center; font-weight: bold; font-size: 0.8rem;
-          }
-          .status-pass { background: #28a745; color: white; }
-          .status-fail { background: #dc3545; color: white; }
-          .status-warn { background: #ffc107; color: black; }
-          .troubleshooting { margin-top: 25px; }
-          .troubleshooting h3 { color: #495057; margin-bottom: 15px; }
-          .troubleshooting ul { padding-left: 20px; line-height: 1.6; }
-          .troubleshooting li { margin-bottom: 8px; }
           .action-section {
             margin-top: 30px; text-align: center;
             padding: 20px; background: #f8f9fa; border-radius: 8px;
@@ -2178,24 +2159,12 @@ function createEnhancedErrorPage(error, requestId, validationResults = null, use
             transition: background 0.3s;
           }
           .action-button:hover { background: #0056b3; text-decoration: none; color: white; }
-          .action-button.danger { background: #dc3545; }
-          .action-button.danger:hover { background: #c82333; }
-          .action-button.success { background: #28a745; }
-          .action-button.success:hover { background: #1e7e34; }
           .diagnostic-info {
             margin-top: 30px; font-size: 0.9rem; color: #6c757d;
             background: #f8f9fa; padding: 15px; border-radius: 6px;
           }
           .diagnostic-info h4 {
             color: #495057; margin-bottom: 10px;
-          }
-          .critical-alert {
-            background: #f8d7da; border: 2px solid #dc3545;
-            color: #721c24; padding: 20px; border-radius: 8px;
-            margin-bottom: 25px;
-          }
-          .critical-alert h3 {
-            color: #721c24; margin-bottom: 15px;
           }
         </style>
       </head>
@@ -2216,15 +2185,6 @@ function createEnhancedErrorPage(error, requestId, validationResults = null, use
                 '❌ System has critical issues preventing normal operation'}
             </div>
 
-            ${criticalIssues.length > 0 ? `
-            <div class="critical-alert">
-              <h3>🚨 Critical Issues Detected</h3>
-              <ul>
-                ${criticalIssues.map(issue => `<li>${issue.message}</li>`).join('')}
-              </ul>
-            </div>
-            ` : ''}
-
             <div class="error-details">
               <h3>Error Details</h3>
               <div class="error-message">
@@ -2236,72 +2196,14 @@ function createEnhancedErrorPage(error, requestId, validationResults = null, use
               </div>
             </div>
 
-            ${validationResults ? `
-            <div class="validation-section">
-              <h3>📋 System Status Check</h3>
-              <div class="validation-item">
-                <div class="validation-status ${validationResults.systemHealth.spreadsheetAccess ? 'status-pass' : 'status-fail'}">
-                  ${validationResults.systemHealth.spreadsheetAccess ? '✓' : '✗'}
-                </div>
-                <span>Spreadsheet Access</span>
-              </div>
-              <div class="validation-item">
-                <div class="validation-status ${validationResults.systemHealth.requiredSheets?.Staff ? 'status-pass' : 'status-fail'}">
-                  ${validationResults.systemHealth.requiredSheets?.Staff ? '✓' : '✗'}
-                </div>
-                <span>Staff Sheet</span>
-              </div>
-              <div class="validation-item">
-                <div class="validation-status ${validationResults.systemHealth.requiredSheets?.Teacher ? 'status-pass' : 'status-fail'}">
-                  ${validationResults.systemHealth.requiredSheets?.Teacher ? '✓' : '✗'}
-                </div>
-                <span>Teacher Sheet</span>
-              </div>
-              <div class="validation-item">
-                <div class="validation-status ${validationResults.systemHealth.cacheSystem ? 'status-pass' : 'status-warn'}">
-                  ${validationResults.systemHealth.cacheSystem ? '✓' : '⚠'}
-                </div>
-                <span>Cache System</span>
-              </div>
-              <div class="validation-item">
-                <div class="validation-status ${validationResults.systemHealth.triggerSystem ? 'status-pass' : 'status-warn'}">
-                  ${validationResults.systemHealth.triggerSystem ? '✓' : '⚠'}
-                </div>
-                <span>Auto-Trigger System</span>
-              </div>
-            </div>
-            ` : ''}
-
-            <div class="troubleshooting">
-              <h3>🔧 Troubleshooting Steps</h3>
-              <ul>
-                <li><strong>First:</strong> Try the "Clear Cache & Retry" button below</li>
-                <li><strong>Check:</strong> SHEET_ID is correctly set in Script Properties</li>
-                <li><strong>Verify:</strong> Spreadsheet exists and is accessible</li>
-                <li><strong>Ensure:</strong> Required sheet tabs exist (Staff, Settings, Teacher)</li>
-                <li><strong>Confirm:</strong> You have permission to access the spreadsheet</li>
-                <li><strong>Role Sheets:</strong> Verify your role has a corresponding sheet tab</li>
-                <li><strong>If persistent:</strong> Open in incognito/private browser window</li>
-                <li><strong>Admin:</strong> Run system validation in Apps Script editor</li>
-              </ul>
-            </div>
-
             <div class="action-section">
               <h3>🛠️ Recovery Actions</h3>
               <button class="action-button" onclick="window.location.reload()">
                 🔄 Simple Retry
               </button>
-              <button class="action-button success" onclick="clearCacheAndRetry()">
+              <button class="action-button" onclick="clearCacheAndRetry()">
                 🧹 Clear Cache & Retry
               </button>
-              <button class="action-button danger" onclick="emergencyReset()">
-                🚨 Emergency Reset
-              </button>
-              <br><br>
-              <a href="mailto:${CONTACT_SETTINGS.SUPPORT_EMAIL}?subject=Danielson Framework Error&body=Error ID: ${Utilities.htmlEncode(errorId)}%0ATimestamp: ${Utilities.htmlEncode(new Date(timestamp).toISOString())}%0AError: ${encodeURIComponent(error.toString())}"
-                 class="action-button" style="background: #6c757d;">
-                📧 Contact Support
-              </a>
             </div>
 
             <div class="diagnostic-info">
@@ -2312,13 +2214,6 @@ function createEnhancedErrorPage(error, requestId, validationResults = null, use
               <strong>Cache Version:</strong> ${Utilities.htmlEncode(getMasterCacheVersion())}<br>
               <strong>Timestamp:</strong> ${Utilities.htmlEncode(new Date(timestamp).toISOString())}<br>
               <strong>User Agent:</strong> ${userAgentString ? Utilities.htmlEncode(userAgentString) : 'Unknown'}<br>
-              ${validationResults ? `
-              <strong>Validation Issues:</strong> ${Utilities.htmlEncode((validationResults.issues?.length || 0).toString())}<br>
-              <strong>System Components:</strong>
-              Spreadsheet: ${validationResults.systemHealth.spreadsheetAccess ? 'OK' : 'FAIL'},
-              Cache: ${validationResults.systemHealth.cacheSystem ? 'OK' : 'WARN'},
-              Triggers: ${validationResults.systemHealth.triggerSystem ? 'OK' : 'WARN'}
-              ` : ''}
             </div>
           </div>
         </div>
@@ -2334,31 +2229,6 @@ function createEnhancedErrorPage(error, requestId, validationResults = null, use
             window.location.href = url.toString();
           }
 
-          function emergencyReset() {
-            console.log('Performing emergency reset...');
-            const url = new URL(window.location);
-            url.searchParams.set('refresh', 'true');
-            url.searchParams.set('nocache', 'true');
-            url.searchParams.set('emergency', 'true');
-            url.searchParams.set('reset', 'true');
-            url.searchParams.set('t', Date.now());
-            window.location.href = url.toString();
-          }
-
-          // Auto-retry after 2 minutes if critical issues
-          const systemHealth = '${systemHealth}';
-          if (systemHealth === 'critical' || systemHealth === 'error') {
-            setTimeout(function() {
-              const retryNotice = document.createElement('div');
-              retryNotice.style.cssText = 'background:#fff3cd; padding:15px; margin:20px; border-radius:6px; border-left:4px solid #ffc107; text-align:center;';
-              retryNotice.innerHTML = '<strong>⏰ Auto-retry in progress...</strong><br>The system will attempt automatic recovery.';
-              document.querySelector('.error-content').appendChild(retryNotice);
-
-              setTimeout(clearCacheAndRetry, 5000);
-            }, 120000); // 2 minutes
-          }
-
-          // Log error for analytics
           console.error('Enhanced Error Page Displayed', {
             errorId: '${Utilities.htmlEncode(errorId)}',
             requestId: '${Utilities.htmlEncode(requestId || 'unknown')}',
