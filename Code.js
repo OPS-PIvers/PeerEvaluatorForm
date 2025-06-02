@@ -6,6 +6,13 @@
  * while adding support for multiple roles and user-specific content.
  */
 
+const STRATEGY3_ROW_SCAN_DEPTH = 3;
+const STRATEGY3_START_COLUMN_INDEX = 2;
+const STRATEGY3_END_COLUMN_INDEX = 4;
+const MAX_PRACTICE_TEXT_LENGTH_HEURISTIC = 200;
+const NEAR_HEADER_ROW_SCAN_DEPTH = 5;
+const MIN_PRACTICE_STRING_LENGTH = 5;
+
 /**
  * Legacy DOMAIN_CONFIGS for backward compatibility
  * Kept in Code.js to avoid cross-file dependency issues
@@ -1756,10 +1763,9 @@ function searchBestPracticesStrategy1(sheetData, componentRow) {
  * Search for best practices using Strategy 2: Search for "best practices" header near this component
  * @param {Array<Array>} sheetData - Raw sheet data
  * @param {number} componentRow - Row where component was found
- * @param {Object} domainInfo - Domain information
  * @return {Array<string>} Array of best practice strings
  */
-function searchBestPracticesStrategy2(sheetData, componentRow, domainInfo) {
+function searchBestPracticesStrategy2(sheetData, componentRow) {
   const practices = [];
   const searchStartRow = Math.max(0, componentRow - 5);
   const searchEndRow = Math.min(sheetData.length, componentRow + 5);
@@ -1780,18 +1786,17 @@ function searchBestPracticesStrategy2(sheetData, componentRow, domainInfo) {
  * Search for best practices using Strategy 3: Look for practices in nearby cells (scan around the component)
  * @param {Array<Array>} sheetData - Raw sheet data
  * @param {number} componentRow - Row where component was found
- * @param {string} componentId - Component ID (e.g., "1a:")
  * @return {Array<string>} Array of best practice strings
  */
-function searchBestPracticesStrategy3(sheetData, componentRow, componentId) {
+function searchBestPracticesStrategy3(sheetData, componentRow) {
   const practices = [];
   // Search in columns C, D, E (indices 2, 3, 4) of the component's row and next few rows
-  for (let i = componentRow; i < Math.min(sheetData.length, componentRow + 3); i++) {
-    for (let j = 2; j <= 4; j++) {
+  for (let i = componentRow; i < Math.min(sheetData.length, componentRow + STRATEGY3_ROW_SCAN_DEPTH); i++) {
+    for (let j = STRATEGY3_START_COLUMN_INDEX; j <= STRATEGY3_END_COLUMN_INDEX; j++) {
       if (sheetData[i] && sheetData[i][j] && sheetData[i][j].toString().trim()) {
         const cellText = sheetData[i][j].toString();
         // Avoid adding proficiency level descriptions if they are too long
-        if (cellText.length < 200) { // Heuristic: actual practices are usually shorter
+        if (cellText.length < MAX_PRACTICE_TEXT_LENGTH_HEURISTIC) { // Heuristic: actual practices are usually shorter
             practices.push(...parseMultilineCell(cellText));
         }
       }
@@ -1837,7 +1842,7 @@ function searchBestPracticesStrategy4(sheetData, componentId, domainInfo) {
 function extractPracticesNearHeader(sheetData, headerRow, headerCol) {
   const practices = [];
   // Look in the cell to the right of the header, and cells below it
-  for (let i = headerRow; i < Math.min(sheetData.length, headerRow + 5); i++) {
+  for (let i = headerRow; i < Math.min(sheetData.length, headerRow + NEAR_HEADER_ROW_SCAN_DEPTH); i++) {
     // Check cell to the right of the header (if not the header row itself for that column)
     if (i === headerRow && headerCol + 1 < sheetData[i].length && sheetData[i][headerCol + 1]) {
       practices.push(...parseMultilineCell(sheetData[i][headerCol + 1].toString()));
@@ -1851,7 +1856,7 @@ function extractPracticesNearHeader(sheetData, headerRow, headerCol) {
         practices.push(...parseMultilineCell(sheetData[i][headerCol+1].toString()));
     }
   }
-  return practices.filter(p => p.length > 5); // Basic filter for very short strings
+  return practices.filter(p => p.length > MIN_PRACTICE_STRING_LENGTH); // Basic filter for very short strings
 }
 
 /**

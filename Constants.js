@@ -254,3 +254,11 @@ const VALIDATION_ERROR_TYPES = {
   // Trigger and Automation
   TRIGGER_ERROR: 'trigger_error'          // Error within an automated trigger
 };
+
+// Search Strategy Constants
+const STRATEGY3_ROW_SCAN_DEPTH = 3;
+const STRATEGY3_START_COLUMN_INDEX = 2; // Column C
+const STRATEGY3_END_COLUMN_INDEX = 4;   // Column E
+const MAX_PRACTICE_TEXT_LENGTH_HEURISTIC = 200;
+const NEAR_HEADER_ROW_SCAN_DEPTH = 5;
+const MIN_PRACTICE_STRING_LENGTH = 5;
