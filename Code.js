@@ -2813,6 +2813,329 @@ function getPageTitle(role) {
 }
 
 /**
+ * Dynamically detect and process domains from any role sheet
+ * @param {Array<Array>} sheetData - Raw sheet data
+ * @param {string} role - Role name for logging
+ * @return {Array<Object>} Array of domain objects
+ */
+function processDynamicDomains(sheetData, role) {
+  debugLog(`Starting dynamic domain detection for ${role}`);
+  
+  const domains = [];
+  const domainMap = detectDomainStructure(sheetData);
+  
+  debugLog(`Detected domain structure for ${role}:`, domainMap);
+  
+  // Process each detected domain
+  Object.keys(domainMap).sort().forEach(domainNumber => {
+    const domainInfo = domainMap[domainNumber];
+    debugLog(`Processing ${domainInfo.name} (rows ${domainInfo.startRow}-${domainInfo.endRow})`);
+    
+    const domain = {
+      number: parseInt(domainNumber),
+      name: domainInfo.name,
+      components: []
+    };
+    
+    // Find components within this domain
+    const components = findComponentsInDomain(sheetData, domainInfo);
+    domain.components = components;
+    
+    debugLog(`Found ${components.length} components in ${domainInfo.name}`);
+    domains.push(domain);
+  });
+  
+  debugLog(`Dynamic domain processing completed for ${role}. Found ${domains.length} domains.`);
+  return domains;
+}
+
+/**
+ * Detect the structure of domains in a sheet by scanning for domain headers
+ * @param {Array<Array>} sheetData - Raw sheet data
+ * @return {Object} Map of domain numbers to their info
+ */
+function detectDomainStructure(sheetData) {
+  const domainMap = {};
+  const domainPattern = /^domain\s+([1-4])[:\s]?\s*(.+)/i;
+  
+  for (let rowIndex = 0; rowIndex < sheetData.length; rowIndex++) {
+    const row = sheetData[rowIndex];
+    const cellValue = row[0] ? row[0].toString().trim() : '';
+    
+    const match = cellValue.match(domainPattern);
+    if (match) {
+      const domainNumber = match[1];
+      const domainTitle = match[2] || `Domain ${domainNumber}`;
+      
+      debugLog(`Found domain header at row ${rowIndex + 1}: "${cellValue}"`);
+      
+      domainMap[domainNumber] = {
+        number: parseInt(domainNumber),
+        name: `Domain ${domainNumber}: ${domainTitle}`,
+        headerRow: rowIndex,
+        startRow: rowIndex + 1, // Start looking for components after the header
+        endRow: null // Will be set when we find the next domain or end of data
+      };
+    }
+  }
+  
+  // Set end rows for each domain
+  const domainNumbers = Object.keys(domainMap).sort();
+  for (let i = 0; i < domainNumbers.length; i++) {
+    const currentDomain = domainNumbers[i];
+    const nextDomain = domainNumbers[i + 1];
+    
+    if (nextDomain) {
+      // End this domain where the next one starts
+      domainMap[currentDomain].endRow = domainMap[nextDomain].headerRow - 1;
+    } else {
+      // Last domain goes to end of data
+      domainMap[currentDomain].endRow = sheetData.length - 1;
+    }
+  }
+  
+  return domainMap;
+}
+
+/**
+ * Find all components within a specific domain
+ * @param {Array<Array>} sheetData - Raw sheet data
+ * @param {Object} domainInfo - Domain information from detectDomainStructure
+ * @return {Array<Object>} Array of component objects
+ */
+function findComponentsInDomain(sheetData, domainInfo) {
+  const components = [];
+  const componentPattern = new RegExp(`^${domainInfo.number}[a-z][:\s]`, 'i');
+  
+  debugLog(`Looking for components in domain ${domainInfo.number} (rows ${domainInfo.startRow}-${domainInfo.endRow})`);
+  
+  for (let rowIndex = domainInfo.startRow; rowIndex <= domainInfo.endRow && rowIndex < sheetData.length; rowIndex++) {
+    const row = sheetData[rowIndex];
+    const cellValue = row[0] ? row[0].toString().trim() : '';
+    
+    if (componentPattern.test(cellValue)) {
+      debugLog(`Found component at row ${rowIndex + 1}: "${cellValue}"`);
+      
+      const component = {
+        title: cellValue,
+        developing: sanitizeText(row[1]) || '',
+        basic: sanitizeText(row[2]) || '',
+        proficient: sanitizeText(row[3]) || '',
+        distinguished: sanitizeText(row[4]) || '',
+        bestPractices: []
+      };
+      
+      // Find best practices for this component
+      const practices = findBestPracticesForComponent(sheetData, cellValue, rowIndex, domainInfo);
+      component.bestPractices = practices;
+      
+      components.push(component);
+      debugLog(`Component processed: ${cellValue} with ${practices.length} best practices`);
+    }
+  }
+  
+  return components;
+}
+
+/**
+ * Find best practices for a specific component using multiple search strategies
+ * @param {Array<Array>} sheetData - Raw sheet data
+ * @param {string} componentTitle - Component title (e.g., "1a: ...")
+ * @param {number} componentRow - Row where component was found
+ * @param {Object} domainInfo - Domain information
+ * @return {Array<string>} Array of best practice strings
+ */
+function findBestPracticesForComponent(sheetData, componentTitle, componentRow, domainInfo) {
+  const componentId = extractComponentId(componentTitle); // e.g., "1a:"
+  
+  if (!componentId) {
+    debugLog(`Could not extract component ID from: ${componentTitle}`);
+    return [];
+  }
+  
+  debugLog(`Looking for best practices for component: ${componentId}`);
+  
+  // Strategy 1: Look in the same pattern as Teacher sheet (4 rows down, column B)
+  let practices = searchBestPracticesStrategy1(sheetData, componentRow);
+  if (practices.length > 0) {
+    debugLog(`Found ${practices.length} practices using Strategy 1 (Teacher pattern)`);
+    return practices;
+  }
+  
+  // Strategy 2: Search for "best practices" header near this component
+  practices = searchBestPracticesStrategy2(sheetData, componentRow, domainInfo);
+  if (practices.length > 0) {
+    debugLog(`Found ${practices.length} practices using Strategy 2 (header search)`);
+    return practices;
+  }
+  
+  // Strategy 3: Look for practices in nearby cells (scan around the component)
+  practices = searchBestPracticesStrategy3(sheetData, componentRow, componentId);
+  if (practices.length > 0) {
+    debugLog(`Found ${practices.length} practices using Strategy 3 (nearby search)`);
+    return practices;
+  }
+  
+  // Strategy 4: Search for the component ID in other columns
+  practices = searchBestPracticesStrategy4(sheetData, componentId, domainInfo);
+  if (practices.length > 0) {
+    debugLog(`Found ${practices.length} practices using Strategy 4 (column search)`);
+    return practices;
+  }
+  
+  debugLog(`No best practices found for component: ${componentId}`);
+  return [];
+}
+
+/**
+ * Strategy 1: Use the same pattern as Teacher sheet (4 rows down, column B)
+ */
+function searchBestPracticesStrategy1(sheetData, componentRow) {
+  const practicesRow = componentRow + 4; // Same offset as Teacher sheet
+  const practicesCol = 1; // Column B (0-indexed)
+  
+  if (practicesRow >= sheetData.length) {
+    return [];
+  }
+  
+  const practicesCell = sheetData[practicesRow][practicesCol];
+  if (practicesCell && practicesCell.toString().trim()) {
+    return parseMultilineCell(practicesCell.toString());
+  }
+  
+  return [];
+}
+
+/**
+ * Strategy 2: Search for "best practices" header within the domain
+ */
+function searchBestPracticesStrategy2(sheetData, componentRow, domainInfo) {
+  const searchStart = Math.max(0, componentRow - 2);
+  const searchEnd = Math.min(sheetData.length - 1, componentRow + 10);
+  
+  for (let rowIndex = searchStart; rowIndex <= searchEnd; rowIndex++) {
+    const row = sheetData[rowIndex];
+    
+    for (let colIndex = 0; colIndex < Math.min(6, row.length); colIndex++) {
+      const cellValue = row[colIndex] ? row[colIndex].toString().toLowerCase() : '';
+      
+      if (cellValue.includes('best') && cellValue.includes('practice')) {
+        debugLog(`Found "best practices" header at row ${rowIndex + 1}, col ${colIndex + 1}`);
+        
+        // Look for practices in nearby cells
+        const practices = extractPracticesNearHeader(sheetData, rowIndex, colIndex);
+        if (practices.length > 0) {
+          return practices;
+        }
+      }
+    }
+  }
+  
+  return [];
+}
+
+/**
+ * Strategy 3: Search in nearby cells around the component
+ */
+function searchBestPracticesStrategy3(sheetData, componentRow, componentId) {
+  const searchOffsets = [
+    { row: 1, col: 1 }, { row: 2, col: 1 }, { row: 3, col: 1 }, { row: 4, col: 1 }, { row: 5, col: 1 },
+    { row: 1, col: 0 }, { row: 2, col: 0 }, { row: 3, col: 0 }, { row: 4, col: 0 }, { row: 5, col: 0 },
+    { row: 0, col: 1 }, { row: 0, col: 2 }, { row: 0, col: 3 }, { row: 0, col: 4 }, { row: 0, col: 5 }
+  ];
+  
+  for (const offset of searchOffsets) {
+    const checkRow = componentRow + offset.row;
+    const checkCol = offset.col;
+    
+    if (checkRow < sheetData.length && checkCol < sheetData[checkRow].length) {
+      const cellValue = sheetData[checkRow][checkCol];
+      
+      if (cellValue && cellValue.toString().trim()) {
+        const cellText = cellValue.toString();
+        
+        // Check if this cell contains multiple lines (likely practices)
+        if (cellText.includes('\n') || cellText.includes('\r')) {
+          const practices = parseMultilineCell(cellText);
+          if (practices.length > 2) { // Likely practices if multiple items
+            debugLog(`Found practices in nearby cell at row ${checkRow + 1}, col ${checkCol + 1}`);
+            return practices;
+          }
+        }
+        
+        // Check if cell mentions the component ID
+        if (cellText.toLowerCase().includes(componentId.toLowerCase().replace(':', ''))) {
+          const practices = parseMultilineCell(cellText);
+          if (practices.length > 0) {
+            debugLog(`Found practices mentioning component ${componentId} at row ${checkRow + 1}, col ${checkCol + 1}`);
+            return practices;
+          }
+        }
+      }
+    }
+  }
+  
+  return [];
+}
+
+/**
+ * Strategy 4: Search for component ID references in other columns
+ */
+function searchBestPracticesStrategy4(sheetData, componentId, domainInfo) {
+  const searchStart = domainInfo.startRow;
+  const searchEnd = domainInfo.endRow;
+  
+  for (let rowIndex = searchStart; rowIndex <= searchEnd && rowIndex < sheetData.length; rowIndex++) {
+    const row = sheetData[rowIndex];
+    
+    for (let colIndex = 1; colIndex < Math.min(10, row.length); colIndex++) {
+      const cellValue = row[colIndex] ? row[colIndex].toString() : '';
+      
+      // Look for cells that reference this component ID
+      if (cellValue.toLowerCase().includes(componentId.toLowerCase().replace(':', ''))) {
+        const practices = parseMultilineCell(cellValue);
+        if (practices.length > 1) {
+          debugLog(`Found practices for ${componentId} at row ${rowIndex + 1}, col ${colIndex + 1}`);
+          return practices;
+        }
+      }
+    }
+  }
+  
+  return [];
+}
+
+/**
+ * Extract practices from cells near a "best practices" header
+ */
+function extractPracticesNearHeader(sheetData, headerRow, headerCol) {
+  const searchCells = [
+    { row: headerRow + 1, col: headerCol },     // Directly below header
+    { row: headerRow, col: headerCol + 1 },     // Right of header
+    { row: headerRow + 1, col: headerCol + 1 }, // Diagonal from header
+    { row: headerRow + 2, col: headerCol },     // Two rows below
+    { row: headerRow + 1, col: headerCol - 1 }, // Below and left
+  ];
+  
+  for (const cell of searchCells) {
+    if (cell.row >= 0 && cell.row < sheetData.length && 
+        cell.col >= 0 && cell.col < sheetData[cell.row].length) {
+      
+      const cellValue = sheetData[cell.row][cell.col];
+      if (cellValue && cellValue.toString().trim()) {
+        const practices = parseMultilineCell(cellValue.toString());
+        if (practices.length > 0) {
+          debugLog(`Extracted ${practices.length} practices from cell at row ${cell.row + 1}, col ${cell.col + 1}`);
+          return practices;
+        }
+      }
+    }
+  }
+  
+  return [];
+}
+
+/**
  * Create an error page for display to users
  * @param {Error} error - Error object
  * @return {HtmlOutput} Error page HTML
@@ -3198,5 +3521,27 @@ function testCompleteWorkflowPhase2(testRole = 'Administrator') {
       success: false,
       error: error.message
     };
+  }
+}
+
+// Add this temporary test function to Code.js for testing
+function testBasicImplementation() {
+  console.log('=== TESTING BASIC IMPLEMENTATION ===');
+  
+  try {
+    // Test with Teacher role first (should use legacy processing)
+    console.log('Testing Teacher role (legacy)...');
+    const teacherData = getAllDomainsData('Teacher', 1);
+    console.log('✓ Teacher role works:', teacherData.domains.length + ' domains');
+    
+    // Test with another role (should use dynamic processing)
+    console.log('Testing Nurse role (dynamic)...');
+    const nurseData = getAllDomainsData('Nurse', 1);
+    console.log('✓ Nurse role works:', nurseData.domains.length + ' domains');
+    
+    console.log('✅ Basic implementation test passed');
+    
+  } catch (error) {
+    console.error('❌ Basic implementation test failed:', error);
   }
 }
