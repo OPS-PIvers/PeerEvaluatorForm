@@ -1555,6 +1555,185 @@ function testAutoTriggerSystem(testEmail = null) {
 }
 
 /**
+ * ADD THIS FUNCTION to Code.js
+ * Dynamically detect and process domains from any role sheet
+ * @param {Array<Array>} sheetData - Raw sheet data
+ * @param {string} role - Role name for logging
+ * @return {Array<Object>} Array of domain objects
+ */
+function processDynamicDomains(sheetData, role) {
+  debugLog(`Starting dynamic domain detection for ${role}`);
+
+  const domains = [];
+  const domainMap = detectDomainStructure(sheetData);
+
+  debugLog(`Detected domain structure for ${role}:`, domainMap);
+
+  // Process each detected domain
+  Object.keys(domainMap).sort().forEach(domainNumber => {
+    const domainInfo = domainMap[domainNumber];
+    debugLog(`Processing ${domainInfo.name} (rows ${domainInfo.startRow}-${domainInfo.endRow})`);
+
+    const domain = {
+      number: parseInt(domainNumber),
+      name: domainInfo.name,
+      components: []
+    };
+
+    // Find components within this domain
+    const components = findComponentsInDomain(sheetData, domainInfo);
+    domain.components = components;
+
+    debugLog(`Found ${components.length} components in ${domainInfo.name}`);
+    domains.push(domain);
+  });
+
+  debugLog(`Dynamic domain processing completed for ${role}. Found ${domains.length} domains.`);
+  return domains;
+}
+
+/**
+ * ADD THIS FUNCTION to Code.js
+ * Detect the structure of domains in a sheet by scanning for domain headers
+ * @param {Array<Array>} sheetData - Raw sheet data
+ * @return {Object} Map of domain numbers to their info
+ */
+function detectDomainStructure(sheetData) {
+  const domainMap = {};
+  const domainPattern = /^domain\s+([1-4])[:\s]?\s*(.+)/i;
+
+  for (let rowIndex = 0; rowIndex < sheetData.length; rowIndex++) {
+    const row = sheetData[rowIndex];
+    const cellValue = row[0] ? row[0].toString().trim() : '';
+
+    const match = cellValue.match(domainPattern);
+    if (match) {
+      const domainNumber = match[1];
+      const domainTitle = match[2] || `Domain ${domainNumber}`;
+
+      debugLog(`Found domain header at row ${rowIndex + 1}: "${cellValue}"`);
+
+      domainMap[domainNumber] = {
+        number: parseInt(domainNumber),
+        name: `Domain ${domainNumber}: ${domainTitle}`,
+        headerRow: rowIndex,
+        startRow: rowIndex + 1, // Start looking for components after the header
+        endRow: null // Will be set when we find the next domain or end of data
+      };
+    }
+  }
+
+  // Set end rows for each domain
+  const domainNumbers = Object.keys(domainMap).sort();
+  for (let i = 0; i < domainNumbers.length; i++) {
+    const currentDomain = domainNumbers[i];
+    const nextDomain = domainNumbers[i + 1];
+
+    if (nextDomain) {
+      // End this domain where the next one starts
+      domainMap[currentDomain].endRow = domainMap[nextDomain].headerRow - 1;
+    } else {
+      // Last domain goes to end of data
+      domainMap[currentDomain].endRow = sheetData.length - 1;
+    }
+  }
+
+  return domainMap;
+}
+
+/**
+ * ADD THIS FUNCTION to Code.js
+ * Find all components within a specific domain
+ * @param {Array<Array>} sheetData - Raw sheet data
+ * @param {Object} domainInfo - Domain information from detectDomainStructure
+ * @return {Array<Object>} Array of component objects
+ */
+function findComponentsInDomain(sheetData, domainInfo) {
+  const components = [];
+  const componentPattern = new RegExp(`^${domainInfo.number}[a-z][:\s]`, 'i');
+
+  debugLog(`Looking for components in domain ${domainInfo.number} (rows ${domainInfo.startRow}-${domainInfo.endRow})`);
+
+  for (let rowIndex = domainInfo.startRow; rowIndex <= domainInfo.endRow && rowIndex < sheetData.length; rowIndex++) {
+    const row = sheetData[rowIndex];
+    const cellValue = row[0] ? row[0].toString().trim() : '';
+
+    if (componentPattern.test(cellValue)) {
+      debugLog(`Found component at row ${rowIndex + 1}: "${cellValue}"`);
+
+      const component = {
+        title: cellValue,
+        developing: sanitizeText(row[1]) || '',
+        basic: sanitizeText(row[2]) || '',
+        proficient: sanitizeText(row[3]) || '',
+        distinguished: sanitizeText(row[4]) || '',
+        bestPractices: []
+      };
+
+      // Find best practices for this component
+      const practices = findBestPracticesForComponent(sheetData, cellValue, rowIndex, domainInfo);
+      component.bestPractices = practices;
+
+      components.push(component);
+      debugLog(`Component processed: ${cellValue} with ${practices.length} best practices`);
+    }
+  }
+
+  return components;
+}
+
+/**
+ * ADD THIS FUNCTION to Code.js
+ * Find best practices for a specific component using multiple search strategies
+ * @param {Array<Array>} sheetData - Raw sheet data
+ * @param {string} componentTitle - Component title (e.g., "1a: ...")
+ * @param {number} componentRow - Row where component was found
+ * @param {Object} domainInfo - Domain information
+ * @return {Array<string>} Array of best practice strings
+ */
+function findBestPracticesForComponent(sheetData, componentTitle, componentRow, domainInfo) {
+  const componentId = extractComponentId(componentTitle); // e.g., "1a:"
+
+  if (!componentId) {
+    debugLog(`Could not extract component ID from: ${componentTitle}`);
+    return [];
+  }
+
+  debugLog(`Looking for best practices for component: ${componentId}`);
+
+  // Strategy 1: Look in the same pattern as Teacher sheet (4 rows down, column B)
+  let practices = searchBestPracticesStrategy1(sheetData, componentRow);
+  if (practices.length > 0) {
+    debugLog(`Found ${practices.length} practices using Strategy 1 (Teacher pattern)`);
+    return practices;
+  }
+
+  // Strategy 2: Search for "best practices" header near this component
+  practices = searchBestPracticesStrategy2(sheetData, componentRow, domainInfo);
+  if (practices.length > 0) {
+    debugLog(`Found ${practices.length} practices using Strategy 2 (header search)`);
+    return practices;
+  }
+
+  // Strategy 3: Look for practices in nearby cells (scan around the component)
+  practices = searchBestPracticesStrategy3(sheetData, componentRow, componentId);
+  if (practices.length > 0) {
+    debugLog(`Found ${practices.length} practices using Strategy 3 (nearby search)`);
+    return practices;
+  }
+
+  // Strategy 4: Search for the component ID in other columns
+  practices = searchBestPracticesStrategy4(sheetData, componentId, domainInfo);
+  if (practices.length > 0) {
+    debugLog(`Found ${practices.length} practices using Strategy 4 (column search)`);
+    return practices;
+  }
+
+  debugLog(`No best practices found for component: ${componentId}`);
+  return [];
+}
+
+/**
  * Main trigger function that handles sheet edits
  * This function is automatically called when the spreadsheet is edited
  * @param {Object} e - Edit event object
