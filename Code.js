@@ -116,8 +116,7 @@ function testPhase3UserContextEnhancement() {
     console.log(`Testing with user: ${userEmail}`);
 
     // Test 1: Session management
-    console.log('
-Test 1: Session Management');
+    console.log('Test 1: Session Management');
     const session = getUserSession(userEmail);
     console.log('✓ Session created/retrieved:', {
       sessionId: session.sessionId,
@@ -126,8 +125,7 @@ Test 1: Session Management');
     });
 
     // Test 2: State detection
-    console.log('
-Test 2: State Detection');
+    console.log('Test 2: State Detection');
     const currentUser = getUserByEmail(userEmail);
     const changeDetection = detectUserStateChanges(userEmail, {
       role: currentUser.role,
@@ -142,8 +140,7 @@ Test 2: State Detection');
     });
 
     // Test 3: Enhanced user context
-    console.log('
-Test 3: Enhanced User Context');
+    console.log('Test 3: Enhanced User Context');
     const context = createUserContext(userEmail);
     console.log('✓ Enhanced context created:', {
       role: context.role,
@@ -154,8 +151,7 @@ Test 3: Enhanced User Context');
     });
 
     // Test 4: Role change history
-    console.log('
-Test 4: Role Change History');
+    console.log('Test 4: Role Change History');
     const history = getRoleChangeHistory(userEmail);
     console.log('✓ Role change history:', {
       totalChanges: history.length,
@@ -163,8 +159,7 @@ Test 4: Role Change History');
     });
 
     // Test 5: User dashboard
-    console.log('
-Test 5: User Dashboard');
+    console.log('Test 5: User Dashboard');
     const dashboard = getUserDashboardData(userEmail);
     console.log('✓ Dashboard data generated:', {
       currentRole: dashboard.user?.currentRole,
@@ -172,8 +167,7 @@ Test 5: User Dashboard');
       totalRoleChanges: dashboard.roleChanges?.total
     });
 
-    console.log('
-✅ Phase 3 user context enhancement test completed successfully');
+    console.log('✅ Phase 3 user context enhancement test completed successfully');
 
   } catch (error) {
     console.error('❌ Error testing Phase 3:', error);
@@ -190,20 +184,17 @@ function testRoleChangeDetection(testEmail, newRole) {
 
   try {
     // Step 1: Get current state
-    console.log('
-Step 1: Getting current state...');
+    console.log('Step 1: Getting current state...');
     const currentState = getStoredUserState(testEmail);
     console.log('Current stored state:', currentState);
 
     // Step 2: Simulate role change in Staff sheet
-    console.log('
-Step 2: Simulating role change...');
+    console.log('Step 2: Simulating role change...');
     console.log('ℹ️  In real usage, you would change the role in the Staff sheet');
-    console.log('ℹ️  For this test, we'll manually trigger detection');
+    console.log('ℹ️  For this test, we will manually trigger detection');
 
     // Step 3: Test change detection
-    console.log('
-Step 3: Testing change detection...');
+    console.log('Step 3: Testing change detection...');
     const mockNewState = {
       role: newRole,
       year: currentState?.year || 1,
@@ -220,8 +211,7 @@ Step 3: Testing change detection...');
 
     // Step 4: Test proactive cache clearing
     if (changeDetection.hasChanged) {
-      console.log('
-Step 4: Testing proactive cache clearing...');
+      console.log('Step 4: Testing proactive cache clearing...');
 
       const roleChange = changeDetection.changes.find(change => change.field === 'role');
       if (roleChange) {
@@ -232,22 +222,18 @@ Step 4: Testing proactive cache clearing...');
     }
 
     // Step 5: Test cache warming
-    console.log('
-Step 5: Testing cache warming...');
+    console.log('Step 5: Testing cache warming...');
     warmCacheForRoleChange(testEmail, newRole);
     console.log('✓ Cache warming completed');
 
     // Step 6: Generate URLs for the new role
-    console.log('
-Step 6: Generating URLs for new role...');
+    console.log('Step 6: Generating URLs for new role...');
     const urls = getUrlForRoleChange(newRole, testEmail);
     console.log('✓ Role change URL generated');
 
-    console.log('
-✅ Role change detection test completed');
-    console.log('
-📋 To complete the test:');
-    console.log('1. Change the user's role in the Staff sheet');
+    console.log('✅ Role change detection test completed');
+    console.log('📋 To complete the test:');
+    console.log('1. Change the users role in the Staff sheet');
     console.log('2. Use the generated URL above');
     console.log('3. Role change should be detected automatically');
 
@@ -274,16 +260,14 @@ function testProactiveMonitoring() {
     });
 
     // Test 2: Session cleanup
-    console.log('
-Test 2: Testing session cleanup...');
+    console.log('Test 2: Testing session cleanup...');
     const cleanupCount = cleanupExpiredSessions();
     console.log('✓ Cleanup completed:', {
       itemsCleaned: cleanupCount
     });
 
     // Test 3: Enhanced validation
-    console.log('
-Test 3: Testing enhanced user validation...');
+    console.log('Test 3: Testing enhanced user validation...');
     const sessionUser = getUserFromSession();
     if (sessionUser && sessionUser.email) {
       const validation = validateUserWithStateTracking(sessionUser.email);
@@ -297,8 +281,7 @@ Test 3: Testing enhanced user validation...');
       console.log('⚠️  No session user for validation test');
     }
 
-    console.log('
-✅ Proactive monitoring test completed successfully');
+    console.log('✅ Proactive monitoring test completed successfully');
 
   } catch (error) {
     console.error('❌ Error testing proactive monitoring:', error);
@@ -322,23 +305,19 @@ function testCompletePhase3Integration() {
     console.log(`Running integration test for: ${userEmail}`);
 
     // Phase 1: Test enhanced cache system
-    console.log('
-🔧 Testing Phase 1 (Enhanced Cache System)...');
+    console.log('🔧 Testing Phase 1 (Enhanced Cache System)...');
     testEnhancedCacheSystem();
 
     // Phase 2: Test cache busting
-    console.log('
-🌐 Testing Phase 2 (Cache Busting)...');
+    console.log('🌐 Testing Phase 2 (Cache Busting)...');
     testPhase2CacheBusting();
 
     // Phase 3: Test user context enhancement
-    console.log('
-👤 Testing Phase 3 (User Context Enhancement)...');
+    console.log('👤 Testing Phase 3 (User Context Enhancement)...');
     testPhase3UserContextEnhancement();
 
     // Integration: Test complete workflow
-    console.log('
-🔄 Testing Complete Integration Workflow...');
+    console.log('🔄 Testing Complete Integration Workflow...');
     const dashboard = getUserDashboardData(userEmail);
 
     if (dashboard.error) {
@@ -371,15 +350,13 @@ function testCompletePhase3Integration() {
       roleSpecific: Object.keys(dashboard.urls.roleSpecific || {}).length
     });
 
-    console.log('
-🎯 RECOMMENDED NEXT STEPS:');
+    console.log('🎯 RECOMMENDED NEXT STEPS:');
     console.log('1. Change your role in the Staff sheet');
     console.log('2. Run: testRoleChangeDetection("' + userEmail + '", "Administrator")');
     console.log('3. Use generated URL to test immediate role switching');
     console.log('4. Verify proactive cache clearing works');
 
-    console.log('
-✅ COMPLETE PHASE 3 INTEGRATION TEST PASSED');
+    console.log('✅ COMPLETE PHASE 3 INTEGRATION TEST PASSED');
 
     return dashboard;
 
