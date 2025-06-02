@@ -421,8 +421,8 @@ function createUserContext(email = null) {
         // Add to role change history
         addRoleChangeToHistory(userEmail, roleChange.oldValue, roleChange.newValue);
 
-        // Clear relevant caches proactively
-        clearCachesForRoleChange(userEmail);
+        // Use the more comprehensive cache clearing function
+        clearCachesForSpecificUser(userEmail, roleChange.oldValue, roleChange.newValue, context.metadata.sessionId);
 
         debugLog('Role change processed', {
           userEmail: userEmail,
