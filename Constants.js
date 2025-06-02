@@ -157,7 +157,7 @@ const DOMAIN_TEMPLATE = {
 /**
  * Default years for observation cycle
  */
-const OBSERVATION_YEARS = [1, 2, 3, 'Probationary'];
+const OBSERVATION_YEARS = [1, 2, 3, 0];
 
 /**
  * Special access roles that can filter and view other users' data

@@ -179,9 +179,16 @@ function getStaffData() {
         name: sanitizeText(row[STAFF_COLUMNS.NAME]),
         email: sanitizeText(row[STAFF_COLUMNS.EMAIL]),
         role: sanitizeText(row[STAFF_COLUMNS.ROLE]),
-        year: parseInt(row[STAFF_COLUMNS.YEAR]) || 1,
+        // year is set below
         rowNumber: rowNumber
       };
+      
+      const yearValue = row[STAFF_COLUMNS.YEAR];
+      if (typeof yearValue === 'string' && yearValue.toLowerCase() === 'probationary') {
+        user.year = 0;
+      } else {
+        user.year = parseInt(yearValue) || 1; // Default to 1 if not 'Probationary' and parsing fails
+      }
       
       // Validate required fields
       if (!user.email || !isValidEmail(user.email)) {
