@@ -344,6 +344,11 @@ function createUserContext(email = null) {
         canAccessRubric: false,
         canSeeAllDomains: false
       },
+      viewMode: 'full', // 'full' or 'assigned'
+      assignedSubdomains: null,
+      hasSpecialAccess: false,
+      canFilter: false,
+      specialRoleType: null, // 'administrator', 'peer_evaluator', 'full_access'
       metadata: {
         createdAt: new Date().toISOString(),
         sessionId: generateUniqueId('context'),
@@ -393,6 +398,30 @@ function createUserContext(email = null) {
     context.isDefaultUser = false;
     context.permissions.canAccessRubric = true;
     context.permissions.canSeeAllDomains = false; // Authenticated users see role-specific content
+
+    // Determine special access levels
+    const specialRoles = ['Administrator', 'Peer Evaluator', 'Full Access'];
+    context.hasSpecialAccess = specialRoles.includes(context.role);
+    context.canFilter = context.hasSpecialAccess;
+
+    // Set special role type for different filtering behaviors
+    if (context.role === 'Administrator') {
+      context.specialRoleType = 'administrator';
+    } else if (context.role === 'Peer Evaluator') {
+      context.specialRoleType = 'peer_evaluator';
+    } else if (context.role === 'Full Access') {
+      context.specialRoleType = 'full_access';
+    }
+
+    // Get assigned subdomains for regular roles
+    if (!context.hasSpecialAccess && context.hasStaffRecord) {
+      context.assignedSubdomains = getAssignedSubdomainsForRoleYear(context.role, context.year);
+      debugLog('Assigned subdomains loaded', {
+        role: context.role,
+        year: context.year,
+        subdomains: context.assignedSubdomains
+      });
+    }
 
     // Detect state changes
     const changeDetection = detectUserStateChanges(userEmail, {
@@ -634,5 +663,110 @@ function clearCachedData(key) {
     cache.remove(key);
   } catch (error) {
     debugLog('Cache clear error', { key: key, error: error.message });
+  }
+}
+
+/**
+ * Check if a component should be visible based on assigned subdomains
+ * @param {string} componentId - Component ID like "1a:", "2b:", etc.
+ * @param {Object} assignedSubdomains - Object with domain1, domain2, domain3, domain4 arrays
+ * @return {boolean} True if component should be visible
+ */
+function isComponentAssigned(componentId, assignedSubdomains) {
+  if (!componentId || !assignedSubdomains) {
+    return false;
+  }
+
+  // Determine which domain this component belongs to
+  const domainNumber = componentId.charAt(0);
+  const domainKey = `domain${domainNumber}`;
+
+  if (!assignedSubdomains[domainKey]) {
+    return false;
+  }
+
+  return assignedSubdomains[domainKey].includes(componentId);
+}
+
+/**
+ * Get staff list for special role filtering
+ * @param {string} filterType - 'probationary', 'all', or specific role
+ * @return {Array} Filtered staff list
+ */
+function getFilteredStaffList(filterType = 'all') {
+  try {
+    const staffData = getStaffData();
+    if (!staffData || !staffData.users) {
+      return [];
+    }
+
+    let filteredUsers = staffData.users;
+
+    if (filterType === 'probationary') {
+      filteredUsers = staffData.users.filter(user => user.year === 'Probationary');
+    } else if (filterType !== 'all' && AVAILABLE_ROLES.includes(filterType)) {
+      filteredUsers = staffData.users.filter(user => user.role === filterType);
+    }
+
+    return filteredUsers.map(user => ({
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      year: user.year,
+      displayName: `${user.name} (${user.role}, Year ${user.year})`
+    }));
+
+  } catch (error) {
+    console.error('Error getting filtered staff list:', error);
+    return [];
+  }
+}
+
+/**
+ * Create user context for special role filtering (when viewing as another user)
+ * @param {string} targetEmail - Email of user to view as
+ * @param {string} requestingRole - Role of person making the request
+ * @return {Object} Modified user context
+ */
+function createFilteredUserContext(targetEmail, requestingRole) {
+  try {
+    // Verify requesting user has permission
+    const specialRoles = ['Administrator', 'Peer Evaluator', 'Full Access'];
+    if (!specialRoles.includes(requestingRole)) {
+      console.warn('Unauthorized filter request from role:', requestingRole);
+      return null;
+    }
+
+    // Get target user data
+    const targetUser = getUserByEmail(targetEmail);
+    if (!targetUser) {
+      console.warn('Target user not found for filtering:', targetEmail);
+      return null;
+    }
+
+    // Create context as if we're the target user
+    const context = createUserContext(targetEmail);
+
+    // Add metadata about the filtering
+    context.isFiltered = true;
+    context.originalRequestingRole = requestingRole;
+    context.filterInfo = {
+      viewingAs: targetUser.name,
+      viewingRole: targetUser.role,
+      viewingYear: targetUser.year,
+      requestedBy: requestingRole
+    };
+
+    debugLog('Filtered user context created', {
+      targetEmail: targetEmail,
+      targetRole: targetUser.role,
+      requestingRole: requestingRole
+    });
+
+    return context;
+
+  } catch (error) {
+    console.error('Error creating filtered user context:', error);
+    return null;
   }
 }
