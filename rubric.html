@@ -519,7 +519,7 @@
             cursor: pointer;
             font-size: 0.9rem;
             font-weight: 600;
-            transition: all 0.3s ease;
+            transition: background 0.3s ease, transform 0.3s ease, box-shadow 0.3s ease;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
 
@@ -706,7 +706,7 @@
             <!-- View Mode Toggle (only for users with assigned subdomains) -->
             <? if (data.userContext && data.userContext.assignedSubdomains && !data.userContext.hasSpecialAccess) { ?>
             <div class="view-toggle-container">
-                <button id="viewToggleBtn" class="view-toggle-btn" onclick="toggleViewMode()">
+                <button id="viewToggleBtn" class="view-toggle-btn" onclick="toggleViewMode()" aria-pressed="<?= data.userContext.viewMode === 'assigned' ? 'true' : 'false' ?>">
                     <span id="viewToggleText">
                         <? if (data.userContext.viewMode === 'assigned') { ?>
                             📋 View: My Assigned Areas
@@ -746,21 +746,21 @@
 
                     <? if (data.userContext.specialRoleType === 'administrator') { ?>
                     <!-- Administrator: Probationary filter only -->
-                    <select id="probationaryFilter" class="filter-select" onchange="applyAdminFilter()">
+                    <select id="probationaryFilter" class="filter-select" onchange="applyAdminFilter()" aria-label="Filter by Probationary Status">
                         <option value="all">All Staff</option>
                         <option value="probationary">Probationary Staff Only</option>
                     </select>
 
                     <? } else if (data.userContext.specialRoleType === 'peer_evaluator' || data.userContext.specialRoleType === 'full_access') { ?>
                     <!-- Peer Evaluator & Full Access: Full filtering options -->
-                    <select id="roleFilter" class="filter-select" onchange="updateAvailableStaff()">
+                    <select id="roleFilter" class="filter-select" onchange="updateAvailableStaff()" aria-label="Filter by Role">
                         <option value="">Select Role...</option>
                         <? for (var r = 0; r < data.userContext.availableRoles?.length || 0; r++) { ?>
                         <option value="<?= data.userContext.availableRoles[r] ?>"><?= data.userContext.availableRoles[r] ?></option>
                         <? } ?>
                     </select>
 
-                    <select id="yearFilter" class="filter-select" onchange="updateAvailableStaff()">
+                    <select id="yearFilter" class="filter-select" onchange="updateAvailableStaff()" aria-label="Filter by Year">
                         <option value="">Select Year...</option>
                         <option value="1">Year 1</option>
                         <option value="2">Year 2</option>
@@ -768,7 +768,7 @@
                         <option value="Probationary">Probationary</option>
                     </select>
 
-                    <select id="staffFilter" class="filter-select" onchange="applyStaffFilter()">
+                    <select id="staffFilter" class="filter-select" onchange="applyStaffFilter()" aria-label="Filter by Staff Member">
                         <option value="">Select Staff Member...</option>
                         <!-- Options populated by JavaScript -->
                     </select>
