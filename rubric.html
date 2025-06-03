@@ -615,16 +615,21 @@
             color: #92400e;
         }
 
-        /* Component Assignment Indicators */
-        .component-assigned {
-            border-left: 4px solid #10b981 !important;
-            background: #f0fdf4 !important;
+        .filter-status-detail {
+            margin-left: 15px;
+            font-size: 0.8rem;
         }
 
-        .component-not-assigned {
+        /* Component Assignment Indicators */
+        .component-section.component-assigned {
+            border-left: 4px solid #10b981;
+            background: #f0fdf4;
+        }
+
+        .component-section.component-not-assigned {
             opacity: 0.6;
-            background: #f8fafc !important;
-            border-left: 4px solid #e5e7eb !important;
+            background: #f8fafc;
+            border-left: 4px solid #e5e7eb;
         }
 
         .assignment-indicator {
@@ -719,19 +724,19 @@
         <div class="filter-status active">
             <strong>👁️ Viewing as:</strong> <?= data.userContext.filterInfo.viewingAs ?>
             (<?= data.userContext.filterInfo.viewingRole ?>, Year <?= data.userContext.filterInfo.viewingYear ?>)
-            <span style="margin-left: 15px; font-size: 0.8rem;">
+            <span class="filter-status-detail">
                 Requested by: <?= data.userContext.filterInfo.requestedBy ?>
             </span>
         </div>
         <? } else if (data.userContext && data.userContext.hasSpecialAccess) { ?>
         <div class="filter-status">
             <strong>🔧 Special Access Mode:</strong> <?= data.userContext.specialRoleType.replace('_', ' ').toUpperCase() ?>
-            <span style="margin-left: 15px; font-size: 0.8rem;">
+            <span class="filter-status-detail">
                 Use filters above to view other staff members' assigned areas
             </span>
         </div>
         <? } ?>
-        
+
         <div class="navigation">
             <!-- Special Role Filters -->
             <? if (data.userContext && data.userContext.hasSpecialAccess) { ?>
@@ -807,6 +812,8 @@
                     var component = data.domains[domainIdx].components[i];
                     var componentId = '';
                     if (component.title) {
+                        // Component titles are expected to start with an ID (e.g., "1a:", "2b:")
+                        // which is used for matching against assigned subdomains.
                         var match = component.title.match(/^([1-4][a-f]):/);
                         componentId = match ? match[1] + ':' : '';
                     }
@@ -841,7 +848,7 @@
                         <div class="performance-levels-content">
                             <div class="row-label">
                                 <?= component.title ?>
-                                <? if (isAssigned && data.userContext && data.userContext.viewMode === 'assigned') { ?>
+                                <? if (isAssigned && data.userContext.viewMode === 'assigned') { ?>
                                 <span class="assigned-badge">📋 Assigned</span>
                                 <? } ?>
                             </div>
