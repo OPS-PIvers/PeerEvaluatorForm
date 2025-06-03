@@ -432,48 +432,66 @@
         }
 
         function requestStaffList(role, year) {
-            // In a real implementation, this would make an AJAX call
-            // For now, we'll redirect with parameters to refresh the page
-            var url = new URL(window.location);
-            url.searchParams.set('getStaffList', 'true');
-            url.searchParams.set('filterRole', role);
-            url.searchParams.set('filterYear', year);
-            url.searchParams.set('t', Date.now());
+            var staffFilter = document.getElementById('staffFilter');
+            if (!staffFilter) {
+                 console.error('Staff filter dropdown element not found in requestStaffList.');
+                 return;
+            }
 
-            // Use a hidden iframe to make the request without refreshing
-            var iframe = document.createElement('iframe');
-            iframe.style.display = 'none';
-            iframe.src = url.toString();
-            document.body.appendChild(iframe);
+            // Indicate loading
+            staffFilter.innerHTML = '<option value="">Loading staff...</option>';
+            staffFilter.disabled = true;
 
-            // Remove iframe after a delay
-            setTimeout(function() {
-                document.body.removeChild(iframe);
-                populateStaffDropdown(role, year);
-            }, 2000);
+            console.log('Requesting staff list for role:', role, 'year:', year);
+
+            google.script.run
+                .withSuccessHandler(function(staffListData) {
+                    populateStaffDropdown(staffListData); // Pass only staffListData
+                    if (staffFilter) staffFilter.disabled = false;
+                })
+                .withFailureHandler(function(error) {
+                    console.error('Error fetching staff list:', error);
+                    if (staffFilter) {
+                        staffFilter.innerHTML = '<option value="">Error loading staff</option>';
+                        staffFilter.disabled = false;
+                    }
+                })
+                .getStaffListForDropdown(role, year);
         }
 
-        function populateStaffDropdown(role, year) {
+        function populateStaffDropdown(staffListData) {
             var staffFilter = document.getElementById('staffFilter');
-            if (!staffFilter) return;
+            if (!staffFilter) {
+                console.error('Staff filter dropdown element not found in populateStaffDropdown.');
+                return;
+            }
 
-            // This is a simplified version - in reality, you'd get data from the server
-            staffFilter.innerHTML = '<option value="">Select Staff Member...</option>';
+            staffFilter.innerHTML = '<option value="">Select Staff Member...</option>'; // Clear and add default
 
-            // Add sample options (this would come from server in real implementation)
-            var sampleStaff = [
-                { email: 'john.doe@orono.k12.mn.us', name: 'Doe, John' },
-                { email: 'jane.smith@orono.k12.mn.us', name: 'Smith, Jane' }
-            ];
-
-            sampleStaff.forEach(function(staff) {
-                var option = document.createElement('option');
-                option.value = staff.email;
-                option.textContent = staff.name + ' (' + role + ', Year ' + year + ')';
-                staffFilter.appendChild(option);
-            });
-
-            console.log('Staff dropdown populated for', role, 'Year', year);
+            if (staffListData && Array.isArray(staffListData)) {
+                if (staffListData.length === 0) {
+                    var noStaffOption = new Option('No staff found for this selection', '');
+                    noStaffOption.disabled = true;
+                    staffFilter.appendChild(noStaffOption);
+                } else {
+                    staffListData.forEach(function(staff) {
+                        if (staff && staff.name && staff.email) {
+                            var option = document.createElement('option');
+                            option.value = staff.email;
+                            option.textContent = staff.name;
+                            staffFilter.appendChild(option);
+                        } else {
+                            console.warn('Invalid staff item found in list:', staff);
+                        }
+                    });
+                }
+                console.log('Staff dropdown populated with', staffListData.length, 'staff members.');
+            } else {
+                console.error('Failed to populate staff dropdown due to invalid or missing staffListData:', staffListData);
+                var errorOption = new Option('Error loading staff data', '');
+                errorOption.disabled = true;
+                staffFilter.appendChild(errorOption);
+            }
         }
 
         function applyStaffFilter() {
@@ -886,6 +904,29 @@
                 margin-bottom: 5px;
             }
         }
+
+        .component-hidden {
+            display: none !important;
+        }
+
+        /* Hover effect for assigned components */
+        .component-section[data-assigned="true"]:hover {
+            border-left-color: var(--color-green-dark);
+            background-color: var(--color-green-light-bg);
+        }
+
+        /* Hover effect for not-assigned components */
+        .component-section[data-assigned="false"]:hover,
+        .component-section:not([data-assigned]):hover { /* Handles components not explicitly marked false initially */
+            border-left-color: var(--color-gray-border-light);
+            background-color: var(--color-gray-bg-light);
+        }
+
+        .assignment-counter-styles {
+            font-size: 0.9rem;
+            opacity: 0.8;
+            margin-left: 10px;
+        }
     </style>
 </head>
 <body>
@@ -1204,10 +1245,10 @@
                 var isAssigned = component.getAttribute('data-assigned') === 'true';
 
                 if (!isAssigned) {
-                    component.style.display = 'none';
+                    component.classList.add('component-hidden');
                     hiddenCount++;
                 } else {
-                    component.style.display = 'block';
+                    component.classList.remove('component-hidden');
                     // Add assigned highlighting
                     component.classList.add('component-assigned');
                 }
@@ -1216,7 +1257,7 @@
             // Hide assignment indicators in assigned mode
             var indicators = document.querySelectorAll('.assignment-indicator');
             indicators.forEach(function(indicator) {
-                indicator.style.display = 'none';
+                indicator.style.display = 'none'; // This might still be direct style manipulation, or could be a class too.
             });
 
             console.log('Hidden', hiddenCount, 'unassigned components');
@@ -1227,7 +1268,7 @@
             var components = document.querySelectorAll('.component-section');
 
             components.forEach(function(component) {
-                component.style.display = 'block';
+                component.classList.remove('component-hidden');
 
                 // Update styling based on assignment
                 var isAssigned = component.getAttribute('data-assigned') === 'true';
@@ -1253,7 +1294,7 @@
             var domains = document.querySelectorAll('.domain-section');
 
             domains.forEach(function(domain) {
-                var visibleComponents = domain.querySelectorAll('.component-section:not([style*="display: none"])');
+                var visibleComponents = domain.querySelectorAll('.component-section:not(.component-hidden)');
                 var domainHeader = domain.querySelector('.domain-header');
                 var navButton = document.querySelector('[data-domain="' + domain.id.split('-')[1] + '"]');
 
@@ -1274,28 +1315,6 @@
                 console.log('View mode preference saved:', currentViewMode);
             } catch (e) {
                 console.log('Could not save view mode preference:', e);
-            }
-        }
-
-        function restoreViewModePreference() {
-            try {
-                var storageKey = 'viewMode_' + (window.pageLoadInfo?.cacheVersion || 'default');
-                var savedMode = sessionStorage.getItem(storageKey);
-
-                if (savedMode && savedMode !== currentViewMode) {
-                    currentViewMode = savedMode;
-
-                    if (savedMode === 'assigned') {
-                        hideUnassignedComponents();
-                    } else {
-                        showAllComponents();
-                    }
-
-                    updateViewToggleButton();
-                    console.log('Restored view mode preference:', savedMode);
-                }
-            } catch (e) {
-                console.log('Could not restore view mode preference:', e);
             }
         }
 
@@ -1323,23 +1342,6 @@
 
         function addAssignmentTooltip(element, message) {
             element.title = message;
-
-            // Add hover effect for visual feedback
-            element.addEventListener('mouseenter', function() {
-                if (this.getAttribute('data-assigned') === 'true') {
-                    this.style.borderLeftColor = '#059669';
-                    this.style.backgroundColor = '#ecfdf5';
-                } else {
-                    this.style.borderLeftColor = '#d1d5db';
-                    this.style.backgroundColor = '#f9fafb';
-                }
-            });
-
-            element.addEventListener('mouseleave', function() {
-                // Reset to default styling
-                this.style.borderLeftColor = '';
-                this.style.backgroundColor = '';
-            });
         }
 
         function createAssignmentSummary() {
@@ -1371,9 +1373,9 @@
                 var header = domain.querySelector('.domain-header');
                 if (header && assignedCount > 0) {
                     var counter = document.createElement('span');
-                    counter.className = 'assignment-counter';
+                    counter.className = 'assignment-counter'; // Keep this for potential general selections
+                    counter.classList.add('assignment-counter-styles'); // Add new class for specific styling
                     counter.innerHTML = ' (' + assignedCount + '/' + totalComponents + ' assigned)';
-                    counter.style.cssText = 'font-size: 0.9rem; opacity: 0.8; margin-left: 10px;';
                     header.appendChild(counter);
                 }
             });
@@ -1470,12 +1472,37 @@
             // Restore look-fors state
             restoreLookForsState();
 
+            // Determine and apply currentViewMode based on URL param, then sessionStorage, then server/default
+            var urlParams = new URLSearchParams(window.location.search);
+            var viewFromURL = urlParams.get('view');
+
+            if (viewFromURL === 'assigned' || viewFromURL === 'full') {
+                currentViewMode = viewFromURL;
+                saveViewModePreference(); // Save the URL-derived mode to sessionStorage
+                console.log('View mode set from URL parameter:', currentViewMode);
+            } else {
+                // No valid view param in URL, try to load from sessionStorage
+                try {
+                    var storageKey = 'viewMode_' + (window.pageLoadInfo?.cacheVersion || 'default');
+                    var savedMode = sessionStorage.getItem(storageKey);
+                    if (savedMode === 'assigned' || savedMode === 'full') {
+                        currentViewMode = savedMode;
+                        console.log('View mode restored from sessionStorage:', currentViewMode);
+                    } else {
+                        // currentViewMode remains as initialized from server (<?= data.userContext?.viewMode || "full" ?>)
+                        // or defaults to 'full' if server value is not set/reliable.
+                        // It's already initialized with this value, so no explicit 'else' needed to set it again.
+                        console.log('View mode initialized (no URL param or session storage, using server/default):', currentViewMode);
+                    }
+                } catch (e) {
+                    console.warn('Could not access sessionStorage for view mode preference:', e);
+                    // currentViewMode remains as initialized from server or defaults to 'full'
+                }
+            }
+
             // Initialize view mode functionality
             if (userAssignedSubdomains) {
-                // Restore view mode preference
-                restoreViewModePreference();
-
-                // Add visual enhancements for assignments
+                // Add visual enhancements for assignments (these are always useful)
                 highlightAssignedComponents();
                 addAssignmentCounters();
 

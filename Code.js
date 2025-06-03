@@ -722,6 +722,70 @@ function checkAllUsersForRoleChanges() {
 }
 
 /**
+ * Retrieves a list of staff members filtered by role and year, formatted for a dropdown.
+ * This function is intended to be called from client-side JavaScript via google.script.run.
+ *
+ * @param {string} role The role to filter by (e.g., "Teacher", "Counselor").
+ * @param {string} year The year to filter by (e.g., "1", "2", "Probationary").
+ * @return {Array<{name: string, email: string}>} An array of staff objects, or an empty array if none found or on error.
+ */
+function getStaffListForDropdown(role, year) {
+  try {
+    debugLog(`getStaffListForDropdown called with role: ${role}, year: ${year}`);
+
+    // Ensure SheetService.getStaffData is available or use a global alias if necessary
+    const staffData = typeof getStaffData === 'function' ? getStaffData() : SheetService.getStaffData();
+
+    if (!staffData || !staffData.users || staffData.users.length === 0) {
+      debugLog('No staff data available in getStaffListForDropdown.');
+      return [];
+    }
+
+    let filteredStaff = staffData.users;
+
+    // Filter by role (case-insensitive)
+    if (role) {
+      const lowerCaseRole = role.toLowerCase();
+      filteredStaff = filteredStaff.filter(user => user.role && user.role.toLowerCase() === lowerCaseRole);
+    }
+
+    // Filter by year
+    if (year) {
+      const lowerCaseYear = year.toString().toLowerCase();
+      if (lowerCaseYear === 'probationary') {
+        filteredStaff = filteredStaff.filter(user => user.year && user.year.toString().toLowerCase() === 'probationary');
+      } else {
+        const numericYear = parseInt(year);
+        if (!isNaN(numericYear)) {
+          // Ensure user.year is treated as a number if it's not 'Probationary'
+          filteredStaff = filteredStaff.filter(user => {
+            const userNumericYear = parseInt(user.year);
+            return !isNaN(userNumericYear) && userNumericYear === numericYear;
+          });
+        } else {
+          // If year is not 'Probationary' and not a valid number, it's an invalid filter for numeric years
+          debugLog(`Invalid numeric year provided: ${year}`);
+          // Depending on desired behavior, could return empty or ignore year filter
+        }
+      }
+    }
+
+    const result = filteredStaff.map(user => ({
+      name: user.name,
+      email: user.email
+    }));
+
+    debugLog(`Found ${result.length} staff members for role '${role}' and year '${year}'.`);
+    return result;
+
+  } catch (error) {
+    console.error('Error in getStaffListForDropdown:', error.toString(), error.stack);
+    debugLog(`Error in getStaffListForDropdown: ${error.toString()} Stack: ${error.stack ? error.stack : 'N/A'}`);
+    return []; // Return empty array on error
+  }
+}
+
+/**
  * Proactive cache warming for role changes
  */
 function warmCacheForRoleChange(userEmail, newRole) {
