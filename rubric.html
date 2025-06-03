@@ -427,17 +427,18 @@
             }
         }
 
-        function formatClientErrorMessage(error, defaultMessage = 'Server error. Please try again.') {
+        const DEFAULT_ERROR_MESSAGE = 'Server error. Please try again.';
+        function formatClientErrorMessage(error, defaultMessage = DEFAULT_ERROR_MESSAGE) {
             let errorDetail = '';
             if (error) {
                 if (error.message && typeof error.message === 'string' && error.message.trim()) {
-                    errorDetail = ': ' + error.message.substring(0, 75);
+                    errorDetail = `: ${error.message.substring(0, 75)}`;
                 } else if (typeof error === 'string' && error.trim()) {
-                    errorDetail = ': ' + error.substring(0, 75);
+                    errorDetail = `: ${error.substring(0, 75)}`;
                 }
             }
             if (!errorDetail) {
-                errorDetail = ': ' + defaultMessage;
+                errorDetail = `: ${defaultMessage}`;
             }
             return errorDetail;
         }
@@ -1394,7 +1395,7 @@
                     const counter = document.createElement('span');
                     counter.className = 'assignment-counter'; // Keep this for potential general selections
                     counter.classList.add('assignment-counter-styles'); // Add new class for specific styling
-                    counter.innerHTML = ' (' + assignedCount + '/' + totalComponents + ' assigned)';
+                    counter.textContent = ' (' + assignedCount + '/' + totalComponents + ' assigned)';
                     // counter.style.cssText = 'font-size: 0.9rem; opacity: 0.8; margin-left: 10px;'; // This line is removed
                     header.appendChild(counter);
                 }
