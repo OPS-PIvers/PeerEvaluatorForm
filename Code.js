@@ -246,6 +246,42 @@ function doGet(e) {
 }
 
 /**
+ * Helper function to determine if a user's year matches a target filter year.
+ * @param {string|number} userYear The year from the user's record (e.g., 1, 2, "Probationary").
+ * @param {string} targetYear The year from the filter (e.g., "1", "Probationary").
+ * @return {boolean} True if the years match according to the defined logic.
+ * @private
+ */
+function _isUserYearMatching(userYear, targetYear) {
+  const standardizedUserYear = userYear ? userYear.toString().toLowerCase() : null;
+  const standardizedTargetYear = targetYear ? targetYear.toString().toLowerCase() : null;
+
+  if (!standardizedUserYear || !standardizedTargetYear) {
+    // If either is null/empty after standardization, they don't match unless both are.
+    // However, typically a filter targetYear wouldn't be null if filtering is active.
+    // And a userYear being null might mean it's not set and shouldn't match specific year filters.
+    return standardizedUserYear === standardizedTargetYear;
+  }
+
+  if (standardizedTargetYear === 'probationary') {
+    return standardizedUserYear === 'probationary';
+  } else {
+    const numericTargetYear = parseInt(standardizedTargetYear);
+    // If targetYear is not 'probationary' and not a parsable number, it's an invalid filter for numeric matching.
+    if (isNaN(numericTargetYear)) {
+      console.warn('_isUserYearMatching: Invalid non-numeric, non-probationary targetYear', { targetYear: targetYear });
+      return false;
+    }
+    // If userYear is 'probationary', it cannot match a numeric targetYear.
+    if (standardizedUserYear === 'probationary') {
+      return false;
+    }
+    const numericUserYear = parseInt(standardizedUserYear);
+    return !isNaN(numericUserYear) && numericUserYear === numericTargetYear;
+  }
+}
+
+/**
  * Enhanced onEdit trigger function that handles both role changes and rubric content changes
  */
 function onEditTrigger(e) {
@@ -718,6 +754,54 @@ function checkAllUsersForRoleChanges() {
   } catch (error) {
     console.error('Error checking users for role changes:', error);
     return { error: error.message };
+  }
+}
+
+/**
+ * Retrieves a list of staff members filtered by role and year, formatted for a dropdown.
+ * This function is intended to be called from client-side JavaScript via google.script.run.
+ *
+ * @param {string} role The role to filter by (e.g., "Teacher", "Counselor").
+ * @param {string} year The year to filter by (e.g., "1", "2", "Probationary").
+ * @return {Array<{name: string, email: string}>} An array of staff objects, or an empty array if none found or on error.
+ */
+function getStaffListForDropdown(role, year) {
+  try {
+    debugLog(`getStaffListForDropdown called with role: ${role}, year: ${year}`);
+
+    // Assuming SheetService.getStaffData() is the canonical way to retrieve staff data.
+    const staffData = SheetService.getStaffData();
+
+    if (!staffData || !staffData.users || staffData.users.length === 0) {
+      debugLog('No staff data available in getStaffListForDropdown.');
+      return [];
+    }
+
+    let filteredStaff = staffData.users;
+
+    // Filter by role (case-insensitive)
+    if (role) {
+      const lowerCaseRole = role.toLowerCase();
+      filteredStaff = filteredStaff.filter(user => user.role && user.role.toLowerCase() === lowerCaseRole);
+    }
+
+    // Filter by year
+    if (year) {
+      filteredStaff = filteredStaff.filter(user => _isUserYearMatching(user.year, year));
+    }
+
+    const result = filteredStaff.map(user => ({
+      name: user.name,
+      email: user.email
+    }));
+
+    debugLog(`Found ${result.length} staff members for role '${role}' and year '${year}'.`);
+    return result;
+
+  } catch (error) {
+    console.error('Error in getStaffListForDropdown:', error.toString(), error.stack);
+    debugLog(`Error in getStaffListForDropdown: ${error.toString()} Stack: ${error.stack ? error.stack : 'N/A'}`);
+    return []; // Return empty array on error
   }
 }
 
