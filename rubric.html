@@ -73,6 +73,7 @@
     --color-gray-bg-dark: #4b5563;
     --color-gray-component-not-assigned-border: #e5e7eb;
     --color-gray-assignment-indicator-not-assigned-bg: #e5e7eb;
+    --color-text-deemphasized: #718096;
 }
         * {
             margin: 0;
@@ -662,9 +663,13 @@
         }
 
         .component-section.component-not-assigned {
-            opacity: 0.6;
             background: var(--color-gray-bg-light);
             border-left: 4px solid var(--color-gray-component-not-assigned-border);
+        }
+
+        .component-section.component-not-assigned .level-content,
+        .component-section.component-not-assigned .look-for-item label {
+            color: var(--color-text-deemphasized);
         }
 
         .assignment-indicator {
