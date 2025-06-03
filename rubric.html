@@ -384,6 +384,158 @@
             }
         }
 
+        // Special Role Filter Functions
+        var availableStaffList = [];
+
+        function applyAdminFilter() {
+            var filterSelect = document.getElementById('probationaryFilter');
+            if (!filterSelect) return;
+
+            var filterType = filterSelect.value;
+            console.log('Administrator filter applied:', filterType);
+
+            // Build new URL with filter parameter
+            var url = new URL(window.location);
+            url.searchParams.set('filterType', filterType);
+            url.searchParams.set('t', Date.now()); // Cache bust
+
+            window.location.href = url.toString();
+        }
+
+        function updateAvailableStaff() {
+            var roleFilter = document.getElementById('roleFilter');
+            var yearFilter = document.getElementById('yearFilter');
+            var staffFilter = document.getElementById('staffFilter');
+
+            if (!roleFilter || !yearFilter || !staffFilter) return;
+
+            var selectedRole = roleFilter.value;
+            var selectedYear = yearFilter.value;
+
+            // Clear staff dropdown
+            staffFilter.innerHTML = '<option value="">Select Staff Member...</option>';
+
+            if (!selectedRole && !selectedYear) {
+                return;
+            }
+
+            // This would normally fetch from server, but for now we'll use a simple approach
+            console.log('Filters updated - Role:', selectedRole, 'Year:', selectedYear);
+
+            // Add a note that staff list will be populated when both role and year are selected
+            if (selectedRole && selectedYear) {
+                staffFilter.innerHTML = '<option value="">Loading staff...</option>';
+
+                // Trigger server request to get staff list
+                requestStaffList(selectedRole, selectedYear);
+            }
+        }
+
+        function requestStaffList(role, year) {
+            // In a real implementation, this would make an AJAX call
+            // For now, we'll redirect with parameters to refresh the page
+            var url = new URL(window.location);
+            url.searchParams.set('getStaffList', 'true');
+            url.searchParams.set('filterRole', role);
+            url.searchParams.set('filterYear', year);
+            url.searchParams.set('t', Date.now());
+
+            // Use a hidden iframe to make the request without refreshing
+            var iframe = document.createElement('iframe');
+            iframe.style.display = 'none';
+            iframe.src = url.toString();
+            document.body.appendChild(iframe);
+
+            // Remove iframe after a delay
+            setTimeout(function() {
+                document.body.removeChild(iframe);
+                populateStaffDropdown(role, year);
+            }, 2000);
+        }
+
+        function populateStaffDropdown(role, year) {
+            var staffFilter = document.getElementById('staffFilter');
+            if (!staffFilter) return;
+
+            // This is a simplified version - in reality, you'd get data from the server
+            staffFilter.innerHTML = '<option value="">Select Staff Member...</option>';
+
+            // Add sample options (this would come from server in real implementation)
+            var sampleStaff = [
+                { email: 'john.doe@orono.k12.mn.us', name: 'Doe, John' },
+                { email: 'jane.smith@orono.k12.mn.us', name: 'Smith, Jane' }
+            ];
+
+            sampleStaff.forEach(function(staff) {
+                var option = document.createElement('option');
+                option.value = staff.email;
+                option.textContent = staff.name + ' (' + role + ', Year ' + year + ')';
+                staffFilter.appendChild(option);
+            });
+
+            console.log('Staff dropdown populated for', role, 'Year', year);
+        }
+
+        function applyStaffFilter() {
+            var staffFilter = document.getElementById('staffFilter');
+            if (!staffFilter) return;
+
+            var selectedStaff = staffFilter.value;
+            if (!selectedStaff) return;
+
+            console.log('Staff filter applied:', selectedStaff);
+
+            // Redirect to view as selected staff member
+            var url = new URL(window.location);
+            url.searchParams.set('filterStaff', selectedStaff);
+            url.searchParams.set('view', 'assigned'); // Default to assigned view for filtered viewing
+            url.searchParams.set('t', Date.now());
+
+            window.location.href = url.toString();
+        }
+
+        function clearAllFilters() {
+            console.log('Clearing all filters');
+
+            // Build URL without filter parameters
+            var url = new URL(window.location);
+            url.searchParams.delete('filterType');
+            url.searchParams.delete('filterRole');
+            url.searchParams.delete('filterYear');
+            url.searchParams.delete('filterStaff');
+            url.searchParams.delete('view');
+            url.searchParams.set('t', Date.now());
+
+            window.location.href = url.toString();
+        }
+
+        function initializeFiltersFromURL() {
+            var urlParams = new URLSearchParams(window.location.search);
+
+            // Restore Administrator filter
+            var probationaryFilter = document.getElementById('probationaryFilter');
+            if (probationaryFilter && urlParams.get('filterType')) {
+                probationaryFilter.value = urlParams.get('filterType');
+            }
+
+            // Restore role/year filters
+            var roleFilter = document.getElementById('roleFilter');
+            var yearFilter = document.getElementById('yearFilter');
+
+            if (roleFilter && urlParams.get('filterRole')) {
+                roleFilter.value = urlParams.get('filterRole');
+            }
+
+            if (yearFilter && urlParams.get('filterYear')) {
+                yearFilter.value = urlParams.get('filterYear');
+            }
+
+            // Update staff list if both role and year are set
+            if (roleFilter && yearFilter && roleFilter.value && yearFilter.value) {
+                updateAvailableStaff();
+            }
+        }
+
         /* Debug info styles (only visible in debug mode) */
         <? if (data.userContext && data.userContext.debugMode) { ?>
         .debug-info {
@@ -995,6 +1147,238 @@
             requestId: '<?= data.userContext ? data.userContext.requestId : "unknown" ?>'
         };
 
+        // View Mode Toggle Functions
+        var currentViewMode = '<?= data.userContext?.viewMode || "full" ?>';
+        var userAssignedSubdomains = <?= data.userContext?.assignedSubdomains ? JSON.stringify(data.userContext.assignedSubdomains) : 'null' ?>;
+
+        function toggleViewMode() {
+            if (currentViewMode === 'full') {
+                switchToAssignedView();
+            } else {
+                switchToFullView();
+            }
+        }
+
+        function switchToAssignedView() {
+            currentViewMode = 'assigned';
+            updateViewToggleButton();
+            hideUnassignedComponents();
+            saveViewModePreference();
+
+            console.log('Switched to assigned view mode');
+        }
+
+        function switchToFullView() {
+            currentViewMode = 'full';
+            updateViewToggleButton();
+            showAllComponents();
+            saveViewModePreference();
+
+            console.log('Switched to full view mode');
+        }
+
+        function updateViewToggleButton() {
+            var button = document.getElementById('viewToggleBtn');
+            var text = document.getElementById('viewToggleText');
+
+            if (!button || !text) return;
+
+            if (currentViewMode === 'assigned') {
+                text.innerHTML = '📚 View: Full Rubric';
+                button.classList.add('assigned-mode');
+                button.title = 'Click to view the complete rubric';
+            } else {
+                text.innerHTML = '📋 View: My Assigned Areas';
+                button.classList.remove('assigned-mode');
+                button.title = 'Click to view only your assigned areas';
+            }
+        }
+
+        function hideUnassignedComponents() {
+            if (!userAssignedSubdomains) return;
+
+            var components = document.querySelectorAll('.component-section');
+            var hiddenCount = 0;
+
+            components.forEach(function(component) {
+                var isAssigned = component.getAttribute('data-assigned') === 'true';
+
+                if (!isAssigned) {
+                    component.style.display = 'none';
+                    hiddenCount++;
+                } else {
+                    component.style.display = 'block';
+                    // Add assigned highlighting
+                    component.classList.add('component-assigned');
+                }
+            });
+
+            // Hide assignment indicators in assigned mode
+            var indicators = document.querySelectorAll('.assignment-indicator');
+            indicators.forEach(function(indicator) {
+                indicator.style.display = 'none';
+            });
+
+            console.log('Hidden', hiddenCount, 'unassigned components');
+            updateDomainVisibility();
+        }
+
+        function showAllComponents() {
+            var components = document.querySelectorAll('.component-section');
+
+            components.forEach(function(component) {
+                component.style.display = 'block';
+
+                // Update styling based on assignment
+                var isAssigned = component.getAttribute('data-assigned') === 'true';
+                if (isAssigned) {
+                    component.classList.add('component-assigned');
+                } else {
+                    component.classList.add('component-not-assigned');
+                }
+            });
+
+            // Show assignment indicators in full mode
+            var indicators = document.querySelectorAll('.assignment-indicator');
+            indicators.forEach(function(indicator) {
+                indicator.style.display = 'flex';
+            });
+
+            console.log('Showing all components');
+            updateDomainVisibility();
+        }
+
+        function updateDomainVisibility() {
+            // Hide domains that have no visible components
+            var domains = document.querySelectorAll('.domain-section');
+
+            domains.forEach(function(domain) {
+                var visibleComponents = domain.querySelectorAll('.component-section:not([style*="display: none"])');
+                var domainHeader = domain.querySelector('.domain-header');
+                var navButton = document.querySelector('[data-domain="' + domain.id.split('-')[1] + '"]');
+
+                if (visibleComponents.length === 0) {
+                    domain.style.display = 'none';
+                    if (navButton) navButton.style.display = 'none';
+                } else {
+                    domain.style.display = 'block';
+                    if (navButton) navButton.style.display = 'block';
+                }
+            });
+        }
+
+        function saveViewModePreference() {
+            try {
+                var storageKey = 'viewMode_' + (window.pageLoadInfo?.cacheVersion || 'default');
+                sessionStorage.setItem(storageKey, currentViewMode);
+                console.log('View mode preference saved:', currentViewMode);
+            } catch (e) {
+                console.log('Could not save view mode preference:', e);
+            }
+        }
+
+        function restoreViewModePreference() {
+            try {
+                var storageKey = 'viewMode_' + (window.pageLoadInfo?.cacheVersion || 'default');
+                var savedMode = sessionStorage.getItem(storageKey);
+
+                if (savedMode && savedMode !== currentViewMode) {
+                    currentViewMode = savedMode;
+
+                    if (savedMode === 'assigned') {
+                        hideUnassignedComponents();
+                    } else {
+                        showAllComponents();
+                    }
+
+                    updateViewToggleButton();
+                    console.log('Restored view mode preference:', savedMode);
+                }
+            } catch (e) {
+                console.log('Could not restore view mode preference:', e);
+            }
+        }
+
+        // Component Assignment Visual Functions
+        function highlightAssignedComponents() {
+            if (!userAssignedSubdomains) return;
+
+            var components = document.querySelectorAll('.component-section');
+
+            components.forEach(function(component) {
+                var componentId = component.getAttribute('data-component-id');
+                var isAssigned = component.getAttribute('data-assigned') === 'true';
+
+                if (isAssigned) {
+                    component.classList.add('component-assigned');
+                    addAssignmentTooltip(component, 'This component is assigned to you for evaluation');
+                } else {
+                    component.classList.add('component-not-assigned');
+                    addAssignmentTooltip(component, 'This component is not assigned to you this year');
+                }
+            });
+
+            console.log('Component assignment highlighting applied');
+        }
+
+        function addAssignmentTooltip(element, message) {
+            element.title = message;
+
+            // Add hover effect for visual feedback
+            element.addEventListener('mouseenter', function() {
+                if (this.getAttribute('data-assigned') === 'true') {
+                    this.style.borderLeftColor = '#059669';
+                    this.style.backgroundColor = '#ecfdf5';
+                } else {
+                    this.style.borderLeftColor = '#d1d5db';
+                    this.style.backgroundColor = '#f9fafb';
+                }
+            });
+
+            element.addEventListener('mouseleave', function() {
+                // Reset to default styling
+                this.style.borderLeftColor = '';
+                this.style.backgroundColor = '';
+            });
+        }
+
+        function createAssignmentSummary() {
+            if (!userAssignedSubdomains) return;
+
+            var summary = {
+                domain1: userAssignedSubdomains.domain1?.length || 0,
+                domain2: userAssignedSubdomains.domain2?.length || 0,
+                domain3: userAssignedSubdomains.domain3?.length || 0,
+                domain4: userAssignedSubdomains.domain4?.length || 0
+            };
+
+            summary.total = summary.domain1 + summary.domain2 + summary.domain3 + summary.domain4;
+
+            console.log('Assignment summary:', summary);
+            return summary;
+        }
+
+        function addAssignmentCounters() {
+            if (!userAssignedSubdomains) return;
+
+            var domains = document.querySelectorAll('.domain-section');
+
+            domains.forEach(function(domain, index) {
+                var domainKey = 'domain' + (index + 1);
+                var assignedCount = userAssignedSubdomains[domainKey]?.length || 0;
+                var totalComponents = domain.querySelectorAll('.component-section').length;
+
+                var header = domain.querySelector('.domain-header');
+                if (header && assignedCount > 0) {
+                    var counter = document.createElement('span');
+                    counter.className = 'assignment-counter';
+                    counter.innerHTML = ' (' + assignedCount + '/' + totalComponents + ' assigned)';
+                    counter.style.cssText = 'font-size: 0.9rem; opacity: 0.8; margin-left: 10px;';
+                    header.appendChild(counter);
+                }
+            });
+        }
+
         // Enhanced toggle function with state persistence
         function toggleLookFors(componentId) {
             var parts = componentId.split('-');
@@ -1086,6 +1470,31 @@
             // Restore look-fors state
             restoreLookForsState();
 
+            // Initialize view mode functionality
+            if (userAssignedSubdomains) {
+                // Restore view mode preference
+                restoreViewModePreference();
+
+                // Add visual enhancements for assignments
+                highlightAssignedComponents();
+                addAssignmentCounters();
+
+                // Initialize with current view mode
+                if (currentViewMode === 'assigned') {
+                    hideUnassignedComponents();
+                } else {
+                    showAllComponents();
+                }
+
+                updateViewToggleButton();
+
+                console.log('View mode initialized:', currentViewMode);
+                console.log('Assignment summary:', createAssignmentSummary());
+            }
+
+            // Initialize special role filters
+            initializeFiltersFromURL();
+
             // Handle navigation button clicks
             var navigation = document.querySelector('.navigation');
             if (navigation) {
@@ -1111,6 +1520,14 @@
                 if (e.key === 'F5') {
                     e.preventDefault();
                     forcePageRefresh();
+                }
+
+                // V key to toggle view mode
+                if (e.key === 'v' || e.key === 'V') {
+                    if (userAssignedSubdomains && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                        e.preventDefault();
+                        toggleViewMode();
+                    }
                 }
             });
         });
@@ -1266,6 +1683,57 @@
             }
         });
 
+        // URL Generation Helper Functions
+        function generateFilteredURL(params) {
+            var url = new URL(window.location);
+
+            // Clear existing filter parameters
+            url.searchParams.delete('filterType');
+            url.searchParams.delete('filterRole');
+            url.searchParams.delete('filterYear');
+            url.searchParams.delete('filterStaff');
+            url.searchParams.delete('view');
+
+            // Add new parameters
+            if (params.filterType) url.searchParams.set('filterType', params.filterType);
+            if (params.filterRole) url.searchParams.set('filterRole', params.filterRole);
+            if (params.filterYear) url.searchParams.set('filterYear', params.filterYear);
+            if (params.filterStaff) url.searchParams.set('filterStaff', params.filterStaff);
+            if (params.view) url.searchParams.set('view', params.view);
+
+            // Always add cache busting
+            url.searchParams.set('t', Date.now());
+
+            return url.toString();
+        }
+
+        function switchToAssignedViewWithURL() {
+            var url = generateFilteredURL({ view: 'assigned' });
+            window.location.href = url;
+        }
+
+        function switchToFullViewWithURL() {
+            var url = generateFilteredURL({ view: 'full' });
+            window.location.href = url;
+        }
+
+        // Debug functions for troubleshooting
+        window.debugViewMode = {
+            getCurrentMode: function() { return currentViewMode; },
+            getAssignedSubdomains: function() { return userAssignedSubdomains; },
+            toggleMode: toggleViewMode,
+            showAll: showAllComponents,
+            hideUnassigned: hideUnassignedComponents,
+            getAssignmentSummary: createAssignmentSummary
+        };
+
+        console.log('Enhanced Danielson Framework app loaded with view mode support');
+        <? if (data.userContext && data.userContext.debugMode) { ?>
+        console.log('🐛 DEBUG MODE ACTIVE');
+        console.log('View mode debug commands available: window.debugViewMode');
+        console.log('Current view mode:', currentViewMode);
+        console.log('User assigned subdomains:', userAssignedSubdomains);
+        <? } ?>
     </script>
 </body>
 </html>
