@@ -273,7 +273,7 @@ function getSettingsData() {
     // Process data with 4-row pattern for each role
     for (let i = 0; i < values.length; i++) {
       const row = values[i];
-      const roleName = sanitizeText(row[0]); // Column A
+      const roleName = sanitizeText(row[SETTINGS_COLUMNS.ROLE]); // Column A
       
       // Skip empty rows
       if (!roleName) {
@@ -293,20 +293,20 @@ function getSettingsData() {
       }
 
       // Get the 4 rows of domain data for this role
-      const domain1Year1 = sanitizeText(values[i][1]);     // B column, row 1 of role group
-      const domain2Year1 = sanitizeText(values[i + 1][1]); // B column, row 2 of role group
-      const domain3Year1 = sanitizeText(values[i + 2][1]); // B column, row 3 of role group
-      const domain4Year1 = sanitizeText(values[i + 3][1]); // B column, row 4 of role group
+      const domain1Year1 = sanitizeText(values[i][SETTINGS_COLUMNS.YEAR_1]);     // B column, row 1 of role group
+      const domain2Year1 = sanitizeText(values[i + 1][SETTINGS_COLUMNS.YEAR_1]); // B column, row 2 of role group
+      const domain3Year1 = sanitizeText(values[i + 2][SETTINGS_COLUMNS.YEAR_1]); // B column, row 3 of role group
+      const domain4Year1 = sanitizeText(values[i + 3][SETTINGS_COLUMNS.YEAR_1]); // B column, row 4 of role group
 
-      const domain1Year2 = sanitizeText(values[i][2]);     // C column, row 1 of role group
-      const domain2Year2 = sanitizeText(values[i + 1][2]); // C column, row 2 of role group
-      const domain3Year2 = sanitizeText(values[i + 2][2]); // C column, row 3 of role group
-      const domain4Year2 = sanitizeText(values[i + 3][2]); // C column, row 4 of role group
+      const domain1Year2 = sanitizeText(values[i][SETTINGS_COLUMNS.YEAR_2]);     // C column, row 1 of role group
+      const domain2Year2 = sanitizeText(values[i + 1][SETTINGS_COLUMNS.YEAR_2]); // C column, row 2 of role group
+      const domain3Year2 = sanitizeText(values[i + 2][SETTINGS_COLUMNS.YEAR_2]); // C column, row 3 of role group
+      const domain4Year2 = sanitizeText(values[i + 3][SETTINGS_COLUMNS.YEAR_2]); // C column, row 4 of role group
 
-      const domain1Year3 = sanitizeText(values[i][3]);     // D column, row 1 of role group
-      const domain2Year3 = sanitizeText(values[i + 1][3]); // D column, row 2 of role group
-      const domain3Year3 = sanitizeText(values[i + 2][3]); // D column, row 3 of role group
-      const domain4Year3 = sanitizeText(values[i + 3][3]); // D column, row 4 of role group
+      const domain1Year3 = sanitizeText(values[i][SETTINGS_COLUMNS.YEAR_3]);     // D column, row 1 of role group
+      const domain2Year3 = sanitizeText(values[i + 1][SETTINGS_COLUMNS.YEAR_3]); // D column, row 2 of role group
+      const domain3Year3 = sanitizeText(values[i + 2][SETTINGS_COLUMNS.YEAR_3]); // D column, row 3 of role group
+      const domain4Year3 = sanitizeText(values[i + 3][SETTINGS_COLUMNS.YEAR_3]); // D column, row 4 of role group
 
       roleYearMappings[roleName] = {
         year1: [domain1Year1, domain2Year1, domain3Year1, domain4Year1],
