@@ -394,11 +394,8 @@
             console.log('Administrator filter applied:', filterType);
 
             // Build new URL with filter parameter
-            const url = new URL(window.location);
-            url.searchParams.set('filterType', filterType);
-            url.searchParams.set('t', Date.now()); // Cache bust
-
-            window.location.href = url.toString();
+            const newUrl = generateFilteredURL({ filterType: filterType });
+            window.location.href = newUrl;
         }
 
         function updateAvailableStaff() {
@@ -528,27 +525,16 @@
             console.log('Staff filter applied:', selectedStaff);
 
             // Redirect to view as selected staff member
-            const url = new URL(window.location);
-            url.searchParams.set('filterStaff', selectedStaff);
-            url.searchParams.set('view', 'assigned'); // Default to assigned view for filtered viewing
-            url.searchParams.set('t', Date.now());
-
-            window.location.href = url.toString();
+            const newUrl = generateFilteredURL({ filterStaff: selectedStaff, view: 'assigned' });
+            window.location.href = newUrl;
         }
 
         function clearAllFilters() {
             console.log('Clearing all filters');
 
             // Build URL without filter parameters
-            const url = new URL(window.location);
-            url.searchParams.delete('filterType');
-            url.searchParams.delete('filterRole');
-            url.searchParams.delete('filterYear');
-            url.searchParams.delete('filterStaff');
-            url.searchParams.delete('view');
-            url.searchParams.set('t', Date.now());
-
-            window.location.href = url.toString();
+            const newUrl = generateFilteredURL({});
+            window.location.href = newUrl;
         }
 
         function initializeFiltersFromURL() {
