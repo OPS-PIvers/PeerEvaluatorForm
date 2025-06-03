@@ -350,7 +350,7 @@ function getFilteredStaffList(filterType = 'all', role = null, year = null) {
 
       case 'by_year':
         if (year) {
-          filteredUsers = filteredUsers.filter(user => user.year.toString() === year.toString());
+          filteredUsers = filteredUsers.filter(user => _isUserYearMatching(user.year, year));
         }
         break;
 
@@ -359,7 +359,7 @@ function getFilteredStaffList(filterType = 'all', role = null, year = null) {
           filteredUsers = filteredUsers.filter(user => user.role === role);
         }
         if (year) {
-          filteredUsers = filteredUsers.filter(user => user.year.toString() === year.toString());
+          filteredUsers = filteredUsers.filter(user => _isUserYearMatching(user.year, year));
         }
         break;
 
@@ -1005,7 +1005,7 @@ function getStaffListForDropdown(role, year) {
     debugLog(`getStaffListForDropdown called with role: ${role}, year: ${year}`);
 
     // Ensure SheetService.getStaffData is available or use a global alias if necessary
-    const staffData = typeof getStaffData === 'function' ? getStaffData() : SheetService.getStaffData();
+    const staffData = getStaffData();
 
     if (!staffData || !staffData.users || staffData.users.length === 0) {
       debugLog('No staff data available in getStaffListForDropdown.');
