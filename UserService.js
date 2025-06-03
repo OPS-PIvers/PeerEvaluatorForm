@@ -400,17 +400,17 @@ function createUserContext(email = null) {
     context.permissions.canSeeAllDomains = false; // Authenticated users see role-specific content
 
     // Determine special access levels
-    const specialRoles = ['Administrator', 'Peer Evaluator', 'Full Access'];
+    const specialRoles = SPECIAL_ACCESS_ROLE_NAMES;
     context.hasSpecialAccess = specialRoles.includes(context.role);
     context.canFilter = context.hasSpecialAccess;
 
     // Set special role type for different filtering behaviors
     if (context.role === 'Administrator') {
-      context.specialRoleType = 'administrator';
+      context.specialRoleType = SPECIAL_ROLE_TYPES.ADMINISTRATOR;
     } else if (context.role === 'Peer Evaluator') {
-      context.specialRoleType = 'peer_evaluator';
+      context.specialRoleType = SPECIAL_ROLE_TYPES.PEER_EVALUATOR;
     } else if (context.role === 'Full Access') {
-      context.specialRoleType = 'full_access';
+      context.specialRoleType = SPECIAL_ROLE_TYPES.FULL_ACCESS;
     }
 
     // Get assigned subdomains for regular roles
@@ -702,9 +702,9 @@ function getFilteredStaffList(filterType = 'all') {
 
     let filteredUsers = staffData.users;
 
-    if (filterType === 'probationary') {
+    if (filterType === FILTER_TYPES.PROBATIONARY_ONLY) {
       filteredUsers = staffData.users.filter(user => user.year === 'Probationary');
-    } else if (filterType !== 'all' && AVAILABLE_ROLES.includes(filterType)) {
+    } else if (filterType !== FILTER_TYPES.ALL_STAFF && AVAILABLE_ROLES.includes(filterType)) {
       filteredUsers = staffData.users.filter(user => user.role === filterType);
     }
 
@@ -731,7 +731,7 @@ function getFilteredStaffList(filterType = 'all') {
 function createFilteredUserContext(targetEmail, requestingRole) {
   try {
     // Verify requesting user has permission
-    const specialRoles = ['Administrator', 'Peer Evaluator', 'Full Access'];
+    const specialRoles = SPECIAL_ACCESS_ROLE_NAMES;
     if (!specialRoles.includes(requestingRole)) {
       console.warn('Unauthorized filter request from role:', requestingRole);
       return null;

@@ -273,6 +273,11 @@ const SPECIAL_ROLE_TYPES = {
 };
 
 /**
+ * Names of roles that have special access permissions
+ */
+const SPECIAL_ACCESS_ROLE_NAMES = ['Administrator', 'Peer Evaluator', 'Full Access'];
+
+/**
  * Filter types for special roles
  */
 const FILTER_TYPES = {
