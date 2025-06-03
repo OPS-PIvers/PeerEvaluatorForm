@@ -456,7 +456,15 @@
                     console.error('Error fetching staff list:', error);
                     if (staffFilter) {
                         staffFilter.innerHTML = ''; // Clear existing options first
-                        var errorOpt = new Option('Error loading staff', '');
+                        var errorMessage = 'Error loading staff';
+                        if (error && typeof error.message === 'string' && error.message.trim() !== '') {
+                            errorMessage += ': ' + error.message.substring(0, 75); // Append first 75 chars of error message
+                        } else if (error && typeof error === 'string' && error.trim() !== '') { // Handle if error itself is a non-empty string
+                             errorMessage += ': ' + error.substring(0, 75);
+                        } else {
+                            errorMessage += ': Server error. Please try again.'; // Generic fallback
+                        }
+                        var errorOpt = new Option(errorMessage, '');
                         errorOpt.disabled = true;
                         staffFilter.appendChild(errorOpt);
                         staffFilter.disabled = false;
