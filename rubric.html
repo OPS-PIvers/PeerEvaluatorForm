@@ -457,13 +457,18 @@
                     if (staffFilter) {
                         staffFilter.innerHTML = ''; // Clear existing options first
                         var errorMessage = 'Error loading staff';
-                        if (error && typeof error.message === 'string' && error.message.trim() !== '') {
-                            errorMessage += ': ' + error.message.substring(0, 75); // Append first 75 chars of error message
-                        } else if (error && typeof error === 'string' && error.trim() !== '') { // Handle if error itself is a non-empty string
-                             errorMessage += ': ' + error.substring(0, 75);
-                        } else {
-                            errorMessage += ': Server error. Please try again.'; // Generic fallback
+                        let errorDetail = '';
+                        if (error) {
+                            if (error.message && typeof error.message === 'string' && error.message.trim()) {
+                                errorDetail = ': ' + error.message.substring(0, 75);
+                            } else if (typeof error === 'string' && error.trim()) {
+                                errorDetail = ': ' + error.substring(0, 75);
+                            }
                         }
+                        if (!errorDetail) {
+                            errorDetail = ': Server error. Please try again.';
+                        }
+                        errorMessage += errorDetail;
                         var errorOpt = new Option(errorMessage, '');
                         errorOpt.disabled = true;
                         staffFilter.appendChild(errorOpt);
@@ -923,11 +928,11 @@
         }
 
         .component-hidden {
-            display: none !important;
+            display: none;
         }
 
         .indicator-hidden {
-            display: none !important;
+            display: none;
         }
 
         /* Hover effect for assigned components */
@@ -1210,8 +1215,8 @@
         };
 
         // View Mode Toggle Functions
-        var currentViewMode = '<?= data.userContext?.viewMode || "full" ?>';
-        var userAssignedSubdomains = <?= data.userContext?.assignedSubdomains ? JSON.stringify(data.userContext.assignedSubdomains) : 'null' ?>;
+        let currentViewMode = '<?= data.userContext?.viewMode || "full" ?>';
+        const userAssignedSubdomains = <?= data.userContext?.assignedSubdomains ? JSON.stringify(data.userContext.assignedSubdomains) : 'null' ?>;
 
         function toggleViewMode() {
             if (currentViewMode === 'full') {
