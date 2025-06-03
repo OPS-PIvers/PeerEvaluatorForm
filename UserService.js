@@ -405,12 +405,15 @@ function createUserContext(email = null) {
     context.canFilter = context.hasSpecialAccess;
 
     // Set special role type for different filtering behaviors
-    if (context.role === 'Administrator') {
-      context.specialRoleType = SPECIAL_ROLE_TYPES.ADMINISTRATOR;
-    } else if (context.role === 'Peer Evaluator') {
-      context.specialRoleType = SPECIAL_ROLE_TYPES.PEER_EVALUATOR;
-    } else if (context.role === 'Full Access') {
-      context.specialRoleType = SPECIAL_ROLE_TYPES.FULL_ACCESS;
+    const roleToSpecialTypeMap = {
+      'Administrator': SPECIAL_ROLE_TYPES.ADMINISTRATOR,
+      'Peer Evaluator': SPECIAL_ROLE_TYPES.PEER_EVALUATOR,
+      'Full Access': SPECIAL_ROLE_TYPES.FULL_ACCESS
+      // Add other roles and their types here if they grant specialRoleType
+    };
+
+    if (roleToSpecialTypeMap[context.role]) {
+      context.specialRoleType = roleToSpecialTypeMap[context.role];
     }
 
     // Get assigned subdomains for regular roles
