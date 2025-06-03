@@ -385,17 +385,16 @@
         }
 
         // Special Role Filter Functions
-        var availableStaffList = [];
 
         function applyAdminFilter() {
-            var filterSelect = document.getElementById('probationaryFilter');
+            const filterSelect = document.getElementById('probationaryFilter');
             if (!filterSelect) return;
 
-            var filterType = filterSelect.value;
+            const filterType = filterSelect.value;
             console.log('Administrator filter applied:', filterType);
 
             // Build new URL with filter parameter
-            var url = new URL(window.location);
+            const url = new URL(window.location);
             url.searchParams.set('filterType', filterType);
             url.searchParams.set('t', Date.now()); // Cache bust
 
@@ -403,14 +402,14 @@
         }
 
         function updateAvailableStaff() {
-            var roleFilter = document.getElementById('roleFilter');
-            var yearFilter = document.getElementById('yearFilter');
-            var staffFilter = document.getElementById('staffFilter');
+            const roleFilter = document.getElementById('roleFilter');
+            const yearFilter = document.getElementById('yearFilter');
+            const staffFilter = document.getElementById('staffFilter');
 
             if (!roleFilter || !yearFilter || !staffFilter) return;
 
-            var selectedRole = roleFilter.value;
-            var selectedYear = yearFilter.value;
+            const selectedRole = roleFilter.value;
+            const selectedYear = yearFilter.value;
 
             // Clear staff dropdown
             staffFilter.innerHTML = '<option value="">Select Staff Member...</option>';
@@ -431,8 +430,23 @@
             }
         }
 
+        function formatClientErrorMessage(error, defaultMessage = 'Server error. Please try again.') {
+            let errorDetail = '';
+            if (error) {
+                if (error.message && typeof error.message === 'string' && error.message.trim()) {
+                    errorDetail = ': ' + error.message.substring(0, 75);
+                } else if (typeof error === 'string' && error.trim()) {
+                    errorDetail = ': ' + error.substring(0, 75);
+                }
+            }
+            if (!errorDetail) {
+                errorDetail = ': ' + defaultMessage;
+            }
+            return errorDetail;
+        }
+
         function requestStaffList(role, year) {
-            var staffFilter = document.getElementById('staffFilter');
+            const staffFilter = document.getElementById('staffFilter');
             if (!staffFilter) {
                  console.error('Staff filter dropdown element not found in requestStaffList.');
                  return;
@@ -440,7 +454,7 @@
 
             // Indicate loading
             staffFilter.innerHTML = ''; // Clear existing options first
-            var loadingOpt = new Option('Loading staff...', '');
+            const loadingOpt = new Option('Loading staff...', '');
             loadingOpt.disabled = true;
             staffFilter.appendChild(loadingOpt);
             staffFilter.disabled = true;
@@ -456,20 +470,8 @@
                     console.error('Error fetching staff list:', error);
                     if (staffFilter) {
                         staffFilter.innerHTML = ''; // Clear existing options first
-                        var errorMessage = 'Error loading staff';
-                        let errorDetail = '';
-                        if (error) {
-                            if (error.message && typeof error.message === 'string' && error.message.trim()) {
-                                errorDetail = ': ' + error.message.substring(0, 75);
-                            } else if (typeof error === 'string' && error.trim()) {
-                                errorDetail = ': ' + error.substring(0, 75);
-                            }
-                        }
-                        if (!errorDetail) {
-                            errorDetail = ': Server error. Please try again.';
-                        }
-                        errorMessage += errorDetail;
-                        var errorOpt = new Option(errorMessage, '');
+                        const errorMessage = 'Error loading staff' + formatClientErrorMessage(error);
+                        const errorOpt = new Option(errorMessage, '');
                         errorOpt.disabled = true;
                         staffFilter.appendChild(errorOpt);
                         staffFilter.disabled = false;
@@ -479,7 +481,7 @@
         }
 
         function populateStaffDropdown(staffListData) {
-            var staffFilter = document.getElementById('staffFilter');
+            const staffFilter = document.getElementById('staffFilter');
             if (!staffFilter) {
                 console.error('Staff filter dropdown element not found in populateStaffDropdown.');
                 return;
@@ -490,7 +492,7 @@
 
             if (staffListData && Array.isArray(staffListData)) {
                 if (staffListData.length === 0) {
-                    var noStaffOption = new Option('No staff found for this selection', '');
+                    const noStaffOption = new Option('No staff found for this selection', '');
                     noStaffOption.disabled = true;
                     staffFilter.appendChild(noStaffOption);
                 } else {
@@ -498,7 +500,7 @@
                         if (typeof staff === 'object' && staff !== null &&
                             typeof staff.name === 'string' && staff.name.trim() !== '' &&
                             typeof staff.email === 'string' && staff.email.trim() !== '') {
-                            var option = document.createElement('option');
+                            const option = document.createElement('option');
                             option.value = staff.email;
                             option.textContent = staff.name;
                             staffFilter.appendChild(option);
@@ -510,23 +512,23 @@
                 console.log('Staff dropdown populated with', staffListData.length, 'staff members.');
             } else {
                 console.error('Failed to populate staff dropdown due to invalid or missing staffListData:', staffListData);
-                var errorOption = new Option('Error loading staff data', '');
+                const errorOption = new Option('Error loading staff data', '');
                 errorOption.disabled = true;
                 staffFilter.appendChild(errorOption);
             }
         }
 
         function applyStaffFilter() {
-            var staffFilter = document.getElementById('staffFilter');
+            const staffFilter = document.getElementById('staffFilter');
             if (!staffFilter) return;
 
-            var selectedStaff = staffFilter.value;
+            const selectedStaff = staffFilter.value;
             if (!selectedStaff) return;
 
             console.log('Staff filter applied:', selectedStaff);
 
             // Redirect to view as selected staff member
-            var url = new URL(window.location);
+            const url = new URL(window.location);
             url.searchParams.set('filterStaff', selectedStaff);
             url.searchParams.set('view', 'assigned'); // Default to assigned view for filtered viewing
             url.searchParams.set('t', Date.now());
@@ -538,7 +540,7 @@
             console.log('Clearing all filters');
 
             // Build URL without filter parameters
-            var url = new URL(window.location);
+            const url = new URL(window.location);
             url.searchParams.delete('filterType');
             url.searchParams.delete('filterRole');
             url.searchParams.delete('filterYear');
@@ -550,17 +552,17 @@
         }
 
         function initializeFiltersFromURL() {
-            var urlParams = new URLSearchParams(window.location.search);
+            const urlParams = new URLSearchParams(window.location.search);
 
             // Restore Administrator filter
-            var probationaryFilter = document.getElementById('probationaryFilter');
+            const probationaryFilter = document.getElementById('probationaryFilter');
             if (probationaryFilter && urlParams.get('filterType')) {
                 probationaryFilter.value = urlParams.get('filterType');
             }
 
             // Restore role/year filters
-            var roleFilter = document.getElementById('roleFilter');
-            var yearFilter = document.getElementById('yearFilter');
+            const roleFilter = document.getElementById('roleFilter');
+            const yearFilter = document.getElementById('yearFilter');
 
             if (roleFilter && urlParams.get('filterRole')) {
                 roleFilter.value = urlParams.get('filterRole');
@@ -1214,6 +1216,9 @@
             requestId: '<?= data.userContext ? data.userContext.requestId : "unknown" ?>'
         };
 
+        // --- Client-Side View Mode Toggling ---
+        // The following functions manage the view mode (full/assigned) dynamically on the client-side
+        // without a page reload. The preference is saved in sessionStorage for the current session.
         // View Mode Toggle Functions
         let currentViewMode = '<?= data.userContext?.viewMode || "full" ?>';
         const userAssignedSubdomains = <?= data.userContext?.assignedSubdomains ? JSON.stringify(data.userContext.assignedSubdomains) : 'null' ?>;
@@ -1245,8 +1250,8 @@
         }
 
         function updateViewToggleButton() {
-            var button = document.getElementById('viewToggleBtn');
-            var text = document.getElementById('viewToggleText');
+            const button = document.getElementById('viewToggleBtn');
+            const text = document.getElementById('viewToggleText');
 
             if (!button || !text) return;
 
@@ -1264,65 +1269,51 @@
         function hideUnassignedComponents() {
             if (!userAssignedSubdomains) return;
 
-            var components = document.querySelectorAll('.component-section');
-            var hiddenCount = 0;
-
+            const components = document.querySelectorAll('.component-section');
             components.forEach(function(component) {
-                var isAssigned = component.getAttribute('data-assigned') === 'true';
-
-                if (!isAssigned) {
-                    component.classList.add('component-hidden');
-                    hiddenCount++;
-                } else {
-                    component.classList.remove('component-hidden');
-                    // Add assigned highlighting
-                    component.classList.add('component-assigned');
-                }
+                const isAssigned = component.getAttribute('data-assigned') === 'true';
+                updateComponentVisualState(component, isAssigned, 'assigned');
             });
 
             // Hide assignment indicators in assigned mode
-            var indicators = document.querySelectorAll('.assignment-indicator');
+            // This part remains as it's specific to the view mode switch, not general component state
+            const indicators = document.querySelectorAll('.assignment-indicator');
             indicators.forEach(function(indicator) {
                 indicator.classList.add('indicator-hidden');
             });
 
-            console.log('Hidden', hiddenCount, 'unassigned components');
+            // The hiddenCount variable is no longer available with the new function,
+            // so the specific count cannot be logged here. We can log a generic message.
+            console.log('Hid unassigned components using new visual state function.');
             updateDomainVisibility();
         }
 
         function showAllComponents() {
-            var components = document.querySelectorAll('.component-section');
-
+            const components = document.querySelectorAll('.component-section');
             components.forEach(function(component) {
-                component.classList.remove('component-hidden');
-
-                // Update styling based on assignment
-                var isAssigned = component.getAttribute('data-assigned') === 'true';
-                if (isAssigned) {
-                    component.classList.add('component-assigned');
-                } else {
-                    component.classList.add('component-not-assigned');
-                }
+                const isAssigned = component.getAttribute('data-assigned') === 'true';
+                updateComponentVisualState(component, isAssigned, 'full');
             });
 
             // Show assignment indicators in full mode
-            var indicators = document.querySelectorAll('.assignment-indicator');
+            // This part remains as it's specific to the view mode switch, not general component state
+            const indicators = document.querySelectorAll('.assignment-indicator');
             indicators.forEach(function(indicator) {
                 indicator.classList.remove('indicator-hidden');
             });
 
-            console.log('Showing all components');
+            console.log('Showing all components using new visual state function.');
             updateDomainVisibility();
         }
 
         function updateDomainVisibility() {
             // Hide domains that have no visible components
-            var domains = document.querySelectorAll('.domain-section');
+            const domains = document.querySelectorAll('.domain-section');
 
             domains.forEach(function(domain) {
-                var visibleComponents = domain.querySelectorAll('.component-section:not(.component-hidden)');
-                var domainHeader = domain.querySelector('.domain-header');
-                var navButton = document.querySelector('[data-domain="' + domain.id.split('-')[1] + '"]');
+                const visibleComponents = domain.querySelectorAll('.component-section:not(.component-hidden)');
+                const domainHeader = domain.querySelector('.domain-header');
+                const navButton = document.querySelector('[data-domain="' + domain.id.split('-')[1] + '"]');
 
                 if (visibleComponents.length === 0) {
                     domain.style.display = 'none';
@@ -1336,7 +1327,7 @@
 
         function saveViewModePreference() {
             try {
-                var storageKey = 'viewMode_' + (window.pageLoadInfo?.cacheVersion || 'default');
+                const storageKey = 'viewMode_' + (window.pageLoadInfo?.cacheVersion || 'default');
                 sessionStorage.setItem(storageKey, currentViewMode);
                 console.log('View mode preference saved:', currentViewMode);
             } catch (e) {
@@ -1345,25 +1336,41 @@
         }
 
         // Component Assignment Visual Functions
+        function updateComponentVisualState(componentElement, isAssigned, currentViewMode) {
+            // Clear existing classes
+            componentElement.classList.remove('component-assigned', 'component-not-assigned', 'component-hidden');
+
+            // Visibility Logic
+            if (currentViewMode === 'assigned') {
+                if (!isAssigned) {
+                    componentElement.classList.add('component-hidden');
+                }
+            }
+            // In 'full' mode, component-hidden is not added here, effectively showing the element.
+
+            // Styling Logic (only if not hidden by the above)
+            if (!componentElement.classList.contains('component-hidden')) {
+                if (isAssigned) {
+                    componentElement.classList.add('component-assigned');
+                    addAssignmentTooltip(componentElement, 'This component is assigned to you for evaluation');
+                } else {
+                    componentElement.classList.add('component-not-assigned');
+                    addAssignmentTooltip(componentElement, 'This component is not assigned to you this year');
+                }
+            }
+        }
+
         function highlightAssignedComponents() {
             if (!userAssignedSubdomains) return;
 
-            var components = document.querySelectorAll('.component-section');
-
+            const components = document.querySelectorAll('.component-section');
             components.forEach(function(component) {
-                var componentId = component.getAttribute('data-component-id');
-                var isAssigned = component.getAttribute('data-assigned') === 'true';
-
-                if (isAssigned) {
-                    component.classList.add('component-assigned');
-                    addAssignmentTooltip(component, 'This component is assigned to you for evaluation');
-                } else {
-                    component.classList.add('component-not-assigned');
-                    addAssignmentTooltip(component, 'This component is not assigned to you this year');
-                }
+                const isAssigned = component.getAttribute('data-assigned') === 'true';
+                // Assuming 'full' mode for highlighting purposes, as this function is about visual styling, not hiding.
+                updateComponentVisualState(component, isAssigned, 'full');
             });
 
-            console.log('Component assignment highlighting applied');
+            console.log('Component assignment highlighting applied using new visual state function.');
         }
 
         function addAssignmentTooltip(element, message) {
@@ -1373,7 +1380,7 @@
         function createAssignmentSummary() {
             if (!userAssignedSubdomains) return;
 
-            var summary = {
+            const summary = {
                 domain1: userAssignedSubdomains.domain1?.length || 0,
                 domain2: userAssignedSubdomains.domain2?.length || 0,
                 domain3: userAssignedSubdomains.domain3?.length || 0,
@@ -1389,16 +1396,16 @@
         function addAssignmentCounters() {
             if (!userAssignedSubdomains) return;
 
-            var domains = document.querySelectorAll('.domain-section');
+            const domains = document.querySelectorAll('.domain-section');
 
             domains.forEach(function(domain, index) {
-                var domainKey = 'domain' + (index + 1);
-                var assignedCount = userAssignedSubdomains[domainKey]?.length || 0;
-                var totalComponents = domain.querySelectorAll('.component-section').length;
+                const domainKey = 'domain' + (index + 1);
+                const assignedCount = userAssignedSubdomains[domainKey]?.length || 0;
+                const totalComponents = domain.querySelectorAll('.component-section').length;
 
-                var header = domain.querySelector('.domain-header');
+                const header = domain.querySelector('.domain-header');
                 if (header && assignedCount > 0) {
-                    var counter = document.createElement('span');
+                    const counter = document.createElement('span');
                     counter.className = 'assignment-counter'; // Keep this for potential general selections
                     counter.classList.add('assignment-counter-styles'); // Add new class for specific styling
                     counter.innerHTML = ' (' + assignedCount + '/' + totalComponents + ' assigned)';
@@ -1410,12 +1417,12 @@
 
         // Enhanced toggle function with state persistence
         function toggleLookFors(componentId) {
-            var parts = componentId.split('-');
-            var domainIdx = parts[1];
-            var componentIdx = parts[3];
+            const parts = componentId.split('-');
+            const domainIdx = parts[1];
+            const componentIdx = parts[3];
             
-            var content = document.getElementById('lookForsContent-' + domainIdx + '-' + componentIdx);
-            var chevron = document.getElementById('chevron-' + domainIdx + '-' + componentIdx);
+            const content = document.getElementById('lookForsContent-' + domainIdx + '-' + componentIdx);
+            const chevron = document.getElementById('chevron-' + domainIdx + '-' + componentIdx);
             
             if (content && chevron) {
                 content.classList.toggle('expanded');
@@ -1423,8 +1430,8 @@
 
                 // Store state in sessionStorage for this session
                 try {
-                    var storageKey = 'lookFors_' + componentId + '_' + window.pageLoadInfo.cacheVersion;
-                    var isExpanded = content.classList.contains('expanded');
+                    const storageKey = 'lookFors_' + componentId + '_' + window.pageLoadInfo.cacheVersion;
+                    const isExpanded = content.classList.contains('expanded');
                     sessionStorage.setItem(storageKey, isExpanded.toString());
                 } catch (e) {
                     console.log('SessionStorage not available:', e);
@@ -1435,13 +1442,13 @@
         // Restore look-fors state on page load
         function restoreLookForsState() {
             try {
-                var expandedSections = [];
-                for (var i = 0; i < sessionStorage.length; i++) {
-                    var key = sessionStorage.key(i);
+                let expandedSections = [];
+                for (let i = 0; i < sessionStorage.length; i++) {
+                    const key = sessionStorage.key(i);
                     if (key && key.startsWith('lookFors_') && key.endsWith('_' + window.pageLoadInfo.cacheVersion)) {
-                        var isExpanded = sessionStorage.getItem(key) === 'true';
+                        const isExpanded = sessionStorage.getItem(key) === 'true';
                         if (isExpanded) {
-                            var componentId = key.replace('lookFors_', '').replace('_' + window.pageLoadInfo.cacheVersion, '');
+                            const componentId = key.replace('lookFors_', '').replace('_' + window.pageLoadInfo.cacheVersion, '');
                             expandedSections.push(componentId);
                         }
                     }
@@ -1449,12 +1456,12 @@
 
                 // Restore expanded state
                 expandedSections.forEach(function(componentId) {
-                    var parts = componentId.split('-');
-                    var domainIdx = parts[1];
-                    var componentIdx = parts[3];
+                    const parts = componentId.split('-');
+                    const domainIdx = parts[1];
+                    const componentIdx = parts[3];
 
-                    var content = document.getElementById('lookForsContent-' + domainIdx + '-' + componentIdx);
-                    var chevron = document.getElementById('chevron-' + domainIdx + '-' + componentIdx);
+                    const content = document.getElementById('lookForsContent-' + domainIdx + '-' + componentIdx);
+                    const chevron = document.getElementById('chevron-' + domainIdx + '-' + componentIdx);
 
                     if (content && chevron) {
                         content.classList.add('expanded');
@@ -1469,7 +1476,7 @@
         }
         
         function scrollToDomain(domainIdx) {
-            var element = document.getElementById('domain-' + domainIdx);
+            const element = document.getElementById('domain-' + domainIdx);
             if (element) {
                 element.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
@@ -1483,7 +1490,7 @@
         function forcePageRefresh() {
             console.log('Forcing page refresh with cache busting');
 
-            var url = new URL(window.location);
+            const url = new URL(window.location);
             url.searchParams.set('refresh', 'true');
             url.searchParams.set('nocache', 'true');
             url.searchParams.set('t', Date.now());
@@ -1500,8 +1507,8 @@
             restoreLookForsState();
 
             // Determine and apply currentViewMode based on URL param, then sessionStorage, then server/default
-            var urlParams = new URLSearchParams(window.location.search);
-            var viewFromURL = urlParams.get('view');
+            const urlParams = new URLSearchParams(window.location.search);
+            const viewFromURL = urlParams.get('view');
 
             if (viewFromURL === 'assigned' || viewFromURL === 'full') {
                 currentViewMode = viewFromURL;
@@ -1510,8 +1517,8 @@
             } else {
                 // No valid view param in URL, try to load from sessionStorage
                 try {
-                    var storageKey = 'viewMode_' + (window.pageLoadInfo?.cacheVersion || 'default');
-                    var savedMode = sessionStorage.getItem(storageKey);
+                    const storageKey = 'viewMode_' + (window.pageLoadInfo?.cacheVersion || 'default');
+                    const savedMode = sessionStorage.getItem(storageKey);
                     if (savedMode === 'assigned' || savedMode === 'full') {
                         currentViewMode = savedMode;
                         console.log('View mode restored from sessionStorage:', currentViewMode);
@@ -1550,11 +1557,11 @@
             initializeFiltersFromURL();
 
             // Handle navigation button clicks
-            var navigation = document.querySelector('.navigation');
+            const navigation = document.querySelector('.navigation');
             if (navigation) {
                 navigation.addEventListener('click', function(e) {
                     if (e.target.classList.contains('nav-button')) {
-                        var domainIdx = e.target.getAttribute('data-domain');
+                        const domainIdx = e.target.getAttribute('data-domain');
                         if (domainIdx !== null) {
                             scrollToDomain(parseInt(domainIdx));
                         }
@@ -1588,7 +1595,7 @@
         
         // Show/hide back to top button
         window.addEventListener('scroll', function() {
-            var backToTop = document.getElementById('backToTop');
+            const backToTop = document.getElementById('backToTop');
             if (backToTop) {
                 if (window.scrollY > 300) {
                     backToTop.classList.add('visible');
@@ -1603,12 +1610,12 @@
         
         // Highlight active navigation button
         window.addEventListener('scroll', function() {
-            var navButtons = document.querySelectorAll('.nav-button');
-            var domainSections = document.querySelectorAll('.domain-section');
+            const navButtons = document.querySelectorAll('.nav-button');
+            const domainSections = document.querySelectorAll('.domain-section');
             
-            var currentDomain = -1;
-            for (var i = 0; i < domainSections.length; i++) {
-                var rect = domainSections[i].getBoundingClientRect();
+            let currentDomain = -1;
+            for (let i = 0; i < domainSections.length; i++) {
+                const rect = domainSections[i].getBoundingClientRect();
                 if (rect.top <= 100 && rect.bottom > 0) {
                     currentDomain = i;
                 }
@@ -1624,14 +1631,14 @@
         });
         
         // Enhanced auto-refresh with cache version checking
-        var autoRefreshInterval = <?= data.userContext && data.userContext.debugMode ? 300000 : 600000 ?>; // 5 min debug, 10 min normal
+        const autoRefreshInterval = <?= data.userContext && data.userContext.debugMode ? 300000 : 600000 ?>; // 5 min debug, 10 min normal
 
         setTimeout(function() {
             console.log('Auto-refresh triggered');
 
             // In debug mode, show notification
             <? if (data.userContext && data.userContext.debugMode) { ?>
-            var notice = document.createElement('div');
+            const notice = document.createElement('div');
             notice.style.cssText = 'position:fixed; top:50px; right:10px; background:#007bff; color:white; padding:10px; border-radius:6px; z-index:9998; font-size:0.9rem;';
             notice.textContent = '🔄 Auto-refreshing to get latest data...';
             document.body.appendChild(notice);
@@ -1649,8 +1656,8 @@
         window.addEventListener('load', function() {
             setTimeout(function() {
                 if (window.performance && window.performance.timing) {
-                    var timing = window.performance.timing;
-                    var loadTime = timing.loadEventEnd - timing.navigationStart;
+                    const timing = window.performance.timing;
+                    const loadTime = timing.loadEventEnd - timing.navigationStart;
                     console.log('Page load time:', loadTime + 'ms');
 
                     // Report slow loads
@@ -1682,10 +1689,10 @@
         <? } ?>
 
         // Floating Navigation Widget Functions
-        var floatingNavOpen = false;
+        let floatingNavOpen = false;
 
         function toggleFloatingNav() {
-            var menu = document.getElementById('floatingNavMenu');
+            const menu = document.getElementById('floatingNavMenu');
             if (menu) {
                 floatingNavOpen = !floatingNavOpen;
                 if (floatingNavOpen) {
@@ -1697,7 +1704,7 @@
         }
 
         function closeFloatingNav() {
-            var menu = document.getElementById('floatingNavMenu');
+            const menu = document.getElementById('floatingNavMenu');
             if (menu) {
                 menu.classList.remove('open');
                 floatingNavOpen = false;
@@ -1706,12 +1713,12 @@
 
         // Show/hide floating navigation based on scroll position
         function updateFloatingNav() {
-            var floatingNav = document.getElementById('floatingNav');
-            var navigation = document.querySelector('.navigation');
+            const floatingNav = document.getElementById('floatingNav');
+            const navigation = document.querySelector('.navigation');
             
             if (floatingNav && navigation) {
-                var navigationRect = navigation.getBoundingClientRect();
-                var isNavigationVisible = navigationRect.bottom > 0;
+                const navigationRect = navigation.getBoundingClientRect();
+                const isNavigationVisible = navigationRect.bottom > 0;
                 
                 if (isNavigationVisible) {
                     floatingNav.classList.remove('visible');
@@ -1724,7 +1731,7 @@
 
         // Close floating nav when clicking outside
         document.addEventListener('click', function(e) {
-            var floatingNav = document.getElementById('floatingNav');
+            const floatingNav = document.getElementById('floatingNav');
             if (floatingNav && !floatingNav.contains(e.target)) {
                 closeFloatingNav();
             }
@@ -1737,9 +1744,10 @@
             }
         });
 
+        // --- URL Generation Utilities ---
         // URL Generation Helper Functions
         function generateFilteredURL(params) {
-            var url = new URL(window.location);
+            const url = new URL(window.location);
 
             // Clear existing filter parameters
             url.searchParams.delete('filterType');
@@ -1761,13 +1769,20 @@
             return url.toString();
         }
 
+        // --- URL-Based View Mode Switching ---
+        // These functions change the view mode by generating a new URL with the 'view' parameter
+        // and then reloading the page. This is useful for creating bookmarkable/shareable links
+        // or for programmatically setting the view state when a page reload is acceptable or desired.
+        // Note: As of the last review, these specific two functions are not directly called by other
+        // parts of this script but serve as utilities if such URL-based view switching is needed.
+        // The `generateFilteredURL` function IS used by other filter applications (e.g., staff filter).
         function switchToAssignedViewWithURL() {
-            var url = generateFilteredURL({ view: 'assigned' });
+            const url = generateFilteredURL({ view: 'assigned' });
             window.location.href = url;
         }
 
         function switchToFullViewWithURL() {
-            var url = generateFilteredURL({ view: 'full' });
+            const url = generateFilteredURL({ view: 'full' });
             window.location.href = url;
         }
 
