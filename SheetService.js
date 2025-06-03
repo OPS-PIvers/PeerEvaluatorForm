@@ -235,7 +235,7 @@ function getStaffData() {
 }
 
 /**
- * Reads data from the Settings sheet
+ * Reads data from the Settings sheet with 4-row role pattern
  * @return {Object|null} Settings data with role-year mappings
  */
 function getSettingsData() {
@@ -270,32 +270,60 @@ function getSettingsData() {
     
     const roleYearMappings = {};
     
-    values.forEach((row, index) => {
-      const rowNumber = index + 2;
-      const role = sanitizeText(row[SETTINGS_COLUMNS.ROLE]);
+    // Process data with 4-row pattern for each role
+    for (let i = 0; i < values.length; i++) {
+      const row = values[i];
+      const roleName = sanitizeText(row[0]); // Column A
       
-      if (!role) {
-        return; // Skip empty rows
+      // Skip empty rows
+      if (!roleName) {
+        continue;
       }
       
-      if (!AVAILABLE_ROLES.includes(role)) {
-        console.warn(`Unknown role in Settings sheet row ${rowNumber}:`, role);
-        return;
+      // Check if this is a valid role
+      if (!AVAILABLE_ROLES.includes(roleName)) {
+        console.warn(`Unknown role in Settings sheet row ${i + 2}:`, roleName);
+        continue;
       }
       
-      roleYearMappings[role] = {
-        year1: parseMultilineCell(row[SETTINGS_COLUMNS.YEAR_1]),
-        year2: parseMultilineCell(row[SETTINGS_COLUMNS.YEAR_2]),
-        year3: parseMultilineCell(row[SETTINGS_COLUMNS.YEAR_3]),
-        rowNumber: rowNumber
+      // Make sure we have 4 rows of data for this role
+      if (i + 3 >= values.length) {
+        console.warn(`Not enough data rows for role ${roleName} starting at row ${i + 2}`);
+        continue;
+      }
+
+      // Get the 4 rows of domain data for this role
+      const domain1Year1 = sanitizeText(values[i][1]);     // B column, row 1 of role group
+      const domain2Year1 = sanitizeText(values[i + 1][1]); // B column, row 2 of role group
+      const domain3Year1 = sanitizeText(values[i + 2][1]); // B column, row 3 of role group
+      const domain4Year1 = sanitizeText(values[i + 3][1]); // B column, row 4 of role group
+
+      const domain1Year2 = sanitizeText(values[i][2]);     // C column, row 1 of role group
+      const domain2Year2 = sanitizeText(values[i + 1][2]); // C column, row 2 of role group
+      const domain3Year2 = sanitizeText(values[i + 2][2]); // C column, row 3 of role group
+      const domain4Year2 = sanitizeText(values[i + 3][2]); // C column, row 4 of role group
+
+      const domain1Year3 = sanitizeText(values[i][3]);     // D column, row 1 of role group
+      const domain2Year3 = sanitizeText(values[i + 1][3]); // D column, row 2 of role group
+      const domain3Year3 = sanitizeText(values[i + 2][3]); // D column, row 3 of role group
+      const domain4Year3 = sanitizeText(values[i + 3][3]); // D column, row 4 of role group
+
+      roleYearMappings[roleName] = {
+        year1: [domain1Year1, domain2Year1, domain3Year1, domain4Year1],
+        year2: [domain1Year2, domain2Year2, domain3Year2, domain4Year2],
+        year3: [domain1Year3, domain2Year3, domain3Year3, domain4Year3],
+        startRow: i + 2 // For debugging
       };
       
-      debugLog(`Settings loaded for role: ${role}`, {
-        year1Count: roleYearMappings[role].year1.length,
-        year2Count: roleYearMappings[role].year2.length,
-        year3Count: roleYearMappings[role].year3.length
+      debugLog(`Settings loaded for role: ${roleName}`, {
+        year1Domains: roleYearMappings[roleName].year1,
+        year2Domains: roleYearMappings[roleName].year2,
+        year3Domains: roleYearMappings[roleName].year3
       });
-    });
+
+      // Skip ahead to next role (past the 4 rows we just processed + 1 blank row)
+      i += 4; // This will be incremented by 1 more by the for loop, making it skip 5 total
+    }
     
     const settingsData = {
       roleYearMappings: roleYearMappings,
