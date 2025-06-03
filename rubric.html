@@ -439,7 +439,10 @@
             }
 
             // Indicate loading
-            staffFilter.innerHTML = '<option value="">Loading staff...</option>';
+            staffFilter.innerHTML = ''; // Clear existing options first
+            var loadingOpt = new Option('Loading staff...', '');
+            loadingOpt.disabled = true;
+            staffFilter.appendChild(loadingOpt);
             staffFilter.disabled = true;
 
             console.log('Requesting staff list for role:', role, 'year:', year);
@@ -452,7 +455,10 @@
                 .withFailureHandler(function(error) {
                     console.error('Error fetching staff list:', error);
                     if (staffFilter) {
-                        staffFilter.innerHTML = '<option value="">Error loading staff</option>';
+                        staffFilter.innerHTML = ''; // Clear existing options first
+                        var errorOpt = new Option('Error loading staff', '');
+                        errorOpt.disabled = true;
+                        staffFilter.appendChild(errorOpt);
                         staffFilter.disabled = false;
                     }
                 })
@@ -466,7 +472,8 @@
                 return;
             }
 
-            staffFilter.innerHTML = '<option value="">Select Staff Member...</option>'; // Clear and add default
+            staffFilter.innerHTML = ''; // Clear existing options first
+            staffFilter.appendChild(new Option('Select Staff Member...', ''));
 
             if (staffListData && Array.isArray(staffListData)) {
                 if (staffListData.length === 0) {
@@ -475,13 +482,15 @@
                     staffFilter.appendChild(noStaffOption);
                 } else {
                     staffListData.forEach(function(staff) {
-                        if (staff && staff.name && staff.email) {
+                        if (typeof staff === 'object' && staff !== null &&
+                            typeof staff.name === 'string' && staff.name.trim() !== '' &&
+                            typeof staff.email === 'string' && staff.email.trim() !== '') {
                             var option = document.createElement('option');
                             option.value = staff.email;
                             option.textContent = staff.name;
                             staffFilter.appendChild(option);
                         } else {
-                            console.warn('Invalid staff item found in list:', staff);
+                            console.warn('Invalid or incomplete staff item found in list. Skipping:', staff);
                         }
                     });
                 }
@@ -909,6 +918,10 @@
             display: none !important;
         }
 
+        .indicator-hidden {
+            display: none !important;
+        }
+
         /* Hover effect for assigned components */
         .component-section[data-assigned="true"]:hover {
             border-left-color: var(--color-green-dark);
@@ -1257,7 +1270,7 @@
             // Hide assignment indicators in assigned mode
             var indicators = document.querySelectorAll('.assignment-indicator');
             indicators.forEach(function(indicator) {
-                indicator.style.display = 'none'; // This might still be direct style manipulation, or could be a class too.
+                indicator.classList.add('indicator-hidden');
             });
 
             console.log('Hidden', hiddenCount, 'unassigned components');
@@ -1282,7 +1295,7 @@
             // Show assignment indicators in full mode
             var indicators = document.querySelectorAll('.assignment-indicator');
             indicators.forEach(function(indicator) {
-                indicator.style.display = 'flex';
+                indicator.classList.remove('indicator-hidden');
             });
 
             console.log('Showing all components');
@@ -1376,6 +1389,7 @@
                     counter.className = 'assignment-counter'; // Keep this for potential general selections
                     counter.classList.add('assignment-counter-styles'); // Add new class for specific styling
                     counter.innerHTML = ' (' + assignedCount + '/' + totalComponents + ' assigned)';
+                    // counter.style.cssText = 'font-size: 0.9rem; opacity: 0.8; margin-left: 10px;'; // This line is removed
                     header.appendChild(counter);
                 }
             });

@@ -246,6 +246,42 @@ function doGet(e) {
 }
 
 /**
+ * Helper function to determine if a user's year matches a target filter year.
+ * @param {string|number} userYear The year from the user's record (e.g., 1, 2, "Probationary").
+ * @param {string} targetYear The year from the filter (e.g., "1", "Probationary").
+ * @return {boolean} True if the years match according to the defined logic.
+ * @private
+ */
+function _isUserYearMatching(userYear, targetYear) {
+  const standardizedUserYear = userYear ? userYear.toString().toLowerCase() : null;
+  const standardizedTargetYear = targetYear ? targetYear.toString().toLowerCase() : null;
+
+  if (!standardizedUserYear || !standardizedTargetYear) {
+    // If either is null/empty after standardization, they don't match unless both are.
+    // However, typically a filter targetYear wouldn't be null if filtering is active.
+    // And a userYear being null might mean it's not set and shouldn't match specific year filters.
+    return standardizedUserYear === standardizedTargetYear;
+  }
+
+  if (standardizedTargetYear === 'probationary') {
+    return standardizedUserYear === 'probationary';
+  } else {
+    const numericTargetYear = parseInt(standardizedTargetYear);
+    // If targetYear is not 'probationary' and not a parsable number, it's an invalid filter for numeric matching.
+    if (isNaN(numericTargetYear)) {
+      debugLog(`_isUserYearMatching: Invalid non-numeric, non-probationary targetYear: ${targetYear}`);
+      return false;
+    }
+    // If userYear is 'probationary', it cannot match a numeric targetYear.
+    if (standardizedUserYear === 'probationary') {
+      return false;
+    }
+    const numericUserYear = parseInt(standardizedUserYear);
+    return !isNaN(numericUserYear) && numericUserYear === numericTargetYear;
+  }
+}
+
+/**
  * Enhanced onEdit trigger function that handles both role changes and rubric content changes
  */
 function onEditTrigger(e) {
@@ -751,23 +787,7 @@ function getStaffListForDropdown(role, year) {
 
     // Filter by year
     if (year) {
-      const lowerCaseYear = year.toString().toLowerCase();
-      if (lowerCaseYear === 'probationary') {
-        filteredStaff = filteredStaff.filter(user => user.year && user.year.toString().toLowerCase() === 'probationary');
-      } else {
-        const numericYear = parseInt(year);
-        if (!isNaN(numericYear)) {
-          // Ensure user.year is treated as a number if it's not 'Probationary'
-          filteredStaff = filteredStaff.filter(user => {
-            const userNumericYear = parseInt(user.year);
-            return !isNaN(userNumericYear) && userNumericYear === numericYear;
-          });
-        } else {
-          // If year is not 'Probationary' and not a valid number, it's an invalid filter for numeric years
-          debugLog(`Invalid numeric year provided: ${year}`);
-          // Depending on desired behavior, could return empty or ignore year filter
-        }
-      }
+      filteredStaff = filteredStaff.filter(user => _isUserYearMatching(user.year, year));
     }
 
     const result = filteredStaff.map(user => ({
