@@ -872,17 +872,21 @@
                     }
 
                     var isAssigned = false;
-                    var shouldShow = true;
-
-                    if (data.userContext && data.userContext.assignedSubdomains && componentId) {
+                    // Calculate isAssigned if componentId is valid and subdomains are available.
+                    // This is needed for styling in 'full' mode and visibility in 'assigned' mode.
+                    if (componentId && data.userContext && data.userContext.assignedSubdomains) {
                         var domainKey = 'domain' + (domainIdx + 1);
                         var assignedList = data.userContext.assignedSubdomains[domainKey] || [];
                         isAssigned = assignedList.indexOf(componentId) !== -1;
+                    }
 
-                        // In assigned mode, only show assigned components
-                        if (data.userContext.viewMode === 'assigned') {
-                            shouldShow = isAssigned;
-                        }
+                    var shouldShow;
+                    if (data.userContext && data.userContext.viewMode === 'assigned') {
+                        // In 'assigned' mode, show only if componentId is valid AND it's assigned.
+                        shouldShow = componentId ? isAssigned : false;
+                    } else {
+                        // In 'full' mode (or if userContext is not fully defined), show all components.
+                        shouldShow = true;
                     }
                     ?>
 
