@@ -769,8 +769,8 @@ function getStaffListForDropdown(role, year) {
   try {
     debugLog(`getStaffListForDropdown called with role: ${role}, year: ${year}`);
 
-    // Ensure SheetService.getStaffData is available or use a global alias if necessary
-    const staffData = typeof getStaffData === 'function' ? getStaffData() : SheetService.getStaffData();
+    // Assuming SheetService.getStaffData() is the canonical way to retrieve staff data.
+    const staffData = SheetService.getStaffData();
 
     if (!staffData || !staffData.users || staffData.users.length === 0) {
       debugLog('No staff data available in getStaffListForDropdown.');
