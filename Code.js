@@ -59,6 +59,13 @@ function doGet(e) {
     const urlRole = params.role || null;
     const proactiveCheck = params.proactive !== 'false'; // Default to true
 
+    // ADD THESE NEW PARAMETERS:
+    const viewMode = params.view || 'full';
+    const filterRole = params.filterRole || null;
+    const filterYear = params.filterYear || null;
+    const filterStaff = params.filterStaff || null;
+    const filterType = params.filterType || 'all';
+
     debugLog('Enhanced web app request received', {
       requestId: requestId,
       forceRefresh: forceRefresh,
@@ -83,6 +90,33 @@ function doGet(e) {
 
     // Create enhanced user context with proactive role change detection
     const userContext = createUserContext();
+
+    // Handle special role filtering
+    let finalUserContext = userContext;
+
+    if (userContext.hasSpecialAccess && filterStaff && isValidEmail(filterStaff)) {
+      // Special role user is viewing as another staff member
+      const filteredContext = createFilteredUserContext(filterStaff, userContext.role);
+      if (filteredContext) {
+        finalUserContext = filteredContext;
+        debugLog('Using filtered user context', {
+          originalRole: userContext.role,
+          viewingAs: filteredContext.filterInfo.viewingAs,
+          viewingRole: filteredContext.filterInfo.viewingRole
+        });
+      }
+    }
+
+    // Set view mode
+    finalUserContext.viewMode = viewMode;
+
+    // Add filter parameters to context
+    finalUserContext.activeFilters = {
+      role: filterRole,
+      year: filterYear,
+      staff: filterStaff,
+      type: filterType
+    };
     
     // Override role if specified in URL (for testing)
     if (urlRole && AVAILABLE_ROLES.includes(urlRole)) {
@@ -113,19 +147,29 @@ function doGet(e) {
     });
     
     // Get role-specific rubric data
-    const rubricData = getAllDomainsData(userContext.role, userContext.year);
+    const rubricData = getAllDomainsData(finalUserContext.role, finalUserContext.year);
     
     // Generate enhanced response metadata
-    const responseMetadata = generateResponseMetadata(userContext, requestId, debugMode);
+    const responseMetadata = generateResponseMetadata(finalUserContext, requestId, debugMode);
 
     // Add comprehensive user context to the data for the HTML template
     rubricData.userContext = {
       // Basic user info
-      email: userContext.email,
-      role: userContext.role,
-      year: userContext.year,
-      isAuthenticated: userContext.isAuthenticated,
-      displayName: userContext.email ? userContext.email.split('@')[0] : 'Guest',
+      email: finalUserContext.email,
+      role: finalUserContext.role,
+      year: finalUserContext.year,
+      isAuthenticated: finalUserContext.isAuthenticated,
+      displayName: finalUserContext.email ? finalUserContext.email.split('@')[0] : 'Guest',
+
+      // NEW VIEW MODE PROPERTIES:
+      viewMode: finalUserContext.viewMode,
+      assignedSubdomains: finalUserContext.assignedSubdomains,
+      hasSpecialAccess: finalUserContext.hasSpecialAccess,
+      canFilter: finalUserContext.canFilter,
+      specialRoleType: finalUserContext.specialRoleType,
+      activeFilters: finalUserContext.activeFilters,
+      isFiltered: finalUserContext.isFiltered || false,
+      filterInfo: finalUserContext.filterInfo || null,
 
       // Request context
       requestId: requestId,
