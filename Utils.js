@@ -331,3 +331,67 @@ function debugLog(message, data = null) {
     console.log(`[DEBUG ${timestamp}] ${message}`);
   }
 }
+
+/**
+ * Parse comma-separated subdomain list into array with colons
+ * @param {string} subdomainString - String like "1a, 1c, 1f"
+ * @return {Array<string>} Array like ["1a:", "1c:", "1f:"]
+ */
+function parseSubdomainList(subdomainString) {
+  // Handle empty or null input
+  if (!subdomainString || typeof subdomainString !== 'string') {
+    return [];
+  }
+
+  // Split by comma, clean up, and add colons
+  return subdomainString
+    .split(',')
+    .map(item => item.trim()) // Remove spaces
+    .filter(item => item.length > 0) // Remove empty items
+    .map(item => {
+      // Add colon if not already present
+      return item.endsWith(':') ? item : item + ':';
+    });
+}
+
+/**
+ * Get assigned subdomains for a specific role and year
+ * @param {string} role - User's role
+ * @param {number|string} year - User's year (1, 2, 3, or 'Probationary')
+ * @return {Object} Object with domain arrays
+ */
+function getAssignedSubdomainsForRoleYear(role, year) {
+  try {
+    const settingsData = getSettingsData();
+    if (!settingsData || !settingsData.roleYearMappings) {
+      debugLog('No settings data available for subdomain assignment');
+      return { domain1: [], domain2: [], domain3: [], domain4: [] };
+    }
+
+    const roleMapping = settingsData.roleYearMappings[role];
+    if (!roleMapping) {
+      debugLog('No mapping found for role', { role: role });
+      return { domain1: [], domain2: [], domain3: [], domain4: [] };
+    }
+
+    // Probationary users see all subdomains (Year 1 content)
+    const yearKey = year === 'Probationary' ? 'year1' : `year${year}`;
+    const yearData = roleMapping[yearKey];
+
+    if (!yearData || !Array.isArray(yearData) || yearData.length < 4) {
+      debugLog('Invalid year data for role', { role: role, year: year, yearKey: yearKey });
+      return { domain1: [], domain2: [], domain3: [], domain4: [] };
+    }
+
+    return {
+      domain1: parseSubdomainList(yearData[0]),
+      domain2: parseSubdomainList(yearData[1]),
+      domain3: parseSubdomainList(yearData[2]),
+      domain4: parseSubdomainList(yearData[3])
+    };
+
+  } catch (error) {
+    console.error('Error getting assigned subdomains:', error);
+    return { domain1: [], domain2: [], domain3: [], domain4: [] };
+  }
+}
