@@ -1027,6 +1027,7 @@
                     <!-- Peer Evaluator & Full Access: Full filtering options -->
                     <select id="roleFilter" class="filter-select" onchange="updateAvailableStaff()" aria-label="Filter by Role">
                         <option value="">Select Role...</option>
+                        <option value="Any">Any Role</option>
                         <? for (var r = 0; r < data.userContext.availableRoles?.length || 0; r++) { ?>
                         <option value="<?= data.userContext.availableRoles[r] ?>"><?= data.userContext.availableRoles[r] ?></option>
                         <? } ?>
@@ -1034,6 +1035,7 @@
 
                     <select id="yearFilter" class="filter-select" onchange="updateAvailableStaff()" aria-label="Filter by Year">
                         <option value="">Select Year...</option>
+                        <option value="Any">Any Year</option>
                         <option value="1">Year 1</option>
                         <option value="2">Year 2</option>
                         <option value="3">Year 3</option>
