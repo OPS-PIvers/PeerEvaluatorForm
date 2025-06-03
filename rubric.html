@@ -39,6 +39,42 @@
     <meta name="turbo-cache-control" content="no-cache">
 
     <style>
+:root {
+    --color-white: white;
+    --color-text-default: #333;
+    --color-bg-body: #f5f5f5;
+
+    /* Greens for toggle button and assignments */
+    --color-green-base: #10b981;
+    --color-green-dark: #059669;
+    --color-green-darker: #047857;
+    --color-green-light-bg: #f0fdf4;
+
+    /* Ambers for toggle button (assigned mode) and active filters */
+    --color-amber-base: #f59e0b;
+    --color-amber-dark: #d97706;
+    --color-amber-darker: #b45309;
+    --color-amber-light-bg: #fef3c7;
+    --color-amber-text-dark: #92400e;
+
+    /* Blues for filter status and select focus */
+    --color-blue-base: #3b82f6;
+    --color-blue-light-bg: #dbeafe;
+    --color-blue-text-dark: #1e40af;
+    --color-blue-focus-shadow: rgba(59, 130, 246, 0.1);
+
+    /* Grays for various UI elements */
+    --color-gray-text: #4a5568;
+    --color-gray-text-light: #374151;
+    --color-gray-border-light: #d1d5db;
+    --color-gray-border-medium: #e2e8f0;
+    --color-gray-bg-light: #f8fafc;
+    --color-gray-bg-medium: #6b7280;
+    --color-gray-bg-dark: #4b5563;
+    --color-gray-component-not-assigned-border: #e5e7eb;
+    --color-gray-assignment-indicator-not-assigned-bg: #e5e7eb;
+    --color-text-deemphasized: #718096;
+}
         * {
             margin: 0;
             padding: 0;
@@ -48,8 +84,8 @@
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
             line-height: 1.6;
-            color: #333;
-            background-color: #f5f5f5;
+            color: var(--color-text-default);
+            background-color: var(--color-bg-body);
             padding: 20px;
         }
         
@@ -130,7 +166,8 @@
         }
         
         .component-section {
-            border-bottom: 1px solid #e2e8f0;
+            border-bottom: 1px solid var(--color-gray-border-medium);
+            position: relative;
         }
         
         .performance-levels-header {
@@ -504,6 +541,199 @@
                 font-size: 0.85rem;
             }
         }
+
+        /* View Toggle Button Styles */
+        .view-toggle-container {
+            margin-top: 15px;
+        }
+
+        .view-toggle-btn {
+            background: linear-gradient(135deg, var(--color-green-base), var(--color-green-dark));
+            color: var(--color-white);
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+            transition: background 0.3s ease, transform 0.3s ease, box-shadow 0.3s ease;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .view-toggle-btn:hover {
+            background: linear-gradient(135deg, var(--color-green-dark), var(--color-green-darker));
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+
+        .view-toggle-btn.assigned-mode {
+            background: linear-gradient(135deg, var(--color-amber-base), var(--color-amber-dark));
+        }
+
+        .view-toggle-btn.assigned-mode:hover {
+            background: linear-gradient(135deg, var(--color-amber-dark), var(--color-amber-darker));
+        }
+
+        /* Special Role Filter Styles */
+        .special-filters {
+            background: var(--color-gray-bg-light);
+            border: 2px solid var(--color-gray-border-medium);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+
+        .filter-section {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .filter-label {
+            font-weight: 600;
+            color: var(--color-gray-text);
+            margin-right: 10px;
+        }
+
+        .filter-select {
+            background: var(--color-white);
+            border: 1px solid var(--color-gray-border-light);
+            border-radius: 4px;
+            padding: 8px 12px;
+            font-size: 0.9rem;
+            color: var(--color-gray-text-light);
+            min-width: 150px;
+        }
+
+        .filter-select:focus {
+            outline: none;
+            border-color: var(--color-blue-base);
+            box-shadow: 0 0 0 3px var(--color-blue-focus-shadow);
+        }
+
+        .filter-btn {
+            background: var(--color-gray-bg-medium);
+            color: var(--color-white);
+            border: none;
+            border-radius: 4px;
+            padding: 8px 16px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: background 0.3s ease;
+        }
+
+        .filter-btn:hover {
+            background: var(--color-gray-bg-dark);
+        }
+
+        .domain-nav {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        /* Filter Status Indicator */
+        .filter-status {
+            background: var(--color-blue-light-bg);
+            border: 1px solid var(--color-blue-base);
+            border-radius: 6px;
+            padding: 10px 15px;
+            margin-bottom: 15px;
+            color: var(--color-blue-text-dark);
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .filter-status.active {
+            background: var(--color-amber-light-bg);
+            border-color: var(--color-amber-base);
+            color: var(--color-amber-text-dark);
+        }
+
+        .filter-status-detail {
+            margin-left: 15px;
+            font-size: 0.8rem;
+        }
+
+        /* Component Assignment Indicators */
+        .component-section.component-assigned {
+            border-left: 4px solid var(--color-green-base);
+            background: var(--color-green-light-bg);
+        }
+
+        .component-section.component-not-assigned {
+            background: var(--color-gray-bg-light);
+            border-left: 4px solid var(--color-gray-component-not-assigned-border);
+        }
+
+        .component-section.component-not-assigned .level-content,
+        .component-section.component-not-assigned .look-for-item label {
+            color: var(--color-text-deemphasized);
+        }
+
+        .assignment-indicator {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background: var(--color-green-base);
+            color: var(--color-white);
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            font-weight: bold;
+        }
+
+        .assignment-indicator.not-assigned {
+            background: var(--color-gray-assignment-indicator-not-assigned-bg);
+            color: var(--color-gray-bg-medium);
+        }
+
+        .assigned-badge {
+            background-color: var(--color-blue-light-bg);
+            color: var(--color-blue-text-dark);
+            padding: 0.2em 0.6em;
+            border-radius: 0.25rem;
+            font-size: 0.8em;
+            margin-left: 8px;
+            font-weight: 500;
+            vertical-align: middle;
+            display: inline-block;
+        }
+
+        /* Mobile Responsive Adjustments */
+        @media (max-width: 768px) {
+            .filter-section {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .filter-select {
+                min-width: auto;
+                width: 100%;
+                margin-bottom: 5px;
+            }
+
+            .view-toggle-btn {
+                width: 100%;
+                max-width: 300px;
+                margin: 0 auto;
+            }
+
+            .domain-nav {
+                flex-direction: column;
+            }
+
+            .nav-button {
+                width: 100%;
+                margin-bottom: 5px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -526,14 +756,90 @@
         <div class="header">
             <h1><?= data.title ?></h1>
             <p><?= data.subtitle ?></p>
-        </div>
-        
-        <div class="navigation">
-            <? for (var d = 0; d < data.domains.length; d++) { ?>
-                <button class="nav-button" data-domain="<?= d ?>">
-                    Domain <?= data.domains[d].number ?>
+            <!-- View Mode Toggle (only for users with assigned subdomains) -->
+            <? if (data.userContext && data.userContext.assignedSubdomains && !data.userContext.hasSpecialAccess) { ?>
+            <div class="view-toggle-container">
+                <button id="viewToggleBtn" class="view-toggle-btn" onclick="toggleViewMode()" aria-pressed="<?= data.userContext.viewMode === 'assigned' ? 'true' : 'false' ?>">
+                    <span id="viewToggleText">
+                        <? if (data.userContext.viewMode === 'assigned') { ?>
+                            📋 View: My Assigned Areas
+                        <? } else { ?>
+                            📚 View: Full Rubric
+                        <? } ?>
+                    </span>
                 </button>
+            </div>
             <? } ?>
+        </div>
+
+        <!-- Filter Status (for special roles) -->
+        <? if (data.userContext && data.userContext.isFiltered) { ?>
+        <div class="filter-status active">
+            <strong>👁️ Viewing as:</strong> <?= data.userContext.filterInfo.viewingAs ?>
+            (<?= data.userContext.filterInfo.viewingRole ?>, Year <?= data.userContext.filterInfo.viewingYear ?>)
+            <span class="filter-status-detail">
+                Requested by: <?= data.userContext.filterInfo.requestedBy ?>
+            </span>
+        </div>
+        <? } else if (data.userContext && data.userContext.hasSpecialAccess) { ?>
+        <div class="filter-status">
+            <strong>🔧 Special Access Mode:</strong> <?= data.userContext.specialRoleType.replace('_', ' ').toUpperCase() ?>
+            <span class="filter-status-detail">
+                Use filters above to view other staff members' assigned areas
+            </span>
+        </div>
+        <? } ?>
+
+        <div class="navigation">
+            <!-- Special Role Filters -->
+            <? if (data.userContext && data.userContext.hasSpecialAccess) { ?>
+            <div class="special-filters">
+                <div class="filter-section">
+                    <span class="filter-label">Viewing Options:</span>
+
+                    <? if (data.userContext.specialRoleType === 'administrator') { ?>
+                    <!-- Administrator: Probationary filter only -->
+                    <select id="probationaryFilter" class="filter-select" onchange="applyAdminFilter()" aria-label="Filter by Probationary Status">
+                        <option value="all">All Staff</option>
+                        <option value="probationary">Probationary Staff Only</option>
+                    </select>
+
+                    <? } else if (data.userContext.specialRoleType === 'peer_evaluator' || data.userContext.specialRoleType === 'full_access') { ?>
+                    <!-- Peer Evaluator & Full Access: Full filtering options -->
+                    <select id="roleFilter" class="filter-select" onchange="updateAvailableStaff()" aria-label="Filter by Role">
+                        <option value="">Select Role...</option>
+                        <? for (var r = 0; r < data.userContext.availableRoles?.length || 0; r++) { ?>
+                        <option value="<?= data.userContext.availableRoles[r] ?>"><?= data.userContext.availableRoles[r] ?></option>
+                        <? } ?>
+                    </select>
+
+                    <select id="yearFilter" class="filter-select" onchange="updateAvailableStaff()" aria-label="Filter by Year">
+                        <option value="">Select Year...</option>
+                        <option value="1">Year 1</option>
+                        <option value="2">Year 2</option>
+                        <option value="3">Year 3</option>
+                        <option value="Probationary">Probationary</option>
+                    </select>
+
+                    <select id="staffFilter" class="filter-select" onchange="applyStaffFilter()" aria-label="Filter by Staff Member">
+                        <option value="">Select Staff Member...</option>
+                        <!-- Options populated by JavaScript -->
+                    </select>
+
+                    <button class="filter-btn" onclick="clearAllFilters()">Clear Filters</button>
+                    <? } ?>
+                </div>
+            </div>
+            <? } ?>
+
+            <!-- Domain Navigation (always visible) -->
+            <div class="domain-nav">
+                <? for (var d = 0; d < data.domains.length; d++) { ?>
+                    <button class="nav-button" data-domain="<?= d ?>">
+                        Domain <?= data.domains[d].number ?>
+                    </button>
+                <? } ?>
+            </div>
         </div>
         
         <? for (var domainIdx = 0; domainIdx < data.domains.length; domainIdx++) { ?>
@@ -554,26 +860,70 @@
                 </div>
                 
                 <? for (var i = 0; i < data.domains[domainIdx].components.length; i++) { ?>
-                    <div class="component-section">
+                    <?
+                    // Determine if this component should be visible
+                    var component = data.domains[domainIdx].components[i];
+                    var componentId = '';
+                    if (component.title) {
+                        // Component titles are expected to start with an ID (e.g., "1a:", "2b:")
+                        // which is used for matching against assigned subdomains.
+                        var match = component.title.match(/^([1-4][a-f]):/);
+                        componentId = match ? match[1] + ':' : '';
+                    }
+
+                    var isAssigned = false;
+                    // Calculate isAssigned if componentId is valid and subdomains are available.
+                    // This is needed for styling in 'full' mode and visibility in 'assigned' mode.
+                    if (componentId && data.userContext && data.userContext.assignedSubdomains) {
+                        var domainKey = 'domain' + (domainIdx + 1);
+                        var assignedList = data.userContext.assignedSubdomains[domainKey] || [];
+                        isAssigned = assignedList.indexOf(componentId) !== -1;
+                    }
+
+                    var shouldShow;
+                    if (data.userContext && data.userContext.viewMode === 'assigned') {
+                        // In 'assigned' mode, show only if componentId is valid AND it's assigned.
+                        shouldShow = componentId ? isAssigned : false;
+                    } else {
+                        // In 'full' mode (or if userContext is not fully defined), show all components.
+                        shouldShow = true;
+                    }
+                    ?>
+
+                    <? if (shouldShow) { ?>
+                    <div class="component-section <?= isAssigned ? 'component-assigned' : 'component-not-assigned' ?>"
+                         data-component-id="<?= componentId ?>"
+                         data-assigned="<?= isAssigned ? 'true' : 'false' ?>">
+
+                        <!-- Assignment Indicator -->
+                        <? if (data.userContext && data.userContext.assignedSubdomains && data.userContext.viewMode === 'full') { ?>
+                        <div class="assignment-indicator <?= isAssigned ? 'assigned' : 'not-assigned' ?>" aria-label="<?= isAssigned ? 'Component assigned' : 'Component not assigned' ?>">
+                            <?= isAssigned ? '✓' : '○' ?>
+                        </div>
+                        <? } ?>
+
                         <div class="performance-levels-content">
                             <div class="row-label">
-                                <?= data.domains[domainIdx].components[i].title ?>
+                                <?= component.title ?>
+                                <? if (isAssigned && data.userContext.viewMode === 'assigned') { ?>
+                                <span class="assigned-badge">📋 Assigned</span>
+                                <? } ?>
                             </div>
                             <div class="level-content">
-                                <?= data.domains[domainIdx].components[i].developing ?>
+                                <?= component.developing ?>
                             </div>
                             <div class="level-content">
-                                <?= data.domains[domainIdx].components[i].basic ?>
+                                <?= component.basic ?>
                             </div>
                             <div class="level-content">
-                                <?= data.domains[domainIdx].components[i].proficient ?>
+                                <?= component.proficient ?>
                             </div>
                             <div class="level-content">
-                                <?= data.domains[domainIdx].components[i].distinguished ?>
+                                <?= component.distinguished ?>
                             </div>
                         </div>
                         
-                        <? if (data.domains[domainIdx].components[i].bestPractices && data.domains[domainIdx].components[i].bestPractices.length > 0) { ?>
+                        <? if (component.bestPractices && component.bestPractices.length > 0) { ?>
                         <div class="look-fors-section">
                             <div class="look-fors-header" onclick="toggleLookFors('domain-<?= domainIdx ?>-component-<?= i ?>')">
                                 <span>Best Practices aligned with 5D+ and PELSB Standards</span>
@@ -581,10 +931,10 @@
                             </div>
                             <div class="look-fors-content" id="lookForsContent-<?= domainIdx ?>-<?= i ?>">
                                 <div class="look-fors-grid">
-                                    <? for (var j = 0; j < data.domains[domainIdx].components[i].bestPractices.length; j++) { ?>
+                                    <? for (var j = 0; j < component.bestPractices.length; j++) { ?>
                                         <div class="look-for-item">
                                             <input type="checkbox" id="practice-<?= domainIdx ?>-<?= i ?>-<?= j ?>" name="practice-<?= domainIdx ?>-<?= i ?>-<?= j ?>">
-                                            <label for="practice-<?= domainIdx ?>-<?= i ?>-<?= j ?>"><?= data.domains[domainIdx].components[i].bestPractices[j] ?></label>
+                                            <label for="practice-<?= domainIdx ?>-<?= i ?>-<?= j ?>"><?= component.bestPractices[j] ?></label>
                                         </div>
                                     <? } ?>
                                 </div>
@@ -592,6 +942,7 @@
                         </div>
                         <? } ?>
                     </div>
+                    <? } ?>
                 <? } ?>
                 
                 <? if (!data.domains[domainIdx].components || data.domains[domainIdx].components.length === 0) { ?>
