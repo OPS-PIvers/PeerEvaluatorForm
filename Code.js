@@ -150,7 +150,7 @@ function doGet(e) {
     const rubricData = getAllDomainsData(finalUserContext.role, finalUserContext.year);
     
     // Generate enhanced response metadata
-    const responseMetadata = generateResponseMetadata(userContext, requestId, debugMode);
+    const responseMetadata = generateResponseMetadata(finalUserContext, requestId, debugMode);
 
     // Add comprehensive user context to the data for the HTML template
     rubricData.userContext = {
