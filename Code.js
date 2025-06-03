@@ -53,6 +53,14 @@ function doGet(e) {
 
     // Parse URL parameters for cache control
     const params = e.parameter || {};
+
+    // Handle AJAX API requests
+    if (params.getStaffList === 'true') {
+      const staffResponse = handleStaffListRequest(e);
+      return ContentService.createTextOutput(JSON.stringify(staffResponse))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
     const forceRefresh = params.refresh === 'true' || params.nocache === 'true';
     const debugMode = params.debug === 'true';
     const urlTimestamp = params.t || null;
@@ -147,7 +155,23 @@ function doGet(e) {
     });
     
     // Get role-specific rubric data
-    const rubricData = getAllDomainsData(finalUserContext.role, finalUserContext.year);
+    const rubricData = getAllDomainsData(
+      finalUserContext.role,
+      finalUserContext.year,
+      finalUserContext.viewMode,      // Pass viewMode
+      finalUserContext.assignedSubdomains // Pass assignedSubdomains
+    );
+
+    // Add special role data if needed
+    if (finalUserContext.hasSpecialAccess) {
+      rubricData.specialRoleData = {
+        availableRoles: AVAILABLE_ROLES.filter(role => role !== finalUserContext.role),
+        availableYears: OBSERVATION_YEARS,
+        probationaryStaff: finalUserContext.specialRoleType === 'administrator' ?
+          getProbationaryStaff() : null,
+        accessValidation: validateSpecialRoleAccess(finalUserContext.role, 'general_access')
+      };
+    }
     
     // Generate enhanced response metadata
     const responseMetadata = generateResponseMetadata(finalUserContext, requestId, debugMode);
@@ -161,7 +185,7 @@ function doGet(e) {
       isAuthenticated: finalUserContext.isAuthenticated,
       displayName: finalUserContext.email ? finalUserContext.email.split('@')[0] : 'Guest',
 
-      // NEW VIEW MODE PROPERTIES:
+      // Enhanced view mode and assignment properties
       viewMode: finalUserContext.viewMode,
       assignedSubdomains: finalUserContext.assignedSubdomains,
       hasSpecialAccess: finalUserContext.hasSpecialAccess,
@@ -170,6 +194,14 @@ function doGet(e) {
       activeFilters: finalUserContext.activeFilters,
       isFiltered: finalUserContext.isFiltered || false,
       filterInfo: finalUserContext.filterInfo || null,
+
+      // Special role data
+      availableRoles: rubricData.specialRoleData?.availableRoles || [],
+      availableYears: rubricData.specialRoleData?.availableYears || [],
+      probationaryStaff: rubricData.specialRoleData?.probationaryStaff || [],
+
+      // Assignment metadata
+      assignmentMetadata: rubricData.assignmentMetadata || null,
 
       // Request context
       requestId: requestId,
@@ -243,6 +275,209 @@ function doGet(e) {
     // Return enhanced error page with cache busting
     return createEnhancedErrorPage(error, requestId, null, e.userAgent);
   }
+}
+
+/**
+ * Handle AJAX requests for staff data (used by special role filters)
+ * @param {Object} e - Event object from doGet
+ * @return {Object} JSON response with staff data
+ */
+function handleStaffListRequest(e) {
+  try {
+    const params = e.parameter || {};
+    const requestingRole = params.requestingRole;
+    const filterRole = params.filterRole;
+    const filterYear = params.filterYear;
+
+    // Validate requesting user has permission
+    const accessValidation = validateSpecialRoleAccess(requestingRole, 'view_any');
+    if (!accessValidation.hasAccess) {
+      return {
+        success: false,
+        error: 'Access denied',
+        message: accessValidation.message
+      };
+    }
+
+    // Get filtered staff list
+    const staffList = getStaffByRoleAndYear(filterRole, filterYear);
+
+    return {
+      success: true,
+      staffList: staffList,
+      filterRole: filterRole,
+      filterYear: filterYear,
+      count: staffList.length
+    };
+
+  } catch (error) {
+    console.error('Error handling staff list request:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * Get filtered staff list for special roles
+ * @param {string} filterType - Type of filter to apply
+ * @param {string} role - Specific role filter (optional)
+ * @param {string|number} year - Specific year filter (optional)
+ * @return {Array} Filtered staff array
+ */
+function getFilteredStaffList(filterType = 'all', role = null, year = null) {
+  try {
+    const staffData = getStaffData();
+    if (!staffData || !staffData.users) {
+      debugLog('No staff data available for filtering');
+      return [];
+    }
+
+    let filteredUsers = [...staffData.users];
+
+    // Apply type-based filtering
+    switch (filterType) {
+      case 'probationary':
+        filteredUsers = filteredUsers.filter(user => user.year === 'Probationary');
+        break;
+
+      case 'by_role':
+        if (role && AVAILABLE_ROLES.includes(role)) {
+          filteredUsers = filteredUsers.filter(user => user.role === role);
+        }
+        break;
+
+      case 'by_year':
+        if (year) {
+          filteredUsers = filteredUsers.filter(user => user.year.toString() === year.toString());
+        }
+        break;
+
+      case 'combined':
+        if (role && AVAILABLE_ROLES.includes(role)) {
+          filteredUsers = filteredUsers.filter(user => user.role === role);
+        }
+        if (year) {
+          filteredUsers = filteredUsers.filter(user => user.year.toString() === year.toString());
+        }
+        break;
+
+      default:
+        // 'all' - no additional filtering
+        break;
+    }
+
+    // Format for frontend use
+    const formattedUsers = filteredUsers.map(user => ({
+      name: user.name || 'Unknown Name',
+      email: user.email,
+      role: user.role || 'Unknown Role',
+      year: user.year || 1,
+      displayName: `${user.name || 'Unknown'} (${user.role || 'Unknown'}, Year ${user.year || 1})`
+    }));
+
+    debugLog('Staff list filtered', {
+      filterType: filterType,
+      role: role,
+      year: year,
+      originalCount: staffData.users.length,
+      filteredCount: formattedUsers.length
+    });
+
+    return formattedUsers;
+
+  } catch (error) {
+    console.error('Error filtering staff list:', formatErrorMessage(error, 'getFilteredStaffList'));
+    return [];
+  }
+}
+
+/**
+ * Get probationary staff only (for Administrator role)
+ * @return {Array} Array of probationary staff
+ */
+function getProbationaryStaff() {
+  return getFilteredStaffList('probationary');
+}
+
+/**
+ * Get staff by role and year (for Peer Evaluator and Full Access)
+ * @param {string} role - Role to filter by
+ * @param {string|number} year - Year to filter by
+ * @return {Array} Filtered staff array
+ */
+function getStaffByRoleAndYear(role, year) {
+  return getFilteredStaffList('combined', role, year);
+}
+
+/**
+ * Validate special role access permissions
+ * @param {string} requestingRole - Role of the person making the request
+ * @param {string} requestType - Type of request ('view_probationary', 'view_any', etc.)
+ * @return {Object} Validation result
+ */
+function validateSpecialRoleAccess(requestingRole, requestType) {
+  const validation = {
+    hasAccess: false,
+    role: requestingRole,
+    requestType: requestType,
+    allowedActions: [],
+    message: 'Access denied'
+  };
+
+  try {
+    switch (requestingRole) {
+      case 'Administrator':
+        validation.hasAccess = true;
+        validation.allowedActions = ['view_probationary', 'view_own_staff'];
+        validation.message = 'Administrator access granted';
+        break;
+
+      case 'Peer Evaluator':
+        validation.hasAccess = true;
+        validation.allowedActions = ['view_any', 'filter_by_role', 'filter_by_year', 'filter_by_staff'];
+        validation.message = 'Peer Evaluator access granted';
+        break;
+
+      case 'Full Access':
+        validation.hasAccess = true;
+        validation.allowedActions = ['view_any', 'filter_by_role', 'filter_by_year', 'filter_by_staff', 'admin_functions'];
+        validation.message = 'Full Access granted';
+        break;
+
+      default:
+        validation.message = `Role "${requestingRole}" does not have special access privileges`;
+        break;
+    }
+
+    // Check if specific request type is allowed
+    if (validation.hasAccess && requestType && !validation.allowedActions.includes(requestType)) {
+      validation.hasAccess = false;
+      validation.message = `Role "${requestingRole}" cannot perform action "${requestType}"`;
+    }
+
+    debugLog('Special role access validation', validation);
+    return validation;
+
+  } catch (error) {
+    console.error('Error validating special role access:', error);
+    validation.message = 'Validation error: ' + error.message;
+    return validation;
+  }
+}
+
+/**
+ * Extracts the component ID (e.g., "1a:") from a component title string.
+ * @param {string} componentTitle The title of the component.
+ * @return {string|null} The extracted component ID, or null if not found.
+ */
+function extractComponentId(componentTitle) {
+  if (!componentTitle || typeof componentTitle !== 'string') {
+    return null;
+  }
+  const match = componentTitle.match(/^([1-4][a-fA-F]:)/);
+  return match ? match[1] : null;
 }
 
 /**
@@ -780,13 +1015,13 @@ function getStaffListForDropdown(role, year) {
     let filteredStaff = staffData.users;
 
     // Filter by role (case-insensitive)
-    if (role) {
+    if (role && role.toLowerCase() !== 'any') {
       const lowerCaseRole = role.toLowerCase();
       filteredStaff = filteredStaff.filter(user => user.role && user.role.toLowerCase() === lowerCaseRole);
     }
 
     // Filter by year
-    if (year) {
+    if (year && year.toLowerCase() !== 'any') {
       filteredStaff = filteredStaff.filter(user => _isUserYearMatching(user.year, year));
     }
 
@@ -894,6 +1129,115 @@ function validateUserWithStateTracking(userEmail) {
       valid: false,
       reason: 'Validation error: ' + error.message,
       error: error.message
+    };
+  }
+}
+
+/**
+ * Enhance domains with assignment information
+ * @param {Array} domains - Array of domain objects
+ * @param {Object} assignedSubdomains - Object with assigned subdomains by domain
+ * @param {string} viewMode - 'full' or 'assigned'
+ * @return {Array} Enhanced domains array
+ */
+function enhanceDomainsWithAssignments(domains, assignedSubdomains, viewMode = 'full') {
+  if (!assignedSubdomains || !Array.isArray(domains)) {
+    return domains;
+  }
+
+  try {
+    return domains.map((domain, domainIndex) => {
+      const domainKey = `domain${domainIndex + 1}`;
+      const assignedList = assignedSubdomains[domainKey] || [];
+
+      // Process each component in the domain
+      const enhancedComponents = domain.components ? domain.components.map(component => {
+        // Extract component ID from title
+        const componentId = extractComponentId(component.title);
+        const isAssigned = componentId ? assignedList.includes(componentId) : false;
+
+        return {
+          ...component,
+          isAssigned: isAssigned,
+          componentId: componentId,
+          assignmentStatus: isAssigned ? 'assigned' : 'not_assigned'
+        };
+      }) : [];
+
+      // Filter components based on view mode
+      let filteredComponents = enhancedComponents;
+      if (viewMode === 'assigned') {
+        filteredComponents = enhancedComponents.filter(comp => comp.isAssigned);
+      }
+
+      const assignedCount = enhancedComponents.filter(comp => comp.isAssigned).length;
+
+      return {
+        ...domain,
+        components: filteredComponents,
+        assignmentInfo: {
+          totalComponents: enhancedComponents.length,
+          assignedComponents: assignedCount,
+          assignedList: assignedList,
+          hasAssignments: assignedCount > 0,
+          assignmentPercentage: enhancedComponents.length > 0 ?
+            Math.round((assignedCount / enhancedComponents.length) * 100) : 0
+        }
+      };
+    });
+
+  } catch (error) {
+    console.error('Error enhancing domains with assignments:', error);
+    return domains;
+  }
+}
+
+/**
+ * Calculate overall assignment metadata
+ * @param {Array} domains - Enhanced domains array
+ * @param {Object} assignedSubdomains - Assigned subdomains object
+ * @return {Object} Assignment metadata
+ */
+function calculateAssignmentMetadata(domains, assignedSubdomains) {
+  try {
+    const metadata = {
+      hasAssignments: !!assignedSubdomains,
+      totalAssigned: 0,
+      totalComponents: 0,
+      assignmentsByDomain: {},
+      overallPercentage: 0
+    };
+
+    domains.forEach((domain, index) => {
+      const domainKey = `domain${index + 1}`;
+      const domainInfo = domain.assignmentInfo || {};
+
+      metadata.totalComponents += domainInfo.totalComponents || 0;
+      metadata.totalAssigned += domainInfo.assignedComponents || 0;
+
+      metadata.assignmentsByDomain[domainKey] = {
+        name: domain.name,
+        assigned: domainInfo.assignedComponents || 0,
+        total: domainInfo.totalComponents || 0,
+        percentage: domainInfo.assignmentPercentage || 0
+      };
+    });
+
+    if (metadata.totalComponents > 0) {
+      metadata.overallPercentage = Math.round((metadata.totalAssigned / metadata.totalComponents) * 100);
+    }
+
+    debugLog('Assignment metadata calculated', metadata);
+    return metadata;
+
+  } catch (error) {
+    console.error('Error calculating assignment metadata:', error);
+    return {
+      hasAssignments: false,
+      totalAssigned: 0,
+      totalComponents: 0,
+      assignmentsByDomain: {},
+      overallPercentage: 0
     };
   }
 }
@@ -1227,9 +1571,9 @@ function addDebugHeaders(htmlOutput, userContext, metadata) {
 }
 
 /**
- * Enhanced function to get all domains data with role and year support
+ * Enhanced function to get all domains data with view mode and assignment support
  */
-function getAllDomainsData(role = null, year = null) {
+function getAllDomainsData(role = null, year = null, viewMode = 'full', assignedSubdomains = null) {
   const startTime = Date.now();
   
   try {
@@ -1237,7 +1581,11 @@ function getAllDomainsData(role = null, year = null) {
     const userRole = role || 'Teacher';
     const userYear = year;
     
-    debugLog('Loading domains data', { role: userRole, year: userYear });
+    debugLog('Loading domains data with view mode support', {
+      role: userRole,
+      year: userYear,
+      viewMode: viewMode
+    });
     
     // Get role-specific sheet data
     const roleSheetData = getRoleSheetData(userRole);
@@ -1251,7 +1599,14 @@ function getAllDomainsData(role = null, year = null) {
       subtitle: roleSheetData.subtitle || "Professional practices and standards",
       role: userRole,
       year: userYear,
-      domains: []
+      viewMode: viewMode,
+      domains: [],
+      assignmentMetadata: {
+        hasAssignments: !!assignedSubdomains,
+        totalAssigned: 0,
+        totalComponents: 0,
+        assignmentsByDomain: {}
+      }
     };
     
     // For Teacher role, use legacy processing for backward compatibility
@@ -1262,6 +1617,12 @@ function getAllDomainsData(role = null, year = null) {
       result.domains = processRoleDomains(roleSheetData, userRole, userYear);
     }
     
+    // Apply assignment metadata and filtering
+    if (assignedSubdomains) {
+      result.domains = enhanceDomainsWithAssignments(result.domains, assignedSubdomains, viewMode);
+      result.assignmentMetadata = calculateAssignmentMetadata(result.domains, assignedSubdomains);
+    }
+
     // Apply year-based filtering if specified
     if (userYear && userYear !== null) {
       result.domains = applyYearFiltering(result.domains, userRole, userYear);
@@ -1271,13 +1632,18 @@ function getAllDomainsData(role = null, year = null) {
     logPerformanceMetrics('getAllDomainsData', executionTime, {
       role: userRole,
       year: userYear,
-      domainCount: result.domains.length
+      viewMode: viewMode,
+      domainCount: result.domains.length,
+      totalComponents: result.assignmentMetadata.totalComponents,
+      assignedComponents: result.assignmentMetadata.totalAssigned
     });
     
-    debugLog('Domains data loaded successfully', {
+    debugLog('Enhanced domains data loaded successfully', {
       role: userRole,
       domainCount: result.domains.length,
-      totalComponents: result.domains.reduce((total, domain) => total + domain.components.length, 0)
+      totalComponents: result.assignmentMetadata.totalComponents,
+      assignedComponents: result.assignmentMetadata.totalAssigned,
+      viewMode: viewMode
     });
     
     return result;
@@ -1290,7 +1656,14 @@ function getAllDomainsData(role = null, year = null) {
       subtitle: `Please check the configuration for role: ${role || 'default'}. Error: ${error.message}`,
       role: role || 'Teacher',
       year: year,
-      domains: []
+      viewMode: viewMode || 'full',
+      domains: [],
+      assignmentMetadata: {
+        hasAssignments: false,
+        totalAssigned: 0,
+        totalComponents: 0,
+        assignmentsByDomain: {}
+      }
     };
   }
 }
