@@ -39,6 +39,41 @@
     <meta name="turbo-cache-control" content="no-cache">
 
     <style>
+:root {
+    --color-white: white;
+    --color-text-default: #333;
+    --color-bg-body: #f5f5f5;
+
+    /* Greens for toggle button and assignments */
+    --color-green-base: #10b981;
+    --color-green-dark: #059669;
+    --color-green-darker: #047857;
+    --color-green-light-bg: #f0fdf4;
+
+    /* Ambers for toggle button (assigned mode) and active filters */
+    --color-amber-base: #f59e0b;
+    --color-amber-dark: #d97706;
+    --color-amber-darker: #b45309;
+    --color-amber-light-bg: #fef3c7;
+    --color-amber-text-dark: #92400e;
+
+    /* Blues for filter status and select focus */
+    --color-blue-base: #3b82f6;
+    --color-blue-light-bg: #dbeafe;
+    --color-blue-text-dark: #1e40af;
+    --color-blue-focus-shadow: rgba(59, 130, 246, 0.1);
+
+    /* Grays for various UI elements */
+    --color-gray-text: #4a5568;
+    --color-gray-text-light: #374151;
+    --color-gray-border-light: #d1d5db;
+    --color-gray-border-medium: #e2e8f0;
+    --color-gray-bg-light: #f8fafc;
+    --color-gray-bg-medium: #6b7280;
+    --color-gray-bg-dark: #4b5563;
+    --color-gray-component-not-assigned-border: #e5e7eb;
+    --color-gray-assignment-indicator-not-assigned-bg: #e5e7eb;
+}
         * {
             margin: 0;
             padding: 0;
@@ -48,8 +83,8 @@
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
             line-height: 1.6;
-            color: #333;
-            background-color: #f5f5f5;
+            color: var(--color-text-default);
+            background-color: var(--color-bg-body);
             padding: 20px;
         }
         
@@ -511,8 +546,8 @@
         }
 
         .view-toggle-btn {
-            background: linear-gradient(135deg, #10b981, #059669);
-            color: white;
+            background: linear-gradient(135deg, var(--color-green-base), var(--color-green-dark));
+            color: var(--color-white);
             border: none;
             padding: 12px 24px;
             border-radius: 6px;
@@ -524,23 +559,23 @@
         }
 
         .view-toggle-btn:hover {
-            background: linear-gradient(135deg, #059669, #047857);
+            background: linear-gradient(135deg, var(--color-green-dark), var(--color-green-darker));
             transform: translateY(-1px);
             box-shadow: 0 4px 8px rgba(0,0,0,0.15);
         }
 
         .view-toggle-btn.assigned-mode {
-            background: linear-gradient(135deg, #f59e0b, #d97706);
+            background: linear-gradient(135deg, var(--color-amber-base), var(--color-amber-dark));
         }
 
         .view-toggle-btn.assigned-mode:hover {
-            background: linear-gradient(135deg, #d97706, #b45309);
+            background: linear-gradient(135deg, var(--color-amber-dark), var(--color-amber-darker));
         }
 
         /* Special Role Filter Styles */
         .special-filters {
-            background: #f8fafc;
-            border: 2px solid #e2e8f0;
+            background: var(--color-gray-bg-light);
+            border: 2px solid var(--color-gray-border-medium);
             border-radius: 8px;
             padding: 15px;
             margin-bottom: 15px;
@@ -555,29 +590,29 @@
 
         .filter-label {
             font-weight: 600;
-            color: #4a5568;
+            color: var(--color-gray-text);
             margin-right: 10px;
         }
 
         .filter-select {
-            background: white;
-            border: 1px solid #d1d5db;
+            background: var(--color-white);
+            border: 1px solid var(--color-gray-border-light);
             border-radius: 4px;
             padding: 8px 12px;
             font-size: 0.9rem;
-            color: #374151;
+            color: var(--color-gray-text-light);
             min-width: 150px;
         }
 
         .filter-select:focus {
             outline: none;
-            border-color: #3b82f6;
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+            border-color: var(--color-blue-base);
+            box-shadow: 0 0 0 3px var(--color-blue-focus-shadow);
         }
 
         .filter-btn {
-            background: #6b7280;
-            color: white;
+            background: var(--color-gray-bg-medium);
+            color: var(--color-white);
             border: none;
             border-radius: 4px;
             padding: 8px 16px;
@@ -587,7 +622,7 @@
         }
 
         .filter-btn:hover {
-            background: #4b5563;
+            background: var(--color-gray-bg-dark);
         }
 
         .domain-nav {
@@ -599,20 +634,20 @@
 
         /* Filter Status Indicator */
         .filter-status {
-            background: #dbeafe;
-            border: 1px solid #3b82f6;
+            background: var(--color-blue-light-bg);
+            border: 1px solid var(--color-blue-base);
             border-radius: 6px;
             padding: 10px 15px;
             margin-bottom: 15px;
-            color: #1e40af;
+            color: var(--color-blue-text-dark);
             font-size: 0.9rem;
             font-weight: 500;
         }
 
         .filter-status.active {
-            background: #fef3c7;
-            border-color: #f59e0b;
-            color: #92400e;
+            background: var(--color-amber-light-bg);
+            border-color: var(--color-amber-base);
+            color: var(--color-amber-text-dark);
         }
 
         .filter-status-detail {
@@ -622,22 +657,22 @@
 
         /* Component Assignment Indicators */
         .component-section.component-assigned {
-            border-left: 4px solid #10b981;
-            background: #f0fdf4;
+            border-left: 4px solid var(--color-green-base);
+            background: var(--color-green-light-bg);
         }
 
         .component-section.component-not-assigned {
             opacity: 0.6;
-            background: #f8fafc;
-            border-left: 4px solid #e5e7eb;
+            background: var(--color-gray-bg-light);
+            border-left: 4px solid var(--color-gray-component-not-assigned-border);
         }
 
         .assignment-indicator {
             position: absolute;
             top: 5px;
             right: 5px;
-            background: #10b981;
-            color: white;
+            background: var(--color-green-base);
+            color: var(--color-white);
             border-radius: 50%;
             width: 20px;
             height: 20px;
@@ -649,8 +684,8 @@
         }
 
         .assignment-indicator.not-assigned {
-            background: #e5e7eb;
-            color: #6b7280;
+            background: var(--color-gray-assignment-indicator-not-assigned-bg);
+            color: var(--color-gray-bg-medium);
         }
 
         /* Mobile Responsive Adjustments */
@@ -840,7 +875,7 @@
 
                         <!-- Assignment Indicator -->
                         <? if (data.userContext && data.userContext.assignedSubdomains && data.userContext.viewMode === 'full') { ?>
-                        <div class="assignment-indicator <?= isAssigned ? 'assigned' : 'not-assigned' ?>">
+                        <div class="assignment-indicator <?= isAssigned ? 'assigned' : 'not-assigned' ?>" aria-label="<?= isAssigned ? 'Component assigned' : 'Component not assigned' ?>">
                             <?= isAssigned ? '✓' : '○' ?>
                         </div>
                         <? } ?>
