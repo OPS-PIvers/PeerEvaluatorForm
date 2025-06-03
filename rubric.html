@@ -384,6 +384,187 @@
             }
         }
 
+        // Special Role Filter Functions
+
+        function applyAdminFilter() {
+            const filterSelect = document.getElementById('probationaryFilter');
+            if (!filterSelect) return;
+
+            const filterType = filterSelect.value;
+            console.log('Administrator filter applied:', filterType);
+
+            // Build new URL with filter parameter
+            const newUrl = generateFilteredURL({ filterType: filterType });
+            window.location.href = newUrl;
+        }
+
+        function updateAvailableStaff() {
+            const roleFilter = document.getElementById('roleFilter');
+            const yearFilter = document.getElementById('yearFilter');
+            const staffFilter = document.getElementById('staffFilter');
+
+            if (!roleFilter || !yearFilter || !staffFilter) return;
+
+            const selectedRole = roleFilter.value;
+            const selectedYear = yearFilter.value;
+
+            // Clear staff dropdown
+            staffFilter.innerHTML = '<option value="">Select Staff Member...</option>';
+
+            if (!selectedRole && !selectedYear) {
+                return;
+            }
+
+            // This would normally fetch from server, but for now we'll use a simple approach
+            console.log('Filters updated - Role:', selectedRole, 'Year:', selectedYear);
+
+            // Add a note that staff list will be populated when both role and year are selected
+            if (selectedRole && selectedYear) {
+                staffFilter.innerHTML = '<option value="">Loading staff...</option>';
+
+                // Trigger server request to get staff list
+                requestStaffList(selectedRole, selectedYear);
+            }
+        }
+
+        const DEFAULT_ERROR_MESSAGE = 'Server error. Please try again.';
+        function formatClientErrorMessage(error, defaultMessage = DEFAULT_ERROR_MESSAGE) {
+            let errorDetail = '';
+            if (error) {
+                if (error.message && typeof error.message === 'string' && error.message.trim()) {
+                    errorDetail = `: ${error.message.substring(0, 75)}`;
+                } else if (typeof error === 'string' && error.trim()) {
+                    errorDetail = `: ${error.substring(0, 75)}`;
+                }
+            }
+            if (!errorDetail) {
+                errorDetail = `: ${defaultMessage}`;
+            }
+            return errorDetail;
+        }
+
+        function requestStaffList(role, year) {
+            const staffFilter = document.getElementById('staffFilter');
+            if (!staffFilter) {
+                 console.error('Staff filter dropdown element not found in requestStaffList.');
+                 return;
+            }
+
+            // Indicate loading
+            staffFilter.innerHTML = ''; // Clear existing options first
+            const loadingOpt = new Option('Loading staff...', '');
+            loadingOpt.disabled = true;
+            staffFilter.appendChild(loadingOpt);
+            staffFilter.disabled = true;
+
+            console.log('Requesting staff list for role:', role, 'year:', year);
+
+            google.script.run
+                .withSuccessHandler(function(staffListData) {
+                    populateStaffDropdown(staffListData); // Pass only staffListData
+                    if (staffFilter) staffFilter.disabled = false;
+                })
+                .withFailureHandler(function(error) {
+                    console.error('Error fetching staff list:', error);
+                    if (staffFilter) {
+                        staffFilter.innerHTML = ''; // Clear existing options first
+                        const errorMessage = 'Error loading staff' + formatClientErrorMessage(error);
+                        const errorOpt = new Option(errorMessage, '');
+                        errorOpt.disabled = true;
+                        staffFilter.appendChild(errorOpt);
+                        staffFilter.disabled = false;
+                    }
+                })
+                .getStaffListForDropdown(role, year);
+        }
+
+        function populateStaffDropdown(staffListData) {
+            const staffFilter = document.getElementById('staffFilter');
+            if (!staffFilter) {
+                console.error('Staff filter dropdown element not found in populateStaffDropdown.');
+                return;
+            }
+
+            staffFilter.innerHTML = ''; // Clear existing options first
+            staffFilter.appendChild(new Option('Select Staff Member...', ''));
+
+            if (staffListData && Array.isArray(staffListData)) {
+                if (staffListData.length === 0) {
+                    const noStaffOption = new Option('No staff found for this selection', '');
+                    noStaffOption.disabled = true;
+                    staffFilter.appendChild(noStaffOption);
+                } else {
+                    staffListData.forEach(function(staff) {
+                        if (typeof staff === 'object' && staff !== null &&
+                            typeof staff.name === 'string' && staff.name.trim() !== '' &&
+                            typeof staff.email === 'string' && staff.email.trim() !== '') {
+                            const option = document.createElement('option');
+                            option.value = staff.email;
+                            option.textContent = staff.name;
+                            staffFilter.appendChild(option);
+                        } else {
+                            console.warn('Invalid or incomplete staff item found in list. Skipping:', staff);
+                        }
+                    });
+                }
+                console.log('Staff dropdown populated with', staffListData.length, 'staff members.');
+            } else {
+                console.error('Failed to populate staff dropdown due to invalid or missing staffListData:', staffListData);
+                const errorOption = new Option('Error loading staff data', '');
+                errorOption.disabled = true;
+                staffFilter.appendChild(errorOption);
+            }
+        }
+
+        function applyStaffFilter() {
+            const staffFilter = document.getElementById('staffFilter');
+            if (!staffFilter) return;
+
+            const selectedStaff = staffFilter.value;
+            if (!selectedStaff) return;
+
+            console.log('Staff filter applied:', selectedStaff);
+
+            // Redirect to view as selected staff member
+            const newUrl = generateFilteredURL({ filterStaff: selectedStaff, view: 'assigned' });
+            window.location.href = newUrl;
+        }
+
+        function clearAllFilters() {
+            console.log('Clearing all filters');
+
+            // Build URL without filter parameters
+            const newUrl = generateFilteredURL({});
+            window.location.href = newUrl;
+        }
+
+        function initializeFiltersFromURL() {
+            const urlParams = new URLSearchParams(window.location.search);
+
+            // Restore Administrator filter
+            const probationaryFilter = document.getElementById('probationaryFilter');
+            if (probationaryFilter && urlParams.get('filterType')) {
+                probationaryFilter.value = urlParams.get('filterType');
+            }
+
+            // Restore role/year filters
+            const roleFilter = document.getElementById('roleFilter');
+            const yearFilter = document.getElementById('yearFilter');
+
+            if (roleFilter && urlParams.get('filterRole')) {
+                roleFilter.value = urlParams.get('filterRole');
+            }
+
+            if (yearFilter && urlParams.get('filterYear')) {
+                yearFilter.value = urlParams.get('filterYear');
+            }
+
+            // Update staff list if both role and year are set
+            if (roleFilter && yearFilter && roleFilter.value && yearFilter.value) {
+                updateAvailableStaff();
+            }
+        }
+
         /* Debug info styles (only visible in debug mode) */
         <? if (data.userContext && data.userContext.debugMode) { ?>
         .debug-info {
@@ -734,6 +915,33 @@
                 margin-bottom: 5px;
             }
         }
+
+        .component-hidden {
+            display: none;
+        }
+
+        .indicator-hidden {
+            display: none;
+        }
+
+        /* Hover effect for assigned components */
+        .component-section[data-assigned="true"]:hover {
+            border-left-color: var(--color-green-dark);
+            background-color: var(--color-green-light-bg);
+        }
+
+        /* Hover effect for not-assigned components */
+        .component-section[data-assigned="false"]:hover,
+        .component-section:not([data-assigned]):hover { /* Handles components not explicitly marked false initially */
+            border-left-color: var(--color-gray-border-light);
+            background-color: var(--color-gray-bg-light);
+        }
+
+        .assignment-counter-styles {
+            font-size: 0.9rem;
+            opacity: 0.8;
+            margin-left: 10px;
+        }
     </style>
 </head>
 <body>
@@ -995,14 +1203,213 @@
             requestId: '<?= data.userContext ? data.userContext.requestId : "unknown" ?>'
         };
 
+        // --- Client-Side View Mode Toggling ---
+        // The following functions manage the view mode (full/assigned) dynamically on the client-side
+        // without a page reload. The preference is saved in sessionStorage for the current session.
+        // View Mode Toggle Functions
+        let currentViewMode = '<?= data.userContext?.viewMode || "full" ?>';
+        const userAssignedSubdomains = <?= data.userContext?.assignedSubdomains ? JSON.stringify(data.userContext.assignedSubdomains) : 'null' ?>;
+
+        function toggleViewMode() {
+            if (currentViewMode === 'full') {
+                switchToAssignedView();
+            } else {
+                switchToFullView();
+            }
+        }
+
+        function switchToAssignedView() {
+            currentViewMode = 'assigned';
+            updateViewToggleButton();
+            hideUnassignedComponents();
+            saveViewModePreference();
+
+            console.log('Switched to assigned view mode');
+        }
+
+        function switchToFullView() {
+            currentViewMode = 'full';
+            updateViewToggleButton();
+            showAllComponents();
+            saveViewModePreference();
+
+            console.log('Switched to full view mode');
+        }
+
+        function updateViewToggleButton() {
+            const button = document.getElementById('viewToggleBtn');
+            const text = document.getElementById('viewToggleText');
+
+            if (!button || !text) return;
+
+            if (currentViewMode === 'assigned') {
+                text.innerHTML = '📚 View: Full Rubric';
+                button.classList.add('assigned-mode');
+                button.title = 'Click to view the complete rubric';
+            } else {
+                text.innerHTML = '📋 View: My Assigned Areas';
+                button.classList.remove('assigned-mode');
+                button.title = 'Click to view only your assigned areas';
+            }
+        }
+
+        function hideUnassignedComponents() {
+            if (!userAssignedSubdomains) return;
+
+            const components = document.querySelectorAll('.component-section');
+            components.forEach(function(component) {
+                const isAssigned = component.getAttribute('data-assigned') === 'true';
+                updateComponentVisualState(component, isAssigned, 'assigned');
+            });
+
+            // Hide assignment indicators in assigned mode
+            // This part remains as it's specific to the view mode switch, not general component state
+            const indicators = document.querySelectorAll('.assignment-indicator');
+            indicators.forEach(function(indicator) {
+                indicator.classList.add('indicator-hidden');
+            });
+
+            // The hiddenCount variable is no longer available with the new function,
+            // so the specific count cannot be logged here. We can log a generic message.
+            console.log('Hid unassigned components using new visual state function.');
+            updateDomainVisibility();
+        }
+
+        function showAllComponents() {
+            const components = document.querySelectorAll('.component-section');
+            components.forEach(function(component) {
+                const isAssigned = component.getAttribute('data-assigned') === 'true';
+                updateComponentVisualState(component, isAssigned, 'full');
+            });
+
+            // Show assignment indicators in full mode
+            // This part remains as it's specific to the view mode switch, not general component state
+            const indicators = document.querySelectorAll('.assignment-indicator');
+            indicators.forEach(function(indicator) {
+                indicator.classList.remove('indicator-hidden');
+            });
+
+            console.log('Showing all components using new visual state function.');
+            updateDomainVisibility();
+        }
+
+        function updateDomainVisibility() {
+            // Hide domains that have no visible components
+            const domains = document.querySelectorAll('.domain-section');
+
+            domains.forEach(function(domain) {
+                const visibleComponents = domain.querySelectorAll('.component-section:not(.component-hidden)');
+                const domainHeader = domain.querySelector('.domain-header');
+                const navButton = document.querySelector('[data-domain="' + domain.id.split('-')[1] + '"]');
+
+                if (visibleComponents.length === 0) {
+                    domain.style.display = 'none';
+                    if (navButton) navButton.style.display = 'none';
+                } else {
+                    domain.style.display = 'block';
+                    if (navButton) navButton.style.display = 'block';
+                }
+            });
+        }
+
+        function saveViewModePreference() {
+            try {
+                const storageKey = 'viewMode_' + (window.pageLoadInfo?.cacheVersion || 'default');
+                sessionStorage.setItem(storageKey, currentViewMode);
+                console.log('View mode preference saved:', currentViewMode);
+            } catch (e) {
+                console.log('Could not save view mode preference:', e);
+            }
+        }
+
+        // Component Assignment Visual Functions
+        function updateComponentVisualState(componentElement, isAssigned, currentViewMode) {
+            // Clear existing classes
+            componentElement.classList.remove('component-assigned', 'component-not-assigned', 'component-hidden');
+
+            // Visibility Logic
+            if (currentViewMode === 'assigned') {
+                if (!isAssigned) {
+                    componentElement.classList.add('component-hidden');
+                }
+            }
+            // In 'full' mode, component-hidden is not added here, effectively showing the element.
+
+            // Styling Logic (only if not hidden by the above)
+            if (!componentElement.classList.contains('component-hidden')) {
+                if (isAssigned) {
+                    componentElement.classList.add('component-assigned');
+                    addAssignmentTooltip(componentElement, 'This component is assigned to you for evaluation');
+                } else {
+                    componentElement.classList.add('component-not-assigned');
+                    addAssignmentTooltip(componentElement, 'This component is not assigned to you this year');
+                }
+            }
+        }
+
+        function highlightAssignedComponents() {
+            if (!userAssignedSubdomains) return;
+
+            const components = document.querySelectorAll('.component-section');
+            components.forEach(function(component) {
+                const isAssigned = component.getAttribute('data-assigned') === 'true';
+                // Assuming 'full' mode for highlighting purposes, as this function is about visual styling, not hiding.
+                updateComponentVisualState(component, isAssigned, 'full');
+            });
+
+            console.log('Component assignment highlighting applied using new visual state function.');
+        }
+
+        function addAssignmentTooltip(element, message) {
+            element.title = message;
+        }
+
+        function createAssignmentSummary() {
+            if (!userAssignedSubdomains) return;
+
+            const summary = {
+                domain1: userAssignedSubdomains.domain1?.length || 0,
+                domain2: userAssignedSubdomains.domain2?.length || 0,
+                domain3: userAssignedSubdomains.domain3?.length || 0,
+                domain4: userAssignedSubdomains.domain4?.length || 0
+            };
+
+            summary.total = summary.domain1 + summary.domain2 + summary.domain3 + summary.domain4;
+
+            console.log('Assignment summary:', summary);
+            return summary;
+        }
+
+        function addAssignmentCounters() {
+            if (!userAssignedSubdomains) return;
+
+            const domains = document.querySelectorAll('.domain-section');
+
+            domains.forEach(function(domain, index) {
+                const domainKey = 'domain' + (index + 1);
+                const assignedCount = userAssignedSubdomains[domainKey]?.length || 0;
+                const totalComponents = domain.querySelectorAll('.component-section').length;
+
+                const header = domain.querySelector('.domain-header');
+                if (header && assignedCount > 0) {
+                    const counter = document.createElement('span');
+                    counter.className = 'assignment-counter'; // Keep this for potential general selections
+                    counter.classList.add('assignment-counter-styles'); // Add new class for specific styling
+                    counter.textContent = ' (' + assignedCount + '/' + totalComponents + ' assigned)';
+                    // counter.style.cssText = 'font-size: 0.9rem; opacity: 0.8; margin-left: 10px;'; // This line is removed
+                    header.appendChild(counter);
+                }
+            });
+        }
+
         // Enhanced toggle function with state persistence
         function toggleLookFors(componentId) {
-            var parts = componentId.split('-');
-            var domainIdx = parts[1];
-            var componentIdx = parts[3];
+            const parts = componentId.split('-');
+            const domainIdx = parts[1];
+            const componentIdx = parts[3];
             
-            var content = document.getElementById('lookForsContent-' + domainIdx + '-' + componentIdx);
-            var chevron = document.getElementById('chevron-' + domainIdx + '-' + componentIdx);
+            const content = document.getElementById('lookForsContent-' + domainIdx + '-' + componentIdx);
+            const chevron = document.getElementById('chevron-' + domainIdx + '-' + componentIdx);
             
             if (content && chevron) {
                 content.classList.toggle('expanded');
@@ -1010,8 +1417,8 @@
 
                 // Store state in sessionStorage for this session
                 try {
-                    var storageKey = 'lookFors_' + componentId + '_' + window.pageLoadInfo.cacheVersion;
-                    var isExpanded = content.classList.contains('expanded');
+                    const storageKey = 'lookFors_' + componentId + '_' + window.pageLoadInfo.cacheVersion;
+                    const isExpanded = content.classList.contains('expanded');
                     sessionStorage.setItem(storageKey, isExpanded.toString());
                 } catch (e) {
                     console.log('SessionStorage not available:', e);
@@ -1022,13 +1429,13 @@
         // Restore look-fors state on page load
         function restoreLookForsState() {
             try {
-                var expandedSections = [];
-                for (var i = 0; i < sessionStorage.length; i++) {
-                    var key = sessionStorage.key(i);
+                let expandedSections = [];
+                for (let i = 0; i < sessionStorage.length; i++) {
+                    const key = sessionStorage.key(i);
                     if (key && key.startsWith('lookFors_') && key.endsWith('_' + window.pageLoadInfo.cacheVersion)) {
-                        var isExpanded = sessionStorage.getItem(key) === 'true';
+                        const isExpanded = sessionStorage.getItem(key) === 'true';
                         if (isExpanded) {
-                            var componentId = key.replace('lookFors_', '').replace('_' + window.pageLoadInfo.cacheVersion, '');
+                            const componentId = key.replace('lookFors_', '').replace('_' + window.pageLoadInfo.cacheVersion, '');
                             expandedSections.push(componentId);
                         }
                     }
@@ -1036,12 +1443,12 @@
 
                 // Restore expanded state
                 expandedSections.forEach(function(componentId) {
-                    var parts = componentId.split('-');
-                    var domainIdx = parts[1];
-                    var componentIdx = parts[3];
+                    const parts = componentId.split('-');
+                    const domainIdx = parts[1];
+                    const componentIdx = parts[3];
 
-                    var content = document.getElementById('lookForsContent-' + domainIdx + '-' + componentIdx);
-                    var chevron = document.getElementById('chevron-' + domainIdx + '-' + componentIdx);
+                    const content = document.getElementById('lookForsContent-' + domainIdx + '-' + componentIdx);
+                    const chevron = document.getElementById('chevron-' + domainIdx + '-' + componentIdx);
 
                     if (content && chevron) {
                         content.classList.add('expanded');
@@ -1056,7 +1463,7 @@
         }
         
         function scrollToDomain(domainIdx) {
-            var element = document.getElementById('domain-' + domainIdx);
+            const element = document.getElementById('domain-' + domainIdx);
             if (element) {
                 element.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
@@ -1070,7 +1477,7 @@
         function forcePageRefresh() {
             console.log('Forcing page refresh with cache busting');
 
-            var url = new URL(window.location);
+            const url = new URL(window.location);
             url.searchParams.set('refresh', 'true');
             url.searchParams.set('nocache', 'true');
             url.searchParams.set('t', Date.now());
@@ -1086,12 +1493,62 @@
             // Restore look-fors state
             restoreLookForsState();
 
+            // Determine and apply currentViewMode based on URL param, then sessionStorage, then server/default
+            const urlParams = new URLSearchParams(window.location.search);
+            const viewFromURL = urlParams.get('view');
+
+            if (viewFromURL === 'assigned' || viewFromURL === 'full') {
+                currentViewMode = viewFromURL;
+                saveViewModePreference(); // Save the URL-derived mode to sessionStorage
+                console.log('View mode set from URL parameter:', currentViewMode);
+            } else {
+                // No valid view param in URL, try to load from sessionStorage
+                try {
+                    const storageKey = 'viewMode_' + (window.pageLoadInfo?.cacheVersion || 'default');
+                    const savedMode = sessionStorage.getItem(storageKey);
+                    if (savedMode === 'assigned' || savedMode === 'full') {
+                        currentViewMode = savedMode;
+                        console.log('View mode restored from sessionStorage:', currentViewMode);
+                    } else {
+                        // currentViewMode remains as initialized from server (<?= data.userContext?.viewMode || "full" ?>)
+                        // or defaults to 'full' if server value is not set/reliable.
+                        // It's already initialized with this value, so no explicit 'else' needed to set it again.
+                        console.log('View mode initialized (no URL param or session storage, using server/default):', currentViewMode);
+                    }
+                } catch (e) {
+                    console.warn('Could not access sessionStorage for view mode preference:', e);
+                    // currentViewMode remains as initialized from server or defaults to 'full'
+                }
+            }
+
+            // Initialize view mode functionality
+            if (userAssignedSubdomains) {
+                // Add visual enhancements for assignments (these are always useful)
+                highlightAssignedComponents();
+                addAssignmentCounters();
+
+                // Initialize with current view mode
+                if (currentViewMode === 'assigned') {
+                    hideUnassignedComponents();
+                } else {
+                    showAllComponents();
+                }
+
+                updateViewToggleButton();
+
+                console.log('View mode initialized:', currentViewMode);
+                console.log('Assignment summary:', createAssignmentSummary());
+            }
+
+            // Initialize special role filters
+            initializeFiltersFromURL();
+
             // Handle navigation button clicks
-            var navigation = document.querySelector('.navigation');
+            const navigation = document.querySelector('.navigation');
             if (navigation) {
                 navigation.addEventListener('click', function(e) {
                     if (e.target.classList.contains('nav-button')) {
-                        var domainIdx = e.target.getAttribute('data-domain');
+                        const domainIdx = e.target.getAttribute('data-domain');
                         if (domainIdx !== null) {
                             scrollToDomain(parseInt(domainIdx));
                         }
@@ -1112,12 +1569,20 @@
                     e.preventDefault();
                     forcePageRefresh();
                 }
+
+                // V key to toggle view mode
+                if (e.key === 'v' || e.key === 'V') {
+                    if (userAssignedSubdomains && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                        e.preventDefault();
+                        toggleViewMode();
+                    }
+                }
             });
         });
         
         // Show/hide back to top button
         window.addEventListener('scroll', function() {
-            var backToTop = document.getElementById('backToTop');
+            const backToTop = document.getElementById('backToTop');
             if (backToTop) {
                 if (window.scrollY > 300) {
                     backToTop.classList.add('visible');
@@ -1132,12 +1597,12 @@
         
         // Highlight active navigation button
         window.addEventListener('scroll', function() {
-            var navButtons = document.querySelectorAll('.nav-button');
-            var domainSections = document.querySelectorAll('.domain-section');
+            const navButtons = document.querySelectorAll('.nav-button');
+            const domainSections = document.querySelectorAll('.domain-section');
             
-            var currentDomain = -1;
-            for (var i = 0; i < domainSections.length; i++) {
-                var rect = domainSections[i].getBoundingClientRect();
+            let currentDomain = -1;
+            for (let i = 0; i < domainSections.length; i++) {
+                const rect = domainSections[i].getBoundingClientRect();
                 if (rect.top <= 100 && rect.bottom > 0) {
                     currentDomain = i;
                 }
@@ -1153,14 +1618,14 @@
         });
         
         // Enhanced auto-refresh with cache version checking
-        var autoRefreshInterval = <?= data.userContext && data.userContext.debugMode ? 300000 : 600000 ?>; // 5 min debug, 10 min normal
+        const autoRefreshInterval = <?= data.userContext && data.userContext.debugMode ? 300000 : 600000 ?>; // 5 min debug, 10 min normal
 
         setTimeout(function() {
             console.log('Auto-refresh triggered');
 
             // In debug mode, show notification
             <? if (data.userContext && data.userContext.debugMode) { ?>
-            var notice = document.createElement('div');
+            const notice = document.createElement('div');
             notice.style.cssText = 'position:fixed; top:50px; right:10px; background:#007bff; color:white; padding:10px; border-radius:6px; z-index:9998; font-size:0.9rem;';
             notice.textContent = '🔄 Auto-refreshing to get latest data...';
             document.body.appendChild(notice);
@@ -1178,8 +1643,8 @@
         window.addEventListener('load', function() {
             setTimeout(function() {
                 if (window.performance && window.performance.timing) {
-                    var timing = window.performance.timing;
-                    var loadTime = timing.loadEventEnd - timing.navigationStart;
+                    const timing = window.performance.timing;
+                    const loadTime = timing.loadEventEnd - timing.navigationStart;
                     console.log('Page load time:', loadTime + 'ms');
 
                     // Report slow loads
@@ -1211,10 +1676,10 @@
         <? } ?>
 
         // Floating Navigation Widget Functions
-        var floatingNavOpen = false;
+        let floatingNavOpen = false;
 
         function toggleFloatingNav() {
-            var menu = document.getElementById('floatingNavMenu');
+            const menu = document.getElementById('floatingNavMenu');
             if (menu) {
                 floatingNavOpen = !floatingNavOpen;
                 if (floatingNavOpen) {
@@ -1226,7 +1691,7 @@
         }
 
         function closeFloatingNav() {
-            var menu = document.getElementById('floatingNavMenu');
+            const menu = document.getElementById('floatingNavMenu');
             if (menu) {
                 menu.classList.remove('open');
                 floatingNavOpen = false;
@@ -1235,12 +1700,12 @@
 
         // Show/hide floating navigation based on scroll position
         function updateFloatingNav() {
-            var floatingNav = document.getElementById('floatingNav');
-            var navigation = document.querySelector('.navigation');
+            const floatingNav = document.getElementById('floatingNav');
+            const navigation = document.querySelector('.navigation');
             
             if (floatingNav && navigation) {
-                var navigationRect = navigation.getBoundingClientRect();
-                var isNavigationVisible = navigationRect.bottom > 0;
+                const navigationRect = navigation.getBoundingClientRect();
+                const isNavigationVisible = navigationRect.bottom > 0;
                 
                 if (isNavigationVisible) {
                     floatingNav.classList.remove('visible');
@@ -1253,7 +1718,7 @@
 
         // Close floating nav when clicking outside
         document.addEventListener('click', function(e) {
-            var floatingNav = document.getElementById('floatingNav');
+            const floatingNav = document.getElementById('floatingNav');
             if (floatingNav && !floatingNav.contains(e.target)) {
                 closeFloatingNav();
             }
@@ -1266,6 +1731,65 @@
             }
         });
 
+        // --- URL Generation Utilities ---
+        // URL Generation Helper Functions
+        function generateFilteredURL(params) {
+            const url = new URL(window.location);
+
+            // Clear existing filter parameters
+            url.searchParams.delete('filterType');
+            url.searchParams.delete('filterRole');
+            url.searchParams.delete('filterYear');
+            url.searchParams.delete('filterStaff');
+            url.searchParams.delete('view');
+
+            // Add new parameters
+            if (params.filterType) url.searchParams.set('filterType', params.filterType);
+            if (params.filterRole) url.searchParams.set('filterRole', params.filterRole);
+            if (params.filterYear) url.searchParams.set('filterYear', params.filterYear);
+            if (params.filterStaff) url.searchParams.set('filterStaff', params.filterStaff);
+            if (params.view) url.searchParams.set('view', params.view);
+
+            // Always add cache busting
+            url.searchParams.set('t', Date.now());
+
+            return url.toString();
+        }
+
+        // --- URL-Based View Mode Switching ---
+        // These functions change the view mode by generating a new URL with the 'view' parameter
+        // and then reloading the page. This is useful for creating bookmarkable/shareable links
+        // or for programmatically setting the view state when a page reload is acceptable or desired.
+        // Note: As of the last review, these specific two functions are not directly called by other
+        // parts of this script but serve as utilities if such URL-based view switching is needed.
+        // The `generateFilteredURL` function IS used by other filter applications (e.g., staff filter).
+        function switchToAssignedViewWithURL() {
+            const url = generateFilteredURL({ view: 'assigned' });
+            window.location.href = url;
+        }
+
+        function switchToFullViewWithURL() {
+            const url = generateFilteredURL({ view: 'full' });
+            window.location.href = url;
+        }
+
+        // Debug functions for troubleshooting
+        window.debugViewMode = {
+            getCurrentMode: function() { return currentViewMode; },
+            getAssignedSubdomains: function() { return userAssignedSubdomains; },
+            toggleMode: toggleViewMode,
+            showAll: showAllComponents,
+            hideUnassigned: hideUnassignedComponents,
+            getAssignmentSummary: createAssignmentSummary
+        };
+
+        console.log('Enhanced Danielson Framework app loaded with view mode support');
+        <? if (data.userContext && data.userContext.debugMode) { ?>
+        console.log('🐛 DEBUG MODE ACTIVE');
+        console.log('View mode debug commands available: window.debugViewMode');
+        console.log('Current view mode:', currentViewMode);
+        console.log('User assigned subdomains:', userAssignedSubdomains);
+        <? } ?>
     </script>
 </body>
 </html>
