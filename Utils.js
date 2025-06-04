@@ -139,6 +139,56 @@ function extractComponentId(componentTitle) {
 }
 
 /**
+ * Parse year value from various formats into a standardized numeric year or special string
+ * @param {*} yearValue - Raw year value from sheet (could be number, string, or other)
+ * @return {number|string|null} Parsed year value (1, 2, 3, 'Probationary') or null if invalid
+ */
+function parseYearValue(yearValue) {
+  // Handle null or undefined
+  if (yearValue === null || yearValue === undefined) {
+    return null;
+  }
+
+  // Convert to string for processing
+  const yearString = yearValue.toString().trim();
+
+  // Handle empty string
+  if (yearString === '') {
+    return null;
+  }
+
+  // Check for probationary variations (case-insensitive)
+  const lowerYearString = yearString.toLowerCase();
+  if (lowerYearString === 'probationary' || 
+      lowerYearString === 'prob' || 
+      lowerYearString === 'p' ||
+      lowerYearString === '0') {
+    return PROBATIONARY_OBSERVATION_YEAR; // This should be 0 based on Constants.js
+  }
+
+  // Try to parse as number
+  const numericYear = parseInt(yearString);
+  if (!isNaN(numericYear)) {
+    // Valid numeric years are 1, 2, 3, or 0 (probationary)
+    if (OBSERVATION_YEARS.includes(numericYear)) {
+      return numericYear;
+    }
+  }
+
+  // Check for "Year X" format
+  const yearMatch = yearString.match(/year\s*(\d+)/i);
+  if (yearMatch) {
+    const extractedYear = parseInt(yearMatch[1]);
+    if (OBSERVATION_YEARS.includes(extractedYear)) {
+      return extractedYear;
+    }
+  }
+
+  // If nothing matches, return null
+  return null;
+}
+
+/**
  * Safely accesses nested object properties without throwing errors
  * @param {Object} obj - Object to access
  * @param {string} path - Dot-notation path (e.g., "user.profile.name")
