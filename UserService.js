@@ -400,8 +400,8 @@ function createUserContext(email = null) {
     context.permissions.canSeeAllDomains = false; // Authenticated users see role-specific content
 
     // Determine special access levels
-    const specialRoles = SPECIAL_ACCESS_ROLE_NAMES;
-    context.hasSpecialAccess = specialRoles.includes(context.role);
+    const specialRolesArray = Object.values(SPECIAL_ROLES);
+    context.hasSpecialAccess = specialRolesArray.includes(context.role);
     context.canFilter = context.hasSpecialAccess;
 
     // Set special role type for different filtering behaviors
@@ -691,39 +691,6 @@ function isComponentAssigned(componentId, assignedSubdomains) {
   return assignedSubdomains[domainKey].includes(componentId);
 }
 
-/**
- * Get staff list for special role filtering
- * @param {string} filterType - 'probationary', 'all', or specific role
- * @return {Array} Filtered staff list
- */
-function getFilteredStaffList(filterType = 'all') {
-  try {
-    const staffData = getStaffData();
-    if (!staffData || !staffData.users) {
-      return [];
-    }
-
-    let filteredUsers = staffData.users;
-
-    if (filterType === FILTER_TYPES.PROBATIONARY_ONLY) {
-      filteredUsers = staffData.users.filter(user => user.year === 'Probationary');
-    } else if (filterType !== FILTER_TYPES.ALL_STAFF && AVAILABLE_ROLES.includes(filterType)) {
-      filteredUsers = staffData.users.filter(user => user.role === filterType);
-    }
-
-    return filteredUsers.map(user => ({
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      year: user.year,
-      displayName: `${user.name} (${user.role}, Year ${user.year})`
-    }));
-
-  } catch (error) {
-    console.error('Error getting filtered staff list:', error);
-    return [];
-  }
-}
 
 /**
  * Create user context for special role filtering (when viewing as another user)
@@ -734,8 +701,8 @@ function getFilteredStaffList(filterType = 'all') {
 function createFilteredUserContext(targetEmail, requestingRole) {
   try {
     // Verify requesting user has permission
-    const specialRoles = SPECIAL_ACCESS_ROLE_NAMES;
-    if (!specialRoles.includes(requestingRole)) {
+    const specialRolesArray = Object.values(SPECIAL_ROLES);
+    if (!specialRolesArray.includes(requestingRole)) {
       console.warn('Unauthorized filter request from role:', requestingRole);
       return null;
     }
