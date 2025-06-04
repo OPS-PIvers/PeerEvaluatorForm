@@ -272,10 +272,11 @@ function getSettingsData() {
     
     // Process data from the Settings sheet.
     // The sheet is expected to have a role name in the first column (defined by SETTINGS_COLUMNS.ROLE).
-    // Each role name should be followed by 4 consecutive rows, where each row represents a Domain (1-4).
-    // Columns B, C, D (defined by SETTINGS_COLUMNS.YEAR_1, YEAR_2, YEAR_3) in these 4 rows
+    // The row containing the role name is the first of 4 consecutive rows used for data; this role row contains data for Domain 1.
+    // The next three rows contain data for Domains 2, 3, and 4, respectively.
+    // Columns B, C, D (defined by SETTINGS_COLUMNS.YEAR_1, YEAR_2, YEAR_3) in these 4 data rows
     // contain the specific items/subdomains for that Domain for Year 1, Year 2, and Year 3 respectively.
-    // The parser actively looks for role names and processes the subsequent 4 rows.
+    // The parser actively looks for role names and processes these 4 rows (the role name row plus the next three).
     // Blank rows between role definitions are skipped.
     for (let i = 0; i < values.length; i++) {
       const row = values[i];
@@ -298,87 +299,6 @@ function getSettingsData() {
         console.warn(`Incomplete data for role ${roleName} starting at settings sheet row ${i + 2}. Expected 4 data rows, found fewer.`);
         continue; // Skip to the next row to find a new role
       }
-
-      // Get the 4 rows of domain data for this role
-      // Expecting 4 rows of data for Domain1, Domain2, Domain3, Domain4 for the current role
-      // Each of these rows has 3 columns for Year1, Year2, Year3
-      // The current row values[i] is the role name, so data starts from values[i] for Domain1, values[i+1] for Domain2 etc.
-      // This seems to be an error in the original code logic. It should be values[i] for role, values[i+1] for D1, values[i+2] for D2 etc.
-      // However, the prompt asks to keep the logic for reading domain data the same, which implies reading from values[i] through values[i+3] for domains.
-      // This means the roleName row itself is also treated as the first data row (Domain1).
-      // Let's stick to the prompt's requirement to keep the reading logic for values[i] to values[i+3] for domains.
-      // This implies the roleName is in values[i][0], Domain1/Year1 is values[i][1], Domain1/Year2 is values[i][2], etc.
-      // And Domain2/Year1 is values[i+1][1]
-      // This is confusing and likely an error in the original sheet structure or interpretation.
-      // The prompt states "The logic for reading domain1Year1, domain2Year1, etc., from values[i], values[i+1], values[i+2], and values[i+3] remains the same."
-      // The existing code reads:
-      // domain1Year1 from values[i][SETTINGS_COLUMNS.YEAR_1]
-      // domain2Year1 from values[i+1][SETTINGS_COLUMNS.YEAR_1]
-      // domain3Year1 from values[i+2][SETTINGS_COLUMNS.YEAR_1]
-      // domain4Year1 from values[i+3][SETTINGS_COLUMNS.YEAR_1]
-      // This means the role itself is NOT one of the 4 data rows. The 4 data rows FOLLOW the role row.
-      // So if roleName is at values[i], then domain data is at values[i+1], values[i+2], values[i+3], values[i+4].
-      // This contradicts the new check `if (i + 3 >= values.length)` which expects only 3 *additional* rows.
-      // Let's re-evaluate based on the prompt: "The logic for reading domain1Year1... from values[i], values[i+1], values[i+2], and values[i+3] remains the same."
-      // This is the critical part. If values[i] is the first data row, values[i+1] is second, etc.
-      // And roleName is also from values[i][0]. This means the sheet has roleName in col0 and domain1 data in col1,2,3 of the SAME ROW.
-      // Then values[i+1] is Domain2 data. values[i+2] is Domain3 data. values[i+3] is Domain4 data.
-      // This interpretation makes the `i+3 >= values.length` check correct for ensuring 4 *total* data rows including the first one.
-
-      // Let's assume the existing code's interpretation of data rows is what needs to be preserved, but the loop structure changes.
-      // Old code: roleName = values[i][0]. Data from values[i+1] to values[i+4]. Loop increment i+=5.
-      // New code: roleName = values[i][0]. Data from values[i+1] to values[i+4]. Loop increment i++. Then i+=3.
-      // The new check `if (i + 3 >= values.length)` is for the *additional* rows needed *after* the current `values[i]` (which is the role name row).
-      // So, if `values[i]` is the role name row, we need `values[i+1]`, `values[i+2]`, `values[i+3]`, `values[i+4]` for the four domains.
-      // This means we need to check `if (i + 4 >= values.length)`. The prompt's new check `i+3` is problematic if data is in `i+1` to `i+4`.
-
-      // Let's look at the original code again:
-      // roleName = values[i][0]
-      // domain1Year1 = values[i+1][1] ...
-      // domain2Year1 = values[i+2][1] ...
-      // domain3Year1 = values[i+3][1] ...
-      // domain4Year1 = values[i+4][1] ...
-      // This means there are 5 rows involved per role: 1 for role name, 4 for data.
-      // The new warning message says: "Expected 4 data rows". This implies the role name row is separate.
-      // If `values[i]` is the role name, then `values[i+1]` to `values[i+4]` are the 4 data rows.
-      // So, to ensure these 4 data rows exist, we must check `i + 4 < values.length` or `i + 4 >= values.length` for the boundary.
-      // More precisely, the last index needed is `i+4`. So we need `i+4 < values.length`.
-      // If `i+4` is the last valid index, then `values.length` must be at least `i+4+1`.
-      // So the check should be `if (i + 4 >= values.length) { continue; }`
-
-      // Given the prompt: "Replace the existing check for i + 3 >= values.length with a more explicit check: if (i + 3 >= values.length) { console.warn(... Expected 4 data rows...); continue; }"
-      // This implies that `values[i]` (role name), `values[i+1]`, `values[i+2]`, `values[i+3]` are the four rows involved in data extraction for a role.
-      // This means `roleName` is in `values[i][0]`, and `domain1Year1` data is also in `values[i][1]`, etc.
-      // And `domain2Year1` data is in `values[i+1][1]`, etc.
-      // `domain3Year1` data is in `values[i+2][1]`, etc.
-      // `domain4Year1` data is in `values[i+3][1]`, etc.
-      // This structure matches the new check `(i+3 >= values.length)` for the four rows containing data.
-      // And the new `i+=3` advancement also matches this structure.
-
-      // The original code was:
-      // roleYearMappings[roleName] = {
-      //   domain1Year1: values[i+1][1], domain1Year2: values[i+1][2], domain1Year3: values[i+1][3],
-      //   domain2Year1: values[i+2][1], domain2Year2: values[i+2][2], domain2Year3: values[i+2][3],
-      //   domain3Year1: values[i+3][1], domain3Year2: values[i+3][2], domain3Year3: values[i+3][3],
-      //   domain4Year1: values[i+4][1], domain4Year2: values[i+4][2], domain4Year3: values[i+4][3],
-      // };
-      // This clearly shows data is from `i+1` to `i+4`.
-      // The prompt says: "The logic for reading domain1Year1, domain2Year1, etc., from values[i], values[i+1], values[i+2], and values[i+3] remains the same."
-      // This is a direct contradiction to the existing code's `values[i+1]...values[i+4]`.
-
-      // Let's assume the prompt's intention for data reading indices (i, i+1, i+2, i+3) is the source of truth for the refactoring,
-      // meaning the data access itself needs to change from `values[i+1]...values[i+4]` to `values[i]...values[i+3]`.
-      // And `roleName` is still `values[i][0]`.
-      // This means the first data row *is* `values[i]`.
-
-      // New interpretation:
-      // Row `i`: `roleName` in `[0]`, `domain1` data in `[1],[2],[3]`
-      // Row `i+1`: `domain2` data in `[1],[2],[3]` (column `[0]` of this row is ignored or could be a sub-label)
-      // Row `i+2`: `domain3` data in `[1],[2],[3]`
-      // Row `i+3`: `domain4` data in `[1],[2],[3]`
-
-      // This matches the new check `if (i + 3 >= values.length)` and the new advancement `i += 3`.
-      // And the warning "Expected 4 data rows" means these 4 rows (i, i+1, i+2, i+3).
 
       roleYearMappings[roleName] = {
         year1: [
