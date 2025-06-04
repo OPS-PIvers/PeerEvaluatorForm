@@ -416,12 +416,21 @@ function createUserContext(email = null) {
       context.specialRoleType = roleToSpecialTypeMap[context.role];
     }
 
-    // Get assigned subdomains for regular roles
-    if (!context.hasSpecialAccess && context.hasStaffRecord) {
+    // Set assignedSubdomains and viewMode based on year
+    if (context.year === PROBATIONARY_OBSERVATION_YEAR) {
+      context.assignedSubdomains = null;
+      context.viewMode = VIEW_MODES.FULL;
+      debugLog('Probationary user context: full view, no assigned subdomains', { role: context.role, year: context.year });
+    } else {
+      // For non-probationary users, get their assigned subdomains
       context.assignedSubdomains = getAssignedSubdomainsForRoleYear(context.role, context.year);
-      debugLog('Assigned subdomains loaded', {
+      // Set view mode: ASSIGNED for regular users, FULL for special access (unless overridden by specific filters later)
+      context.viewMode = context.hasSpecialAccess ? VIEW_MODES.FULL : VIEW_MODES.ASSIGNED;
+      debugLog('Non-probationary user context: viewMode set', {
         role: context.role,
         year: context.year,
+        viewMode: context.viewMode,
+        hasSpecialAccess: context.hasSpecialAccess,
         subdomains: context.assignedSubdomains
       });
     }
@@ -717,19 +726,44 @@ function createFilteredUserContext(targetEmail, requestingRole) {
     // Create context as if we're the target user
     const context = createUserContext(targetEmail);
 
+    // Explicitly set assignedSubdomains and viewMode for the filtered context
+    // based on the targetUser's (staffUser's) year.
+    let assignedSubdomainsResult = null;
+    let viewModeResult = VIEW_MODES.FULL; // Default to full view
+
+    if (targetUser && targetUser.year === PROBATIONARY_OBSERVATION_YEAR) {
+      assignedSubdomainsResult = null; // Probationary staff viewed by admin/special role sees all subdomains
+      viewModeResult = VIEW_MODES.FULL;
+      debugLog('Filtered context for Probationary user: full view, no assigned subdomains', { targetEmail: targetEmail, requestingRole: requestingRole });
+    } else if (targetUser) {
+      assignedSubdomainsResult = getAssignedSubdomainsForRoleYear(targetUser.role, targetUser.year);
+      // For non-probationary, default to assigned view when being filtered
+      viewModeResult = VIEW_MODES.ASSIGNED;
+      debugLog('Filtered context for Non-Probationary user: assigned view', { targetEmail: targetEmail, targetYear: targetUser.year, requestingRole: requestingRole });
+    } else {
+      // Should not happen if targetUser was validated before, but as a fallback:
+      debugLog('Target user not found within createFilteredUserContext after initial check, defaulting to full view', { targetEmail: targetEmail, requestingRole: requestingRole });
+    }
+
+    context.assignedSubdomains = assignedSubdomainsResult;
+    context.viewMode = viewModeResult;
+
     // Add metadata about the filtering
     context.isFiltered = true;
     context.originalRequestingRole = requestingRole;
     context.filterInfo = {
-      viewingAs: targetUser.name,
-      viewingRole: targetUser.role,
-      viewingYear: targetUser.year,
+      viewingAs: targetUser ? targetUser.name : 'Unknown',
+      viewingRole: targetUser ? targetUser.role : 'Unknown',
+      viewingYear: targetUser ? targetUser.year : 'Unknown',
       requestedBy: requestingRole
     };
 
-    debugLog('Filtered user context created', {
+    debugLog('Filtered user context created and adjusted', {
       targetEmail: targetEmail,
-      targetRole: targetUser.role,
+      targetRole: context.role, // Use context.role as it might have been finalized by createUserContext
+      targetYear: context.year, // Same for year
+      assignedSubdomains: context.assignedSubdomains,
+      viewMode: context.viewMode,
       requestingRole: requestingRole
     });
 
