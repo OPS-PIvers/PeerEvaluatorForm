@@ -1204,8 +1204,8 @@ function enhanceDomainsWithAssignments(domains, assignedSubdomains, viewMode = '
       const enhancedComponents = domain.components ? domain.components.map(component => {
         // Extract component ID from title
         const componentId = extractComponentId(component.title);
-        // Check if componentId is valid and assignedList is not empty before .includes()
-        const isAssigned = componentId ? assignedList.includes(componentId) : false;
+        // Check if componentId is valid before calling .includes() on assignedList (which is guaranteed to be an array)
+        const isAssigned = componentId && assignedList.includes(componentId);
 
         return {
           ...component,
