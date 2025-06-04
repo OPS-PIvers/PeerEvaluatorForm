@@ -1768,12 +1768,14 @@ function getAllDomainsData(role = null, year = null, viewMode = 'full', assigned
     
     return {
       title: "Error Loading Data",
-      subtitle: `Please check the configuration for role: ${role || 'default'}. Error: ${error.message}`,
-      role: role || 'Teacher',
-      year: year,
-      viewMode: viewMode || 'full',
+      subtitle: `An error occurred. Please see details below.`, // Subtitle can be generic
+      role: role || 'Teacher', // Keep role if available
+      year: year, // Keep year if available
+      viewMode: viewMode || 'full', // Keep viewMode if available
       domains: [],
-      assignmentMetadata: {
+      isError: true,
+      errorMessage: `An unexpected error occurred while loading data for role '${role || 'default'}'. Error details: ${error.message}. Please try again later or contact support if the issue persists.`,
+      assignmentMetadata: { // Keep this structure for consistency if the UI expects it
         hasAssignments: false,
         totalAssigned: 0,
         totalComponents: 0,
