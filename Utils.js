@@ -395,3 +395,49 @@ function getAssignedSubdomainsForRoleYear(role, year) {
     return { domain1: [], domain2: [], domain3: [], domain4: [] };
   }
 }
+
+/**
+ * Helper function to determine if a user's year matches a target filter year.
+ * @param {string|number} userYear The year from the user's record (e.g., 1, 2, "Year 1", "Probationary").
+ * @param {string} targetYear The year from the filter (e.g., "1", "Year 1", "Probationary").
+ * @return {boolean} True if the years match according to the defined logic.
+ * @private
+ */
+function _isUserYearMatching(userYear, targetYear) {
+  // Handle cases where inputs might not be strings, or to normalize before strict check
+  // Ensure that null or undefined inputs are treated as empty strings for initial comparison,
+  // as parseYearValue itself handles null/undefined by returning null.
+  const sUserYearInput = (userYear === null || userYear === undefined) ? "" : String(userYear);
+  const sTargetYearInput = (targetYear === null || targetYear === undefined) ? "" : String(targetYear);
+
+  // Trim the string inputs for comparison.
+  const sUserYear = sUserYearInput.trim();
+  const sTargetYear = sTargetYearInput.trim();
+
+  // If the string representations (trimmed, case-insensitive) are identical, they match.
+  // This handles "foo" vs "foo", "" vs "", "1" vs "1".
+  if (sUserYear.toLowerCase() === sTargetYear.toLowerCase()) {
+    return true;
+  }
+
+  // We need parseYearValue for the semantic comparison.
+  // Assume parseYearValue is defined elsewhere and accessible.
+  const parsedUserYear = parseYearValue(userYear);
+  const parsedTargetYear = parseYearValue(targetYear);
+
+  // At this point, the original string values (after trimming and case change) were different.
+  // If both parse to null, it means they were different *unparseable* strings. So, no match.
+  if (parsedUserYear === null && parsedTargetYear === null) {
+    return false;
+  }
+
+  // If one parsed to null and the other didn't (and originals were different), they don't match.
+  if (parsedUserYear === null || parsedTargetYear === null) {
+    return false;
+  }
+
+  // Both parsed to valid, non-null years, and original string forms were different
+  // (e.g., "Year 1" vs "1" which parse to the same numeric year).
+  // Compare the numeric results of parsing.
+  return parsedUserYear === parsedTargetYear;
+}
