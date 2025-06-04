@@ -74,6 +74,41 @@ function doGet(e) {
     const filterStaff = params.filterStaff || null;
     const filterType = params.filterType || 'all';
 
+    // Enhanced filter logic for role-only vs role+year scenarios
+    let effectiveRole = userContext.role;  // Default to user's actual role
+    let effectiveYear = userContext.year;  // Default to user's actual year
+    let shouldShowFullRubric = false;
+    let shouldShowAssignedAreas = false;
+
+    // Handle special role filtering scenarios
+    if (userContext.hasSpecialAccess) {
+        if (filterRole && filterRole !== '' && AVAILABLE_ROLES.includes(filterRole)) {
+            // Role filter is applied
+            effectiveRole = filterRole;
+            
+            if (filterYear && filterYear !== '') {
+                // Both role and year filters applied - show assigned areas
+                effectiveYear = parseInt(filterYear) || filterYear; // Handle 'Probationary' string
+                shouldShowAssignedAreas = true;
+                
+                debugLog('Special role filtering: Role + Year mode', {
+                    filterRole: filterRole,
+                    filterYear: filterYear,
+                    effectiveRole: effectiveRole,
+                    effectiveYear: effectiveYear
+                });
+            } else {
+                // Only role filter applied - show full rubric for that role
+                shouldShowFullRubric = true;
+                
+                debugLog('Special role filtering: Role-only mode', {
+                    filterRole: filterRole,
+                    effectiveRole: effectiveRole
+                });
+            }
+        }
+    }
+
     debugLog('Enhanced web app request received', {
       requestId: requestId,
       forceRefresh: forceRefresh,
@@ -102,21 +137,44 @@ function doGet(e) {
     // Handle special role filtering
     let finalUserContext = userContext;
 
-    if (userContext.hasSpecialAccess && filterStaff && isValidEmail(filterStaff)) {
-      // Special role user is viewing as another staff member
-      const filteredContext = createFilteredUserContext(filterStaff, userContext.role);
-      if (filteredContext) {
-        finalUserContext = filteredContext;
-        debugLog('Using filtered user context', {
-          originalRole: userContext.role,
-          viewingAs: filteredContext.filterInfo.viewingAs,
-          viewingRole: filteredContext.filterInfo.viewingRole
-        });
-      }
+    if (userContext.hasSpecialAccess) {
+        if (filterStaff && isValidEmail(filterStaff)) {
+            // Staff-specific filtering (existing behavior)
+            const filteredContext = createFilteredUserContext(filterStaff, userContext.role);
+            if (filteredContext) {
+                finalUserContext = filteredContext;
+                debugLog('Using filtered user context for staff member', {
+                    originalRole: userContext.role,
+                    viewingAs: filteredContext.filterInfo.viewingAs,
+                    viewingRole: filteredContext.filterInfo.viewingRole
+                });
+            }
+        } else if (shouldShowFullRubric || shouldShowAssignedAreas) {
+            // Role or Role+Year filtering - create synthetic context
+            finalUserContext = createSyntheticUserContext(effectiveRole, effectiveYear, userContext, {
+                isRoleFiltered: true,
+                showFullRubric: shouldShowFullRubric,
+                showAssignedAreas: shouldShowAssignedAreas,
+                originalRole: userContext.role
+            });
+            
+            debugLog('Using synthetic user context for role filtering', {
+                originalRole: userContext.role,
+                effectiveRole: effectiveRole,
+                effectiveYear: effectiveYear,
+                showFullRubric: shouldShowFullRubric,
+                showAssignedAreas: shouldShowAssignedAreas
+            });
+        }
     }
 
-    // Set view mode
-    finalUserContext.viewMode = viewMode;
+    // Set view mode (URL parameter can override filter logic)
+    if (viewMode && (viewMode === 'full' || viewMode === 'assigned')) {
+        finalUserContext.viewMode = viewMode;
+    } else if (!finalUserContext.isSynthetic) {
+        // Only set default view mode if not already set by synthetic context
+        finalUserContext.viewMode = 'full';
+    }
 
     // Add filter parameters to context
     finalUserContext.activeFilters = {
@@ -1000,8 +1058,18 @@ function getStaffListForDropdown(role, year) {
   try {
     debugLog(`getStaffListForDropdown called with role: ${role}, year: ${year}`);
 
-    const staffData = SheetService.getStaffData();
+    // Enhanced input validation
+    if (!role || typeof role !== 'string' || role.trim() === '') {
+      debugLog('Invalid role provided to getStaffListForDropdown', { role: role });
+      return [];
+    }
 
+    if (!year || typeof year !== 'string' || year.trim() === '') {
+      debugLog('Invalid year provided to getStaffListForDropdown', { year: year });
+      return [];
+    }
+
+    const staffData = getStaffData();
 
     if (!staffData || !staffData.users || staffData.users.length === 0) {
       debugLog('No staff data available in getStaffListForDropdown.');
@@ -1010,28 +1078,57 @@ function getStaffListForDropdown(role, year) {
 
     let filteredStaff = staffData.users;
 
-    // Filter by role (case-insensitive)
-    if (role && role.toLowerCase() !== 'any') {
-      const lowerCaseRole = role.toLowerCase();
-      filteredStaff = filteredStaff.filter(user => user.role && user.role.toLowerCase() === lowerCaseRole);
+    // Filter by role (handle "Any" specially)
+    if (role.toLowerCase() !== 'any') {
+      const targetRole = role.trim();
+      
+      // Validate that the role exists in AVAILABLE_ROLES
+      if (!AVAILABLE_ROLES.includes(targetRole)) {
+        debugLog(`Invalid role provided: ${targetRole}. Valid roles are:`, AVAILABLE_ROLES);
+        return [];
+      }
+      
+      filteredStaff = filteredStaff.filter(user => {
+        return user.role && user.role.trim() === targetRole;
+      });
+      
+      debugLog(`After role filter (${targetRole}):`, filteredStaff.length, 'staff members');
     }
 
-    // Filter by year
-    if (year && year.toLowerCase() !== 'any') {
-      filteredStaff = filteredStaff.filter(user => _isUserYearMatching(user.year, year));
+    // Filter by year (handle "Any" specially)
+    if (year.toLowerCase() !== 'any') {
+      const targetYear = year.trim();
+      
+      filteredStaff = filteredStaff.filter(user => {
+        return _isUserYearMatching(user.year, targetYear);
+      });
+      
+      debugLog(`After year filter (${targetYear}):`, filteredStaff.length, 'staff members');
     }
 
+    // Format results for dropdown
     const result = filteredStaff.map(user => ({
-      name: user.name,
-      email: user.email
+      name: user.name || 'Unknown Name',
+      email: user.email || '',
+      role: user.role || 'Unknown Role',
+      year: user.year || 'Unknown Year',
+      displayText: `${user.name || 'Unknown'} (${user.role || 'Unknown'}, Year ${user.year || 'N/A'})`
     }));
 
+    // Sort by name for better user experience
+    result.sort((a, b) => {
+      const nameA = a.name.toLowerCase();
+      const nameB = b.name.toLowerCase();
+      return nameA.localeCompare(nameB);
+    });
+
     debugLog(`Found ${result.length} staff members for role '${role}' and year '${year}'.`);
+    
     return result;
 
   } catch (error) {
     console.error('Error in getStaffListForDropdown:', error.toString(), error.stack);
-    debugLog(`Error in getStaffListForDropdown: ${error.toString()} Stack: ${error.stack ? error.stack : 'N/A'}`);
+    debugLog(`Error in getStaffListForDropdown: ${error.toString()} Stack: ${error.stack || 'N/A'}`);
     return []; // Return empty array on error
   }
 }
@@ -1969,4 +2066,68 @@ function generateAllUrlVariations(userContext = null) {
     console.error('Error generating URL variations:', error);
     return { error: error.message };
   }
+}
+
+/**
+ * Create synthetic user context for role/year filtering by special access users
+ * @param {string} targetRole - Role to simulate
+ * @param {number|string} targetYear - Year to simulate  
+ * @param {Object} originalContext - Original user context
+ * @param {Object} filterOptions - Filter configuration options
+ * @return {Object} Synthetic user context
+ */
+function createSyntheticUserContext(targetRole, targetYear, originalContext, filterOptions = {}) {
+    try {
+        debugLog('Creating synthetic user context', {
+            targetRole: targetRole,
+            targetYear: targetYear,
+            filterOptions: filterOptions
+        });
+
+        // Create a copy of the original context
+        const syntheticContext = {
+            ...originalContext,
+            role: targetRole,
+            year: targetYear,
+            isFiltered: true,
+            isSynthetic: true,
+            
+            // Override view mode based on filter type
+            viewMode: filterOptions.showAssignedAreas ? 'assigned' : 'full',
+            
+            // Get assigned subdomains for this role/year if needed
+            assignedSubdomains: filterOptions.showAssignedAreas ? 
+                getAssignedSubdomainsForRoleYear(targetRole, targetYear) : null,
+            
+            // Enhanced filter info
+            filterInfo: {
+                filterType: filterOptions.showFullRubric ? 'role_only' : 'role_and_year',
+                viewingRole: targetRole,
+                viewingYear: targetYear,
+                requestedBy: originalContext.role,
+                showFullRubric: filterOptions.showFullRubric,
+                showAssignedAreas: filterOptions.showAssignedAreas,
+                originalRole: filterOptions.originalRole
+            },
+            
+            // Maintain special access from original context
+            hasSpecialAccess: originalContext.hasSpecialAccess,
+            canFilter: originalContext.canFilter,
+            specialRoleType: originalContext.specialRoleType
+        };
+
+        debugLog('Synthetic user context created successfully', {
+            role: syntheticContext.role,
+            year: syntheticContext.year,
+            viewMode: syntheticContext.viewMode,
+            hasAssignedSubdomains: !!syntheticContext.assignedSubdomains,
+            filterType: syntheticContext.filterInfo.filterType
+        });
+
+        return syntheticContext;
+
+    } catch (error) {
+        console.error('Error creating synthetic user context:', error);
+        return originalContext; // Fallback to original context
+    }
 }
