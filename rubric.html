@@ -848,7 +848,7 @@
 
                     <? } else if (data.userContext.specialRoleType === 'peer_evaluator' || data.userContext.specialRoleType === 'full_access') { ?>
                     <!-- Peer Evaluator & Full Access: Full filtering options -->
-                    <select id="roleFilter" class="filter-select" onchange="updateAvailableStaff()" aria-label="Filter by Role">
+                    <select id="roleFilter" class="filter-select" onchange="handleRoleSelection()" aria-label="Filter by Role">
                         <option value="">Select Role...</option>
                         <option value="Any">Any Role</option>
                         <? for (var r = 0; r < data.userContext.availableRoles?.length || 0; r++) { ?>
@@ -856,7 +856,7 @@
                         <? } ?>
                     </select>
 
-                    <select id="yearFilter" class="filter-select" onchange="updateAvailableStaff()" aria-label="Filter by Year">
+                    <select id="yearFilter" class="filter-select" onchange="updateAvailableStaff()" aria-label="Filter by Year" style="display: none;">
                         <option value="">Select Year...</option>
                         <option value="Any">Any Year</option>
                         <option value="1">Year 1</option>
@@ -865,7 +865,7 @@
                         <option value="Probationary">Probationary</option>
                     </select>
 
-                    <select id="staffFilter" class="filter-select" onchange="applyStaffFilter()" aria-label="Filter by Staff Member">
+                    <select id="staffFilter" class="filter-select" onchange="applyStaffFilter()" aria-label="Filter by Staff Member" style="display: none;">
                         <option value="">Select Staff Member...</option>
                         <!-- Options populated by JavaScript -->
                     </select>
@@ -1050,23 +1050,102 @@
             const selectedRole = roleFilter.value;
             const selectedYear = yearFilter.value;
 
-            // Clear staff dropdown
-            staffFilter.innerHTML = '<option value="">Select Staff Member...</option>';
+            console.log('updateAvailableStaff called - Role:', selectedRole, 'Year:', selectedYear);
 
-            if (!selectedRole && !selectedYear) {
+            if (!selectedRole || selectedRole === '') {
+                // If no role, this shouldn't happen due to progressive display
                 return;
             }
 
-            // This would normally fetch from server, but for now we'll use a simple approach
-            console.log('Filters updated - Role:', selectedRole, 'Year:', selectedYear);
-
-            // Add a note that staff list will be populated when both role and year are selected
-            if (selectedRole && selectedYear) {
-                staffFilter.innerHTML = '<option value="">Loading staff...</option>';
-
-                // Trigger server request to get staff list
-                requestStaffList(selectedRole, selectedYear);
+            if (!selectedYear || selectedYear === '') {
+                // Year was cleared - hide staff dropdown and stay on role-only view
+                staffFilter.style.display = 'none';
+                staffFilter.innerHTML = '<option value="">Select Staff Member...</option>';
+                
+                // Re-apply role-only filter
+                applyRoleOnlyFilter(selectedRole);
+                return;
             }
+
+            // Both role and year are selected
+            console.log('Both role and year selected - showing staff filter and applying role+year filter');
+            
+            // Show staff dropdown
+            staffFilter.style.display = 'inline-block';
+            
+            // Clear and populate staff dropdown
+            staffFilter.innerHTML = '<option value="">Select Staff Member...</option>';
+            
+            // Apply role+year filter (show assigned subdomains)
+            applyRoleAndYearFilter(selectedRole, selectedYear);
+            
+            // Populate staff list for this role+year combination
+            requestStaffList(selectedRole, selectedYear);
+        }
+
+        function applyRoleAndYearFilter(role, year) {
+            console.log('Applying role+year filter for:', role, 'year:', year);
+            
+            // Build URL to show assigned subdomains for this role/year combination
+            const newUrl = generateFilteredURL({ 
+                filterRole: role,
+                filterYear: year,
+                view: 'assigned'  // Show only assigned areas for this role/year
+            });
+            
+            window.location.href = newUrl;
+        }
+
+        function handleRoleSelection() {
+            const roleFilter = document.getElementById('roleFilter');
+            const yearFilter = document.getElementById('yearFilter');
+            const staffFilter = document.getElementById('staffFilter');
+
+            if (!roleFilter || !yearFilter || !staffFilter) return;
+
+            const selectedRole = roleFilter.value;
+
+            if (!selectedRole || selectedRole === '') {
+                // No role selected - hide year and staff dropdowns
+                yearFilter.style.display = 'none';
+                staffFilter.style.display = 'none';
+                
+                // Clear their values
+                yearFilter.value = '';
+                staffFilter.value = '';
+                
+                // Clear staff dropdown options
+                staffFilter.innerHTML = '<option value="">Select Staff Member...</option>';
+                
+                console.log('No role selected - hiding other filters');
+                return;
+            }
+
+            // Role is selected - show year dropdown and apply role filter
+            yearFilter.style.display = 'inline-block';
+            
+            // Reset year and staff selections
+            yearFilter.value = '';
+            staffFilter.value = '';
+            staffFilter.style.display = 'none';
+            staffFilter.innerHTML = '<option value="">Select Staff Member...</option>';
+
+            console.log('Role selected:', selectedRole, '- showing year filter');
+
+            // Apply role-only filter (show full rubric for this role)
+            applyRoleOnlyFilter(selectedRole);
+        }
+
+        function applyRoleOnlyFilter(role) {
+            console.log('Applying role-only filter for:', role);
+            
+            // Build URL to show full rubric for this role
+            const newUrl = generateFilteredURL({ 
+                filterRole: role,
+                view: 'full'  // Show full rubric, not assigned areas
+            });
+            
+            window.location.href = newUrl;
         }
 
         const DEFAULT_ERROR_MESSAGE = 'Server error. Please try again.';
@@ -1088,14 +1167,23 @@
         function requestStaffList(role, year) {
             const staffFilter = document.getElementById('staffFilter');
             if (!staffFilter) {
-                 console.error('Staff filter dropdown element not found in requestStaffList.');
-                 return;
+                console.error('Staff filter dropdown element not found in requestStaffList.');
+                return;
+            }
+
+            // Validate inputs
+            if (!role || !year) {
+                console.warn('Invalid role or year provided to requestStaffList:', { role: role, year: year });
+                staffFilter.innerHTML = '<option value="">Invalid selection</option>';
+                return;
             }
 
             // Indicate loading
             staffFilter.innerHTML = ''; // Clear existing options first
             const loadingOpt = new Option('Loading staff...', '');
             loadingOpt.disabled = true;
+            loadingOpt.style.fontStyle = 'italic';
+            loadingOpt.style.color = '#007bff'; // Blue color for loading
             staffFilter.appendChild(loadingOpt);
             staffFilter.disabled = true;
 
@@ -1103,7 +1191,7 @@
 
             google.script.run
                 .withSuccessHandler(function(staffListData) {
-                    populateStaffDropdown(staffListData); // Pass only staffListData
+                    populateStaffDropdown(staffListData);
                     if (staffFilter) staffFilter.disabled = false;
                 })
                 .withFailureHandler(function(error) {
@@ -1113,6 +1201,8 @@
                         const errorMessage = 'Error loading staff' + formatClientErrorMessage(error);
                         const errorOpt = new Option(errorMessage, '');
                         errorOpt.disabled = true;
+                        errorOpt.style.fontStyle = 'italic';
+                        errorOpt.style.color = '#dc3545'; // Red color for error
                         staffFilter.appendChild(errorOpt);
                         staffFilter.disabled = false;
                     }
@@ -1134,15 +1224,25 @@
                 if (staffListData.length === 0) {
                     const noStaffOption = new Option('No staff found for this selection', '');
                     noStaffOption.disabled = true;
+                    noStaffOption.style.fontStyle = 'italic';
+                    noStaffOption.style.color = '#666';
                     staffFilter.appendChild(noStaffOption);
                 } else {
                     staffListData.forEach(function(staff) {
                         if (typeof staff === 'object' && staff !== null &&
                             typeof staff.name === 'string' && staff.name.trim() !== '' &&
                             typeof staff.email === 'string' && staff.email.trim() !== '') {
+                            
                             const option = document.createElement('option');
                             option.value = staff.email;
-                            option.textContent = staff.name;
+                            
+                            // Use displayText if available, otherwise construct it
+                            if (staff.displayText) {
+                                option.textContent = staff.displayText;
+                            } else {
+                                option.textContent = `${staff.name} (${staff.role || 'Unknown'}, Year ${staff.year || 'N/A'})`;
+                            }
+                            
                             staffFilter.appendChild(option);
                         } else {
                             console.warn('Invalid or incomplete staff item found in list. Skipping:', staff);
@@ -1154,6 +1254,8 @@
                 console.error('Failed to populate staff dropdown due to invalid or missing staffListData:', staffListData);
                 const errorOption = new Option('Error loading staff data', '');
                 errorOption.disabled = true;
+                errorOption.style.fontStyle = 'italic';
+                errorOption.style.color = '#dc3545'; // Red color for error
                 staffFilter.appendChild(errorOption);
             }
         }
