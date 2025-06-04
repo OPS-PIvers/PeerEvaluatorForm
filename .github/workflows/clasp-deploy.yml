@@ -1,0 +1,39 @@
+name: Auto Deploy Apps Script
+on:
+  push:
+    branches:
+      - main # Change this to your main branch if it's not named 'main'
+      # Add other branches here if you want pushes to them to trigger deployment
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 'lts/*' # Or a specific version like '18.x' or '20.x'
+    - name: Install clasp
+      run: npm install -g @google/clasp
+    - name: Authenticate clasp
+      run: |
+        # Create the credentials file from the secret
+        echo '${{ secrets.CLASPRC_JSON }}' > ~/.clasprc.json
+        # Validate JSON format (fails if not valid)
+        jq empty ~/.clasprc.json || { echo "Invalid JSON in credentials"; cat ~/.clasprc.json; exit 1; }
+    - name: Push code to Apps Script
+      # Use --force if you encounter issues with minor version bumps
+      run: clasp push --force
+    - name: Update deployment
+      # If you have a specific deployment ID to update, use this format
+      run: |
+        if [ -n "${{ secrets.DEPLOYMENT_ID }}" ]; then
+          clasp deploy --deploymentId ${{ secrets.DEPLOYMENT_ID }} --description "Auto-deployment $(date)"
+        else
+          clasp deploy --description "Auto-deployment $(date)"
+        fi
+    # Optional: Clean up the credentials file (good practice)
+    - name: Clean up credentials
+      if: always() # Run even if previous steps failed
+      run: rm -f ~/.clasprc.json
