@@ -553,7 +553,7 @@
             window.location.href = newUrl;
         }
 
-        function initializeFiltersFromURL() {
+        window.initializeFiltersFromURL = function() {
             const urlParams = new URLSearchParams(window.location.search);
 
             // Restore Administrator filter
