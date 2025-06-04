@@ -444,7 +444,7 @@ function getFilteredStaffList(filterType = 'all', role = null, year = null) {
     // Apply type-based filtering
     switch (filterType) {
       case 'probationary':
-        filteredUsers = filteredUsers.filter(user => user.year === 'Probationary');
+        filteredUsers = filteredUsers.filter(user => user.year === PROBATIONARY_OBSERVATION_YEAR);
         break;
 
       case 'by_role':
