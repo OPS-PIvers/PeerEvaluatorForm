@@ -1241,7 +1241,7 @@ function enhanceDomainsWithAssignments(domains, assignedSubdomains, viewMode = '
 
   } catch (error) {
     console.error('Error enhancing domains with assignments:', error);
-    return domains;
+    throw error; // Re-throw the error
   }
 }
 
