@@ -1656,8 +1656,17 @@ function getAllDomainsData(role = null, year = null, viewMode = 'full', assigned
   if (year !== null && year !== undefined) {
     const observationYear = parseInt(year);
     if (isNaN(observationYear) || !OBSERVATION_YEARS.includes(observationYear)) {
-      console.warn(`Invalid year: ${year}. Proceeding without year filter.`);
-      // userYear remains null, effectively ignoring the invalid year
+      console.error(`Invalid year: ${year}. Returning error structure.`);
+      return {
+        title: "Error Loading Data",
+        subtitle: `Invalid year specified: ${year}. Please select a valid year.`,
+      role: role,
+        year: year,     // original invalid year
+      viewMode: viewMode,
+        domains: [],
+        isError: true,
+      errorMessage: `Invalid year: ${year}. Valid years are: ${OBSERVATION_YEARS.join(', ')}`
+      };
     } else {
       userYear = observationYear;
     }
