@@ -157,10 +157,7 @@ const DOMAIN_TEMPLATE = {
 /**
  * String identifier for probationary status
  */
-const PROBATIONARY_STATUS_STRING = 'probationary';
-if (cellValue && cellValue.toLowerCase() === PROBATIONARY_STATUS_STRING) {
-  // It's probationary, regardless of case in the sheet
-}
+const PROBATIONARY_STATUS_STRING = 'Probationary';
 
 /**
  * Numeric representation for probationary observation year
