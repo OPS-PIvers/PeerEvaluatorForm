@@ -2432,6 +2432,7 @@ function createFilterSelectionInterface(userContext, requestId) {
         
         // Pass data to the template
         htmlTemplate.userContext = userContext;
+        htmlTemplate.userContext.probationaryYearValue = PROBATIONARY_OBSERVATION_YEAR;
         htmlTemplate.availableRoles = AVAILABLE_ROLES;
         htmlTemplate.availableYears = OBSERVATION_YEARS;
 
