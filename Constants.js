@@ -295,3 +295,59 @@ const VALIDATION_ERROR_TYPES = {
   // Trigger and Automation
   TRIGGER_ERROR: 'trigger_error'          // Error within an automated trigger
 };
+
+/**
+ * View mode constants for subdomain filtering
+ */
+const VIEW_MODES = {
+  FULL: 'full',
+  ASSIGNED: 'assigned'
+};
+
+/**
+ * Special role types for filtering
+ */
+const SPECIAL_ROLE_TYPES = {
+  ADMINISTRATOR: 'administrator',
+  PEER_EVALUATOR: 'peer_evaluator',
+  FULL_ACCESS: 'full_access'
+};
+
+/**
+ * Names of roles that have special access permissions
+ */
+const SPECIAL_ROLES = {
+  ADMINISTRATOR: 'Administrator',
+  PEER_EVALUATOR: 'Peer Evaluator',
+  FULL_ACCESS: 'Full Access'
+};
+
+const SPECIAL_ACTIONS = {
+  VIEW_PROBATIONARY: 'view_probationary',
+  VIEW_OWN_STAFF: 'view_own_staff',
+  VIEW_ANY: 'view_any',
+  FILTER_BY_ROLE: 'filter_by_role',
+  FILTER_BY_YEAR: 'filter_by_year',
+  FILTER_BY_STAFF: 'filter_by_staff',
+  ADMIN_FUNCTIONS: 'admin_functions',
+  GENERAL_ACCESS: 'general_access'
+};
+
+/**
+ * Filter types for special roles
+ */
+const FILTER_TYPES = {
+  ALL_STAFF: 'all',
+  PROBATIONARY_ONLY: 'probationary',
+  BY_ROLE: 'by_role',
+  BY_YEAR: 'by_year',
+  BY_STAFF_MEMBER: 'by_staff_member'
+};
+
+/**
+ * UI text for view mode toggle
+ */
+const VIEW_MODE_TEXT = {
+  FULL: 'View: Full Rubric',
+  ASSIGNED: 'View: My Assigned Areas'
+};
