@@ -1070,6 +1070,7 @@
         }
 
         function generateProbationaryStaffHtml(data) {
+            const probationaryYear = <?= userContext.probationaryYearValue ?>;
             let html = `
                 <div style="background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
                     <div style="background: linear-gradient(135deg, #dc2626, #b91c1c); color: white; padding: 30px; text-align: center;">
@@ -1082,13 +1083,17 @@
             if (data.staff && data.staff.length > 0) {
                 html += '<div style="display: grid; gap: 15px;">';
                 data.staff.forEach(function(staff) {
+                    // Make all staff members clickable
+                    const onclickAttribute = `onclick="loadStaffMemberRubric('${staff.email}', '${staff.role}', ${staff.year})"`;
+                    const cursorStyle = 'cursor: pointer;';
+
                     html += `
-                        <div style="background: #fef2f2; border: 2px solid #fecaca; border-radius: 8px; padding: 20px;">
+                        <div style="background: #fef2f2; border: 2px solid #fecaca; border-radius: 8px; padding: 20px; ${cursorStyle}" ${onclickAttribute}>
                             <h4 style="margin: 0 0 10px 0; color: #dc2626; font-size: 1.1rem;">${staff.name || 'Unknown Name'}</h4>
                             <div style="color: #7f1d1d; font-size: 0.95rem;">
                                 <div><strong>Email:</strong> ${staff.email || 'No email'}</div>
                                 <div><strong>Role:</strong> ${staff.role || 'Unknown Role'}</div>
-                                <div><strong>Year:</strong> ${staff.year || 'Unknown Year'}</div>
+                                <div><strong>Year:</strong> ${staff.year === probationaryYear ? 'Probationary' : (staff.year || 'Unknown Year')}</div>
                             </div>
                         </div>
                     `;
@@ -1263,6 +1268,23 @@
             specialRoleType: '<?= userContext.specialRoleType ?>',
             year: <?= userContext.year || 1 ?>
         });
+
+        function loadStaffMemberRubric(email, role, year) {
+            // Attempt to load rubric for any role
+            showLoading(`Loading ${role} rubric...`); // More generic message
+            const filterParams = {
+                role: role,
+                year: year,
+                staff: email,
+                viewType: 'assigned' // Default to assigned areas for a specific staff member
+            };
+            google.script.run
+                .withSuccessHandler(handleRubricData)
+                .withFailureHandler(handleError)
+                .loadRubricData(filterParams);
+            console.log(`Attempting to load rubric for ${email}, Role: ${role}, Year: ${year}`);
+        }
+
         // Function to toggle look-fors sections (copied from main rubric)
         function toggleLookFors(componentId) {
             const parts = componentId.split('-');
