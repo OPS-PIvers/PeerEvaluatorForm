@@ -270,9 +270,17 @@ function getSettingsData() {
     
     const roleYearMappings = {};
     
-    // Process data with 4-row pattern for each role
+    // Process data from the Settings sheet.
+    // The sheet is expected to have a role name in the first column (defined by SETTINGS_COLUMNS.ROLE).
+    // The row containing the role name is the first of 4 consecutive rows used for data; this role row contains data for Domain 1.
+    // The next three rows contain data for Domains 2, 3, and 4, respectively.
+    // Columns B, C, D (defined by SETTINGS_COLUMNS.YEAR_1, YEAR_2, YEAR_3) in these 4 data rows
+    // contain the specific items/subdomains for that Domain for Year 1, Year 2, and Year 3 respectively.
+    // The parser actively looks for role names and processes these 4 rows (the role name row plus the next three).
+    // Blank rows between role definitions are skipped.
     for (let i = 0; i < values.length; i++) {
       const row = values[i];
+      // Potential start of a role definition
       const roleName = sanitizeText(row[SETTINGS_COLUMNS.ROLE]); // Column A
       
       // Skip empty rows
@@ -286,33 +294,32 @@ function getSettingsData() {
         continue;
       }
       
-      // Make sure we have 4 rows of data for this role
+      // Ensure there are enough rows for a complete 4-domain definition for this role.
       if (i + 3 >= values.length) {
-        console.warn(`Not enough data rows for role ${roleName} starting at row ${i + 2}`);
-        continue;
+        console.warn(`Incomplete data for role ${roleName} starting at settings sheet row ${i + 2}. Expected 4 data rows, found fewer.`);
+        continue; // Skip to the next row to find a new role
       }
 
-      // Get the 4 rows of domain data for this role
-      const domain1Year1 = sanitizeText(values[i][SETTINGS_COLUMNS.YEAR_1]);     // B column, row 1 of role group
-      const domain2Year1 = sanitizeText(values[i + 1][SETTINGS_COLUMNS.YEAR_1]); // B column, row 2 of role group
-      const domain3Year1 = sanitizeText(values[i + 2][SETTINGS_COLUMNS.YEAR_1]); // B column, row 3 of role group
-      const domain4Year1 = sanitizeText(values[i + 3][SETTINGS_COLUMNS.YEAR_1]); // B column, row 4 of role group
-
-      const domain1Year2 = sanitizeText(values[i][SETTINGS_COLUMNS.YEAR_2]);     // C column, row 1 of role group
-      const domain2Year2 = sanitizeText(values[i + 1][SETTINGS_COLUMNS.YEAR_2]); // C column, row 2 of role group
-      const domain3Year2 = sanitizeText(values[i + 2][SETTINGS_COLUMNS.YEAR_2]); // C column, row 3 of role group
-      const domain4Year2 = sanitizeText(values[i + 3][SETTINGS_COLUMNS.YEAR_2]); // C column, row 4 of role group
-
-      const domain1Year3 = sanitizeText(values[i][SETTINGS_COLUMNS.YEAR_3]);     // D column, row 1 of role group
-      const domain2Year3 = sanitizeText(values[i + 1][SETTINGS_COLUMNS.YEAR_3]); // D column, row 2 of role group
-      const domain3Year3 = sanitizeText(values[i + 2][SETTINGS_COLUMNS.YEAR_3]); // D column, row 3 of role group
-      const domain4Year3 = sanitizeText(values[i + 3][SETTINGS_COLUMNS.YEAR_3]); // D column, row 4 of role group
-
       roleYearMappings[roleName] = {
-        year1: [domain1Year1, domain2Year1, domain3Year1, domain4Year1],
-        year2: [domain1Year2, domain2Year2, domain3Year2, domain4Year2],
-        year3: [domain1Year3, domain2Year3, domain3Year3, domain4Year3],
-        startRow: i + 2 // For debugging
+        year1: [
+          sanitizeText(values[i][SETTINGS_COLUMNS.YEAR_1]),    // Domain 1, Year 1 data from current role row
+          sanitizeText(values[i+1][SETTINGS_COLUMNS.YEAR_1]),  // Domain 2, Year 1 data from next row
+          sanitizeText(values[i+2][SETTINGS_COLUMNS.YEAR_1]),  // Domain 3, Year 1 data from row after next
+          sanitizeText(values[i+3][SETTINGS_COLUMNS.YEAR_1])   // Domain 4, Year 1 data from row 3 after role row
+        ],
+        year2: [
+          sanitizeText(values[i][SETTINGS_COLUMNS.YEAR_2]),    // Domain 1, Year 2
+          sanitizeText(values[i+1][SETTINGS_COLUMNS.YEAR_2]),  // Domain 2, Year 2
+          sanitizeText(values[i+2][SETTINGS_COLUMNS.YEAR_2]),  // Domain 3, Year 2
+          sanitizeText(values[i+3][SETTINGS_COLUMNS.YEAR_2])   // Domain 4, Year 2
+        ],
+        year3: [
+          sanitizeText(values[i][SETTINGS_COLUMNS.YEAR_3]),    // Domain 1, Year 3
+          sanitizeText(values[i+1][SETTINGS_COLUMNS.YEAR_3]),  // Domain 2, Year 3
+          sanitizeText(values[i+2][SETTINGS_COLUMNS.YEAR_3]),  // Domain 3, Year 3
+          sanitizeText(values[i+3][SETTINGS_COLUMNS.YEAR_3])   // Domain 4, Year 3
+        ],
+        startRow: i + 2 // For debugging, refers to the 1-based sheet row number for the roleName
       };
       
       debugLog(`Settings loaded for role: ${roleName}`, {
@@ -320,9 +327,9 @@ function getSettingsData() {
         year2Domains: roleYearMappings[roleName].year2,
         year3Domains: roleYearMappings[roleName].year3
       });
-
-      // Skip ahead to next role (past the 4 rows we just processed + 1 blank row)
-      i += 4; // This will be incremented by 1 more by the for loop, making it skip 5 total
+      // Advance the index by 3 to account for the 3 additional rows just processed for the current role.
+      // The loop's i++ will then move to the next row, effectively skipping the 4 processed data rows.
+      i += 3; // Advance index past the 3 additional data rows just processed. Loop's i++ handles the first.
     }
     
     const settingsData = {
