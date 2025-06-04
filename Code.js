@@ -99,7 +99,16 @@ function doGet(e) {
     // Create enhanced user context with proactive role change detection
     const userContext = createUserContext();
 
-    // ✅ NOW userContext is defined, so we can use it safely
+    // Check if this is a special access user without active filters
+    if (userContext.hasSpecialAccess && !hasActiveFilters(params)) {
+        debugLog('Special access user detected - showing filter interface', {
+            role: userContext.role,
+            specialRoleType: userContext.specialRoleType,
+            requestId: requestId
+        });
+        
+        return createFilterSelectionInterface(userContext, requestId);
+    }
     // Enhanced filter logic for role-only vs role+year scenarios
     let effectiveRole = userContext.role;  // Default to user's actual role
     let effectiveYear = userContext.year;  // Default to user's actual year
@@ -213,6 +222,11 @@ function doGet(e) {
       requestId: requestId
     });
     
+    // Fallback check
+    // If we tried to show filter interface but it failed, continue with normal flow
+    if (userContext.hasSpecialAccess && !hasActiveFilters(params)) {
+        console.log('⚠️ Filter interface should have been shown but continuing with normal flow');
+    }
     // Get role-specific rubric data
     const rubricData = getAllDomainsData(
       finalUserContext.role,
@@ -2379,4 +2393,263 @@ function createEnhancedErrorPage(error, requestId, userContext, userAgent) {
       </div>
     `).setTitle('System Error');
   }
+}
+
+/**
+ * Check if there are active filter parameters
+ */
+function hasActiveFilters(params) {
+    const hasFilters = !!(
+        params.filterRole || 
+        params.filterYear || 
+        params.filterStaff || 
+        params.filterType === 'probationary' ||
+        params.view ||
+        params.role  // URL role override
+    );
+    
+    debugLog('Checking for active filters', {
+        params: params,
+        hasFilters: hasFilters
+    });
+    
+    return hasFilters;
+}
+
+/**
+ * Create filter selection interface for special access users
+ */
+function createFilterSelectionInterface(userContext, requestId) {
+    try {
+        debugLog('Creating filter selection interface', {
+            role: userContext.role,
+            specialRoleType: userContext.specialRoleType,
+            requestId: requestId
+        });
+
+        // Create the HTML template using the new filter-interface.html file
+        const htmlTemplate = HtmlService.createTemplateFromFile('filter-interface');
+        
+        // Pass data to the template
+        htmlTemplate.userContext = userContext;
+        htmlTemplate.availableRoles = AVAILABLE_ROLES;
+        htmlTemplate.availableYears = OBSERVATION_YEARS;
+
+        // Generate the HTML output
+        const htmlOutput = htmlTemplate.evaluate()
+            .setTitle(`${userContext.role} - Select Rubric View`)
+            .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+
+        // Add cache-busting headers (reuse existing function)
+        const responseMetadata = generateResponseMetadata(userContext, requestId, false);
+        addCacheBustingHeaders(htmlOutput, responseMetadata);
+
+        console.log(`✅ FILTER INTERFACE LOADED: ${userContext.role} (${userContext.specialRoleType}) - Request ID: ${requestId}`);
+        
+        debugLog('Filter selection interface created successfully', { requestId });
+        return htmlOutput;
+
+    } catch (error) {
+        console.error('Error creating filter selection interface:', error);
+        
+        // Fallback to the original rubric if the filter interface fails
+        console.log('⚠️ FILTER INTERFACE FAILED - Falling back to regular rubric');
+        return null; // This will cause the function to continue with normal rubric loading
+    }
+}
+
+/**
+ * Server-side function for AJAX rubric loading - Phase 4
+ * This function is called from the filter interface via google.script.run
+ */
+function loadRubricData(filterParams) {
+    try {
+        debugLog('Loading rubric data via AJAX', { filterParams });
+
+        const { role, year, viewType, filterType, staff } = filterParams;
+
+        // Handle probationary staff filter (Administrator feature)
+        if (filterType === 'probationary') {
+            const probationaryStaff = getProbationaryStaff();
+            return {
+                success: true,
+                data: {
+                    title: "📋 Probationary Staff Overview",
+                    subtitle: "All staff members in probationary status",
+                    isProbationaryView: true,
+                    staff: probationaryStaff,
+                    domains: [], // No rubric domains for this view
+                    viewType: 'probationary'
+                },
+                filterParams: filterParams
+            };
+        }
+
+        // Handle staff member specific view
+        if (staff && isValidEmail(staff)) {
+            // Get the specific staff member's context
+            const staffUser = getUserByEmail(staff);
+            if (!staffUser) {
+                return { 
+                    success: false, 
+                    error: `Staff member not found: ${staff}` 
+                };
+            }
+
+            // Load rubric data for this specific staff member
+            const rubricData = getAllDomainsData(
+                staffUser.role,
+                staffUser.year,
+                'assigned', // Always show assigned areas for staff members
+                getAssignedSubdomainsForRoleYear(staffUser.role, staffUser.year)
+            );
+
+            rubricData.filterContext = {
+                isStaffView: true,
+                staffName: staffUser.name,
+                staffEmail: staffUser.email,
+                staffRole: staffUser.role,
+                staffYear: staffUser.year
+            };
+
+            return { 
+                success: true, 
+                data: rubricData,
+                filterParams: filterParams
+            };
+        }
+
+        // Validate role if provided
+        if (role && !AVAILABLE_ROLES.includes(role)) {
+            return { 
+                success: false, 
+                error: `Invalid role: ${role}. Valid roles are: ${AVAILABLE_ROLES.join(', ')}` 
+            };
+        }
+
+        // Determine effective parameters
+        let effectiveRole = role || 'Teacher';
+        let effectiveYear = year ? (parseInt(year) || year) : null;
+        let effectiveViewMode = viewType === 'assigned' ? 'assigned' : 'full';
+        let assignedSubdomains = null;
+
+        // Get assigned subdomains if needed
+        if (effectiveViewMode === 'assigned' && effectiveYear) {
+            assignedSubdomains = getAssignedSubdomainsForRoleYear(effectiveRole, effectiveYear);
+        }
+
+        // Get rubric data
+        const rubricData = getAllDomainsData(
+            effectiveRole,
+            effectiveYear,
+            effectiveViewMode,
+            assignedSubdomains
+        );
+
+        // Add filter context for the UI
+        rubricData.filterContext = {
+            role: effectiveRole,
+            year: effectiveYear,
+            viewType: effectiveViewMode,
+            isFiltered: true,
+            hasAssignedAreas: !!assignedSubdomains
+        };
+
+        console.log(`✅ AJAX RUBRIC LOADED: ${effectiveRole} (${effectiveViewMode}) - Year: ${effectiveYear || 'Any'}`);
+
+        return { 
+            success: true, 
+            data: rubricData,
+            filterParams: filterParams
+        };
+
+    } catch (error) {
+        console.error('Error loading rubric data via AJAX:', error);
+        return { 
+            success: false, 
+            error: error.message || 'An error occurred while loading rubric data'
+        };
+    }
+}
+
+/**
+ * Server-side function for getting staff data for filters - Phase 4
+ */
+function getStaffForFilters(role, year) {
+    try {
+        debugLog('Getting staff for filters via AJAX', { role, year });
+
+        if (!role || !AVAILABLE_ROLES.includes(role)) {
+            return { 
+                success: false, 
+                error: 'Valid role is required' 
+            };
+        }
+
+        // Get staff list for this role/year combination
+        const staff = getStaffByRoleAndYear(role, year);
+        
+        console.log(`✅ AJAX STAFF LOADED: ${staff.length} staff members for ${role}, Year ${year || 'Any'}`);
+
+        return {
+            success: true,
+            staff: staff,
+            role: role,
+            year: year,
+            count: staff.length
+        };
+
+    } catch (error) {
+        console.error('Error getting staff for filters via AJAX:', error);
+        return { 
+            success: false, 
+            error: error.message || 'An error occurred while loading staff data'
+        };
+    }
+}
+
+/**
+ * Get current user's own rubric data - Phase 4
+ */
+function getMyOwnRubricData() {
+    try {
+        debugLog('Getting current user own rubric data');
+        
+        const userContext = createUserContext();
+        if (!userContext || !userContext.email) {
+            return {
+                success: false,
+                error: 'User not authenticated'
+            };
+        }
+
+        const rubricData = getAllDomainsData(
+            userContext.role,
+            userContext.year,
+            'assigned',
+            userContext.assignedSubdomains
+        );
+
+        rubricData.filterContext = {
+            isOwnView: true,
+            role: userContext.role,
+            year: userContext.year,
+            viewType: 'assigned'
+        };
+
+        console.log(`✅ AJAX OWN RUBRIC LOADED: ${userContext.role}, Year ${userContext.year}`);
+
+        return {
+            success: true,
+            data: rubricData,
+            userContext: userContext
+        };
+
+    } catch (error) {
+        console.error('Error getting own rubric data:', error);
+        return {
+            success: false,
+            error: error.message || 'Error loading your rubric data'
+        };
+    }
 }

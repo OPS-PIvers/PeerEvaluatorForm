@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><?= userContext.role ?> - Select Rubric View</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #4a5568, #2d3748);
+            color: white;
+            padding: 40px 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2rem;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+        
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+        
+        .content {
+            padding: 40px 30px;
+        }
+        
+        .quick-actions {
+            margin-bottom: 40px;
+        }
+        
+        .section-title {
+            color: #4a5568;
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .actions-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+        }
+        
+        .action-card {
+            background: white;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 25px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        
+        .action-card:hover {
+            border-color: #3182ce;
+            background: #f7fafc;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+        }
+        
+        .action-icon {
+            font-size: 2.5rem;
+            margin-bottom: 15px;
+            display: block;
+        }
+        
+        .action-title {
+            font-weight: 600;
+            color: #2d3748;
+            font-size: 1.1rem;
+            margin-bottom: 8px;
+        }
+        
+        .action-desc {
+            color: #718096;
+            font-size: 0.95rem;
+        }
+        
+        .custom-filters {
+            background: #f8fafc;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 30px;
+            display: none;
+        }
+        
+        .filter-row {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .filter-select, .filter-btn {
+            padding: 12px 15px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 1rem;
+            background: white;
+            transition: all 0.3s ease;
+        }
+        
+        .filter-select {
+            flex: 1;
+            min-width: 200px;
+        }
+        
+        .filter-select:focus {
+            outline: none;
+            border-color: #3182ce;
+            box-shadow: 0 0 0 3px rgba(49, 130, 206, 0.1);
+        }
+        
+        .filter-btn {
+            background: #3182ce;
+            color: white;
+            border: 2px solid #3182ce;
+            cursor: pointer;
+            font-weight: 600;
+            min-width: 140px;
+        }
+        
+        .filter-btn:hover:not(:disabled) {
+            background: #2c5aa0;
+            border-color: #2c5aa0;
+        }
+        
+        .filter-btn:disabled {
+            background: #cbd5e0;
+            border-color: #cbd5e0;
+            cursor: not-allowed;
+        }
+        
+        .btn-secondary {
+            background: #6b7280;
+            border-color: #6b7280;
+        }
+        
+        .btn-secondary:hover {
+            background: #4b5563;
+            border-color: #4b5563;
+        }
+        
+        .loading, .error {
+            text-align: center;
+            padding: 40px;
+            margin: 20px 0;
+            border-radius: 12px;
+            display: none;
+        }
+        
+        .loading {
+            background: #f0f9ff;
+            color: #0369a1;
+            border: 2px solid #bae6fd;
+        }
+        
+        .error {
+            background: #fef2f2;
+            color: #dc2626;
+            border: 2px solid #fecaca;
+        }
+        
+        .loading-spinner {
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            border: 3px solid rgba(3, 105, 161, 0.3);
+            border-radius: 50%;
+            border-top-color: #0369a1;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 10px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .filter-status {
+            background: #dbeafe;
+            border: 2px solid #3b82f6;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+            color: #1e40af;
+            font-weight: 500;
+            display: none;
+        }
+        
+        .rubric-container {
+            display: none;
+            margin-top: 30px;
+        }
+        
+        @media (max-width: 768px) {
+            .content {
+                padding: 20px;
+            }
+            
+            .actions-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .filter-row {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .filter-select, .filter-btn {
+                min-width: auto;
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>👥 <?= userContext.role ?> Dashboard</h1>
+            <p>Select how you'd like to view rubric information</p>
+        </div>
+        
+        <div class="content">
+            <!-- Quick Actions Section -->
+            <div class="quick-actions">
+                <h2 class="section-title">
+                    <span>🎯</span>
+                    Quick Actions
+                </h2>
+                
+                <div class="actions-grid">
+                    <!-- Administrator Only Actions -->
+                    <? if (userContext.specialRoleType === 'administrator') { ?>
+                    <div class="action-card" onclick="loadProbationaryView()">
+                        <span class="action-icon">👨‍🏫</span>
+                        <div class="action-title">Probationary Staff</div>
+                        <div class="action-desc">View all staff members in probationary status</div>
+                    </div>
+                    <? } ?>
+                    
+                    <!-- Peer Evaluator and Full Access Actions -->
+                    <? if (userContext.specialRoleType === 'peer_evaluator' || userContext.specialRoleType === 'full_access') { ?>
+                    <div class="action-card" onclick="showCustomFilters()">
+                        <span class="action-icon">🔍</span>
+                        <div class="action-title">Custom Filters</div>
+                        <div class="action-desc">Filter by role, year, or specific staff member</div>
+                    </div>
+                    
+                    <div class="action-card" onclick="loadMyOwnView()">
+                        <span class="action-icon">📋</span>
+                        <div class="action-title">My Own Rubric</div>
+                        <div class="action-desc">View your personal assigned areas</div>
+                    </div>
+                    <? } ?>
+                </div>
+            </div>
+            
+            <!-- Custom Filters Section -->
+            <div class="custom-filters" id="customFilters">
+                <h2 class="section-title">
+                    <span>🔍</span>
+                    Custom Filtering
+                </h2>
+                
+                <div class="filter-row">
+                    <select id="roleSelect" class="filter-select" onchange="handleRoleChange()">
+                        <option value="">1. Select Role...</option>
+                        <? for (var i = 0; i < availableRoles.length; i++) { ?>
+                        <option value="<?= availableRoles[i] ?>"><?= availableRoles[i] ?></option>
+                        <? } ?>
+                    </select>
+                </div>
+                
+                <div class="filter-row">
+                    <select id="yearSelect" class="filter-select" style="display: none;" onchange="handleYearChange()">
+                        <option value="">2. Select Year (Optional)...</option>
+                        <option value="1">Year 1</option>
+                        <option value="2">Year 2</option>
+                        <option value="3">Year 3</option>
+                        <option value="Probationary">Probationary</option>
+                    </select>
+                </div>
+                
+                <div class="filter-row">
+                    <select id="staffSelect" class="filter-select" style="display: none;" onchange="handleStaffChange()">
+                        <option value="">3. Select Staff Member (Optional)...</option>
+                    </select>
+                </div>
+                
+                <div class="filter-row">
+                    <button class="filter-btn" id="loadBtn" onclick="loadSelectedView()" disabled>
+                        📖 Load Rubric
+                    </button>
+                    <button class="filter-btn btn-secondary" onclick="clearFilters()">
+                        🗑️ Clear All
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Status and Loading -->
+            <div class="loading" id="loading">
+                <div class="loading-spinner"></div>
+                Loading rubric data...
+            </div>
+            
+            <div class="error" id="error">
+                <div id="errorMessage"></div>
+                <button class="filter-btn btn-secondary" onclick="hideError()" style="margin-top: 15px;">
+                    Dismiss
+                </button>
+            </div>
+            
+            <div class="filter-status" id="filterStatus">
+                <strong>Currently Viewing:</strong> <span id="filterStatusText"></span>
+            </div>
+            
+            <!-- Rubric Content -->
+            <div class="rubric-container" id="rubricContainer">
+                <!-- Rubric content will be loaded here via JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global state
+        let currentFilters = {
+            role: null,
+            year: null,
+            staff: null,
+            viewType: 'full'
+        };
+
+        // Quick Action Handlers
+        function loadProbationaryView() {
+            showLoading('Loading probationary staff...');
+            currentFilters = { 
+                role: null, 
+                year: null, 
+                staff: null, 
+                viewType: 'probationary' 
+            };
+            
+            google.script.run
+                .withSuccessHandler(handleRubricData)
+                .withFailureHandler(handleError)
+                .loadRubricData({ filterType: 'probationary' });
+        }
+
+        function loadMyOwnView() {
+            showLoading('Loading your assigned areas...');
+            currentFilters = { 
+                role: '<?= userContext.role ?>', 
+                year: <?= userContext.year || 1 ?>, 
+                staff: null, 
+                viewType: 'assigned' 
+            };
+            
+            google.script.run
+                .withSuccessHandler(handleRubricData)
+                .withFailureHandler(handleError)
+                .getMyOwnRubricData();
+        }
+
+        function showCustomFilters() {
+            document.getElementById('customFilters').style.display = 'block';
+            document.getElementById('customFilters').scrollIntoView({ 
+                behavior: 'smooth', 
+                block: 'start' 
+            });
+        }
+
+        // Filter Handlers
+        function handleRoleChange() {
+            const roleSelect = document.getElementById('roleSelect');
+            const yearSelect = document.getElementById('yearSelect');
+            const staffSelect = document.getElementById('staffSelect');
+            const loadBtn = document.getElementById('loadBtn');
+            
+            currentFilters.role = roleSelect.value;
+            currentFilters.year = null;
+            currentFilters.staff = null;
+            
+            // Reset dependent dropdowns
+            yearSelect.value = '';
+            staffSelect.value = '';
+            staffSelect.style.display = 'none';
+            
+            if (roleSelect.value) {
+                yearSelect.style.display = 'block';
+                loadBtn.disabled = false;
+                loadBtn.textContent = '📖 Load Full Rubric';
+                currentFilters.viewType = 'full';
+            } else {
+                yearSelect.style.display = 'none';
+                loadBtn.disabled = true;
+            }
+        }
+
+        function handleYearChange() {
+            const yearSelect = document.getElementById('yearSelect');
+            const staffSelect = document.getElementById('staffSelect');
+            const loadBtn = document.getElementById('loadBtn');
+            
+            currentFilters.year = yearSelect.value;
+            currentFilters.staff = null;
+            staffSelect.value = '';
+            
+            if (yearSelect.value) {
+                staffSelect.style.display = 'block';
+                loadBtn.textContent = '📋 Load Assigned Areas';
+                currentFilters.viewType = 'assigned';
+                
+                // Load staff for this role/year combination
+                loadStaffOptions();
+            } else {
+                staffSelect.style.display = 'none';
+                loadBtn.textContent = '📖 Load Full Rubric';
+                currentFilters.viewType = 'full';
+            }
+        }
+
+        function handleStaffChange() {
+            const staffSelect = document.getElementById('staffSelect');
+            currentFilters.staff = staffSelect.value;
+        }
+
+        function loadStaffOptions() {
+            const staffSelect = document.getElementById('staffSelect');
+            staffSelect.innerHTML = '<option value="">Loading staff...</option>';
+            staffSelect.disabled = true;
+            
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    populateStaffDropdown(result);
+                    staffSelect.disabled = false;
+                })
+                .withFailureHandler(function(error) {
+                    console.error('Error loading staff:', error);
+                    staffSelect.innerHTML = '<option value="">Error loading staff</option>';
+                    staffSelect.disabled = false;
+                    showError('Failed to load staff list: ' + (error.message || error));
+                })
+                .getStaffForFilters(currentFilters.role, currentFilters.year);
+        }
+
+        function loadSelectedView() {
+            if (!currentFilters.role) return;
+            
+            showLoading('Loading rubric data...');
+            
+            google.script.run
+                .withSuccessHandler(handleRubricData)
+                .withFailureHandler(handleError)
+                .loadRubricData(currentFilters);
+        }
+
+        function clearFilters() {
+            // Reset all form elements
+            document.getElementById('roleSelect').value = '';
+            document.getElementById('yearSelect').value = '';
+            document.getElementById('staffSelect').value = '';
+            document.getElementById('yearSelect').style.display = 'none';
+            document.getElementById('staffSelect').style.display = 'none';
+            document.getElementById('loadBtn').disabled = true;
+            
+            // Hide results
+            document.getElementById('rubricContainer').style.display = 'none';
+            document.getElementById('filterStatus').style.display = 'none';
+            
+            // Reset state
+            currentFilters = { role: null, year: null, staff: null, viewType: 'full' };
+            
+            console.log('Filters cleared');
+        }
+
+        function populateStaffDropdown(result) {
+            const staffSelect = document.getElementById('staffSelect');
+            
+            if (!result.success) {
+                staffSelect.innerHTML = '<option value="">Error: ' + result.error + '</option>';
+                return;
+            }
+            
+            staffSelect.innerHTML = '<option value="">3. Select Staff Member (Optional)...</option>';
+            
+            if (result.staff && result.staff.length > 0) {
+                result.staff.forEach(function(staff) {
+                    if (staff.email && staff.name) {
+                        const option = document.createElement('option');
+                        option.value = staff.email;
+                        option.textContent = staff.displayText || `${staff.name} (${staff.role}, Year ${staff.year})`;
+                        staffSelect.appendChild(option);
+                    }
+                });
+                console.log(`Loaded ${result.staff.length} staff members`);
+            } else {
+                const noStaffOption = document.createElement('option');
+                noStaffOption.value = '';
+                noStaffOption.textContent = 'No staff found for this selection';
+                noStaffOption.disabled = true;
+                staffSelect.appendChild(noStaffOption);
+            }
+        }
+
+        function handleRubricData(result) {
+            hideLoading();
+            
+            if (!result.success) {
+                showError(result.error || 'Failed to load rubric data');
+                return;
+            }
+            
+            console.log('Rubric data loaded successfully:', result);
+            
+            // Update filter status
+            updateFilterStatus(result);
+            
+            // Generate and display rubric HTML
+            const rubricHtml = generateRubricHtml(result.data);
+            document.getElementById('rubricContainer').innerHTML = rubricHtml;
+            document.getElementById('rubricContainer').style.display = 'block';
+            
+            // Scroll to rubric
+            document.getElementById('rubricContainer').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function handleError(error) {
+            console.error('AJAX Error:', error);
+            hideLoading();
+            
+            let errorMessage = 'An error occurred while loading the data.';
+            if (error && error.message) {
+                errorMessage = error.message;
+            } else if (typeof error === 'string') {
+                errorMessage = error;
+            }
+            
+            showError(errorMessage);
+        }
+
+        function updateFilterStatus(result) {
+            const status = document.getElementById('filterStatus');
+            const statusText = document.getElementById('filterStatusText');
+            
+            let text = '';
+            const data = result.data;
+            
+            if (data.isProbationaryView) {
+                text = `Probationary Staff (${data.staff.length} staff members)`;
+            } else if (data.filterContext) {
+                if (data.filterContext.isOwnView) {
+                    text = `Your Assigned Areas (${data.filterContext.role}, Year ${data.filterContext.year})`;
+                } else if (data.filterContext.isStaffView) {
+                    text = `${data.filterContext.staffName} (${data.filterContext.staffRole}, Year ${data.filterContext.staffYear})`;
+                } else if (data.filterContext.role && data.filterContext.year) {
+                    text = `${data.filterContext.role} - Year ${data.filterContext.year} (${data.filterContext.viewType === 'assigned' ? 'Assigned Areas' : 'Full Rubric'})`;
+                } else if (data.filterContext.role) {
+                    text = `${data.filterContext.role} (Full Rubric)`;
+                }
+            }
+            
+            if (text) {
+                statusText.textContent = text;
+                status.style.display = 'block';
+            } else {
+                status.style.display = 'none';
+            }
+        }
+
+        function generateRubricHtml(rubricData) {
+            if (rubricData.isProbationaryView) {
+                return generateProbationaryStaffHtml(rubricData);
+            }
+            
+            return generateStandardRubricHtml(rubricData);
+        }
+
+        function generateProbationaryStaffHtml(data) {
+            let html = `
+                <div style="background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
+                    <div style="background: linear-gradient(135deg, #dc2626, #b91c1c); color: white; padding: 30px; text-align: center;">
+                        <h2 style="margin: 0; font-size: 1.8rem;">📋 ${data.title}</h2>
+                        <p style="margin: 10px 0 0 0; opacity: 0.9;">${data.subtitle}</p>
+                    </div>
+                    <div style="padding: 30px;">
+            `;
+            
+            if (data.staff && data.staff.length > 0) {
+                html += '<div style="display: grid; gap: 15px;">';
+                data.staff.forEach(function(staff) {
+                    html += `
+                        <div style="background: #fef2f2; border: 2px solid #fecaca; border-radius: 8px; padding: 20px;">
+                            <h4 style="margin: 0 0 10px 0; color: #dc2626; font-size: 1.1rem;">${staff.name || 'Unknown Name'}</h4>
+                            <div style="color: #7f1d1d; font-size: 0.95rem;">
+                                <div><strong>Email:</strong> ${staff.email || 'No email'}</div>
+                                <div><strong>Role:</strong> ${staff.role || 'Unknown Role'}</div>
+                                <div><strong>Year:</strong> ${staff.year || 'Unknown Year'}</div>
+                            </div>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+            } else {
+                html += `
+                    <div style="text-align: center; padding: 40px; color: #059669;">
+                        <div style="font-size: 3rem; margin-bottom: 15px;">🎉</div>
+                        <h3 style="color: #065f46; margin-bottom: 10px;">Great News!</h3>
+                        <p style="color: #047857;">No staff members are currently in probationary status.</p>
+                    </div>
+                `;
+            }
+            
+            html += '</div></div>';
+            return html;
+        }
+
+        function generateStandardRubricHtml(rubricData) {
+            let html = `
+                <div style="background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
+                    <div style="background: linear-gradient(135deg, #4a5568, #2d3748); color: white; padding: 30px; text-align: center;">
+                        <h2 style="margin: 0; font-size: 1.8rem;">${rubricData.title}</h2>
+                        <p style="margin: 10px 0 0 0; opacity: 0.9;">${rubricData.subtitle}</p>
+                    </div>
+                    <div style="padding: 30px;">
+            `;
+            
+            if (rubricData.domains && rubricData.domains.length > 0) {
+                rubricData.domains.forEach(function(domain, domainIndex) {
+                    html += `
+                        <div style="margin-bottom: 40px;">
+                            <h3 style="color: #4a5568; border-bottom: 3px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 20px; font-size: 1.3rem;">
+                                ${domain.name}
+                            </h3>
+                    `;
+                    
+                    if (domain.components && domain.components.length > 0) {
+                        domain.components.forEach(function(component) {
+                            const isAssigned = component.isAssigned;
+                            const borderColor = isAssigned ? '#10b981' : '#e5e7eb';
+                            const bgColor = isAssigned ? '#f0fdf4' : '#f8fafc';
+                            
+                            html += `
+                                <div style="margin: 20px 0; border: 2px solid ${borderColor}; border-radius: 8px; background: ${bgColor}; overflow: hidden;">
+                                    <div style="background: ${isAssigned ? '#dcfce7' : '#f1f5f9'}; padding: 15px; border-bottom: 1px solid ${borderColor};">
+                                        <h4 style="margin: 0; color: #1f2937; font-size: 1.1rem;">
+                                            ${component.title}
+                                            ${isAssigned ? '<span style="background: #10b981; color: white; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; margin-left: 10px;">ASSIGNED</span>' : ''}
+                                        </h4>
+                                    </div>
+                                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1px; background: ${borderColor};">
+                                        <div style="background: white; padding: 15px;">
+                                            <div style="font-weight: 600; color: #dc2626; margin-bottom: 8px; font-size: 0.9rem;">DEVELOPING</div>
+                                            <div style="font-size: 0.85rem; line-height: 1.4;">${component.developing || 'No description available'}</div>
+                                        </div>
+                                        <div style="background: white; padding: 15px;">
+                                            <div style="font-weight: 600; color: #d97706; margin-bottom: 8px; font-size: 0.9rem;">BASIC</div>
+                                            <div style="font-size: 0.85rem; line-height: 1.4;">${component.basic || 'No description available'}</div>
+                                        </div>
+                                        <div style="background: white; padding: 15px;">
+                                            <div style="font-weight: 600; color: #059669; margin-bottom: 8px; font-size: 0.9rem;">PROFICIENT</div>
+                                            <div style="font-size: 0.85rem; line-height: 1.4;">${component.proficient || 'No description available'}</div>
+                                        </div>
+                                        <div style="background: white; padding: 15px;">
+                                            <div style="font-weight: 600; color: #7c3aed; margin-bottom: 8px; font-size: 0.9rem;">DISTINGUISHED</div>
+                                            <div style="font-size: 0.85rem; line-height: 1.4;">${component.distinguished || 'No description available'}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        });
+                    } else {
+                        html += '<p style="color: #6b7280; font-style: italic; text-align: center; padding: 20px;">No components available for this domain.</p>';
+                    }
+                    
+                    html += '</div>';
+                });
+            } else {
+                html += '<p style="color: #6b7280; font-style: italic; text-align: center; padding: 40px;">No domains found.</p>';
+            }
+            
+            html += `
+                    </div>
+                </div>
+            `;
+            
+            return html;
+        }
+
+        // UI Helper Functions
+        function showLoading(message = 'Loading...') {
+            const loading = document.getElementById('loading');
+            loading.innerHTML = `<div class="loading-spinner"></div>${message}`;
+            loading.style.display = 'block';
+            hideError();
+        }
+
+        function hideLoading() {
+            document.getElementById('loading').style.display = 'none';
+        }
+
+        function showError(message) {
+            document.getElementById('errorMessage').textContent = message;
+            document.getElementById('error').style.display = 'block';
+            hideLoading();
+        }
+
+        function hideError() {
+            document.getElementById('error').style.display = 'none';
+        }
+
+        function showTempMessage(message) {
+            const container = document.getElementById('rubricContainer');
+            container.innerHTML = `
+                <div style="background: #f0f9ff; border: 2px solid #0ea5e9; border-radius: 12px; padding: 30px; text-align: center; color: #0369a1;">
+                    <div style="font-size: 2rem; margin-bottom: 15px;">🚀</div>
+                    <h3 style="margin-bottom: 10px; color: #0369a1;">Coming Soon!</h3>
+                    <p>${message}</p>
+                </div>
+            `;
+            container.style.display = 'block';
+            
+            // Update status
+            document.getElementById('filterStatusText').textContent = 'Preview Mode';
+            document.getElementById('filterStatus').style.display = 'block';
+        }
+
+        // Initialize
+        console.log('Filter interface loaded successfully!');
+        console.log('User Context:', {
+            role: '<?= userContext.role ?>',
+            specialRoleType: '<?= userContext.specialRoleType ?>',
+            year: <?= userContext.year || 1 ?>
+        });
+    </script>
+</body>
+</html>
