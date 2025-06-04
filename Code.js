@@ -1659,13 +1659,13 @@ function getAllDomainsData(role = null, year = null, viewMode = 'full', assigned
       console.error(`Invalid year: ${year}. Returning error structure.`);
       return {
         title: "Error Loading Data",
-      subtitle: `Invalid year specified: ${year}. Please select a valid year. Valid years are: ${OBSERVATION_YEARS.join(', ')}`, // Corrected
-      role: role, // Corrected
+      subtitle: `Invalid year specified: ${year}. Please select a valid year. Valid years are: ${OBSERVATION_YEARS.join(', ')}`,
+      role: role,
         year: year,     // original invalid year
-      viewMode: viewMode, // Corrected
+      viewMode: viewMode,
         domains: [],
         isError: true,
-      errorMessage: `Invalid year: ${year}. Valid years are: ${OBSERVATION_YEARS.join(', ')}` // Corrected
+      errorMessage: `Invalid year: ${year}. Valid years are: ${OBSERVATION_YEARS.join(', ')}`
       };
     } else {
       userYear = observationYear;
