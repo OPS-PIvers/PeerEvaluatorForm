@@ -46,7 +46,10 @@ const AVAILABLE_ROLES = [
   'Early Childhood',
   'Parent Educator',
   'Social Worker',
-  'Sp.Ed.'
+  'Sp.Ed.',
+  'Peer Evaluator',
+  'Administrator',
+  'Full Access'
 ];
 
 /**
@@ -91,7 +94,8 @@ const DEFAULT_ROLE_CONFIG = {
 const VALIDATION_PATTERNS = {
   EMAIL: /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
   COMPONENT_ID: /^[1-4][a-f]:/, // Matches patterns like "1a:", "2b:", etc.
-  SUBDOMAIN_PATTERN: /^[1-4][a-f]:/
+  SUBDOMAIN_PATTERN: /^[1-4][a-f]:/,
+  SUBDOMAIN_LIST: /^[1-4][a-f](,\s*[1-4][a-f])*$/ // Matches "1a, 1c, 1f"
 };
 
 /**
@@ -151,9 +155,46 @@ const DOMAIN_TEMPLATE = {
 };
 
 /**
+ * String identifier for probationary status
+ */
+const PROBATIONARY_STATUS_STRING = 'probationary';
+
+/**
+ * Numeric representation for probationary observation year
+ */
+const PROBATIONARY_OBSERVATION_YEAR = 0;
+
+/**
  * Default years for observation cycle
  */
-const OBSERVATION_YEARS = [1, 2, 3];
+const OBSERVATION_YEARS = [1, 2, 3, PROBATIONARY_OBSERVATION_YEAR];
+
+/**
+ * Special access roles that can filter and view other users' data
+ */
+const SPECIAL_ACCESS_ROLES = [
+  'Peer Evaluator',
+  'Administrator', 
+  'Full Access'
+];
+
+/**
+ * View modes for rubric display
+ */
+const VIEW_MODES = {
+  FULL: 'full',
+  ASSIGNED: 'assigned'
+};
+
+/**
+ * Filter types for special access roles
+ */
+const FILTER_TYPES = {
+  ROLE: 'role',
+  YEAR: 'year', 
+  STAFF: 'staff',
+  PROBATIONARY: 'probationary'
+};
 
 /**
  * Default best practices offset (for legacy Teacher sheet compatibility)
@@ -275,7 +316,22 @@ const SPECIAL_ROLE_TYPES = {
 /**
  * Names of roles that have special access permissions
  */
-const SPECIAL_ACCESS_ROLE_NAMES = ['Administrator', 'Peer Evaluator', 'Full Access'];
+const SPECIAL_ROLES = {
+  ADMINISTRATOR: 'Administrator',
+  PEER_EVALUATOR: 'Peer Evaluator',
+  FULL_ACCESS: 'Full Access'
+};
+
+const SPECIAL_ACTIONS = {
+  VIEW_PROBATIONARY: 'view_probationary',
+  VIEW_OWN_STAFF: 'view_own_staff',
+  VIEW_ANY: 'view_any',
+  FILTER_BY_ROLE: 'filter_by_role',
+  FILTER_BY_YEAR: 'filter_by_year',
+  FILTER_BY_STAFF: 'filter_by_staff',
+  ADMIN_FUNCTIONS: 'admin_functions',
+  GENERAL_ACCESS: 'general_access'
+};
 
 /**
  * Filter types for special roles
