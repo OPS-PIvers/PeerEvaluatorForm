@@ -310,7 +310,7 @@ function handleStaffListRequest(e) {
     // Validate filterYear if provided
     if (filterYear) {
       const parsedFilterYear = parseInt(filterYear);
-      if (typeof parsedFilterYear !== 'number' || isNaN(parsedFilterYear) || !OBSERVATION_YEARS.includes(parsedFilterYear)) {
+      if (isNaN(parsedFilterYear) || !OBSERVATION_YEARS.includes(parsedFilterYear)) {
         return {
           success: false,
           error: 'Invalid input',
@@ -1204,8 +1204,8 @@ function enhanceDomainsWithAssignments(domains, assignedSubdomains, viewMode = '
       const enhancedComponents = domain.components ? domain.components.map(component => {
         // Extract component ID from title
         const componentId = extractComponentId(component.title);
-        // Check if componentId is valid and assignedList is not empty before .includes()
-        const isAssigned = componentId && assignedList.length > 0 ? assignedList.includes(componentId) : false;
+        // Check if componentId is valid before calling .includes() on assignedList (which is guaranteed to be an array)
+        const isAssigned = componentId && assignedList.includes(componentId);
 
         return {
           ...component,
