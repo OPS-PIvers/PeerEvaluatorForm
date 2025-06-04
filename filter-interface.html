@@ -241,6 +241,226 @@
                 width: 100%;
             }
         }
+
+        /* === COPIED FROM MAIN RUBRIC === */
+        .domain-section {
+            border-bottom: 3px solid #e2e8f0;
+        }
+
+        .domain-header {
+            background: linear-gradient(135deg, #7c9ac5, #5a82b8);
+            color: white;
+            padding: 15px 20px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .component-section {
+            border-bottom: 1px solid #e2e8f0;
+            position: relative;
+            margin-bottom: 20px;
+        }
+
+        .performance-levels-header {
+            position: sticky;
+            top: 56px;
+            z-index: 40;
+            background: white;
+            border-bottom: 2px solid #e2e8f0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .performance-levels {
+            display: grid;
+            grid-template-columns: 200px 1fr 1fr 1fr 1fr;
+            min-height: 50px;
+        }
+
+        .performance-levels-content {
+            display: grid;
+            grid-template-columns: 200px 1fr 1fr 1fr 1fr;
+            min-height: 120px;
+        }
+
+        .level-header {
+            background: #e2e8f0;
+            padding: 12px;
+            font-weight: 600;
+            text-align: center;
+            border-bottom: 1px solid #cbd5e0;
+            color: #4a5568;
+            font-size: 0.9rem;
+        }
+
+        .level-content {
+            padding: 20px;
+            border-right: 1px solid #e2e8f0;
+            border-bottom: 1px solid #e2e8f0;
+            background: white;
+            color: #4a5568;
+            font-size: 0.9rem;
+        }
+
+        .level-content:last-child {
+            border-right: none;
+        }
+
+        .row-label {
+            background: #64748b;
+            padding: 20px;
+            font-weight: 600;
+            color: white;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+            font-size: 0.9rem;
+        }
+
+        .look-fors-section {
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .look-fors-header {
+            background: linear-gradient(135deg, #3182ce, #2b77cb);
+            color: white;
+            padding: 10px 20px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 600;
+            transition: background 0.3s ease;
+            font-size: 0.85rem;
+        }
+
+        .look-fors-header:hover {
+            background: linear-gradient(135deg, #2b77cb, #2c5aa0);
+        }
+
+        .chevron {
+            transition: transform 0.3s ease;
+            font-size: 1rem;
+        }
+
+        .chevron.expanded {
+            transform: rotate(180deg);
+        }
+
+        .look-fors-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+            background: #f8fafc;
+        }
+
+        .look-fors-content.expanded {
+            max-height: 250px;
+        }
+
+        .look-fors-grid {
+            padding: 12px 20px;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 8px;
+        }
+
+        .look-for-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            padding: 8px 12px;
+            background: white;
+            border-radius: 4px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+            border-left: 3px solid #3182ce;
+        }
+
+        .look-for-item input[type="checkbox"] {
+            margin-top: 2px;
+            transform: scale(1.1);
+            accent-color: #3182ce;
+        }
+
+        .look-for-item label {
+            cursor: pointer;
+            color: #4a5568;
+            font-weight: 500;
+            font-size: 0.85rem;
+            line-height: 1.4;
+        }
+
+        /* Assignment styling */
+        .component-assigned {
+            border-left: 4px solid #10b981;
+            background: #f0fdf4;
+        }
+
+        .component-not-assigned {
+            background: #f8fafc;
+            border-left: 4px solid #e5e7eb;
+        }
+
+        .assignment-indicator {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background: #10b981;
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            font-weight: bold;
+        }
+
+        .assignment-indicator.not-assigned {
+            background: #e5e7eb;
+            color: #6b7280;
+        }
+
+        .assigned-badge {
+            background-color: #dbeafe;
+            color: #1e40af;
+            padding: 0.2em 0.6em;
+            border-radius: 0.25rem;
+            font-size: 0.8em;
+            margin-left: 8px;
+            font-weight: 500;
+            vertical-align: middle;
+            display: inline-block;
+        }
+
+        /* Mobile responsive updates */
+        @media (max-width: 768px) {
+            .performance-levels, .performance-levels-content {
+                grid-template-columns: 1fr;
+                gap: 1px;
+            }
+            
+            .level-header, .row-label, .level-content {
+                border-right: none;
+                padding: 15px;
+            }
+            
+            .level-header {
+                font-size: 0.8rem;
+            }
+            
+            .row-label {
+                font-size: 0.8rem;
+            }
+            
+            .level-content {
+                font-size: 0.8rem;
+            }
+        }
     </style>
 </head>
 <body>
@@ -651,50 +871,88 @@
                         <h2 style="margin: 0; font-size: 1.8rem;">${rubricData.title}</h2>
                         <p style="margin: 10px 0 0 0; opacity: 0.9;">${rubricData.subtitle}</p>
                     </div>
-                    <div style="padding: 30px;">
+                    <div style="padding: 0;">
             `;
             
             if (rubricData.domains && rubricData.domains.length > 0) {
                 rubricData.domains.forEach(function(domain, domainIndex) {
                     html += `
-                        <div style="margin-bottom: 40px;">
-                            <h3 style="color: #4a5568; border-bottom: 3px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 20px; font-size: 1.3rem;">
+                        <div class="domain-section" id="domain-${domainIndex}">
+                            <div class="domain-header">
                                 ${domain.name}
-                            </h3>
+                            </div>
+                            
+                            <!-- Sticky column headers for this domain -->
+                            <div class="performance-levels-header">
+                                <div class="performance-levels">
+                                    <div class="level-header"></div>
+                                    <div class="level-header">Developing</div>
+                                    <div class="level-header">Basic</div>
+                                    <div class="level-header">Proficient</div>
+                                    <div class="level-header">Distinguished</div>
+                                </div>
+                            </div>
                     `;
                     
                     if (domain.components && domain.components.length > 0) {
-                        domain.components.forEach(function(component) {
-                            const isAssigned = component.isAssigned;
-                            const borderColor = isAssigned ? '#10b981' : '#e5e7eb';
-                            const bgColor = isAssigned ? '#f0fdf4' : '#f8fafc';
+                        domain.components.forEach(function(component, componentIndex) {
+                            const isAssigned = component.isAssigned || false;
+                            const componentClass = isAssigned ? 'component-assigned' : 'component-not-assigned';
+                            const componentId = component.componentId || '';
                             
                             html += `
-                                <div style="margin: 20px 0; border: 2px solid ${borderColor}; border-radius: 8px; background: ${bgColor}; overflow: hidden;">
-                                    <div style="background: ${isAssigned ? '#dcfce7' : '#f1f5f9'}; padding: 15px; border-bottom: 1px solid ${borderColor};">
-                                        <h4 style="margin: 0; color: #1f2937; font-size: 1.1rem;">
+                                <div class="component-section ${componentClass}" 
+                                    data-component-id="${componentId}"
+                                    data-assigned="${isAssigned ? 'true' : 'false'}">
+
+                                    <!-- Assignment Indicator -->
+                                    ${isAssigned ? `
+                                    <div class="assignment-indicator assigned" aria-label="Component assigned">
+                                        ✓
+                                    </div>
+                                    ` : `
+                                    <div class="assignment-indicator not-assigned" aria-label="Component not assigned">
+                                        ○
+                                    </div>
+                                    `}
+
+                                    <div class="performance-levels-content">
+                                        <div class="row-label">
                                             ${component.title}
-                                            ${isAssigned ? '<span style="background: #10b981; color: white; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; margin-left: 10px;">ASSIGNED</span>' : ''}
-                                        </h4>
-                                    </div>
-                                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1px; background: ${borderColor};">
-                                        <div style="background: white; padding: 15px;">
-                                            <div style="font-weight: 600; color: #dc2626; margin-bottom: 8px; font-size: 0.9rem;">DEVELOPING</div>
-                                            <div style="font-size: 0.85rem; line-height: 1.4;">${component.developing || 'No description available'}</div>
+                                            ${isAssigned ? '<span class="assigned-badge">📋 Assigned</span>' : ''}
                                         </div>
-                                        <div style="background: white; padding: 15px;">
-                                            <div style="font-weight: 600; color: #d97706; margin-bottom: 8px; font-size: 0.9rem;">BASIC</div>
-                                            <div style="font-size: 0.85rem; line-height: 1.4;">${component.basic || 'No description available'}</div>
+                                        <div class="level-content">
+                                            ${component.developing || 'No description available'}
                                         </div>
-                                        <div style="background: white; padding: 15px;">
-                                            <div style="font-weight: 600; color: #059669; margin-bottom: 8px; font-size: 0.9rem;">PROFICIENT</div>
-                                            <div style="font-size: 0.85rem; line-height: 1.4;">${component.proficient || 'No description available'}</div>
+                                        <div class="level-content">
+                                            ${component.basic || 'No description available'}
                                         </div>
-                                        <div style="background: white; padding: 15px;">
-                                            <div style="font-weight: 600; color: #7c3aed; margin-bottom: 8px; font-size: 0.9rem;">DISTINGUISHED</div>
-                                            <div style="font-size: 0.85rem; line-height: 1.4;">${component.distinguished || 'No description available'}</div>
+                                        <div class="level-content">
+                                            ${component.proficient || 'No description available'}
+                                        </div>
+                                        <div class="level-content">
+                                            ${component.distinguished || 'No description available'}
                                         </div>
                                     </div>
+                                    
+                                    ${component.bestPractices && component.bestPractices.length > 0 ? `
+                                    <div class="look-fors-section">
+                                        <div class="look-fors-header" onclick="toggleLookFors('domain-${domainIndex}-component-${componentIndex}')">
+                                            <span>Best Practices aligned with 5D+ and PELSB Standards</span>
+                                            <span class="chevron" id="chevron-${domainIndex}-${componentIndex}">▼</span>
+                                        </div>
+                                        <div class="look-fors-content" id="lookForsContent-${domainIndex}-${componentIndex}">
+                                            <div class="look-fors-grid">
+                                                ${component.bestPractices.map((practice, practiceIndex) => `
+                                                    <div class="look-for-item">
+                                                        <input type="checkbox" id="practice-${domainIndex}-${componentIndex}-${practiceIndex}" name="practice-${domainIndex}-${componentIndex}-${practiceIndex}">
+                                                        <label for="practice-${domainIndex}-${componentIndex}-${practiceIndex}">${practice}</label>
+                                                    </div>
+                                                `).join('')}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    ` : ''}
                                 </div>
                             `;
                         });
@@ -702,7 +960,7 @@
                         html += '<p style="color: #6b7280; font-style: italic; text-align: center; padding: 20px;">No components available for this domain.</p>';
                     }
                     
-                    html += '</div>';
+                    html += '</div>'; // Close domain-section
                 });
             } else {
                 html += '<p style="color: #6b7280; font-style: italic; text-align: center; padding: 40px;">No domains found.</p>';
@@ -761,6 +1019,20 @@
             specialRoleType: '<?= userContext.specialRoleType ?>',
             year: <?= userContext.year || 1 ?>
         });
+        // Function to toggle look-fors sections (copied from main rubric)
+        function toggleLookFors(componentId) {
+            const parts = componentId.split('-');
+            const domainIdx = parts[1];
+            const componentIdx = parts[3];
+            
+            const content = document.getElementById('lookForsContent-' + domainIdx + '-' + componentIdx);
+            const chevron = document.getElementById('chevron-' + domainIdx + '-' + componentIdx);
+            
+            if (content && chevron) {
+                content.classList.toggle('expanded');
+                chevron.classList.toggle('expanded');
+            }
+        }
     </script>
 </body>
 </html>
