@@ -769,7 +769,6 @@ function getStaffListForDropdown(role, year) {
   try {
     debugLog(`getStaffListForDropdown called with role: ${role}, year: ${year}`);
 
-    // Assuming SheetService.getStaffData() is the canonical way to retrieve staff data.
     const staffData = SheetService.getStaffData();
 
     if (!staffData || !staffData.users || staffData.users.length === 0) {
