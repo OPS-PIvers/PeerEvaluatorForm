@@ -288,6 +288,7 @@ function handleStaffListRequest(e) {
     const requestingRole = params.requestingRole;
     const filterRole = params.filterRole;
     const filterYear = params.filterYear;
+    let yearArgument = filterYear;
 
     // Validate requestingRole
     if (typeof requestingRole !== 'string' || !AVAILABLE_ROLES.includes(requestingRole)) {
@@ -317,6 +318,7 @@ function handleStaffListRequest(e) {
           message: 'filterYear must be a number and a valid observation year.'
         };
       }
+      yearArgument = parsedFilterYear;
     }
 
     // Validate requesting user has permission
@@ -330,7 +332,7 @@ function handleStaffListRequest(e) {
     }
 
     // Get filtered staff list
-    const staffList = getStaffByRoleAndYear(filterRole, filterYear);
+    const staffList = getStaffByRoleAndYear(filterRole, yearArgument);
 
     return {
       success: true,
@@ -403,8 +405,8 @@ function getFilteredStaffList(filterType = 'all', role = null, year = null) {
       name: user.name || 'Unknown Name',
       email: user.email,
       role: user.role || 'Unknown Role',
-      year: user.year || 1,
-      displayName: `${user.name || 'Unknown'} (${user.role || 'Unknown'}, Year ${user.year || 1})`
+      year: user.year || null,
+      displayName: `${user.name || 'Unknown'} (${user.role || 'Unknown'}, Year ${user.year ? user.year : 'N/A'})`
     }));
 
     debugLog('Staff list filtered', {
@@ -458,21 +460,21 @@ function validateSpecialRoleAccess(requestingRole, requestType) {
 
   try {
     switch (requestingRole) {
-      case 'Administrator':
+      case SPECIAL_ROLES.ADMINISTRATOR:
         validation.hasAccess = true;
-        validation.allowedActions = ['view_probationary', 'view_own_staff'];
+        validation.allowedActions = [SPECIAL_ACTIONS.VIEW_PROBATIONARY, SPECIAL_ACTIONS.VIEW_OWN_STAFF];
         validation.message = 'Administrator access granted';
         break;
 
-      case 'Peer Evaluator':
+      case SPECIAL_ROLES.PEER_EVALUATOR:
         validation.hasAccess = true;
-        validation.allowedActions = ['view_any', 'filter_by_role', 'filter_by_year', 'filter_by_staff'];
+        validation.allowedActions = [SPECIAL_ACTIONS.VIEW_ANY, SPECIAL_ACTIONS.FILTER_BY_ROLE, SPECIAL_ACTIONS.FILTER_BY_YEAR, SPECIAL_ACTIONS.FILTER_BY_STAFF];
         validation.message = 'Peer Evaluator access granted';
         break;
 
-      case 'Full Access':
+      case SPECIAL_ROLES.FULL_ACCESS:
         validation.hasAccess = true;
-        validation.allowedActions = ['view_any', 'filter_by_role', 'filter_by_year', 'filter_by_staff', 'admin_functions'];
+        validation.allowedActions = [SPECIAL_ACTIONS.VIEW_ANY, SPECIAL_ACTIONS.FILTER_BY_ROLE, SPECIAL_ACTIONS.FILTER_BY_YEAR, SPECIAL_ACTIONS.FILTER_BY_STAFF, SPECIAL_ACTIONS.ADMIN_FUNCTIONS];
         validation.message = 'Full Access granted';
         break;
 
