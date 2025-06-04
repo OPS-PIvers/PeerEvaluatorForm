@@ -74,6 +74,32 @@ function doGet(e) {
     const filterStaff = params.filterStaff || null;
     const filterType = params.filterType || 'all';
 
+    debugLog('Enhanced web app request received', {
+      requestId: requestId,
+      forceRefresh: forceRefresh,
+      debugMode: debugMode,
+      urlTimestamp: urlTimestamp,
+      urlRole: urlRole,
+      proactiveCheck: proactiveCheck,
+      userAgent: e.userAgent || 'Unknown'
+    });
+
+    // Handle force refresh - clear all relevant caches
+    if (forceRefresh) {
+      debugLog('Force refresh requested - clearing caches', { requestId });
+
+      const sessionUser = getUserFromSession();
+      if (sessionUser && sessionUser.email) {
+        clearUserCaches(sessionUser.email);
+      } else {
+        forceCleanAllCaches();
+      }
+    }
+
+    // Create enhanced user context with proactive role change detection
+    const userContext = createUserContext();
+
+    // ✅ NOW userContext is defined, so we can use it safely
     // Enhanced filter logic for role-only vs role+year scenarios
     let effectiveRole = userContext.role;  // Default to user's actual role
     let effectiveYear = userContext.year;  // Default to user's actual year
@@ -108,31 +134,6 @@ function doGet(e) {
             }
         }
     }
-
-    debugLog('Enhanced web app request received', {
-      requestId: requestId,
-      forceRefresh: forceRefresh,
-      debugMode: debugMode,
-      urlTimestamp: urlTimestamp,
-      urlRole: urlRole,
-      proactiveCheck: proactiveCheck,
-      userAgent: e.userAgent || 'Unknown'
-    });
-
-    // Handle force refresh - clear all relevant caches
-    if (forceRefresh) {
-      debugLog('Force refresh requested - clearing caches', { requestId });
-
-      const sessionUser = getUserFromSession();
-      if (sessionUser && sessionUser.email) {
-        clearUserCaches(sessionUser.email);
-      } else {
-        forceCleanAllCaches();
-      }
-    }
-
-    // Create enhanced user context with proactive role change detection
-    const userContext = createUserContext();
 
     // Handle special role filtering
     let finalUserContext = userContext;
@@ -2146,12 +2147,15 @@ function createEnhancedErrorPage(error, requestId, userContext, userAgent) {
       stack: error.stack || 'No stack trace available'
     };
 
-    const htmlTemplate = HtmlService.createTemplate(`
-<!DOCTYPE html>
+    // Create simple HTML content directly instead of using template
+    const htmlContent = `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate, max-age=0">
+    <meta http-equiv="pragma" content="no-cache">
+    <meta http-equiv="expires" content="0">
     <title>System Error - Danielson Framework</title>
     <style>
         body {
@@ -2262,9 +2266,9 @@ function createEnhancedErrorPage(error, requestId, userContext, userAgent) {
 
         <div class="error-details">
             <strong>Error Details:</strong><br>
-            Time: <?= errorDetails.timestamp ?><br>
-            Request ID: <?= errorDetails.requestId ?><br>
-            Message: <?= errorDetails.message ?><br>
+            Time: ${errorDetails.timestamp}<br>
+            Request ID: ${errorDetails.requestId}<br>
+            Message: ${errorDetails.message}<br>
         </div>
     </div>
 
@@ -2282,22 +2286,14 @@ function createEnhancedErrorPage(error, requestId, userContext, userAgent) {
             forceRefresh();
         }, 30000);
 
-        console.error('System Error Details:', <?= JSON.stringify(errorDetails) ?>);
+        console.error('System Error Details:', ${JSON.stringify(errorDetails)});
     </script>
 </body>
-</html>`);
+</html>`;
 
-    htmlTemplate.errorDetails = errorDetails;
-
-    const htmlOutput = htmlTemplate.evaluate()
+    const htmlOutput = HtmlService.createHtmlOutput(htmlContent)
       .setTitle('System Error - Danielson Framework')
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-
-    // Add cache-busting headers
-    htmlOutput
-      .addMetaTag('cache-control', 'no-cache, no-store, must-revalidate, max-age=0')
-      .addMetaTag('pragma', 'no-cache')
-      .addMetaTag('expires', '0');
 
     console.error('Enhanced error page created:', {
       requestId: errorDetails.requestId,
