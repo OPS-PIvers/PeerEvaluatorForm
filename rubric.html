@@ -1175,7 +1175,12 @@
             </div>
         <? } ?>
         
-        <? if (!data.domains || data.domains.length === 0) { ?>
+        <? if (data.isError) { ?>
+        <div style="padding: 40px; text-align: center; color: #D8000C; background-color: #FFBABA; border: 1px solid #D8000C; border-radius: 5px; margin: 10px;">
+            <h3 style="color: #D8000C;">Error</h3>
+            <p><?= data.errorMessage ?></p>
+        </div>
+        <? } else if (!data.domains || data.domains.length === 0) { ?>
         <div style="padding: 40px; text-align: center; color: #666;">
             <h3>No domains found</h3>
             <p>Please check your Google Sheet data and try refreshing the page.</p>
