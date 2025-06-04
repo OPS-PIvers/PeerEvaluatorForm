@@ -93,9 +93,9 @@ const DEFAULT_ROLE_CONFIG = {
  */
 const VALIDATION_PATTERNS = {
   EMAIL: /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
-  COMPONENT_ID: /^[1-4][a-f]:/, // Matches patterns like "1a:", "2b:", etc.
-  SUBDOMAIN_PATTERN: /^[1-4][a-f]:/,
-  SUBDOMAIN_LIST: /^[1-4][a-f](,\s*[1-4][a-f])*$/ // Matches "1a, 1c, 1f"
+  COMPONENT_ID: /^[1-4][a-fA-F]:/, // Matches patterns like "1a:", "2b:", etc.
+  SUBDOMAIN_PATTERN: /^[1-4][a-fA-F]:/,
+  SUBDOMAIN_LIST: /^[1-4][a-fA-F](,\s*[1-4][a-fA-F])*$/ // Matches "1a, 1c, 1f"
 };
 
 /**
@@ -158,6 +158,9 @@ const DOMAIN_TEMPLATE = {
  * String identifier for probationary status
  */
 const PROBATIONARY_STATUS_STRING = 'probationary';
+if (cellValue && cellValue.toLowerCase() === PROBATIONARY_STATUS_STRING) {
+  // It's probationary, regardless of case in the sheet
+}
 
 /**
  * Numeric representation for probationary observation year
