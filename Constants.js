@@ -275,7 +275,22 @@ const SPECIAL_ROLE_TYPES = {
 /**
  * Names of roles that have special access permissions
  */
-const SPECIAL_ACCESS_ROLE_NAMES = ['Administrator', 'Peer Evaluator', 'Full Access'];
+const SPECIAL_ROLES = {
+  ADMINISTRATOR: 'Administrator',
+  PEER_EVALUATOR: 'Peer Evaluator',
+  FULL_ACCESS: 'Full Access'
+};
+
+const SPECIAL_ACTIONS = {
+  VIEW_PROBATIONARY: 'view_probationary',
+  VIEW_OWN_STAFF: 'view_own_staff',
+  VIEW_ANY: 'view_any',
+  FILTER_BY_ROLE: 'filter_by_role',
+  FILTER_BY_YEAR: 'filter_by_year',
+  FILTER_BY_STAFF: 'filter_by_staff',
+  ADMIN_FUNCTIONS: 'admin_functions',
+  GENERAL_ACCESS: 'general_access'
+};
 
 /**
  * Filter types for special roles
