@@ -75,6 +75,21 @@
     --color-gray-assignment-indicator-not-assigned-bg: #e5e7eb;
     --color-text-deemphasized: #718096;
 }
+
+.error-container {
+    padding: 40px;
+    text-align: center;
+    color: #D8000C; /* Standard error text color */
+    background-color: #FFBABA; /* Light red background for errors */
+    border: 1px solid #D8000C; /* Standard error border color */
+    border-radius: 5px;
+    margin: 10px;
+}
+
+.error-title {
+    color: #D8000C; /* Ensure title also uses the error text color */
+    /* Any other h3-specific styles for the error title can go here if needed */
+}
         * {
             margin: 0;
             padding: 0;
@@ -1016,6 +1031,7 @@
                     <!-- Peer Evaluator & Full Access: Full filtering options -->
                     <select id="roleFilter" class="filter-select" onchange="updateAvailableStaff()" aria-label="Filter by Role">
                         <option value="">Select Role...</option>
+                        <option value="Any">Any Role</option>
                         <? for (var r = 0; r < data.userContext.availableRoles?.length || 0; r++) { ?>
                         <option value="<?= data.userContext.availableRoles[r] ?>"><?= data.userContext.availableRoles[r] ?></option>
                         <? } ?>
@@ -1023,6 +1039,7 @@
 
                     <select id="yearFilter" class="filter-select" onchange="updateAvailableStaff()" aria-label="Filter by Year">
                         <option value="">Select Year...</option>
+                        <option value="Any">Any Year</option>
                         <option value="1">Year 1</option>
                         <option value="2">Year 2</option>
                         <option value="3">Year 3</option>
@@ -1075,7 +1092,7 @@
                     if (component.title) {
                         // Component titles are expected to start with an ID (e.g., "1a:", "2b:")
                         // which is used for matching against assigned subdomains.
-                        var match = component.title.match(/^([1-4][a-f]):/);
+                        var match = component.title.match(/^([1-4][a-fA-F]):/);
                         componentId = match ? match[1] + ':' : '';
                     }
 
@@ -1162,7 +1179,12 @@
             </div>
         <? } ?>
         
-        <? if (!data.domains || data.domains.length === 0) { ?>
+        <? if (data.isError) { ?>
+        <div class="error-container">
+            <h3 class="error-title">Error</h3>
+            <p><?= data.errorMessage ?></p>
+        </div>
+        <? } else if (!data.domains || data.domains.length === 0) { ?>
         <div style="padding: 40px; text-align: center; color: #666;">
             <h3>No domains found</h3>
             <p>Please check your Google Sheet data and try refreshing the page.</p>
