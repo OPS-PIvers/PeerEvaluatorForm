@@ -513,31 +513,6 @@ function extractComponentId(componentTitle) {
 }
 
 /**
- * Helper function to determine if a user's year matches a target filter year.
- * @param {string|number} userYear The year from the user's record (e.g., 1, 2, "Year 1", "Probationary").
- * @param {string} targetYear The year from the filter (e.g., "1", "Year 1", "Probationary").
- * @return {boolean} True if the years match according to the defined logic.
- * @private
- */
-function _isUserYearMatching(userYear, targetYear) {
-  // Parse both years using the enhanced parser
-  const parsedUserYear = parseYearValue(userYear);
-  const parsedTargetYear = parseYearValue(targetYear);
-
-  // Handle null cases
-  if (parsedUserYear === null && parsedTargetYear === null) {
-    return true; // Both are null/invalid
-  }
-  
-  if (parsedUserYear === null || parsedTargetYear === null) {
-    return false; // One is null, the other isn't
-  }
-
-  // Direct comparison of parsed numeric values
-  return parsedUserYear === parsedTargetYear;
-}
-
-/**
  * Enhanced onEdit trigger function that handles both role changes and rubric content changes
  */
 function onEditTrigger(e) {
