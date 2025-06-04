@@ -297,14 +297,6 @@ const VALIDATION_ERROR_TYPES = {
 };
 
 /**
- * View mode constants for subdomain filtering
- */
-const VIEW_MODES = {
-  FULL: 'full',
-  ASSIGNED: 'assigned'
-};
-
-/**
  * Special role types for filtering
  */
 const SPECIAL_ROLE_TYPES = {
