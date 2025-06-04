@@ -288,6 +288,38 @@ function handleStaffListRequest(e) {
     const requestingRole = params.requestingRole;
     const filterRole = params.filterRole;
     const filterYear = params.filterYear;
+    let yearArgument = filterYear;
+
+    // Validate requestingRole
+    if (typeof requestingRole !== 'string' || !AVAILABLE_ROLES.includes(requestingRole)) {
+      return {
+        success: false,
+        error: 'Invalid input',
+        message: 'requestingRole must be a string and a valid role.'
+      };
+    }
+
+    // Validate filterRole if provided
+    if (filterRole && (typeof filterRole !== 'string' || !AVAILABLE_ROLES.includes(filterRole))) {
+      return {
+        success: false,
+        error: 'Invalid input',
+        message: 'filterRole must be a string and a valid role.'
+      };
+    }
+
+    // Validate filterYear if provided
+    if (filterYear) {
+      const parsedFilterYear = parseInt(filterYear);
+      if (isNaN(parsedFilterYear) || !OBSERVATION_YEARS.includes(parsedFilterYear)) {
+        return {
+          success: false,
+          error: 'Invalid input',
+          message: 'filterYear must be a number and a valid observation year.'
+        };
+      }
+      yearArgument = parsedFilterYear;
+    }
 
     // Validate requesting user has permission
     const accessValidation = validateSpecialRoleAccess(requestingRole, 'view_any');
@@ -300,7 +332,7 @@ function handleStaffListRequest(e) {
     }
 
     // Get filtered staff list
-    const staffList = getStaffByRoleAndYear(filterRole, filterYear);
+    const staffList = getStaffByRoleAndYear(filterRole, yearArgument);
 
     return {
       success: true,
@@ -373,8 +405,8 @@ function getFilteredStaffList(filterType = 'all', role = null, year = null) {
       name: user.name || 'Unknown Name',
       email: user.email,
       role: user.role || 'Unknown Role',
-      year: user.year || 1,
-      displayName: `${user.name || 'Unknown'} (${user.role || 'Unknown'}, Year ${user.year || 1})`
+      year: user.year || null,
+      displayName: `${user.name || 'Unknown'} (${user.role || 'Unknown'}, Year ${user.year ? user.year : 'N/A'})`
     }));
 
     debugLog('Staff list filtered', {
@@ -428,21 +460,21 @@ function validateSpecialRoleAccess(requestingRole, requestType) {
 
   try {
     switch (requestingRole) {
-      case 'Administrator':
+      case SPECIAL_ROLES.ADMINISTRATOR:
         validation.hasAccess = true;
-        validation.allowedActions = ['view_probationary', 'view_own_staff'];
+        validation.allowedActions = [SPECIAL_ACTIONS.VIEW_PROBATIONARY, SPECIAL_ACTIONS.VIEW_OWN_STAFF];
         validation.message = 'Administrator access granted';
         break;
 
-      case 'Peer Evaluator':
+      case SPECIAL_ROLES.PEER_EVALUATOR:
         validation.hasAccess = true;
-        validation.allowedActions = ['view_any', 'filter_by_role', 'filter_by_year', 'filter_by_staff'];
+        validation.allowedActions = [SPECIAL_ACTIONS.VIEW_ANY, SPECIAL_ACTIONS.FILTER_BY_ROLE, SPECIAL_ACTIONS.FILTER_BY_YEAR, SPECIAL_ACTIONS.FILTER_BY_STAFF];
         validation.message = 'Peer Evaluator access granted';
         break;
 
-      case 'Full Access':
+      case SPECIAL_ROLES.FULL_ACCESS:
         validation.hasAccess = true;
-        validation.allowedActions = ['view_any', 'filter_by_role', 'filter_by_year', 'filter_by_staff', 'admin_functions'];
+        validation.allowedActions = [SPECIAL_ACTIONS.VIEW_ANY, SPECIAL_ACTIONS.FILTER_BY_ROLE, SPECIAL_ACTIONS.FILTER_BY_YEAR, SPECIAL_ACTIONS.FILTER_BY_STAFF, SPECIAL_ACTIONS.ADMIN_FUNCTIONS];
         validation.message = 'Full Access granted';
         break;
 
@@ -1141,20 +1173,41 @@ function validateUserWithStateTracking(userEmail) {
  * @return {Array} Enhanced domains array
  */
 function enhanceDomainsWithAssignments(domains, assignedSubdomains, viewMode = 'full') {
-  if (!assignedSubdomains || !Array.isArray(domains)) {
+  // Validate domains
+  if (!Array.isArray(domains)) {
+    const errorMessage = 'enhanceDomainsWithAssignments: domains must be an array.';
+    console.error(errorMessage);
+    throw new Error(errorMessage); // Throw an error to be caught by the caller
+  }
+
+  // Validate assignedSubdomains if provided
+  if (assignedSubdomains && typeof assignedSubdomains !== 'object') {
+    const errorMessage = 'enhanceDomainsWithAssignments: assignedSubdomains must be an object if provided.';
+    console.error(errorMessage);
+    throw new Error(errorMessage); // Throw an error to be caught by the caller
+  }
+
+  // If assignedSubdomains is not provided, no enhancement is needed.
+  if (!assignedSubdomains) {
     return domains;
   }
 
   try {
     return domains.map((domain, domainIndex) => {
       const domainKey = `domain${domainIndex + 1}`;
-      const assignedList = assignedSubdomains[domainKey] || [];
+      let assignedList = assignedSubdomains[domainKey];
+
+      // Ensure assignedList is an array before using .includes()
+      if (!Array.isArray(assignedList)) {
+        assignedList = []; // Treat as empty if not an array
+      }
 
       // Process each component in the domain
       const enhancedComponents = domain.components ? domain.components.map(component => {
         // Extract component ID from title
         const componentId = extractComponentId(component.title);
-        const isAssigned = componentId ? assignedList.includes(componentId) : false;
+        // Check if componentId is valid before calling .includes() on assignedList (which is guaranteed to be an array)
+        const isAssigned = componentId && assignedList.includes(componentId);
 
         return {
           ...component,
@@ -1575,21 +1628,83 @@ function addDebugHeaders(htmlOutput, userContext, metadata) {
  */
 function getAllDomainsData(role = null, year = null, viewMode = 'full', assignedSubdomains = null) {
   const startTime = Date.now();
+  let userRole = 'Teacher'; // Default role
+  let userYear = null;
+  let effectiveViewMode = VIEW_MODES.FULL;
+  let effectiveAssignedSubdomains = null;
+
+  // Validate role
+  if (role) {
+    if (typeof role === 'string' && AVAILABLE_ROLES.includes(role)) {
+      userRole = role;
+    } else {
+      console.error(`Invalid role: ${role}. Returning error structure.`);
+      return {
+        title: "Error Loading Data",
+        subtitle: `Invalid role specified: ${role}. Please select a valid role.`,
+        role: role,
+        year: year,
+        viewMode: viewMode,
+        domains: [],
+        isError: true,
+        errorMessage: `Invalid role: ${role}. Valid roles are: ${AVAILABLE_ROLES.join(', ')}.`
+      };
+    }
+  }
+
+  // Validate year
+  if (year !== null && year !== undefined) {
+    const observationYear = parseInt(year);
+    if (isNaN(observationYear) || !OBSERVATION_YEARS.includes(observationYear)) {
+      console.error(`Invalid year: ${year}. Returning error structure.`);
+      return {
+        title: "Error Loading Data",
+        subtitle: `Invalid year specified: ${year}. Please select a valid year.`,
+      role: role,
+        year: year,     // original invalid year
+      viewMode: viewMode,
+        domains: [],
+        isError: true,
+      errorMessage: `Invalid year: ${year}. Valid years are: ${OBSERVATION_YEARS.join(', ')}`
+      };
+    } else {
+      userYear = observationYear;
+    }
+  }
+
+  // Validate viewMode
+  if (viewMode && typeof viewMode === 'string') {
+    const lowerViewMode = viewMode.toLowerCase();
+    if (Object.values(VIEW_MODES).includes(lowerViewMode)) {
+      effectiveViewMode = lowerViewMode;
+    } else {
+      console.warn(`Invalid viewMode: ${viewMode}. Defaulting to 'full'.`);
+      // effectiveViewMode is already VIEW_MODES.FULL
+    }
+  }
+
+  // Validate assignedSubdomains
+  if (assignedSubdomains) {
+    if (typeof assignedSubdomains === 'object' && !Array.isArray(assignedSubdomains)) {
+      effectiveAssignedSubdomains = assignedSubdomains;
+    } else {
+      console.warn(`Invalid assignedSubdomains: not an object. Proceeding as if no assignments were provided.`);
+      // effectiveAssignedSubdomains remains null
+    }
+  }
   
   try {
-    // Use default role if none provided (backward compatibility)
-    const userRole = role || 'Teacher';
-    const userYear = year;
-    
-    debugLog('Loading domains data with view mode support', {
+    debugLog('Loading domains data with validated parameters', {
       role: userRole,
       year: userYear,
-      viewMode: viewMode
+      viewMode: effectiveViewMode,
+      hasAssignedSubdomains: !!effectiveAssignedSubdomains
     });
     
     // Get role-specific sheet data
     const roleSheetData = getRoleSheetData(userRole);
     if (!roleSheetData) {
+      // This case should ideally be handled by role validation, but as a fallback:
       throw new Error(`Unable to load data for role: ${userRole}`);
     }
     
@@ -1599,10 +1714,10 @@ function getAllDomainsData(role = null, year = null, viewMode = 'full', assigned
       subtitle: roleSheetData.subtitle || "Professional practices and standards",
       role: userRole,
       year: userYear,
-      viewMode: viewMode,
+      viewMode: effectiveViewMode,
       domains: [],
       assignmentMetadata: {
-        hasAssignments: !!assignedSubdomains,
+        hasAssignments: !!effectiveAssignedSubdomains,
         totalAssigned: 0,
         totalComponents: 0,
         assignmentsByDomain: {}
@@ -1618,13 +1733,13 @@ function getAllDomainsData(role = null, year = null, viewMode = 'full', assigned
     }
     
     // Apply assignment metadata and filtering
-    if (assignedSubdomains) {
-      result.domains = enhanceDomainsWithAssignments(result.domains, assignedSubdomains, viewMode);
-      result.assignmentMetadata = calculateAssignmentMetadata(result.domains, assignedSubdomains);
+    if (effectiveAssignedSubdomains) {
+      result.domains = enhanceDomainsWithAssignments(result.domains, effectiveAssignedSubdomains, effectiveViewMode);
+      result.assignmentMetadata = calculateAssignmentMetadata(result.domains, effectiveAssignedSubdomains);
     }
 
     // Apply year-based filtering if specified
-    if (userYear && userYear !== null) {
+    if (userYear !== null) { // Check against null explicitly
       result.domains = applyYearFiltering(result.domains, userRole, userYear);
     }
     
@@ -1632,7 +1747,7 @@ function getAllDomainsData(role = null, year = null, viewMode = 'full', assigned
     logPerformanceMetrics('getAllDomainsData', executionTime, {
       role: userRole,
       year: userYear,
-      viewMode: viewMode,
+      viewMode: effectiveViewMode,
       domainCount: result.domains.length,
       totalComponents: result.assignmentMetadata.totalComponents,
       assignedComponents: result.assignmentMetadata.totalAssigned
@@ -1653,12 +1768,14 @@ function getAllDomainsData(role = null, year = null, viewMode = 'full', assigned
     
     return {
       title: "Error Loading Data",
-      subtitle: `Please check the configuration for role: ${role || 'default'}. Error: ${error.message}`,
-      role: role || 'Teacher',
-      year: year,
-      viewMode: viewMode || 'full',
+      subtitle: `An error occurred. Please see details below.`, // Subtitle can be generic
+      role: role || 'Teacher', // Keep role if available
+      year: year, // Keep year if available
+      viewMode: viewMode || 'full', // Keep viewMode if available
       domains: [],
-      assignmentMetadata: {
+      isError: true,
+      errorMessage: `An unexpected error occurred while loading data for role '${role || 'default'}'. Error details: ${error.message}. Please try again later or contact support if the issue persists.`,
+      assignmentMetadata: { // Keep this structure for consistency if the UI expects it
         hasAssignments: false,
         totalAssigned: 0,
         totalComponents: 0,
