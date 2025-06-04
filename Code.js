@@ -536,7 +536,7 @@ function _isUserYearMatching(userYear, targetYear) {
     const numericTargetYear = parseInt(standardizedTargetYear);
     // If targetYear is not 'probationary' and not a parsable number, it's an invalid filter for numeric matching.
     if (isNaN(numericTargetYear)) {
-      debugLog('_isUserYearMatching: Invalid non-numeric, non-probationary targetYear', { targetYear: targetYear });
+      console.warn('_isUserYearMatching: Invalid non-numeric, non-probationary targetYear', { targetYear: targetYear });
       return false;
     }
     // If userYear is 'probationary', it cannot match a numeric targetYear.
@@ -1036,8 +1036,8 @@ function getStaffListForDropdown(role, year) {
   try {
     debugLog(`getStaffListForDropdown called with role: ${role}, year: ${year}`);
 
-    // Ensure SheetService.getStaffData is available or use a global alias if necessary
-    const staffData = getStaffData();
+    const staffData = SheetService.getStaffData();
+
 
     if (!staffData || !staffData.users || staffData.users.length === 0) {
       debugLog('No staff data available in getStaffListForDropdown.');
