@@ -1660,9 +1660,9 @@ function getAllDomainsData(role = null, year = null, viewMode = 'full', assigned
       return {
         title: "Error Loading Data",
         subtitle: `Invalid year specified: ${year}. Please select a valid year. Valid years are: ${OBSERVATION_YEARS.join(', ')}.`,
-        role: userRole, // or the original 'role' param
+      role: role, // Corrected
         year: year,     // original invalid year
-        viewMode: effectiveViewMode, // or original 'viewMode' param
+      viewMode: viewMode, // Corrected
         domains: [],
         isError: true,
         errorMessage: `Invalid year: ${year}. Valid years are: ${OBSERVATION_YEARS.join(', ')}.`
