@@ -1286,10 +1286,14 @@
             <span class="nav-text">Domains</span>
         </button>
         <div class="floating-nav-menu" id="floatingNavMenu">
-            <? for (var d = 0; d < data.domains.length; d++) { ?>
-                <button class="floating-nav-item" onclick="scrollToDomain(<?= d ?>); closeFloatingNav();">
-                    Domain <?= data.domains[d].number ?>
-                </button>
+    <? if (typeof data !== 'undefined' && data && data.domains && data.domains.length > 0) { ?>
+        <? for (var d = 0; d < data.domains.length; d++) { ?>
+            <button class="floating-nav-item" onclick="scrollToDomain(<?= d ?>); closeFloatingNav();">
+                Domain <?= data.domains[d].number ?>
+            </button>
+        <? } ?>
+    <? } else { ?>
+        <div class="floating-nav-item" style="text-align:center; cursor:default;">Domains will appear here</div>
             <? } ?>
         </div>
     </div>
