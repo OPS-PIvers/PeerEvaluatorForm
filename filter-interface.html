@@ -461,6 +461,137 @@
                 font-size: 0.8rem;
             }
         }
+
+        /* Floating Navigation Widget */
+        .floating-nav {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+            pointer-events: none;
+        }
+
+        .floating-nav.visible {
+            opacity: 1;
+            visibility: visible;
+            pointer-events: auto;
+        }
+
+        .floating-nav-button {
+            background: #3182ce;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 10px 15px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+            min-width: 120px;
+        }
+
+        .floating-nav-button:hover {
+            background: #2c5aa0;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(0,0,0,0.2);
+        }
+
+        .nav-icon {
+            font-size: 1.1rem;
+            line-height: 1;
+        }
+
+        .nav-text {
+            font-size: 0.85rem;
+        }
+
+        .floating-nav-menu {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+            margin-top: 8px;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-10px);
+            transition: all 0.3s ease;
+            min-width: 180px;
+            max-height: 60vh;
+            overflow-y: auto;
+        }
+
+        .floating-nav-menu.open {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .floating-nav-item {
+            display: block;
+            width: 100%;
+            background: none;
+            border: none;
+            padding: 12px 16px;
+            text-align: left;
+            cursor: pointer;
+            font-size: 0.9rem;
+            color: #4a5568;
+            transition: background 0.2s ease;
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+        .floating-nav-item:last-child {
+            border-bottom: none;
+        }
+
+        .floating-nav-item:hover {
+            background: #f8fafc;
+            color: #3182ce;
+        }
+
+        .floating-nav-item:first-child {
+            border-top-left-radius: 8px;
+            border-top-right-radius: 8px;
+        }
+
+        .floating-nav-item:last-child {
+            border-bottom-left-radius: 8px;
+            border-bottom-right-radius: 8px;
+        }
+
+        /* Mobile adjustments */
+        @media (max-width: 768px) {
+            .floating-nav {
+                top: 15px;
+                left: 15px;
+            }
+
+            .floating-nav-button {
+                padding: 8px 12px;
+                min-width: 100px;
+                font-size: 0.8rem;
+            }
+
+            .floating-nav-menu {
+                min-width: 160px;
+                max-height: 50vh;
+            }
+
+            .floating-nav-item {
+                padding: 10px 14px;
+                font-size: 0.85rem;
+            }
+        }
     </style>
 </head>
 <body>
@@ -572,6 +703,111 @@
     </div>
 
     <script>
+        // Floating Navigation Widget Functions
+        let floatingNavOpen = false;
+
+        function toggleFloatingNav() {
+            const menu = document.getElementById('floatingNavMenu');
+            if (menu) {
+                floatingNavOpen = !floatingNavOpen;
+                if (floatingNavOpen) {
+                    menu.classList.add('open');
+                } else {
+                    menu.classList.remove('open');
+                }
+            }
+        }
+
+        function closeFloatingNav() {
+            const menu = document.getElementById('floatingNavMenu');
+            if (menu) {
+                menu.classList.remove('open');
+                floatingNavOpen = false;
+            }
+        }
+
+        function scrollToDomain(domainIdx) {
+            const element = document.getElementById('domain-' + domainIdx);
+            if (element) {
+                // Adjust for sticky header if present and visible
+                let offset = 0;
+                const header = document.querySelector('.header'); // Or any other sticky element
+                if (header && getComputedStyle(header).position === 'sticky') {
+                    offset = header.offsetHeight;
+                }
+
+                const bodyRect = document.body.getBoundingClientRect().top;
+                const elementRect = element.getBoundingClientRect().top;
+                const elementPosition = elementRect - bodyRect;
+                const offsetPosition = elementPosition - offset;
+
+                window.scrollTo({
+                    top: offsetPosition,
+                    behavior: 'smooth'
+                });
+                closeFloatingNav(); // Close nav after scrolling
+            }
+        }
+
+        // Close floating nav when clicking outside
+        document.addEventListener('click', function(e) {
+            const floatingNav = document.getElementById('floatingNav');
+            // Check if the click is outside the floatingNav and not on the toggle button itself
+            if (floatingNav && !floatingNav.contains(e.target)) {
+                closeFloatingNav();
+            }
+        });
+
+        // Close floating nav when pressing Escape
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeFloatingNav();
+            }
+        });
+
+        function populateFloatingNavMenu(rubricData) {
+            const menu = document.getElementById('floatingNavMenu');
+            if (!menu) {
+                console.error('Floating nav menu element not found.');
+                return;
+            }
+
+            // Clear existing items
+            menu.innerHTML = '';
+
+            if (rubricData && rubricData.domains && rubricData.domains.length > 0) {
+                rubricData.domains.forEach(function(domain, index) {
+                    const item = document.createElement('button');
+                    item.className = 'floating-nav-item';
+                    // Attempt to get domain number from domain.name if domain.number is not directly available
+                    // This is an assumption based on typical naming like "Domain 1: Teaching..."
+                    let domainNumberDisplay = `Domain ${index + 1}`; // Fallback
+                    if (domain.number) {
+                        domainNumberDisplay = `Domain ${domain.number}`;
+                    } else {
+                        const nameMatch = domain.name ? domain.name.match(/^Domain\s*(\d+)/i) : null;
+                        if (nameMatch && nameMatch[1]) {
+                            domainNumberDisplay = `Domain ${nameMatch[1]}`;
+                        }
+                    }
+                    item.textContent = `${domainNumberDisplay}: ${domain.name.replace(/^Domain\s*\d+:\s*/i, '')}`; // Display name without "Domain X:" prefix
+                    item.onclick = function() {
+                        scrollToDomain(index);
+                        // closeFloatingNav(); // closeFloatingNav is already called within scrollToDomain
+                    };
+                    menu.appendChild(item);
+                });
+            } else {
+                // Optionally, add a message if there are no domains
+                const noDomainsItem = document.createElement('div');
+                noDomainsItem.className = 'floating-nav-item';
+                noDomainsItem.textContent = 'No domains loaded.';
+                noDomainsItem.style.textAlign = 'center';
+                noDomainsItem.style.cursor = 'default';
+                menu.appendChild(noDomainsItem);
+            }
+        }
+
         // Global state
         let currentFilters = {
             role: null,
@@ -772,6 +1008,15 @@
             
             // Scroll to rubric
             document.getElementById('rubricContainer').scrollIntoView({ behavior: 'smooth' });
+
+            // Populate the floating navigation menu
+            if (result.data && !result.data.isProbationaryView) { // Only populate if it's a standard rubric view
+                populateFloatingNavMenu(result.data);
+            } else {
+                // Clear or hide nav menu if not applicable (e.g., probationary view)
+                const menu = document.getElementById('floatingNavMenu');
+                if (menu) menu.innerHTML = '<div class="floating-nav-item" style="text-align:center; cursor:default;">N/A</div>';
+            }
         }
 
         function handleError(error) {
@@ -1034,5 +1279,19 @@
             }
         }
     </script>
+
+    <div class="floating-nav visible" id="floatingNav">
+        <button class="floating-nav-button" onclick="toggleFloatingNav()">
+            <span class="nav-icon">≡</span>
+            <span class="nav-text">Domains</span>
+        </button>
+        <div class="floating-nav-menu" id="floatingNavMenu">
+            <? for (var d = 0; d < data.domains.length; d++) { ?>
+                <button class="floating-nav-item" onclick="scrollToDomain(<?= d ?>); closeFloatingNav();">
+                    Domain <?= data.domains[d].number ?>
+                </button>
+            <? } ?>
+        </div>
+    </div>
 </body>
 </html>
