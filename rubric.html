@@ -1103,7 +1103,7 @@
                     if (component.title) {
                         // Component titles are expected to start with an ID (e.g., "1a:", "2b:")
                         // which is used for matching against assigned subdomains.
-                        var match = component.title.match(/^([1-4][a-f]):/);
+                        var match = component.title.match(/^([1-4][a-fA-F]):/);
                         componentId = match ? match[1] + ':' : '';
                     }
 
