@@ -157,7 +157,7 @@ const DOMAIN_TEMPLATE = {
 /**
  * String identifier for probationary status
  */
-const PROBATIONARY_STATUS_STRING = 'Probationary';
+const PROBATIONARY_STATUS_STRING = 'probationary';
 
 /**
  * Numeric representation for probationary observation year
