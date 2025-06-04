@@ -187,16 +187,6 @@ const VIEW_MODES = {
 };
 
 /**
- * Filter types for special access roles
- */
-const FILTER_TYPES = {
-  ROLE: 'role',
-  YEAR: 'year', 
-  STAFF: 'staff',
-  PROBATIONARY: 'probationary'
-};
-
-/**
  * Default best practices offset (for legacy Teacher sheet compatibility)
  */
 const LEGACY_BEST_PRACTICES_OFFSET = {
