@@ -308,12 +308,15 @@ function handleStaffListRequest(e) {
     }
 
     // Validate filterYear if provided
-    if (filterYear && (typeof parseInt(filterYear) !== 'number' || !OBSERVATION_YEARS.includes(parseInt(filterYear)))) {
-      return {
-        success: false,
-        error: 'Invalid input',
-        message: 'filterYear must be a number and a valid observation year.'
-      };
+    if (filterYear) {
+      const parsedFilterYear = parseInt(filterYear);
+      if (typeof parsedFilterYear !== 'number' || isNaN(parsedFilterYear) || !OBSERVATION_YEARS.includes(parsedFilterYear)) {
+        return {
+          success: false,
+          error: 'Invalid input',
+          message: 'filterYear must be a number and a valid observation year.'
+        };
+      }
     }
 
     // Validate requesting user has permission
@@ -1170,14 +1173,16 @@ function validateUserWithStateTracking(userEmail) {
 function enhanceDomainsWithAssignments(domains, assignedSubdomains, viewMode = 'full') {
   // Validate domains
   if (!Array.isArray(domains)) {
-    console.error('enhanceDomainsWithAssignments: domains must be an array.');
-    return domains; // Return unmodified domains if validation fails
+    const errorMessage = 'enhanceDomainsWithAssignments: domains must be an array.';
+    console.error(errorMessage);
+    throw new Error(errorMessage); // Throw an error to be caught by the caller
   }
 
   // Validate assignedSubdomains if provided
   if (assignedSubdomains && typeof assignedSubdomains !== 'object') {
-    console.error('enhanceDomainsWithAssignments: assignedSubdomains must be an object if provided.');
-    return domains; // Return unmodified domains if validation fails
+    const errorMessage = 'enhanceDomainsWithAssignments: assignedSubdomains must be an object if provided.';
+    console.error(errorMessage);
+    throw new Error(errorMessage); // Throw an error to be caught by the caller
   }
 
   // If assignedSubdomains is not provided, no enhancement is needed.
@@ -1647,21 +1652,24 @@ function getAllDomainsData(role = null, year = null, viewMode = 'full', assigned
 
   // Validate year
   if (year !== null && year !== undefined) {
-    const parsedYear = parseInt(year);
-    if (!isNaN(parsedYear) && OBSERVATION_YEARS.includes(parsedYear)) {
-      userYear = parsedYear;
-    } else {
+    const observationYear = parseInt(year);
+    if (isNaN(observationYear) || !OBSERVATION_YEARS.includes(observationYear)) {
       console.warn(`Invalid year: ${year}. Proceeding without year filter.`);
       // userYear remains null, effectively ignoring the invalid year
+    } else {
+      userYear = observationYear;
     }
   }
 
   // Validate viewMode
-  if (viewMode && typeof viewMode === 'string' && Object.values(VIEW_MODES).includes(viewMode.toLowerCase())) {
-    effectiveViewMode = viewMode.toLowerCase();
-  } else {
-    console.warn(`Invalid viewMode: ${viewMode}. Defaulting to 'full'.`);
-    // effectiveViewMode is already VIEW_MODES.FULL
+  if (viewMode && typeof viewMode === 'string') {
+    const lowerViewMode = viewMode.toLowerCase();
+    if (Object.values(VIEW_MODES).includes(lowerViewMode)) {
+      effectiveViewMode = lowerViewMode;
+    } else {
+      console.warn(`Invalid viewMode: ${viewMode}. Defaulting to 'full'.`);
+      // effectiveViewMode is already VIEW_MODES.FULL
+    }
   }
 
   // Validate assignedSubdomains
