@@ -185,16 +185,18 @@ function getStaffData() {
       
       const yearValue = row[STAFF_COLUMNS.YEAR];
 
-      if (typeof yearValue === 'string' && yearValue.toLowerCase() === PROBATIONARY_STATUS_STRING) {
-        user.year = PROBATIONARY_OBSERVATION_YEAR;
+      // Use the new helper function to parse year values
+      const parsedYear = parseYearValue(yearValue);
+
+      if (parsedYear !== null && OBSERVATION_YEARS.includes(parsedYear)) {
+        user.year = parsedYear;
       } else {
-        const parsedNumericYear = parseInt(yearValue);
-        if (OBSERVATION_YEARS.includes(parsedNumericYear)) {
-          user.year = parsedNumericYear;
-        } else {
-          // Default to 1 if parsing fails, year is not a string 'probationary', 
-          // or the parsed year is not in the allowed OBSERVATION_YEARS list
-          user.year = 1; 
+        // Default to 1 if parsing fails or year is not in the allowed OBSERVATION_YEARS list
+        user.year = 1;
+        
+        // Log warning for debugging if original value was not empty
+        if (yearValue && yearValue.toString().trim() !== '') {
+          console.warn(`Invalid year value in Staff sheet row ${rowNumber}: "${yearValue}". Using default year 1.`);
         }
       }
       

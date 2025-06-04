@@ -514,38 +514,27 @@ function extractComponentId(componentTitle) {
 
 /**
  * Helper function to determine if a user's year matches a target filter year.
- * @param {string|number} userYear The year from the user's record (e.g., 1, 2, "Probationary").
- * @param {string} targetYear The year from the filter (e.g., "1", "Probationary").
+ * @param {string|number} userYear The year from the user's record (e.g., 1, 2, "Year 1", "Probationary").
+ * @param {string} targetYear The year from the filter (e.g., "1", "Year 1", "Probationary").
  * @return {boolean} True if the years match according to the defined logic.
  * @private
  */
 function _isUserYearMatching(userYear, targetYear) {
-  const standardizedUserYear = userYear ? userYear.toString().toLowerCase() : null;
-  const standardizedTargetYear = targetYear ? targetYear.toString().toLowerCase() : null;
+  // Parse both years using the enhanced parser
+  const parsedUserYear = parseYearValue(userYear);
+  const parsedTargetYear = parseYearValue(targetYear);
 
-  if (!standardizedUserYear || !standardizedTargetYear) {
-    // If either is null/empty after standardization, they don't match unless both are.
-    // However, typically a filter targetYear wouldn't be null if filtering is active.
-    // And a userYear being null might mean it's not set and shouldn't match specific year filters.
-    return standardizedUserYear === standardizedTargetYear;
+  // Handle null cases
+  if (parsedUserYear === null && parsedTargetYear === null) {
+    return true; // Both are null/invalid
+  }
+  
+  if (parsedUserYear === null || parsedTargetYear === null) {
+    return false; // One is null, the other isn't
   }
 
-  if (standardizedTargetYear === 'probationary') {
-    return standardizedUserYear === 'probationary';
-  } else {
-    const numericTargetYear = parseInt(standardizedTargetYear);
-    // If targetYear is not 'probationary' and not a parsable number, it's an invalid filter for numeric matching.
-    if (isNaN(numericTargetYear)) {
-      console.warn('_isUserYearMatching: Invalid non-numeric, non-probationary targetYear', { targetYear: targetYear });
-      return false;
-    }
-    // If userYear is 'probationary', it cannot match a numeric targetYear.
-    if (standardizedUserYear === 'probationary') {
-      return false;
-    }
-    const numericUserYear = parseInt(standardizedUserYear);
-    return !isNaN(numericUserYear) && numericUserYear === numericTargetYear;
-  }
+  // Direct comparison of parsed numeric values
+  return parsedUserYear === parsedTargetYear;
 }
 
 /**
