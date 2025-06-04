@@ -2131,3 +2131,193 @@ function createSyntheticUserContext(targetRole, targetYear, originalContext, fil
         return originalContext; // Fallback to original context
     }
 }
+
+/**
+ * Create enhanced error page with cache busting and debug info
+ * Add this function to the end of your Code.js file, before the final closing brace
+ */
+function createEnhancedErrorPage(error, requestId, userContext, userAgent) {
+  try {
+    const errorDetails = {
+      message: error instanceof Error ? error.message : error.toString(),
+      timestamp: new Date().toISOString(),
+      requestId: requestId || generateUniqueId('error'),
+      userAgent: userAgent || 'Unknown',
+      stack: error.stack || 'No stack trace available'
+    };
+
+    const htmlTemplate = HtmlService.createTemplate(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Error - Danielson Framework</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f8f9fa;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+        }
+        .error-container {
+            max-width: 600px;
+            margin: 50px auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 40px;
+            text-align: center;
+        }
+        .error-icon {
+            font-size: 4rem;
+            color: #dc3545;
+            margin-bottom: 20px;
+        }
+        .error-title {
+            color: #dc3545;
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 15px;
+        }
+        .error-message {
+            color: #666;
+            font-size: 1rem;
+            line-height: 1.6;
+            margin-bottom: 30px;
+        }
+        .error-actions {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            transition: all 0.3s ease;
+        }
+        .btn-primary {
+            background: #007bff;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #0056b3;
+        }
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        .btn-secondary:hover {
+            background: #545b62;
+        }
+        .error-details {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 0.8rem;
+            color: #666;
+            text-align: left;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        @media (max-width: 768px) {
+            .error-container {
+                margin: 20px auto;
+                padding: 20px;
+            }
+            .btn {
+                width: 100%;
+                margin-bottom: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="error-container">
+        <div class="error-icon">⚠️</div>
+        <h1 class="error-title">System Error</h1>
+        <div class="error-message">
+            <p>We encountered an error while loading the Danielson Framework.</p>
+            <p>This is usually temporary. Please try refreshing the page or contact your administrator if the problem persists.</p>
+        </div>
+        
+        <div class="error-actions">
+            <button class="btn btn-primary" onclick="window.location.reload()">
+                🔄 Refresh Page
+            </button>
+            <button class="btn btn-secondary" onclick="forceRefresh()">
+                💨 Force Refresh
+            </button>
+        </div>
+
+        <div class="error-details">
+            <strong>Error Details:</strong><br>
+            Time: <?= errorDetails.timestamp ?><br>
+            Request ID: <?= errorDetails.requestId ?><br>
+            Message: <?= errorDetails.message ?><br>
+        </div>
+    </div>
+
+    <script>
+        function forceRefresh() {
+            const url = new URL(window.location);
+            url.searchParams.set('refresh', 'true');
+            url.searchParams.set('nocache', 'true');
+            url.searchParams.set('t', Date.now());
+            window.location.href = url.toString();
+        }
+
+        // Auto-refresh after 30 seconds
+        setTimeout(function() {
+            forceRefresh();
+        }, 30000);
+
+        console.error('System Error Details:', <?= JSON.stringify(errorDetails) ?>);
+    </script>
+</body>
+</html>`);
+
+    htmlTemplate.errorDetails = errorDetails;
+
+    const htmlOutput = htmlTemplate.evaluate()
+      .setTitle('System Error - Danielson Framework')
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+
+    // Add cache-busting headers
+    htmlOutput
+      .addMetaTag('cache-control', 'no-cache, no-store, must-revalidate, max-age=0')
+      .addMetaTag('pragma', 'no-cache')
+      .addMetaTag('expires', '0');
+
+    console.error('Enhanced error page created:', {
+      requestId: errorDetails.requestId,
+      error: errorDetails.message,
+      timestamp: errorDetails.timestamp
+    });
+
+    return htmlOutput;
+
+  } catch (createErrorPageError) {
+    console.error('Error creating enhanced error page:', createErrorPageError);
+    
+    // Fallback to basic error response
+    return HtmlService.createHtmlOutput(`
+      <div style="text-align: center; padding: 50px; font-family: Arial, sans-serif;">
+        <h2 style="color: #dc3545;">System Error</h2>
+        <p>An error occurred while loading the application.</p>
+        <p>Please refresh the page or contact your administrator.</p>
+        <button onclick="window.location.reload()" style="padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">Refresh Page</button>
+      </div>
+    `).setTitle('System Error');
+  }
+}
