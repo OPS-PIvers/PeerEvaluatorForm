@@ -2071,65 +2071,128 @@ function generateAllUrlVariations(userContext = null) {
 
 /**
  * Create synthetic user context for role/year filtering by special access users
- * @param {string} targetRole - Role to simulate
- * @param {number|string} targetYear - Year to simulate  
- * @param {Object} originalContext - Original user context
- * @param {Object} filterOptions - Filter configuration options
- * @return {Object} Synthetic user context
+ * ENHANCED VERSION - Fixes blank screen issue
  */
 function createSyntheticUserContext(targetRole, targetYear, originalContext, filterOptions = {}) {
     try {
-        debugLog('Creating synthetic user context', {
+        debugLog('Creating synthetic user context - Enhanced Version', {
             targetRole: targetRole,
             targetYear: targetYear,
-            filterOptions: filterOptions
+            filterOptions: filterOptions,
+            originalRole: originalContext?.role
         });
 
-        // Create a copy of the original context
+        // VALIDATION: Check if targetRole is valid
+        if (!targetRole || typeof targetRole !== 'string') {
+            console.error('Invalid targetRole provided:', targetRole);
+            return {
+                ...originalContext,
+                error: 'Invalid role specified',
+                isError: true
+            };
+        }
+
+        if (!AVAILABLE_ROLES.includes(targetRole)) {
+            console.error('Role not in AVAILABLE_ROLES:', targetRole, 'Available:', AVAILABLE_ROLES);
+            return {
+                ...originalContext,
+                error: `Role "${targetRole}" is not available. Available roles: ${AVAILABLE_ROLES.join(', ')}`,
+                isError: true
+            };
+        }
+
+        // VALIDATION: Check if originalContext exists
+        if (!originalContext) {
+            console.error('No original context provided');
+            return {
+                role: targetRole,
+                year: targetYear || 1,
+                isFiltered: true,
+                isSynthetic: true,
+                error: 'Missing user context',
+                isError: true
+            };
+        }
+
+        // Create a safe copy of the original context
         const syntheticContext = {
+            // Copy all original properties first
             ...originalContext,
+            
+            // Override with synthetic values
             role: targetRole,
-            year: targetYear,
+            year: targetYear || originalContext.year || 1,
             isFiltered: true,
             isSynthetic: true,
+            isError: false,
             
-            // Override view mode based on filter type
+            // Set view mode based on filter type
             viewMode: filterOptions.showAssignedAreas ? 'assigned' : 'full',
             
-            // Get assigned subdomains for this role/year if needed
-            assignedSubdomains: filterOptions.showAssignedAreas ? 
-                getAssignedSubdomainsForRoleYear(targetRole, targetYear) : null,
+            // Get assigned subdomains if needed
+            assignedSubdomains: null,
             
             // Enhanced filter info
             filterInfo: {
                 filterType: filterOptions.showFullRubric ? 'role_only' : 'role_and_year',
                 viewingRole: targetRole,
                 viewingYear: targetYear,
-                requestedBy: originalContext.role,
-                showFullRubric: filterOptions.showFullRubric,
-                showAssignedAreas: filterOptions.showAssignedAreas,
-                originalRole: filterOptions.originalRole
+                requestedBy: originalContext.role || 'Unknown',
+                showFullRubric: !!filterOptions.showFullRubric,
+                showAssignedAreas: !!filterOptions.showAssignedAreas,
+                originalRole: originalContext.role || 'Unknown'
             },
             
             // Maintain special access from original context
-            hasSpecialAccess: originalContext.hasSpecialAccess,
-            canFilter: originalContext.canFilter,
-            specialRoleType: originalContext.specialRoleType
+            hasSpecialAccess: originalContext.hasSpecialAccess || false,
+            canFilter: originalContext.canFilter || false,
+            specialRoleType: originalContext.specialRoleType || null
         };
 
-        debugLog('Synthetic user context created successfully', {
+        // Get assigned subdomains if showing assigned areas
+        if (filterOptions.showAssignedAreas && targetYear) {
+            try {
+                syntheticContext.assignedSubdomains = getAssignedSubdomainsForRoleYear(targetRole, targetYear);
+                debugLog('Assigned subdomains loaded for synthetic context', {
+                    role: targetRole,
+                    year: targetYear,
+                    subdomains: syntheticContext.assignedSubdomains
+                });
+            } catch (subdomainError) {
+                console.warn('Error loading assigned subdomains:', subdomainError);
+                // Continue without assigned subdomains rather than failing
+                syntheticContext.assignedSubdomains = null;
+            }
+        }
+
+        debugLog('Synthetic user context created successfully - Enhanced Version', {
             role: syntheticContext.role,
             year: syntheticContext.year,
             viewMode: syntheticContext.viewMode,
             hasAssignedSubdomains: !!syntheticContext.assignedSubdomains,
-            filterType: syntheticContext.filterInfo.filterType
+            filterType: syntheticContext.filterInfo?.filterType
         });
 
         return syntheticContext;
 
     } catch (error) {
-        console.error('Error creating synthetic user context:', error);
-        return originalContext; // Fallback to original context
+        console.error('Error creating synthetic user context - Enhanced Version:', error);
+        
+        // Return a safe fallback context instead of throwing
+        return {
+            ...originalContext,
+            role: originalContext?.role || 'Teacher', // Safe fallback
+            year: originalContext?.year || 1,
+            isFiltered: true,
+            isSynthetic: true,
+            isError: true,
+            error: `Error creating filtered view: ${error.message}`,
+            filterInfo: {
+                error: error.message,
+                requestedRole: targetRole,
+                fallbackUsed: true
+            }
+        };
     }
 }
 
