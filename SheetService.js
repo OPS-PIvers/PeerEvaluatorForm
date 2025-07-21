@@ -922,7 +922,7 @@ function testSheetConnectivity() {
     results.spreadsheet.name = spreadsheet.getName();
     
     // Test critical sheets
-    const criticalSheets = [SHEET_NAMES.STAFF, SHEET_NAMES.SETTINGS, SHEET_NAMES.TEACHER];
+    const criticalSheets = [SHEET_NAMES.STAFF, SHEET_NAMES.SETTINGS, SHEET_NAMES.TEACHER, SHEET_NAMES.OBSERVATIONS, SHEET_NAMES.RATINGS];
     
     criticalSheets.forEach(sheetName => {
       results.summary.total++;
@@ -968,4 +968,460 @@ function testSheetConnectivity() {
   
   debugLog('Sheet connectivity test completed', results);
   return results;
+}
+
+/**
+ * Creates a new observation.
+ * @param {string} observeeEmail The email of the user being observed.
+ * @param {string} evaluatorEmail The email of the user conducting the observation.
+ * @param {string} observationName The name of the observation.
+ * @return {string} The ID of the new observation.
+ */
+function createObservation(observeeEmail, evaluatorEmail, observationName) {
+  try {
+    const spreadsheet = openSpreadsheet();
+    let sheet = getSheetByName(spreadsheet, SHEET_NAMES.OBSERVATIONS);
+
+    if (!sheet) {
+      sheet = spreadsheet.insertSheet(SHEET_NAMES.OBSERVATIONS);
+      sheet.appendRow(['Observation ID', 'Observee Email', 'Evaluator Email', 'Observation Name', 'Start Time', 'End Time', 'Status', 'Folder ID', 'Notes Doc ID']);
+    }
+
+    const observee = getUserByEmail(observeeEmail);
+    const observeeName = observee ? observee.name : 'Unknown User';
+    const currentYear = new Date().getFullYear();
+    const folderName = `${observeeName} - ${currentYear} ${observationName}`;
+
+    const folder = DriveApp.createFolder(folderName);
+    const notesDoc = DocumentApp.create(`${observationName} Notes`);
+    DriveApp.getFileById(notesDoc.getId()).moveTo(folder);
+
+    const observationId = generateUniqueId('obs');
+    const startTime = new Date();
+
+    sheet.appendRow([observationId, observeeEmail, evaluatorEmail, observationName, startTime, '', OBSERVATION_STATUS.IN_PROGRESS, folder.getId(), notesDoc.getId()]);
+
+    debugLog('Observation created successfully', { observationId, observeeEmail, evaluatorEmail, observationName });
+    return observationId;
+  } catch (error) {
+    console.error('Error creating observation:', formatErrorMessage(error, 'createObservation'));
+    return null;
+  }
+}
+
+/**
+ * Finalizes an observation.
+ * @param {string} observationId The ID of the observation to finalize.
+ */
+function finalizeObservation(observationId) {
+  try {
+    const spreadsheet = openSpreadsheet();
+    const sheet = getSheetByName(spreadsheet, SHEET_NAMES.OBSERVATIONS);
+    const data = sheet.getDataRange().getValues();
+
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0] === observationId) {
+        sheet.getRange(i + 1, 7).setValue(OBSERVATION_STATUS.FINALIZED);
+        sheet.getRange(i + 1, 6).setValue(new Date());
+        debugLog('Observation finalized successfully', { observationId });
+        return;
+      }
+    }
+  } catch (error) {
+    console.error('Error finalizing observation:', formatErrorMessage(error, 'finalizeObservation'));
+  }
+}
+
+/**
+ * Saves a note for a specific component and observation.
+ * @param {string} observationId The ID of the observation.
+ * @param {string} componentId The ID of the component (e.g., "1a:").
+ * @param {string} noteContent The content of the note.
+ */
+function saveNote(observationId, componentId, noteContent) {
+  try {
+    const spreadsheet = openSpreadsheet();
+    const sheet = getSheetByName(spreadsheet, SHEET_NAMES.OBSERVATIONS);
+    const data = sheet.getDataRange().getValues();
+
+    let notesDocId = null;
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0] === observationId) {
+        notesDocId = data[i][8];
+        break;
+      }
+    }
+
+    if (notesDocId) {
+      const doc = DocumentApp.openById(notesDocId);
+      const body = doc.getBody();
+      let section = body.findText(`## ${componentId}`);
+
+      if (section) {
+        // Clear existing content for this section
+        let nextSection = body.findText('## ', section.getElement());
+        let startElement = section.getElement().getParent();
+        let endElement = nextSection ? nextSection.getElement().getParent() : null;
+        let currentElement = startElement.getNextSibling();
+
+        while (currentElement && currentElement !== endElement) {
+          let toRemove = currentElement;
+          currentElement = currentElement.getNextSibling();
+          toRemove.removeFromParent();
+        }
+
+        body.insertParagraph(body.getChildIndex(startElement) + 1, noteContent);
+      } else {
+        body.appendParagraph(`## ${componentId}`).setHeading(DocumentApp.ParagraphHeading.HEADING2);
+        body.appendParagraph(noteContent);
+      }
+      doc.saveAndClose();
+      debugLog('Note saved successfully to Google Doc', { observationId, componentId });
+    }
+  } catch (error) {
+    console.error('Error saving note:', formatErrorMessage(error, 'saveNote'));
+  }
+}
+
+/**
+ * Retrieves all notes for a specific observation.
+ * @param {string} observationId The ID of the observation.
+ * @return {Object} An object mapping component IDs to note content.
+ */
+function getNotes(observationId) {
+  try {
+    const spreadsheet = openSpreadsheet();
+    const sheet = getSheetByName(spreadsheet, SHEET_NAMES.OBSERVATIONS);
+    const data = sheet.getDataRange().getValues();
+
+    let notesDocId = null;
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0] === observationId) {
+        notesDocId = data[i][8];
+        break;
+      }
+    }
+
+    if (notesDocId) {
+      const doc = DocumentApp.openById(notesDocId);
+      const body = doc.getBody();
+      const text = body.getText();
+      const notes = {};
+      const sections = text.split('## ');
+
+      for (let i = 1; i < sections.length; i++) {
+        let section = sections[i];
+        let lines = section.split('\n');
+        let componentId = lines.shift();
+        let content = lines.join('\n');
+        notes[componentId] = content;
+      }
+      debugLog('Notes retrieved successfully from Google Doc', { observationId, noteCount: Object.keys(notes).length });
+      return notes;
+    }
+    return {};
+  } catch (error) {
+    console.error('Error retrieving notes:', formatErrorMessage(error, 'getNotes'));
+    return {};
+  }
+}
+
+/**
+ * Saves a rating for a specific component and observation.
+ * @param {string} observationId The ID of the observation.
+ * @param {string} componentId The ID of the component (e.g., "1a:").
+ * @param {string} rating The rating (e.g., "Developing", "Basic").
+ */
+function saveRating(observationId, componentId, rating) {
+  try {
+    const spreadsheet = openSpreadsheet();
+    let sheet = getSheetByName(spreadsheet, SHEET_NAMES.RATINGS);
+
+    if (!sheet) {
+      sheet = spreadsheet.insertSheet(SHEET_NAMES.RATINGS);
+      sheet.appendRow(['Observation ID', 'Component ID', 'Rating', 'Last Updated']);
+    }
+
+    const data = sheet.getDataRange().getValues();
+    let ratingFound = false;
+
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0] === observationId && data[i][1] === componentId) {
+        sheet.getRange(i + 1, 3).setValue(rating);
+        sheet.getRange(i + 1, 4).setValue(new Date());
+        ratingFound = true;
+        break;
+      }
+    }
+
+    if (!ratingFound) {
+      sheet.appendRow([observationId, componentId, rating, new Date()]);
+    }
+
+    debugLog('Rating saved successfully', { observationId, componentId, rating });
+  } catch (error) {
+    console.error('Error saving rating:', formatErrorMessage(error, 'saveRating'));
+  }
+}
+
+/**
+ * Uploads a media file to the observation folder.
+ * @param {string} observationId The ID of the observation.
+ * @param {string} componentId The ID of the component (e.g., "1a:").
+ * @param {string} fileData The base64 encoded file data.
+ * @param {string} fileName The name of the file.
+ * @param {string} mimeType The MIME type of the file.
+ */
+function uploadMedia(observationId, componentId, fileData, fileName, mimeType) {
+  try {
+    const spreadsheet = openSpreadsheet();
+    const sheet = getSheetByName(spreadsheet, SHEET_NAMES.OBSERVATIONS);
+    const data = sheet.getDataRange().getValues();
+
+    let folderId = null;
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0] === observationId) {
+        folderId = data[i][7];
+        break;
+      }
+    }
+
+    if (folderId) {
+      const folder = DriveApp.getFolderById(folderId);
+      const decodedData = Utilities.base64Decode(fileData);
+      const blob = Utilities.newBlob(decodedData, mimeType, fileName);
+      folder.createFile(blob);
+      debugLog('Media uploaded successfully', { observationId, componentId, fileName });
+    }
+  } catch (error) {
+    console.error('Error uploading media:', formatErrorMessage(error, 'uploadMedia'));
+  }
+}
+
+/**
+ * Retrieves observations based on user role and filters.
+ * - Peer Evaluators can see all observations for a given observee.
+ * - Other users can only see their own 'Finalized' observations.
+ * @param {string} observeeEmail The email of the user being observed.
+ * @param {string|null} status - Optional status to filter by (e.g., "In Progress", "Finalized").
+ * @return {Array} An array of observation objects.
+ */
+function getObservations(observeeEmail, status = null) {
+  try {
+    const userContext = createUserContext(); // Gets current user's role and email
+    const isPeerEvaluator = userContext.role === 'Peer Evaluator';
+    let targetEmail = observeeEmail;
+
+    // Security Enforcement: If not a peer evaluator, user can only see their own finalized observations.
+    if (!isPeerEvaluator) {
+      targetEmail = userContext.email;
+      status = OBSERVATION_STATUS.FINALIZED; // Force status to Finalized
+      debugLog('Non-evaluator access: fetching own finalized observations.', { user: targetEmail });
+    }
+
+    if (!targetEmail) {
+        debugLog('getObservations called with no target email.', { isPeerEvaluator });
+        return [];
+    }
+
+    const spreadsheet = openSpreadsheet();
+    const sheet = getSheetByName(spreadsheet, SHEET_NAMES.OBSERVATIONS);
+
+    if (!sheet) {
+      return [];
+    }
+
+    const data = sheet.getDataRange().getValues();
+    const observations = [];
+    // Loop from row 1 to skip header
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      const obsObserveeEmail = row[1];
+      const obsStatus = row[6];
+
+      // Match email and optionally status
+      if (obsObserveeEmail === targetEmail && (!status || obsStatus === status)) {
+        observations.push({
+          id: row[0],
+          observeeEmail: row[1],
+          evaluatorEmail: row[2],
+          name: row[3],
+          startTime: row[4],
+          endTime: row[5],
+          status: row[6],
+          folderId: row[7],
+          notesDocId: row[8]
+        });
+      }
+    }
+
+    debugLog('Observations retrieved successfully', { 
+        requestedFor: observeeEmail,
+        retrievedFor: targetEmail,
+        filterStatus: status,
+        observationCount: observations.length 
+    });
+    return observations;
+  } catch (error) {
+    console.error('Error retrieving observations:', formatErrorMessage(error, 'getObservations'));
+    return [];
+  }
+}
+
+/**
+ * Retrieves all details for a single observation, including ratings and notes.
+ * @param {string} observationId The ID of the observation.
+ * @return {Object|null} A comprehensive observation object or null if not found.
+ */
+function getObservationDetails(observationId) {
+    try {
+        const spreadsheet = openSpreadsheet();
+        const obsSheet = getSheetByName(spreadsheet, SHEET_NAMES.OBSERVATIONS);
+        if (!obsSheet) return null;
+
+        const obsData = obsSheet.getDataRange().getValues();
+        let observation = null;
+
+        // Find the observation
+        for (let i = 1; i < obsData.length; i++) {
+            if (obsData[i][0] === observationId) {
+                observation = {
+                    id: obsData[i][0],
+                    observeeEmail: obsData[i][1],
+                    evaluatorEmail: obsData[i][2],
+                    name: obsData[i][3],
+                    startTime: obsData[i][4],
+                    endTime: obsData[i][5],
+                    status: obsData[i][6],
+                    folderId: obsData[i][7],
+                    notesDocId: obsData[i][8],
+                    ratings: {},
+                    notes: {}
+                };
+                break;
+            }
+        }
+
+        if (!observation) {
+            debugLog('Observation not found', { observationId });
+            return null;
+        }
+
+        // Get all ratings for this observation
+        const ratingsSheet = getSheetByName(spreadsheet, SHEET_NAMES.RATINGS);
+        if (ratingsSheet) {
+            const ratingsData = ratingsSheet.getDataRange().getValues();
+            for (let i = 1; i < ratingsData.length; i++) {
+                if (ratingsData[i][0] === observationId) {
+                    const componentId = ratingsData[i][1];
+                    const rating = ratingsData[i][2];
+                    observation.ratings[componentId] = rating;
+                }
+            }
+        }
+
+        // Get all notes for this observation
+        if (observation.notesDocId) {
+            observation.notes = getNotes(observationId);
+        }
+        
+        debugLog('Observation details retrieved successfully', { observationId });
+        return observation;
+
+    } catch (error) {
+        console.error('Error retrieving observation details:', formatErrorMessage(error, 'getObservationDetails'));
+        return null;
+    }
+}
+
+/**
+ * Renames an observation.
+ * @param {string} observationId The ID of the observation to rename.
+ * @param {string} newName The new name for the observation.
+ */
+function renameObservation(observationId, newName) {
+  try {
+    const spreadsheet = openSpreadsheet();
+    const sheet = getSheetByName(spreadsheet, SHEET_NAMES.OBSERVATIONS);
+    const data = sheet.getDataRange().getValues();
+
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0] === observationId) {
+        sheet.getRange(i + 1, 4).setValue(newName);
+        debugLog('Observation renamed successfully', { observationId, newName });
+        return;
+      }
+    }
+  } catch (error) {
+    console.error('Error renaming observation:', formatErrorMessage(error, 'renameObservation'));
+  }
+}
+
+/**
+ * Deletes an observation and its associated data.
+ * @param {string} observationId The ID of the observation to delete.
+ */
+function deleteObservation(observationId) {
+  try {
+    const spreadsheet = openSpreadsheet();
+    const sheet = getSheetByName(spreadsheet, SHEET_NAMES.OBSERVATIONS);
+    const data = sheet.getDataRange().getValues();
+
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0] === observationId) {
+        const folderId = data[i][7];
+        const notesDocId = data[i][8];
+
+        if (folderId) {
+          DriveApp.getFolderById(folderId).setTrashed(true);
+        }
+        if (notesDocId) {
+          DriveApp.getFileById(notesDocId).setTrashed(true);
+        }
+
+        sheet.deleteRow(i + 1);
+        debugLog('Observation deleted successfully', { observationId });
+        return;
+      }
+    }
+  } catch (error) {
+    console.error('Error deleting observation:', formatErrorMessage(error, 'deleteObservation'));
+  }
+}
+
+/**
+ * Exports an observation rubric to PDF.
+ * @param {string} observationId The ID of the observation to export.
+ * @return {string} The URL of the generated PDF file.
+ */
+function exportToPdf(observationId) {
+  try {
+    const spreadsheet = openSpreadsheet();
+    const sheet = getSheetByName(spreadsheet, SHEET_NAMES.OBSERVATIONS);
+    const data = sheet.getDataRange().getValues();
+
+    let folderId = null;
+    let observationName = null;
+
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0] === observationId) {
+        folderId = data[i][7];
+        observationName = data[i][3];
+        break;
+      }
+    }
+
+    if (folderId && observationName) {
+      const folder = DriveApp.getFolderById(folderId);
+      const html = HtmlService.createTemplateFromFile('rubric-pdf').evaluate().getContent();
+      const pdf = Utilities.newBlob(html, 'text/html', `${observationName}.html`).getAs('application/pdf');
+      const pdfFile = folder.createFile(pdf).setName(`${observationName}.pdf`);
+      return pdfFile.getUrl();
+    }
+
+    return null;
+  } catch (error) {
+    console.error('Error exporting to PDF:', formatErrorMessage(error, 'exportToPdf'));
+    return null;
+  }
 }
