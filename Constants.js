@@ -9,7 +9,10 @@
 const SHEET_NAMES = {
   STAFF: 'Staff',
   SETTINGS: 'Settings',
-  TEACHER: 'Teacher'
+  TEACHER: 'Teacher',
+  NOTES: 'Notes',
+  OBSERVATIONS: 'Observations',
+  RATINGS: 'Ratings'
 };
 
 /**
@@ -332,4 +335,9 @@ const FILTER_TYPES = {
 const VIEW_MODE_TEXT = {
   FULL: 'View: Full Rubric',
   ASSIGNED: 'View: My Assigned Areas'
+};
+
+const OBSERVATION_STATUS = {
+  IN_PROGRESS: 'In Progress',
+  FINALIZED: 'Finalized'
 };

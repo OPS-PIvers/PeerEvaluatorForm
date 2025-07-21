@@ -776,6 +776,167 @@
             opacity: 0.8;
             margin-left: 10px;
         }
+
+        /* Notes Section Styles */
+        .notes-section {
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .notes-header {
+            background: linear-gradient(135deg, #6b7280, #4b5563);
+            color: white;
+            padding: 10px 20px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 600;
+            transition: background 0.3s ease;
+            font-size: 0.85rem;
+        }
+
+        .notes-header:hover {
+            background: linear-gradient(135deg, #4b5563, #374151);
+        }
+
+        .notes-chevron {
+            transition: transform 0.3s ease;
+            font-size: 1rem;
+        }
+
+        .notes-chevron.expanded {
+            transform: rotate(180deg);
+        }
+
+        .notes-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+            background: #f8fafc;
+        }
+
+        .notes-content.expanded {
+            max-height: 500px; /* Allow for a large text area */
+        }
+
+        .notes-textarea {
+            width: 100%;
+            min-height: 100px;
+            padding: 15px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            font-family: inherit;
+            font-size: 0.9rem;
+            resize: vertical; /* Allow vertical resizing */
+            display: block;
+            box-sizing: border-box;
+        }
+
+        /* Media Upload Styles */
+        .media-upload-section {
+            padding: 10px 20px;
+            background: #f8fafc;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .media-upload-label {
+            cursor: pointer;
+            background: #3182ce;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            display: inline-block;
+        }
+
+        .media-upload-input {
+            display: none;
+        }
+
+        /* Rating Styles */
+        .level-content.active {
+            background-color: var(--color-blue-light-bg);
+            border: 2px solid var(--color-blue-base);
+        }
+
+        /* Dialog Styles */
+        .dialog-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+
+        .dialog-box {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            width: 90%;
+            max-width: 600px;
+        }
+
+        .dialog-header {
+            padding: 15px 20px;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .dialog-header h3 {
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+
+        .dialog-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #6b7280;
+        }
+
+        .dialog-content {
+            padding: 20px;
+            max-height: 60vh;
+            overflow-y: auto;
+        }
+
+        #observation-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        #observation-list li {
+            padding: 10px;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .dialog-footer {
+            padding: 15px 20px;
+            border-top: 1px solid #e2e8f0;
+            text-align: right;
+        }
+
+        .dialog-button {
+            background: #4a5568;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
     </style>
 </head>
 <body>
@@ -833,6 +994,8 @@
         <? } ?>
 
         <div class="navigation">
+            <!-- This space is now managed by the main app logic -->
+
             <!-- Special Role Filters -->
             <? if (data.userContext && data.userContext.hasSpecialAccess) { ?>
             <div class="special-filters">
@@ -885,130 +1048,187 @@
                 <? } ?>
             </div>
         </div>
-        
-        <? for (var domainIdx = 0; domainIdx < data.domains.length; domainIdx++) { ?>
-            <div class="domain-section" id="domain-<?= domainIdx ?>">
-                <div class="domain-header">
-                    <?= data.domains[domainIdx].name ?>
-                </div>
-                
-                <!-- Sticky column headers for this domain -->
-                <div class="performance-levels-header">
-                    <div class="performance-levels">
-                        <div class="level-header"></div>
-                        <div class="level-header">Developing</div>
-                        <div class="level-header">Basic</div>
-                        <div class="level-header">Proficient</div>
-                        <div class="level-header">Distinguished</div>
+
+        <!-- ================================================================= -->
+        <!-- ============ START: OBSERVATION MANAGEMENT DASHBOARD ============ -->
+        <!-- ================================================================= -->
+        <div id="observation-dashboard" style="display: none; padding: 20px;">
+            <h2 id="dashboard-title" style="margin-bottom: 15px;">Observations for [Staff Name]</h2>
+            <div id="observation-list-container">
+                <!-- Observations will be dynamically inserted here -->
+            </div>
+            <div style="margin-top: 20px;">
+                <button class="nav-button" onclick="beginNewObservation()">Begin New Observation</button>
+            </div>
+        </div>
+        <!-- =============================================================== -->
+        <!-- ============ END: OBSERVATION MANAGEMENT DASHBOARD ============ -->
+        <!-- =============================================================== -->
+
+        <!-- ================================================================= -->
+        <!-- ================= START: OBSERvee Finalized View =============== -->
+        <!-- ================================================================= -->
+        <div id="observee-dashboard" style="display: none; padding: 20px;">
+            <h2 style="margin-bottom: 15px;">My Finalized Observations</h2>
+            <div id="finalized-observation-list-container">
+                <!-- Finalized observations for the user will be inserted here -->
+            </div>
+        </div>
+        <!-- =============================================================== -->
+        <!-- ================== END: OBSERvee Finalized View =============== -->
+        <!-- =============================================================== -->
+
+
+        <!-- ================================================================= -->
+        <!-- ===================== START: RUBRIC CONTAINER =================== -->
+        <!-- ================================================================= -->
+        <div id="rubric-container" style="display: none;">
+            <? for (var domainIdx = 0; domainIdx < data.domains.length; domainIdx++) { ?>
+                <div class="domain-section" id="domain-<?= domainIdx ?>">
+                    <div class="domain-header">
+                        <?= data.domains[domainIdx].name ?>
                     </div>
-                </div>
-                
-                <? for (var i = 0; i < data.domains[domainIdx].components.length; i++) { ?>
-                    <?
-                    // Determine if this component should be visible
-                    var component = data.domains[domainIdx].components[i];
-                    var componentId = '';
-                    if (component.title) {
-                        // Component titles are expected to start with an ID (e.g., "1a:", "2b:")
-                        // which is used for matching against assigned subdomains.
-                        var match = component.title.match(/^([1-4][a-fA-F]):/);
-                        componentId = match ? match[1] + ':' : '';
-                    }
-
-                    var isAssigned = false;
-                    // Calculate isAssigned if componentId is valid and subdomains are available.
-                    // This is needed for styling in 'full' mode and visibility in 'assigned' mode.
-                    if (componentId && data.userContext && data.userContext.assignedSubdomains) {
-                        var domainKey = 'domain' + (domainIdx + 1);
-                        var assignedList = data.userContext.assignedSubdomains[domainKey] || [];
-                        isAssigned = assignedList.indexOf(componentId) !== -1;
-                    }
-
-                    var shouldShow;
-                    if (data.userContext && data.userContext.viewMode === 'assigned') {
-                        // In 'assigned' mode, show only if componentId is valid AND it's assigned.
-                        shouldShow = componentId ? isAssigned : false;
-                    } else {
-                        // In 'full' mode (or if userContext is not fully defined), show all components.
-                        shouldShow = true;
-                    }
-                    ?>
-
-                    <? if (shouldShow) { ?>
-                    <div class="component-section <?= isAssigned ? 'component-assigned' : 'component-not-assigned' ?>"
-                         data-component-id="<?= componentId ?>"
-                         data-assigned="<?= isAssigned ? 'true' : 'false' ?>">
-
-                        <!-- Assignment Indicator -->
-                        <? if (data.userContext && data.userContext.assignedSubdomains && data.userContext.viewMode === 'full') { ?>
-                        <div class="assignment-indicator <?= isAssigned ? 'assigned' : 'not-assigned' ?>" aria-label="<?= isAssigned ? 'Component assigned' : 'Component not assigned' ?>">
-                            <?= isAssigned ? '✓' : '○' ?>
+                    
+                    <!-- Sticky column headers for this domain -->
+                    <div class="performance-levels-header">
+                        <div class="performance-levels">
+                            <div class="level-header"></div>
+                            <div class="level-header">Developing</div>
+                            <div class="level-header">Basic</div>
+                            <div class="level-header">Proficient</div>
+                            <div class="level-header">Distinguished</div>
                         </div>
-                        <? } ?>
+                    </div>
+                    
+                    <? for (var i = 0; i < data.domains[domainIdx].components.length; i++) { ?>
+                        <?
+                        // Determine if this component should be visible
+                        var component = data.domains[domainIdx].components[i];
+                        var componentId = '';
+                        if (component.title) {
+                            // Component titles are expected to start with an ID (e.g., "1a:", "2b:")
+                            // which is used for matching against assigned subdomains.
+                            var match = component.title.match(/^([1-4][a-fA-F]):/);
+                            componentId = match ? match[1] + ':' : '';
+                        }
 
-                        <div class="performance-levels-content">
-                            <div class="row-label">
-                                <?= component.title ?>
-                                <? if (isAssigned && data.userContext.viewMode === 'assigned') { ?>
-                                <span class="assigned-badge">📋 Assigned</span>
-                                <? } ?>
+                        var isAssigned = false;
+                        // Calculate isAssigned if componentId is valid and subdomains are available.
+                        // This is needed for styling in 'full' mode and visibility in 'assigned' mode.
+                        if (componentId && data.userContext && data.userContext.assignedSubdomains) {
+                            var domainKey = 'domain' + (domainIdx + 1);
+                            var assignedList = data.userContext.assignedSubdomains[domainKey] || [];
+                            isAssigned = assignedList.indexOf(componentId) !== -1;
+                        }
+
+                        var shouldShow;
+                        if (data.userContext && data.userContext.viewMode === 'assigned') {
+                            // In 'assigned' mode, show only if componentId is valid AND it's assigned.
+                            shouldShow = componentId ? isAssigned : false;
+                        } else {
+                            // In 'full' mode (or if userContext is not fully defined), show all components.
+                            shouldShow = true;
+                        }
+                        ?>
+
+                        <? if (shouldShow) { ?>
+                        <div class="component-section <?= isAssigned ? 'component-assigned' : 'component-not-assigned' ?>"
+                             data-component-id="<?= componentId ?>"
+                             data-assigned="<?= isAssigned ? 'true' : 'false' ?>">
+
+                            <!-- Assignment Indicator -->
+                            <? if (data.userContext && data.userContext.assignedSubdomains && data.userContext.viewMode === 'full') { ?>
+                            <div class="assignment-indicator <?= isAssigned ? 'assigned' : 'not-assigned' ?>" aria-label="<?= isAssigned ? 'Component assigned' : 'Component not assigned' ?>">
+                                <?= isAssigned ? '✓' : '○' ?>
                             </div>
-                            <div class="level-content">
-                                <?= component.developing ?>
-                            </div>
-                            <div class="level-content">
-                                <?= component.basic ?>
-                            </div>
-                            <div class="level-content">
-                                <?= component.proficient ?>
-                            </div>
-                            <div class="level-content">
-                                <?= component.distinguished ?>
-                            </div>
-                        </div>
-                        
-                        <? if (component.bestPractices && component.bestPractices.length > 0) { ?>
-                        <div class="look-fors-section">
-                            <div class="look-fors-header" onclick="toggleLookFors('domain-<?= domainIdx ?>-component-<?= i ?>')">
-                                <span>Best Practices aligned with 5D+ and PELSB Standards</span>
-                                <span class="chevron" id="chevron-<?= domainIdx ?>-<?= i ?>">▼</span>
-                            </div>
-                            <div class="look-fors-content" id="lookForsContent-<?= domainIdx ?>-<?= i ?>">
-                                <div class="look-fors-grid">
-                                    <? for (var j = 0; j < component.bestPractices.length; j++) { ?>
-                                        <div class="look-for-item">
-                                            <input type="checkbox" id="practice-<?= domainIdx ?>-<?= i ?>-<?= j ?>" name="practice-<?= domainIdx ?>-<?= i ?>-<?= j ?>">
-                                            <label for="practice-<?= domainIdx ?>-<?= i ?>-<?= j ?>"><?= component.bestPractices[j] ?></label>
-                                        </div>
+                            <? } ?>
+
+                            <div class="performance-levels-content">
+                                <div class="row-label">
+                                    <?= component.title ?>
+                                    <? if (isAssigned && data.userContext.viewMode === 'assigned') { ?>
+                                    <span class="assigned-badge">📋 Assigned</span>
                                     <? } ?>
+                                </div>
+                                <div class="level-content">
+                                    <?= component.developing ?>
+                                </div>
+                                <div class="level-content">
+                                    <?= component.basic ?>
+                                </div>
+                                <div class="level-content" data-rating="Proficient" onclick="selectRating(this, '<?= componentId ?>')">
+                                    <?= component.proficient ?>
+                                </div>
+                                <div class="level-content" data-rating="Distinguished" onclick="selectRating(this, '<?= componentId ?>')">
+                                    <?= component.distinguished ?>
+                                </div>
+                            </div>
+
+                            <!-- Media Upload -->
+                            <div class="media-upload-section">
+                                <label for="media-upload-<?= componentId ?>" class="media-upload-label">Upload Media</label>
+                                <input type="file" id="media-upload-<?= componentId ?>" class="media-upload-input" onchange="uploadMedia('<?= componentId ?>')" multiple>
+                            </div>
+                            
+                            <? if (component.bestPractices && component.bestPractices.length > 0) { ?>
+                            <div class="look-fors-section">
+                                <div class="look-fors-header" onclick="toggleLookFors('domain-<?= domainIdx ?>-component-<?= i ?>')">
+                                    <span>Best Practices aligned with 5D+ and PELSB Standards</span>
+                                    <span class="chevron" id="chevron-<?= domainIdx ?>-<?= i ?>">▼</span>
+                                </div>
+                                <div class="look-fors-content" id="lookForsContent-<?= domainIdx ?>-<?= i ?>">
+                                    <div class="look-fors-grid">
+                                        <? for (var j = 0; j < component.bestPractices.length; j++) { ?>
+                                            <div class="look-for-item">
+                                                <input type="checkbox" id="practice-<?= domainIdx ?>-<?= i ?>-<?= j ?>" name="practice-<?= domainIdx ?>-<?= i ?>-<?= j ?>">
+                                                <label for="practice-<?= domainIdx ?>-<?= i ?>-<?= j ?>"><?= component.bestPractaces[j] ?></label>
+                                            </div>
+                                        <? } ?>
+                                    </div>
+                                </div>
+                            </div>
+                            <? } ?>
+
+                            <!-- Notes Section -->
+                            <div class="notes-section">
+                                <div class="notes-header" onclick="toggleNotes('<?= componentId ?>')">
+                                    <span>Notes</span>
+                                    <span class="notes-chevron" id="notes-chevron-<?= componentId ?>">▼</span>
+                                </div>
+                                <div class="notes-content" id="notes-content-<?= componentId ?>">
+                                    <textarea class="notes-textarea" id="notes-textarea-<?= componentId ?>" placeholder="Enter your notes here..." onblur="saveNote('<?= componentId ?>')"></textarea>
                                 </div>
                             </div>
                         </div>
                         <? } ?>
+                    <? } ?>
+                    
+                    <? if (!data.domains[domainIdx].components || data.domains[domainIdx].components.length === 0) { ?>
+                    <div style="padding: 40px; text-align: center; color: #666;">
+                        <h3>No components found for <?= data.domains[domainIdx].name ?></h3>
+                        <p>Please check your Google Sheet data.</p>
                     </div>
                     <? } ?>
-                <? } ?>
-                
-                <? if (!data.domains[domainIdx].components || data.domains[domainIdx].components.length === 0) { ?>
-                <div style="padding: 40px; text-align: center; color: #666;">
-                    <h3>No components found for <?= data.domains[domainIdx].name ?></h3>
-                    <p>Please check your Google Sheet data.</p>
                 </div>
-                <? } ?>
+            <? } ?>
+            
+            <? if (data.isError) { ?>
+            <div class="error-container">
+                <h3 class="error-title">Error</h3>
+                <p><?= data.errorMessage ?></p>
             </div>
-        <? } ?>
-        
-        <? if (data.isError) { ?>
-        <div class="error-container">
-            <h3 class="error-title">Error</h3>
-            <p><?= data.errorMessage ?></p>
-        </div>
-        <? } else if (!data.domains || data.domains.length === 0) { ?>
-        <div style="padding: 40px; text-align: center; color: #666;">
-            <h3>No domains found</h3>
-            <p>Please check your Google Sheet data and try refreshing the page.</p>
-        </div>
-        <? } ?>
+            <? } else if (!data.domains || data.domains.length === 0) { ?>
+            <div style="padding: 40px; text-align: center; color: #666;">
+                <h3>No domains found</h3>
+                <p>Please check your Google Sheet data and try refreshing the page.</p>
+            </div>
+            <? } ?>
+
+            <div style="padding: 20px; text-align: right; border-top: 2px solid #e2e8f0;">
+                <button id="save-progress-btn" class="nav-button" onclick="saveAllProgress()">Save Progress</button>
+                <button id="finalize-btn" class="nav-button" onclick="finalizeAndSubmitObservation()" style="background-color: #10b981;">Finalize and Submit Observation</button>
+            </div>
+        </div> <!-- closes rubric-container -->
     </div>
 
     <button class="back-to-top" id="backToTop" onclick="scrollToTop()">↑</button>
@@ -1023,6 +1243,22 @@
                     Domain <?= data.domains[d].number ?>
                 </button>
             <? } ?>
+        </div>
+    </div>
+
+    <!-- Observation Management Dialog -->
+    <div id="observation-dialog" class="dialog-overlay" style="display: none;">
+        <div class="dialog-box">
+            <div class="dialog-header">
+                <h3 id="dialog-title">Select Observation</h3>
+                <button class="dialog-close" onclick="closeObservationDialog()">&times;</button>
+            </div>
+            <div class="dialog-content">
+                <ul id="observation-list"></ul>
+            </div>
+            <div class="dialog-footer">
+                <button class="dialog-button" onclick="closeObservationDialog()">Cancel</button>
+            </div>
         </div>
     </div>
 
@@ -1664,57 +1900,15 @@
         document.addEventListener('DOMContentLoaded', function() {
             console.log('Page loaded:', window.pageLoadInfo);
 
+            // Initialize the new observation workflow
+            initializeApp();
+
+            // --- Keep existing functionality that is still relevant ---
+
             // Restore look-fors state
             restoreLookForsState();
 
-            // Determine and apply currentViewMode based on URL param, then sessionStorage, then server/default
-            const urlParams = new URLSearchParams(window.location.search);
-            const viewFromURL = urlParams.get('view');
-
-            if (viewFromURL === 'assigned' || viewFromURL === 'full') {
-                currentViewMode = viewFromURL;
-                saveViewModePreference(); // Save the URL-derived mode to sessionStorage
-                console.log('View mode set from URL parameter:', currentViewMode);
-            } else {
-                // No valid view param in URL, try to load from sessionStorage
-                try {
-                    const storageKey = 'viewMode_' + (window.pageLoadInfo?.cacheVersion || 'default');
-                    const savedMode = sessionStorage.getItem(storageKey);
-                    if (savedMode === 'assigned' || savedMode === 'full') {
-                        currentViewMode = savedMode;
-                        console.log('View mode restored from sessionStorage:', currentViewMode);
-                    } else {
-                        // currentViewMode remains as initialized from server (<?= data.userContext?.viewMode || "full" ?>)
-                        // or defaults to 'full' if server value is not set/reliable.
-                        // It's already initialized with this value, so no explicit 'else' needed to set it again.
-                        console.log('View mode initialized (no URL param or session storage, using server/default):', currentViewMode);
-                    }
-                } catch (e) {
-                    console.warn('Could not access sessionStorage for view mode preference:', e);
-                    // currentViewMode remains as initialized from server or defaults to 'full'
-                }
-            }
-
-            // Initialize view mode functionality
-            if (userAssignedSubdomains) {
-                // Add visual enhancements for assignments (these are always useful)
-                highlightAssignedComponents();
-                addAssignmentCounters();
-
-                // Initialize with current view mode
-                if (currentViewMode === 'assigned') {
-                    hideUnassignedComponents();
-                } else {
-                    showAllComponents();
-                }
-
-                updateViewToggleButton();
-
-                console.log('View mode initialized:', currentViewMode);
-                console.log('Assignment summary:', createAssignmentSummary());
-            }
-
-            // Initialize special role filters
+            // Initialize special role filters (still needed for Peer Evaluator)
             initializeFiltersFromURL();
 
             // Handle navigation button clicks
@@ -1742,14 +1936,6 @@
                 if (e.key === 'F5') {
                     e.preventDefault();
                     forcePageRefresh();
-                }
-
-                // V key to toggle view mode
-                if (e.key === 'v' || e.key === 'V') {
-                    if (userAssignedSubdomains && !e.ctrlKey && !e.metaKey && !e.altKey) {
-                        e.preventDefault();
-                        toggleViewMode();
-                    }
                 }
             });
         });
@@ -1793,6 +1979,178 @@
         
         // Enhanced auto-refresh with cache version checking
         const autoRefreshInterval = <?= data.userContext && data.userContext.debugMode ? 300000 : 600000 ?>; // 5 min debug, 10 min normal
+
+        // --- NEW OBSERVATION WORKFLOW ---
+
+        let currentUser = null;
+        let activeObservee = null;
+        // currentObservationId is already defined earlier in the script
+
+        function initializeApp() {
+            currentUser = <?= JSON.stringify(data.userContext) ?>;
+            console.log('Initializing app for role:', currentUser.role);
+
+            if (currentUser.role === 'Peer Evaluator') {
+                setupPeerEvaluatorView();
+            } else {
+                setupObserveeView();
+            }
+        }
+
+        function setupPeerEvaluatorView() {
+            console.log('Setting up Peer Evaluator view.');
+            // The filters are already visible for this role.
+            // We just need to attach the event handler that starts the observation workflow.
+            const staffFilter = document.getElementById('staffFilter');
+            if (staffFilter) {
+                staffFilter.addEventListener('change', () => {
+                    if (staffFilter.value) {
+                        activeObservee = {
+                            email: staffFilter.value,
+                            name: staffFilter.options[staffFilter.selectedIndex].text
+                        };
+                        loadObservationDashboard(activeObservee);
+                    }
+                });
+            }
+        }
+
+        function setupObserveeView() {
+            console.log('Setting up Observee view.');
+            // Hide filters and show the observee dashboard
+            document.querySelector('.special-filters')?.style.display = 'none';
+            document.getElementById('observee-dashboard').style.display = 'block';
+            
+            google.script.run
+                .withSuccessHandler(observations => {
+                    const container = document.getElementById('finalized-observation-list-container');
+                    container.innerHTML = ''; // Clear
+                    if (observations && observations.length > 0) {
+                        observations.forEach(obs => {
+                            const obsEl = document.createElement('div');
+                            obsEl.innerHTML = `
+                                <h4>${obs.name}</h4>
+                                <p>Finalized on: ${new Date(obs.endTime).toLocaleDateString()}</p>
+                                <button onclick="loadRubricForObservation('${obs.id}', 'view')">View</button>
+                            `;
+                            container.appendChild(obsEl);
+                        });
+                    } else {
+                        container.innerHTML = '<p>You have no finalized observations to view at this time.</p>';
+                        // Optionally, show the default read-only rubric here
+                        document.getElementById('rubric-container').style.display = 'block';
+                        setRubricReadOnly(true);
+                    }
+                })
+                .withFailureHandler(err => {
+                    console.error('Failed to load finalized observations', err);
+                    alert('Could not load your observations. Please try again.');
+                })
+                .getObservations(currentUser.email, 'Finalized');
+        }
+
+        function loadObservationDashboard(observee) {
+            document.getElementById('dashboard-title').textContent = `Observations for ${observee.name}`;
+            document.getElementById('observation-dashboard').style.display = 'block';
+            document.getElementById('rubric-container').style.display = 'none';
+
+            const container = document.getElementById('observation-list-container');
+            container.innerHTML = '<p>Loading observations...</p>';
+
+            google.script.run
+                .withSuccessHandler(observations => {
+                    container.innerHTML = ''; // Clear
+                    if (observations && observations.length > 0) {
+                        observations.forEach(obs => {
+                            const obsEl = document.createElement('div');
+                            obsEl.style.borderBottom = '1px solid #ccc';
+                            obsEl.style.padding = '10px 0';
+                            obsEl.innerHTML = `
+                                <h4>${obs.name} (${obs.status})</h4>
+                                <p>Started on: ${new Date(obs.startTime).toLocaleDateString()}</p>
+                                <button onclick="loadRubricForObservation('${obs.id}', 'edit')">Resume</button>
+                                <button onclick="renameObservation('${obs.id}')">Rename</button>
+                                <button onclick="deleteObservation('${obs.id}')">Delete</button>
+                            `;
+                            container.appendChild(obsEl);
+                        });
+                    } else {
+                        container.innerHTML = '<p>No observations have been started for this user.</p>';
+                    }
+                })
+                .withFailureHandler(err => {
+                    console.error('Failed to load observation dashboard', err);
+                    container.innerHTML = '<p>Error loading observations.</p>';
+                })
+                .getObservations(observee.email);
+        }
+
+        function beginNewObservation() {
+            const observationName = prompt('Please enter a name for this new observation:', 'New Observation');
+            if (observationName && activeObservee) {
+                google.script.run
+                    .withSuccessHandler(observationId => {
+                        if (observationId) {
+                            loadRubricForObservation(observationId, 'edit');
+                        } else {
+                            alert('Failed to create a new observation.');
+                        }
+                    })
+                    .withFailureHandler(err => {
+                        alert('Error creating observation: ' + err.message);
+                    })
+                    .createObservation(activeObservee.email, observationName);
+            }
+        }
+
+        function loadRubricForObservation(observationId, mode) {
+            currentObservationId = observationId;
+            document.getElementById('observation-dashboard').style.display = 'none';
+            document.getElementById('observee-dashboard').style.display = 'none';
+            document.getElementById('rubric-container').style.display = 'block';
+
+            // TODO: Add a loading spinner
+            
+            google.script.run
+                .withSuccessHandler(details => {
+                    if (details) {
+                        // Populate ratings
+                        Object.keys(details.ratings).forEach(componentId => {
+                            const ratingValue = details.ratings[componentId];
+                            const el = document.querySelector(`.level-content[data-rating="${ratingValue}"][onclick*="'${componentId}'"]`);
+                            if (el) {
+                                // Clear other active states for this component
+                                el.parentElement.querySelectorAll('.level-content.active').forEach(activeEl => activeEl.classList.remove('active'));
+                                el.classList.add('active');
+                            }
+                        });
+
+                        // Populate notes
+                        Object.keys(details.notes).forEach(componentId => {
+                            const noteText = details.notes[componentId];
+                            const textarea = document.getElementById(`notes-textarea-${componentId}`);
+                            if (textarea) {
+                                textarea.value = noteText;
+                            }
+                        });
+
+                        setRubricReadOnly(mode === 'view');
+                    }
+                })
+                .withFailureHandler(err => {
+                    alert('Failed to load observation details.');
+                    console.error(err);
+                })
+                .getObservationDetails(observationId);
+        }
+
+        function setRubricReadOnly(isReadOnly) {
+            document.querySelectorAll('.level-content[data-rating]').forEach(el => el.style.pointerEvents = isReadOnly ? 'none' : 'auto');
+            document.querySelectorAll('.notes-textarea').forEach(el => el.disabled = isReadOnly);
+            document.querySelectorAll('.media-upload-label').forEach(el => el.style.display = isReadOnly ? 'none' : 'inline-block');
+            document.getElementById('save-progress-btn').style.display = isReadOnly ? 'none' : 'inline-block';
+            document.getElementById('finalize-btn').style.display = isReadOnly ? 'none' : 'inline-block';
+        }
 
         setTimeout(function() {
             console.log('Auto-refresh triggered');
@@ -1939,6 +2297,256 @@
         console.log('Current view mode:', currentViewMode);
         console.log('User assigned subdomains:', userAssignedSubdomains);
         <? } ?>
+
+        // --- Notes Functions ---
+        function toggleNotes(componentId) {
+            const content = document.getElementById('notes-content-' + componentId);
+            const chevron = document.getElementById('notes-chevron-' + componentId);
+            if (content && chevron) {
+                content.classList.toggle('expanded');
+                chevron.classList.toggle('expanded');
+            }
+        }
+
+        function saveNote(componentId) {
+            const textarea = document.getElementById('notes-textarea-' + componentId);
+            if (textarea) {
+                const noteContent = textarea.value;
+                google.script.run
+                    .withSuccessHandler(() => {
+                        console.log('Note saved successfully for', componentId);
+                    })
+                    .withFailureHandler((error) => {
+                        console.error('Error saving note for', componentId, ':', error);
+                    })
+                    .saveNote(componentId, noteContent);
+            }
+        }
+
+        function loadNotes() {
+            google.script.run
+                .withSuccessHandler((notes) => {
+                    console.log('Notes loaded successfully');
+                    for (const componentId in notes) {
+                        const textarea = document.getElementById('notes-textarea-' + componentId);
+                        if (textarea) {
+                            textarea.value = notes[componentId];
+                        }
+                    }
+                })
+                .withFailureHandler((error) => {
+                    console.error('Error loading notes:', error);
+                })
+                .getNotes();
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            loadNotes();
+        });
+
+        // --- Observation Management ---
+        let currentObservationId = null;
+
+        function beginObservation() {
+            const observeeEmail = document.getElementById('staffFilter').value;
+            if (!observeeEmail) {
+                alert('Please select a staff member first.');
+                return;
+            }
+
+            const observationName = prompt('Enter a name for this observation:');
+            if (observationName) {
+                google.script.run
+                    .withSuccessHandler((observationId) => {
+                        currentObservationId = observationId;
+                        document.getElementById('observation-management').style.display = 'none';
+                        document.querySelector('.domain-nav').style.display = 'flex';
+                        alert('Observation started successfully!');
+                    })
+                    .withFailureHandler((error) => {
+                        console.error('Error starting observation:', error);
+                        alert('Error starting observation. Please try again.');
+                    })
+                    .createObservation(observeeEmail, observationName);
+            }
+        }
+
+        function resumeObservation() {
+            // TODO: Implement observation selection dialog
+            alert('Resume Observation functionality not yet implemented.');
+        }
+
+        function viewPreviousObservation() {
+            // TODO: Implement observation selection dialog (view-only)
+            alert('View Previous Observation functionality not yet implemented.');
+        }
+
+        function applyStaffFilter() {
+            const staffFilter = document.getElementById('staffFilter');
+            if (!staffFilter) return;
+
+            const selectedStaff = staffFilter.value;
+            if (!selectedStaff) {
+                document.getElementById('observation-management').style.display = 'none';
+                return;
+            }
+
+            document.getElementById('observation-management').style.display = 'block';
+        }
+
+        // --- Observation Dialog ---
+        function openObservationDialog(mode) {
+            const observeeEmail = document.getElementById('staffFilter').value;
+            if (!observeeEmail) {
+                alert('Please select a staff member first.');
+                return;
+            }
+
+            google.script.run
+                .withSuccessHandler((observations) => {
+                    const list = document.getElementById('observation-list');
+                    list.innerHTML = '';
+
+                    if (observations.length === 0) {
+                        list.innerHTML = '<li>No observations found.</li>';
+                    } else {
+                        observations.forEach(obs => {
+                            const li = document.createElement('li');
+                            li.innerHTML = `
+                                <span>${obs.name} (${new Date(obs.startTime).toLocaleDateString()})</span>
+                                <div>
+                                    <button onclick="selectObservation('${obs.id}', '${mode}')">Select</button>
+                                    <button onclick="editObservation('${obs.id}')">Edit</button>
+                                    <button onclick="deleteObservation('${obs.id}')">Delete</button>
+                                </div>
+                            `;
+                            list.appendChild(li);
+                        });
+                    }
+
+                    document.getElementById('dialog-title').innerText = mode === 'resume' ? 'Resume Observation' : 'View Previous Observation';
+                    document.getElementById('observation-dialog').style.display = 'flex';
+                })
+                .withFailureHandler((error) => {
+                    console.error('Error getting observations:', error);
+                    alert('Error getting observations. Please try again.');
+                })
+                .getObservations(observeeEmail);
+        }
+
+        function closeObservationDialog() {
+            document.getElementById('observation-dialog').style.display = 'none';
+        }
+
+        function selectObservation(observationId, mode) {
+            currentObservationId = observationId;
+            closeObservationDialog();
+            loadNotes();
+            // TODO: Load ratings
+
+            if (mode === 'view') {
+                // TODO: Disable editing
+            }
+        }
+
+        function editObservation(observationId) {
+            const newName = prompt('Enter a new name for this observation:');
+            if (newName) {
+                // TODO: Implement server-side rename
+                alert('Rename functionality not yet implemented.');
+            }
+        }
+
+        function deleteObservation(observationId) {
+            if (confirm('Are you sure you want to delete this observation and all its data?')) {
+                // TODO: Implement server-side delete
+                alert('Delete functionality not yet implemented.');
+            }
+        }
+
+        function resumeObservation() {
+            openObservationDialog('resume');
+        }
+
+        function viewPreviousObservation() {
+            openObservationDialog('view');
+        }
+
+        // --- PDF Export ---
+        function exportToPdf() {
+            if (!currentObservationId) {
+                alert('Please start or resume an observation first.');
+                return;
+            }
+
+            google.script.run
+                .withSuccessHandler((pdfUrl) => {
+                    window.open(pdfUrl, '_blank');
+                })
+                .withFailureHandler((error) => {
+                    console.error('Error exporting to PDF:', error);
+                    alert('Error exporting to PDF. Please try again.');
+                })
+                .exportToPdf(currentObservationId);
+        }
+
+        // --- Rating and Media Functions ---
+        function selectRating(element, componentId) {
+            if (!currentObservationId) {
+                alert('Please start or resume an observation first.');
+                return;
+            }
+
+            const rating = element.dataset.rating;
+            const parent = element.parentElement;
+            
+            // Remove active state from siblings
+            for (let i = 0; i < parent.children.length; i++) {
+                parent.children[i].classList.remove('active');
+            }
+
+            // Add active state to clicked element
+            element.classList.add('active');
+
+            google.script.run
+                .withSuccessHandler(() => {
+                    console.log('Rating saved successfully for', componentId);
+                })
+                .withFailureHandler((error) => {
+                    console.error('Error saving rating for', componentId, ':', error);
+                })
+                .saveRating(currentObservationId, componentId, rating);
+        }
+
+        function uploadMedia(componentId) {
+            if (!currentObservationId) {
+                alert('Please start or resume an observation first.');
+                return;
+            }
+
+            const fileInput = document.getElementById('media-upload-' + componentId);
+            const file = fileInput.files[0];
+
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const fileData = e.target.result.split(',')[1];
+                    const fileName = file.name;
+                    const mimeType = file.type;
+
+                    google.script.run
+                        .withSuccessHandler(() => {
+                            alert('Media uploaded successfully!');
+                        })
+                        .withFailureHandler((error) => {
+                            console.error('Error uploading media:', error);
+                            alert('Error uploading media. Please try again.');
+                        })
+                        .uploadMedia(currentObservationId, componentId, fileData, fileName, mimeType);
+                };
+                reader.readAsDataURL(file);
+            }
+        }
     </script>
 </body>
 </html>
