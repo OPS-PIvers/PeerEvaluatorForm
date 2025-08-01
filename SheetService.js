@@ -977,8 +977,12 @@ function testSheetConnectivity() {
  * @param {string} observationName The name of the observation.
  * @return {string} The ID of the new observation.
  */
-function createObservation(observeeEmail, evaluatorEmail, observationName) {
+function createObservation(observeeEmail, observationName) {
+  if (!isPeerEvaluator()) {
+    throw new Error('Only Peer Evaluators can create observations.');
+  }
   try {
+    const evaluatorEmail = Session.getActiveUser().getEmail();
     const spreadsheet = openSpreadsheet();
     let sheet = getSheetByName(spreadsheet, SHEET_NAMES.OBSERVATIONS);
 
@@ -1014,6 +1018,9 @@ function createObservation(observeeEmail, evaluatorEmail, observationName) {
  * @param {string} observationId The ID of the observation to finalize.
  */
 function finalizeObservation(observationId) {
+  if (!isPeerEvaluator()) {
+    throw new Error('Only Peer Evaluators can finalize observations.');
+  }
   try {
     const spreadsheet = openSpreadsheet();
     const sheet = getSheetByName(spreadsheet, SHEET_NAMES.OBSERVATIONS);
@@ -1039,6 +1046,9 @@ function finalizeObservation(observationId) {
  * @param {string} noteContent The content of the note.
  */
 function saveNote(observationId, componentId, noteContent) {
+  if (!isPeerEvaluator()) {
+    throw new Error('Only Peer Evaluators can save notes.');
+  }
   try {
     const spreadsheet = openSpreadsheet();
     const sheet = getSheetByName(spreadsheet, SHEET_NAMES.OBSERVATIONS);
@@ -1133,6 +1143,9 @@ function getNotes(observationId) {
  * @param {string} rating The rating (e.g., "Developing", "Basic").
  */
 function saveRating(observationId, componentId, rating) {
+  if (!isPeerEvaluator()) {
+    throw new Error('Only Peer Evaluators can save ratings.');
+  }
   try {
     const spreadsheet = openSpreadsheet();
     let sheet = getSheetByName(spreadsheet, SHEET_NAMES.RATINGS);
@@ -1173,6 +1186,9 @@ function saveRating(observationId, componentId, rating) {
  * @param {string} mimeType The MIME type of the file.
  */
 function uploadMedia(observationId, componentId, fileData, fileName, mimeType) {
+  if (!isPeerEvaluator()) {
+    throw new Error('Only Peer Evaluators can upload media.');
+  }
   try {
     const spreadsheet = openSpreadsheet();
     const sheet = getSheetByName(spreadsheet, SHEET_NAMES.OBSERVATIONS);
@@ -1340,6 +1356,9 @@ function getObservationDetails(observationId) {
  * @param {string} newName The new name for the observation.
  */
 function renameObservation(observationId, newName) {
+  if (!isPeerEvaluator()) {
+    throw new Error('Only Peer Evaluators can rename observations.');
+  }
   try {
     const spreadsheet = openSpreadsheet();
     const sheet = getSheetByName(spreadsheet, SHEET_NAMES.OBSERVATIONS);
@@ -1362,6 +1381,9 @@ function renameObservation(observationId, newName) {
  * @param {string} observationId The ID of the observation to delete.
  */
 function deleteObservation(observationId) {
+  if (!isPeerEvaluator()) {
+    throw new Error('Only Peer Evaluators can delete observations.');
+  }
   try {
     const spreadsheet = openSpreadsheet();
     const sheet = getSheetByName(spreadsheet, SHEET_NAMES.OBSERVATIONS);
@@ -1395,6 +1417,9 @@ function deleteObservation(observationId) {
  * @return {string} The URL of the generated PDF file.
  */
 function exportToPdf(observationId) {
+  if (!isPeerEvaluator()) {
+    throw new Error('Only Peer Evaluators can export to PDF.');
+  }
   try {
     const spreadsheet = openSpreadsheet();
     const sheet = getSheetByName(spreadsheet, SHEET_NAMES.OBSERVATIONS);

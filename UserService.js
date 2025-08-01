@@ -31,6 +31,29 @@ function getUserFromSession() {
 }
 
 /**
+ * Checks if the current user has the 'Peer Evaluator' role.
+ * @return {boolean} True if the user is a Peer Evaluator, false otherwise.
+ */
+function isPeerEvaluator() {
+  try {
+    const userContext = createUserContext();
+    const hasPeerEvaluatorRole = userContext.role === 'Peer Evaluator';
+
+    debugLog('Peer Evaluator check performed', {
+      user: userContext.email,
+      role: userContext.role,
+      isPeerEvaluator: hasPeerEvaluatorRole
+    });
+
+    return hasPeerEvaluatorRole;
+  } catch (error) {
+    console.error('Error checking for Peer Evaluator role:', formatErrorMessage(error, 'isPeerEvaluator'));
+    // In case of error, default to false for security
+    return false;
+  }
+}
+
+/**
  * Gets user information by email from the Staff sheet
  * REPLACE THIS FUNCTION in UserService.js
  * Enhanced getUserByEmail function with cache versioning

@@ -2309,6 +2309,10 @@
         }
 
         function saveNote(componentId) {
+            if (!currentObservationId) {
+                alert('Cannot save note: No observation is active.');
+                return;
+            }
             const textarea = document.getElementById('notes-textarea-' + componentId);
             if (textarea) {
                 const noteContent = textarea.value;
@@ -2318,15 +2322,20 @@
                     })
                     .withFailureHandler((error) => {
                         console.error('Error saving note for', componentId, ':', error);
+                        alert('Failed to save note: ' + error.message);
                     })
-                    .saveNote(componentId, noteContent);
+                    .saveNote(currentObservationId, componentId, noteContent);
             }
         }
 
-        function loadNotes() {
+        function loadNotes(observationId) {
+            if (!observationId) return;
             google.script.run
                 .withSuccessHandler((notes) => {
-                    console.log('Notes loaded successfully');
+                    console.log('Notes loaded successfully for observation:', observationId);
+                    // Clear all existing notes first
+                    document.querySelectorAll('.notes-textarea').forEach(ta => ta.value = '');
+                    // Populate with loaded notes
                     for (const componentId in notes) {
                         const textarea = document.getElementById('notes-textarea-' + componentId);
                         if (textarea) {
@@ -2336,12 +2345,14 @@
                 })
                 .withFailureHandler((error) => {
                     console.error('Error loading notes:', error);
+                    alert('Could not load notes for this observation.');
                 })
-                .getNotes();
+                .getNotes(observationId);
         }
 
         document.addEventListener('DOMContentLoaded', function() {
-            loadNotes();
+            // Do not load notes on initial page load, only when an observation is selected.
+            // loadNotes(currentObservationId);
         });
 
         // --- Observation Management ---
@@ -2441,7 +2452,7 @@
         function selectObservation(observationId, mode) {
             currentObservationId = observationId;
             closeObservationDialog();
-            loadNotes();
+            loadNotes(observationId);
             // TODO: Load ratings
 
             if (mode === 'view') {
