@@ -2009,7 +2009,7 @@ function createObservation(observeeEmail, observationName) {
   try {
     // This calls the SheetService function, which now gets the evaluator email
     // from the session and has its own security check.
-    return SheetService.createObservation(observeeEmail, observationName);
+    return createObservation(observeeEmail, observationName);
   } catch (error) {
     console.error('Error creating observation:', formatErrorMessage(error, 'createObservation'));
     // Re-throw the error so the client-side gets a meaningful message
