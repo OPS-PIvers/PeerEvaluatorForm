@@ -2087,7 +2087,7 @@ function getObservations(observeeEmail, status = null) {
   try {
     // The SheetService.getObservations function now contains the security logic.
     // This wrapper just passes the call through.
-    return SheetService.getObservations(observeeEmail, status);
+    return getObservations(observeeEmail, status);
   } catch (error) {
     console.error('Error retrieving observations:', formatErrorMessage(error, 'getObservations'));
     return [];
