@@ -2046,8 +2046,8 @@ function saveNote(observationId, componentId, noteContent) {
  */
 function saveRating(observationId, componentId, rating) {
   try {
-    // This calls the SheetService function, which has its own security check.
-    SheetService.saveRating(observationId, componentId, rating);
+    // This calls the saveRating function, which has its own security check.
+    saveRating(observationId, componentId, rating);
     return true;
   } catch (error) {
     console.error('Error saving rating:', formatErrorMessage(error, 'saveRating'));
