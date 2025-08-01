@@ -2027,8 +2027,8 @@ function createObservation(observeeEmail, observationName) {
  */
 function saveNote(observationId, componentId, noteContent) {
   try {
-    // This calls the SheetService.saveNote function, which has its own security check.
-    SheetService.saveNote(observationId, componentId, noteContent);
+    // This calls the global saveNote function, which has its own security check.
+    saveNote(observationId, componentId, noteContent);
     return true;
   } catch (error) {
     console.error('Error saving note:', formatErrorMessage(error, 'saveNote'));
