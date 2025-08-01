@@ -2105,7 +2105,7 @@ function getObservationDetails(observationId) {
     // Security for this is handled by the fact that a user must first get an observation ID
     // from getObservations(), which is secure. An attacker could guess an ID, but the risk is low.
     // For higher security, we could add a check in SheetService.getObservationDetails.
-    return SheetService.getObservationDetails(observationId);
+    return getObservationDetails(observationId);
   } catch (error) {
     console.error('Error retrieving observation details:', formatErrorMessage(error, 'getObservationDetails'));
     return null;
