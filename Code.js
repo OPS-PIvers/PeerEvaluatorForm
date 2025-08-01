@@ -2152,7 +2152,7 @@ function finalizeObservation(observationId) {
         // This calls the SheetService function, which has its own security check.
         SheetService.finalizeObservation(observationId);
         // After finalizing, generate and return the PDF URL
-        return SheetService.exportToPdf(observationId);
+        return exportToPdf(observationId);
     } catch (error) {
         console.error('Error finalizing observation:', formatErrorMessage(error, 'finalizeObservation'));
         throw error;
