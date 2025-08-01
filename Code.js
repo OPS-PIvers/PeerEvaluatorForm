@@ -2121,7 +2121,7 @@ function getObservationDetails(observationId) {
 function renameObservation(observationId, newName) {
   try {
     // This calls the SheetService function, which has its own security check.
-    SheetService.renameObservation(observationId, newName);
+    renameObservation(observationId, newName);
   } catch (error) {
     console.error('Error renaming observation:', formatErrorMessage(error, 'renameObservation'));
   }
