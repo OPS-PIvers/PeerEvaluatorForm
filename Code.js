@@ -2149,8 +2149,8 @@ function deleteObservation(observationId) {
  */
 function finalizeObservation(observationId) {
     try {
-        // This calls the SheetService function, which has its own security check.
-        SheetService.finalizeObservation(observationId);
+        // This calls the global finalizeObservation function, which has its own security check.
+        finalizeObservation(observationId);
         // After finalizing, generate and return the PDF URL
         return exportToPdf(observationId);
     } catch (error) {
