@@ -2168,7 +2168,7 @@ function finalizeObservation(observationId) {
 function exportToPdf(observationId) {
   try {
     // This calls the SheetService function, which has its own security check.
-    return exportToPdf(observationId);
+    return SheetService.exportToPdf(observationId);
   } catch (error) {
     console.error('Error exporting to PDF:', formatErrorMessage(error, 'exportToPdf'));
     return null;
