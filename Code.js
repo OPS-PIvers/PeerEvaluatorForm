@@ -2135,7 +2135,7 @@ function renameObservation(observationId, newName) {
 function deleteObservation(observationId) {
   try {
     // This calls the SheetService function, which has its own security check.
-    SheetService.deleteObservation(observationId);
+    deleteObservation(observationId);
   } catch (error) {
     console.error('Error deleting observation:', formatErrorMessage(error, 'deleteObservation'));
   }
