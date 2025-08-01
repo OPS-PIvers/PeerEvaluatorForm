@@ -2309,6 +2309,10 @@
         }
 
         function saveNote(componentId) {
+            if (!currentObservationId) {
+                console.warn('Cannot save note without an active observation.');
+                return;
+            }
             const textarea = document.getElementById('notes-textarea-' + componentId);
             if (textarea) {
                 const noteContent = textarea.value;
@@ -2319,14 +2323,18 @@
                     .withFailureHandler((error) => {
                         console.error('Error saving note for', componentId, ':', error);
                     })
-                    .saveNote(componentId, noteContent);
+                    .saveNote(currentObservationId, componentId, noteContent);
             }
         }
 
         function loadNotes() {
+            if (!currentObservationId) return; // Don't run if no observation is active
             google.script.run
                 .withSuccessHandler((notes) => {
-                    console.log('Notes loaded successfully');
+                    console.log('Notes loaded successfully for observation:', currentObservationId);
+                    // Clear all existing notes first
+                    document.querySelectorAll('.notes-textarea').forEach(ta => ta.value = '');
+                    // Populate with new notes
                     for (const componentId in notes) {
                         const textarea = document.getElementById('notes-textarea-' + componentId);
                         if (textarea) {
@@ -2337,11 +2345,11 @@
                 .withFailureHandler((error) => {
                     console.error('Error loading notes:', error);
                 })
-                .getNotes();
+                .getNotes(currentObservationId);
         }
 
         document.addEventListener('DOMContentLoaded', function() {
-            loadNotes();
+            // DO NOT call loadNotes() here anymore, it should be called when an observation is selected.
         });
 
         // --- Observation Management ---
