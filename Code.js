@@ -2067,8 +2067,8 @@ function saveRating(observationId, componentId, rating) {
  */
 function uploadMedia(observationId, componentId, fileData, fileName, mimeType) {
   try {
-    // This calls the uploadMedia function, which has its own security check.
-    uploadMedia(observationId, componentId, fileData, fileName, mimeType);
+    // This calls the SheetService.uploadMedia function, which has its own security check.
+    SheetService.uploadMedia(observationId, componentId, fileData, fileName, mimeType);
     return true;
   } catch (error) {
     console.error('Error uploading media:', formatErrorMessage(error, 'uploadMedia'));
