@@ -974,7 +974,9 @@ function testSheetConnectivity() {
  * Creates a new observation.
  * @param {string} observeeEmail The email of the user being observed.
  * @param {string} observationName The name of the observation.
- * @return {string} The ID of the new observation.
+ * @return {string|null} The ID of the new observation, or null if creation failed.
+ * @throws {Error} If the evaluator email cannot be determined from the session.
+ * @note The evaluator email is obtained from the current session user. This function must be called in a context where Session.getActiveUser().getEmail() returns a valid email.
  */
 function createObservation(observeeEmail, observationName) {
   if (!isPeerEvaluator()) {
