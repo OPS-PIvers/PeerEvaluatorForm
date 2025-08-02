@@ -2000,60 +2000,14 @@
         function setupPeerEvaluatorView() {
             document.getElementById('observation-dashboard').style.display = 'block';
             document.getElementById('rubric-container').style.display = 'none';
-            // Initially, no staff member is selected, so the dashboard is generic.
-            // The title and list will be updated when a staff member is chosen via the filters.
             document.getElementById('dashboard-title').textContent = 'Select a Staff Member to Begin';
-        }
-            console.log('Setting up Peer Evaluator view.');
-            // The filters are already visible for this role.
-            // We just need to attach the event handler that starts the observation workflow.
-            const staffFilter = document.getElementById('staffFilter');
-            if (staffFilter) {
-                staffFilter.addEventListener('change', () => {
-                    if (staffFilter.value) {
-                        activeObservee = {
-                            email: staffFilter.value,
-                            name: staffFilter.options[staffFilter.selectedIndex].text
-                        };
-                        loadObservationDashboard(activeObservee);
-                    }
-                });
-            }
         }
 
         function setupObserveeView() {
-            console.log('Setting up Observee view.');
-            // Hide filters and show the observee dashboard
-            document.querySelector('.special-filters')?.style.display = 'none';
             document.getElementById('observee-dashboard').style.display = 'block';
-            
-            google.script.run
-                .withSuccessHandler(observations => {
-                    const container = document.getElementById('finalized-observation-list-container');
-                    container.innerHTML = ''; // Clear
-                    if (observations && observations.length > 0) {
-                        observations.forEach(obs => {
-                            const obsEl = document.createElement('div');
-                            obsEl.innerHTML = `
-                                <h4>${obs.name}</h4>
-                                <p>Finalized on: ${new Date(obs.endTime).toLocaleDateString()}</p>
-                                <button onclick="loadRubricForObservation('${obs.id}', 'view')">View Rubric</button>
-                                <a href="https://drive.google.com/drive/folders/${obs.folderId}" target="_blank">View Media</a>
-                            `;
-                            container.appendChild(obsEl);
-                        });
-                    } else {
-                        container.innerHTML = '<p>You have no finalized observations to view at this time.</p>';
-                        // Optionally, show the default read-only rubric here
-                        document.getElementById('rubric-container').style.display = 'block';
-                        setRubricReadOnly(true);
-                    }
-                })
-                .withFailureHandler(err => {
-                    console.error('Failed to load finalized observations', err);
-                    alert('Could not load your observations. Please try again.');
-                })
-                .getObservations(currentUser.email, 'Finalized');
+            document.getElementById('rubric-container').style.display = 'none';
+            google.script.run.withSuccessHandler(displayFinalizedObservations).getObservations(currentUser.email);
+            setRubricReadOnly(true); // Make the rubric read-only for observees
         }
 
         function loadObservationDashboard(observee) {
