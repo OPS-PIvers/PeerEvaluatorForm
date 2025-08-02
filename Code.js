@@ -99,16 +99,6 @@ function doGet(e) {
     // Create enhanced user context with proactive role change detection
     const userContext = createUserContext();
 
-    // Check if this is a special access user without active filters
-    if (userContext.hasSpecialAccess && !hasActiveFilters(params)) {
-        debugLog('Special access user detected - showing filter interface', {
-            role: userContext.role,
-            specialRoleType: userContext.specialRoleType,
-            requestId: requestId
-        });
-        
-        return createFilterSelectionInterface(userContext, requestId);
-    }
     // Enhanced filter logic for role-only vs role+year scenarios
     let effectiveRole = userContext.role;  // Default to user's actual role
     let effectiveYear = userContext.year;  // Default to user's actual year
