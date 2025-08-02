@@ -249,6 +249,9 @@ function doGet(e) {
     // Generate enhanced response metadata
     const responseMetadata = generateResponseMetadata(finalUserContext, requestId, debugMode);
 
+    // *** ADDING DEBUG LOG ***
+    console.log('Server-side userContext:', JSON.stringify(finalUserContext, null, 2));
+
     // Add comprehensive user context to the data for the HTML template
     rubricData.userContext = {
       // Basic user info
