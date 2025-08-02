@@ -977,6 +977,7 @@ function testSheetConnectivity() {
  * @return {string|null} The ID of the new observation, or null if creation failed.
  * @throws {Error} If the evaluator email cannot be determined from the session.
  * @note The evaluator email is obtained from the current session user. This function must be called in a context where Session.getActiveUser().getEmail() returns a valid email.
+ * @since 2.1.0 Signature changed from 3 parameters to 2 parameters (removed third parameter) in June 2024.
  */
 function createObservation(observeeEmail, observationName) {
   if (!isPeerEvaluator()) {
