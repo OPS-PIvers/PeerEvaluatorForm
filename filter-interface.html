@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Permissions-Policy" content="ambient-light-sensor=(), camera=(), microphone=(), speaker=(), vibrate=(), vr=()">
-    <title><?= userContext.role ?> - Select Rubric View</title>
+    <meta http-equiv="Content-Security-Policy" content="frame-ancestors 'self'; default-src 'self' 'unsafe-inline' 'unsafe-eval' *.googleusercontent.com *.google.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' *.googleusercontent.com *.google.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: *.googleusercontent.com *.google.com;">
+    <title><?= userContext.role.replace(/[<>&"']/g, function(c) { return '&#' + c.charCodeAt(0) + ';'; }) ?> - Select Rubric View</title>
     <style>
         * {
             margin: 0;
@@ -597,7 +598,7 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>👥 <?= userContext.role ?> Dashboard</h1>
+            <h1>👥 <?= userContext.role.replace(/[<>&"']/g, function(c) { return '&#' + c.charCodeAt(0) + ';'; }) ?> Dashboard</h1>
             <p>Select how you'd like to view rubric information</p>
         </div>
         
@@ -1071,7 +1072,7 @@
         }
 
         function generateProbationaryStaffHtml(data) {
-            const probationaryYear = <?= userContext.probationaryYearValue ?>;
+            const probationaryYear = <?= JSON.stringify(userContext.probationaryYearValue) ?>;
             let html = `
                 <div style="background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
                     <div style="background: linear-gradient(135deg, #dc2626, #b91c1c); color: white; padding: 30px; text-align: center;">

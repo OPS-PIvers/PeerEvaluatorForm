@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Permissions-Policy" content="ambient-light-sensor=(), camera=(), microphone=(), speaker=(), vibrate=(), vr=()">
+    <meta http-equiv="Content-Security-Policy" content="frame-ancestors 'self'; default-src 'self' 'unsafe-inline' 'unsafe-eval' *.googleusercontent.com *.google.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' *.googleusercontent.com *.google.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: *.googleusercontent.com *.google.com;">
 
     <!-- Cache Control Headers -->
     <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate, max-age=0">
@@ -22,7 +23,7 @@
         <meta name="x-timestamp" content="<?= data.userContext.responseMetadata.timestamp ?>">
         <meta name="x-cache-version" content="<?= data.userContext.responseMetadata.cacheVersion ?>">
         <meta name="x-etag" content="<?= data.userContext.responseMetadata.etag ?>">
-        <meta name="x-role" content="<?= data.userContext.role ?>">
+        <meta name="x-role" content="<?= data.userContext.role.replace(/[<>&"']/g, function(c) { return '&#' + c.charCodeAt(0) + ';'; }) ?>">
         <meta name="x-year" content="<?= data.userContext.year ?>">
 
         <? if (data.userContext.debugMode) { ?>
@@ -34,7 +35,7 @@
     <? } ?>
 
     <!-- Dynamic Title -->
-    <title><?= data.title ?> - <?= data.userContext ? data.userContext.role : 'Framework' ?></title>
+    <title><?= data.title.replace(/[<>&"']/g, function(c) { return '&#' + c.charCodeAt(0) + ';'; }) ?> - <?= data.userContext ? data.userContext.role.replace(/[<>&"']/g, function(c) { return '&#' + c.charCodeAt(0) + ';'; }) : 'Framework' ?></title>
 
     <!-- Prevent browser back/forward cache -->
     <meta name="turbo-cache-control" content="no-cache">
@@ -945,9 +946,9 @@
     <? if (data.userContext && data.userContext.debugMode) { ?>
     <div class="debug-info">
         <h4>🐛 DEBUG INFO</h4>
-        <div><strong>Role:</strong> <?= data.userContext.role ?></div>
+        <div><strong>Role:</strong> <?= data.userContext.role.replace(/[<>&"']/g, function(c) { return '&#' + c.charCodeAt(0) + ';'; }) ?></div>
         <div><strong>Year:</strong> <?= data.userContext.year ?></div>
-        <div><strong>Email:</strong> <?= data.userContext.email || 'Anonymous' ?></div>
+        <div><strong>Email:</strong> <?= (data.userContext.email || 'Anonymous').replace(/[<>&"']/g, function(c) { return '&#' + c.charCodeAt(0) + ';'; }) ?></div>
         <div><strong>Cache Ver:</strong> <?= data.userContext.cacheVersion ?></div>
         <div><strong>Request ID:</strong> <?= data.userContext.requestId ?></div>
         <div><strong>Timestamp:</strong> <?= new Date(data.userContext.timestamp).toLocaleTimeString() ?></div>
@@ -958,8 +959,8 @@
     <? } ?>
     <div class="container">
         <div class="header">
-            <h1><?= data.title ?></h1>
-            <p><?= data.subtitle ?></p>
+            <h1><?= data.title.replace(/[<>&"']/g, function(c) { return '&#' + c.charCodeAt(0) + ';'; }) ?></h1>
+            <p><?= data.subtitle.replace(/[<>&"']/g, function(c) { return '&#' + c.charCodeAt(0) + ';'; }) ?></p>
             <!-- View Mode Toggle (only for users with assigned subdomains) -->
             <? if (data.userContext && data.userContext.assignedSubdomains && !data.userContext.hasSpecialAccess) { ?>
             <div class="view-toggle-container">
@@ -979,15 +980,15 @@
         <!-- Filter Status (for special roles) -->
         <? if (data.userContext && data.userContext.isFiltered) { ?>
         <div class="filter-status active">
-            <strong>👁️ Viewing as:</strong> <?= data.userContext.filterInfo.viewingAs ?>
-            (<?= data.userContext.filterInfo.viewingRole ?>, Year <?= data.userContext.filterInfo.viewingYear ?>)
+            <strong>👁️ Viewing as:</strong> <?= data.userContext.filterInfo.viewingAs.replace(/[<>&"']/g, function(c) { return '&#' + c.charCodeAt(0) + ';'; }) ?>
+            (<?= data.userContext.filterInfo.viewingRole.replace(/[<>&"']/g, function(c) { return '&#' + c.charCodeAt(0) + ';'; }) ?>, Year <?= data.userContext.filterInfo.viewingYear ?>)
             <span class="filter-status-detail">
-                Requested by: <?= data.userContext.filterInfo.requestedBy ?>
+                Requested by: <?= data.userContext.filterInfo.requestedBy.replace(/[<>&"']/g, function(c) { return '&#' + c.charCodeAt(0) + ';'; }) ?>
             </span>
         </div>
         <? } else if (data.userContext && data.userContext.hasSpecialAccess) { ?>
         <div class="filter-status">
-            <strong>🔧 Special Access Mode:</strong> <?= data.userContext.specialRoleType.replace('_', ' ').toUpperCase() ?>
+            <strong>🔧 Special Access Mode:</strong> <?= data.userContext.specialRoleType.replace('_', ' ').toUpperCase().replace(/[<>&"']/g, function(c) { return '&#' + c.charCodeAt(0) + ';'; }) ?>
             <span class="filter-status-detail">
                 Use filters above to view other staff members' assigned areas
             </span>
@@ -1016,7 +1017,7 @@
                         <option value="">Select Role...</option>
                         <option value="Any">Any Role</option>
                         <? for (var r = 0; r < data.userContext.availableRoles?.length || 0; r++) { ?>
-                        <option value="<?= data.userContext.availableRoles[r] ?>"><?= data.userContext.availableRoles[r] ?></option>
+                        <option value="<?= data.userContext.availableRoles[r].replace(/[<>&"']/g, function(c) { return '&#' + c.charCodeAt(0) + ';'; }) ?>"><?= data.userContext.availableRoles[r].replace(/[<>&"']/g, function(c) { return '&#' + c.charCodeAt(0) + ';'; }) ?></option>
                         <? } ?>
                     </select>
 
