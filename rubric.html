@@ -1998,6 +1998,12 @@
         }
 
         function setupPeerEvaluatorView() {
+            document.getElementById('observation-dashboard').style.display = 'block';
+            document.getElementById('rubric-container').style.display = 'none';
+            // Initially, no staff member is selected, so the dashboard is generic.
+            // The title and list will be updated when a staff member is chosen via the filters.
+            document.getElementById('dashboard-title').textContent = 'Select a Staff Member to Begin';
+        }
             console.log('Setting up Peer Evaluator view.');
             // The filters are already visible for this role.
             // We just need to attach the event handler that starts the observation workflow.
