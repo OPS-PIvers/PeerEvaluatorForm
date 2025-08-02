@@ -1559,9 +1559,9 @@
         window.pageLoadInfo = {
             timestamp: Date.now(),
             userAgent: navigator.userAgent,
-            role: <?= JSON.stringify(data.userContext ? data.userContext.role : "unknown") ?>,
-            cacheVersion: <?= JSON.stringify(data.userContext ? data.userContext.cacheVersion : "unknown") ?>,
-            requestId: <?= JSON.stringify(data.userContext ? data.userContext.requestId : "unknown") ?>
+        role: <?= JSON.stringify(data.userContext ? data.userContext.role : "unknown").replace(/</g, '\\u003c') ?>,
+        cacheVersion: <?= JSON.stringify(data.userContext ? data.userContext.cacheVersion : "unknown").replace(/</g, '\\u003c') ?>,
+        requestId: <?= JSON.stringify(data.userContext ? data.userContext.requestId : "unknown").replace(/</g, '\\u003c') ?>
         };
 
         function initializeFiltersFromURL() {
@@ -1619,8 +1619,8 @@
         // The following functions manage the view mode (full/assigned) dynamically on the client-side
         // without a page reload. The preference is saved in sessionStorage for the current session.
         // View Mode Toggle Functions
-        let currentViewMode = <?= JSON.stringify(data.userContext?.viewMode || "full") ?>;
-        const userAssignedSubdomains = <?= data.userContext?.assignedSubdomains ? JSON.stringify(data.userContext.assignedSubdomains) : 'null' ?>;
+        let currentViewMode = <?= JSON.stringify(data.userContext?.viewMode || "full").replace(/</g, '\\u003c') ?>;
+        const userAssignedSubdomains = <?= data.userContext?.assignedSubdomains ? JSON.stringify(data.userContext.assignedSubdomains).replace(/</g, '\\u003c') : 'null' ?>;
 
         function toggleViewMode() {
             if (currentViewMode === 'full') {
@@ -2016,7 +2016,7 @@
         }
 
         function initializeApp() {
-            currentUser = <?= JSON.stringify(data.userContext) ?>;
+            currentUser = <?= JSON.stringify(data.userContext).replace(/</g, '\\u003c') ?>;
             console.log('Client-side currentUser:', currentUser);
             console.log('Initializing app for role:', currentUser.role);
 
