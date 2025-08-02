@@ -973,16 +973,21 @@ function testSheetConnectivity() {
 /**
  * Creates a new observation.
  * @param {string} observeeEmail The email of the user being observed.
- * @param {string} evaluatorEmail The email of the user conducting the observation.
  * @param {string} observationName The name of the observation.
- * @return {string} The ID of the new observation.
+ * @return {string|null} The ID of the new observation, or null if creation failed.
+ * @throws {Error} If the evaluator email cannot be determined from the session.
+ * @note The evaluator email is obtained from the current session user. This function must be called in a context where Session.getActiveUser().getEmail() returns a valid email.
+ * @since 2.1.0 Signature changed from 3 parameters to 2 parameters (removed third parameter) in June 2024.
  */
 function createObservation(observeeEmail, observationName) {
   if (!isPeerEvaluator()) {
-    throw new Error('Only Peer Evaluators can create observations.');
+    throw new Error('Only Peer Evaluators can perform this action.');
   }
   try {
     const evaluatorEmail = Session.getActiveUser().getEmail();
+    if (!evaluatorEmail) {
+      throw new Error('Could not identify the evaluator.');
+    }
     const spreadsheet = openSpreadsheet();
     let sheet = getSheetByName(spreadsheet, SHEET_NAMES.OBSERVATIONS);
 
@@ -1019,7 +1024,7 @@ function createObservation(observeeEmail, observationName) {
  */
 function finalizeObservation(observationId) {
   if (!isPeerEvaluator()) {
-    throw new Error('Only Peer Evaluators can finalize observations.');
+    throw new Error('Only Peer Evaluators can perform this action.');
   }
   try {
     const spreadsheet = openSpreadsheet();
@@ -1047,7 +1052,7 @@ function finalizeObservation(observationId) {
  */
 function saveNote(observationId, componentId, noteContent) {
   if (!isPeerEvaluator()) {
-    throw new Error('Only Peer Evaluators can save notes.');
+    throw new Error('Only Peer Evaluators can perform this action.');
   }
   try {
     const spreadsheet = openSpreadsheet();
@@ -1144,7 +1149,7 @@ function getNotes(observationId) {
  */
 function saveRating(observationId, componentId, rating) {
   if (!isPeerEvaluator()) {
-    throw new Error('Only Peer Evaluators can save ratings.');
+    throw new Error('Only Peer Evaluators can perform this action.');
   }
   try {
     const spreadsheet = openSpreadsheet();
@@ -1187,7 +1192,7 @@ function saveRating(observationId, componentId, rating) {
  */
 function uploadMedia(observationId, componentId, fileData, fileName, mimeType) {
   if (!isPeerEvaluator()) {
-    throw new Error('Only Peer Evaluators can upload media.');
+    throw new Error('Only Peer Evaluators can perform this action.');
   }
   try {
     const spreadsheet = openSpreadsheet();
@@ -1357,7 +1362,7 @@ function getObservationDetails(observationId) {
  */
 function renameObservation(observationId, newName) {
   if (!isPeerEvaluator()) {
-    throw new Error('Only Peer Evaluators can rename observations.');
+    throw new Error('Only Peer Evaluators can perform this action.');
   }
   try {
     const spreadsheet = openSpreadsheet();
@@ -1382,7 +1387,7 @@ function renameObservation(observationId, newName) {
  */
 function deleteObservation(observationId) {
   if (!isPeerEvaluator()) {
-    throw new Error('Only Peer Evaluators can delete observations.');
+    throw new Error('Only Peer Evaluators can perform this action.');
   }
   try {
     const spreadsheet = openSpreadsheet();
@@ -1418,7 +1423,7 @@ function deleteObservation(observationId) {
  */
 function exportToPdf(observationId) {
   if (!isPeerEvaluator()) {
-    throw new Error('Only Peer Evaluators can export to PDF.');
+    throw new Error('Only Peer Evaluators can perform this action.');
   }
   try {
     const spreadsheet = openSpreadsheet();
