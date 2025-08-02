@@ -56,3 +56,116 @@ function testIsValidEmailFunction() {
 }
 
 // To run tests, execute runAllTests() from the Apps Script editor.
+
+// --- NEW OBSERVATION WORKFLOW TESTS ---
+
+// Mock data and services
+const MOCK_DATA = {
+  evaluator: { email: 'evaluator@example.com', role: 'Peer Evaluator' },
+  teacher1: { email: 'teacher1@example.com', role: 'Teacher' },
+  teacher2: { email: 'teacher2@example.com', role: 'Teacher' },
+  observations: [],
+  ratings: []
+};
+
+// Mock Apps Script Services
+const MockSession = {
+  getActiveUser: () => ({ getEmail: () => MOCK_DATA.currentUser.email })
+};
+
+const MockDriveApp = {
+  createFolder: (name) => ({ getId: () => `folder_${name.replace(/\s/g, '_')}` }),
+  getFileById: (id) => ({ moveTo: (folder) => {} })
+};
+
+const MockDocumentApp = {
+  create: (name) => ({ getId: () => `doc_${name.replace(/\s/g, '_')}` })
+};
+
+function runObservationTests() {
+  // Backup original services
+  const originalSession = Session;
+  const originalDriveApp = DriveApp;
+  const originalDocumentApp = DocumentApp;
+
+  // Inject mocks
+  Session = MockSession;
+  DriveApp = MockDriveApp;
+  DocumentApp = MockDocumentApp;
+
+  console.log("Starting Observation Workflow Tests...");
+  try {
+    test_createObservation();
+    test_getObservations_security();
+    test_finalizeObservation();
+  } catch (e) {
+    console.error("An error occurred during testing:", e);
+  } finally {
+    // Restore original services
+    Session = originalSession;
+    DriveApp = originalDriveApp;
+    DocumentApp = originalDocumentApp;
+    console.log("Observation Workflow Tests Completed.");
+  }
+}
+
+function test_createObservation() {
+  console.log("Running test: createObservation...");
+  MOCK_DATA.currentUser = MOCK_DATA.evaluator;
+  
+  const obsId = createObservation(MOCK_DATA.teacher1.email, 'Q1 Observation');
+  
+  assert(obsId, "createObservation should return an observation ID.");
+  
+  const obs = getObservationDetails(obsId);
+  assert(obs, "getObservationDetails should retrieve the created observation.");
+  assert(obs.observeeEmail === MOCK_DATA.teacher1.email, "Observation has incorrect observee email.");
+  assert(obs.evaluatorEmail === MOCK_DATA.evaluator.email, "Observation has incorrect evaluator email.");
+  assert(obs.status === OBSERVATION_STATUS.IN_PROGRESS, "New observation should have 'In Progress' status.");
+  
+  MOCK_DATA.observations.push(obs); // Save for next tests
+  console.log("...createObservation PASSED.");
+}
+
+function test_getObservations_security() {
+  console.log("Running test: getObservations security...");
+  
+  // 1. Peer Evaluator should see the observation they created for teacher1
+  MOCK_DATA.currentUser = MOCK_DATA.evaluator;
+  let evaluatorObs = getObservations(MOCK_DATA.teacher1.email);
+  assert(evaluatorObs.length === 1, "Evaluator should see 1 observation for teacher1.");
+  assert(evaluatorObs[0].id === MOCK_DATA.observations[0].id, "Evaluator sees the correct observation.");
+
+  // 2. Teacher1 should NOT see the observation yet (it's not finalized)
+  MOCK_DATA.currentUser = MOCK_DATA.teacher1;
+  let teacher1Obs_inprogress = getObservations(MOCK_DATA.teacher1.email);
+  assert(teacher1Obs_inprogress.length === 0, "Teacher should see 0 observations while it's in progress.");
+
+  // 3. Teacher2 should NOT see the observation
+  MOCK_DATA.currentUser = MOCK_DATA.teacher2;
+  let teacher2Obs = getObservations(MOCK_DATA.teacher1.email);
+  assert(teacher2Obs.length === 0, "Teacher2 should not see observations for Teacher1.");
+
+  console.log("...getObservations security PASSED.");
+}
+
+function test_finalizeObservation() {
+  console.log("Running test: finalizeObservation...");
+  const obsId = MOCK_DATA.observations[0].id;
+
+  // Finalize the observation
+  MOCK_DATA.currentUser = MOCK_DATA.evaluator;
+  finalizeObservation(obsId);
+  
+  const obs = getObservationDetails(obsId);
+  assert(obs.status === OBSERVATION_STATUS.FINALIZED, "Observation status should be 'Finalized'.");
+  assert(obs.endTime, "Finalized observation should have an end time.");
+
+  // Now, Teacher1 should be able to see it.
+  MOCK_DATA.currentUser = MOCK_DATA.teacher1;
+  let teacher1Obs_finalized = getObservations(MOCK_DATA.teacher1.email);
+  assert(teacher1Obs_finalized.length === 1, "Teacher should see 1 observation after it is finalized.");
+  assert(teacher1Obs_finalized[0].id === obsId, "Teacher sees the correct finalized observation.");
+
+  console.log("...finalizeObservation PASSED.");
+}
