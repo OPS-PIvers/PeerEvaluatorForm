@@ -1982,12 +1982,51 @@
 
         // --- NEW OBSERVATION WORKFLOW ---
 
+        // --- NEW OBSERVATION WORKFLOW ---
+
         let currentUser = null;
         let activeObservee = null;
-        // currentObservationId is already defined earlier in the script
+        let currentObservationId = null;
+
+        function displayFinalizedObservations(observations) {
+            const container = document.getElementById('finalized-observation-list-container');
+            container.innerHTML = ''; // Clear previous content
+
+            if (!observations || observations.length === 0) {
+                container.innerHTML = '<p>No finalized observations found.</p>';
+                // Show the default read-only rubric
+                document.getElementById('rubric-container').style.display = 'block';
+                setRubricReadOnly(true);
+                return;
+            }
+
+            observations.forEach(obs => {
+                const obsEl = document.createElement('div');
+                obsEl.className = 'observation-item';
+                obsEl.innerHTML = `
+                    <h4>${obs.name}</h4>
+                    <p>Finalized on: ${new Date(obs.endTime).toLocaleDateString()}</p>
+                    <button onclick="loadRubricForObservation('${obs.id}', 'view')">View Rubric</button>
+                    <a href="https://drive.google.com/drive/folders/${obs.folderId}" target="_blank">View Media</a>
+                `;
+                container.appendChild(obsEl);
+            });
+        }
 
         function initializeApp() {
-            currentUser = <?= JSON.stringify(data.userContext) ?>;
+            let userContextData = <?= JSON.stringify(data.userContext) ?>;
+            // Ensure userContextData is an object, not a string
+            if (typeof userContextData === 'string') {
+                try {
+                    currentUser = JSON.parse(userContextData);
+                } catch (e) {
+                    console.error("Failed to parse user context data:", e);
+                    currentUser = { role: 'Teacher', isError: true }; // Fallback
+                }
+            } else {
+                currentUser = userContextData;
+            }
+            
             console.log('Client-side currentUser:', currentUser);
             console.log('Initializing app for role:', currentUser.role);
 
