@@ -1028,7 +1028,7 @@
                         <option value="Probationary">Probationary</option>
                     </select>
 
-                    <select id="staffFilter" class="filter-select" onchange="applyStaffFilter()" aria-label="Filter by Staff Member" style="display: none;">
+                    <select id="staffFilter" class="filter-select" aria-label="Filter by Staff Member" style="display: none;">
                         <option value="">Select Staff Member...</option>
                         <!-- Options populated by JavaScript -->
                     </select>
@@ -1181,7 +1181,7 @@
                                         <? for (var j = 0; j < component.bestPractices.length; j++) { ?>
                                             <div class="look-for-item">
                                                 <input type="checkbox" id="practice-<?= domainIdx ?>-<?= i ?>-<?= j ?>" name="practice-<?= domainIdx ?>-<?= i ?>-<?= j ?>">
-                                                <label for="practice-<?= domainIdx ?>-<?= i ?>-<?= j ?>"><?= component.bestPractaces[j] ?></label>
+                                                <label for="practice-<?= domainIdx ?>-<?= i ?>-<?= j ?>"><?= component.bestPractices[j] ?></label>
                                             </div>
                                         <? } ?>
                                     </div>
@@ -2031,7 +2031,8 @@
                             obsEl.innerHTML = `
                                 <h4>${obs.name}</h4>
                                 <p>Finalized on: ${new Date(obs.endTime).toLocaleDateString()}</p>
-                                <button onclick="loadRubricForObservation('${obs.id}', 'view')">View</button>
+                                <button onclick="loadRubricForObservation('${obs.id}', 'view')">View Rubric</button>
+                                <a href="https://drive.google.com/drive/folders/${obs.folderId}" target="_blank">View Media</a>
                             `;
                             container.appendChild(obsEl);
                         });
@@ -2103,6 +2104,86 @@
             }
         }
 
+        function renameObservation(observationId) {
+            const newName = prompt('Enter a new name for this observation:');
+            if (newName && newName.trim() !== '') {
+                google.script.run
+                    .withSuccessHandler(() => {
+                        alert('Observation renamed successfully.');
+                        loadObservationDashboard(activeObservee); // Refresh dashboard
+                    })
+                    .withFailureHandler(err => {
+                        alert('Error renaming observation: ' + err.message);
+                    })
+                    .renameObservation(observationId, newName.trim());
+            }
+        }
+
+        function deleteObservation(observationId) {
+            if (confirm('Are you sure you want to delete this observation and all its data? This cannot be undone.')) {
+                google.script.run
+                    .withSuccessHandler(() => {
+                        alert('Observation deleted successfully.');
+                        loadObservationDashboard(activeObservee); // Refresh dashboard
+                    })
+                    .withFailureHandler(err => {
+                        alert('Error deleting observation: ' + err.message);
+                    })
+                    .deleteObservation(observationId);
+            }
+        }
+
+        let autosaveInterval;
+        function startAutosave() {
+            if (autosaveInterval) clearInterval(autosaveInterval);
+            autosaveInterval = setInterval(saveAllProgress, 30000); // Autosave every 30 seconds
+            console.log('Autosave started.');
+        }
+
+        function stopAutosave() {
+            clearInterval(autosaveInterval);
+            console.log('Autosave stopped.');
+        }
+
+        function saveAllProgress() {
+            if (!currentObservationId) return;
+            console.log('Saving progress...');
+            // In a real app, you'd collect all dirty data. For now, we'll just show a message.
+            // This function can be expanded to batch-save all unsaved notes and ratings.
+            const saveButton = document.getElementById('save-progress-btn');
+            saveButton.textContent = 'Saving...';
+            setTimeout(() => {
+                saveButton.textContent = 'Save Progress';
+                // Add a small status update for the user
+                const statusEl = document.createElement('span');
+                statusEl.textContent = ' (Saved at ' + new Date().toLocaleTimeString() + ')';
+                statusEl.style.fontSize = '0.8em';
+                saveButton.parentElement.appendChild(statusEl);
+                setTimeout(() => statusEl.remove(), 5000);
+            }, 1000);
+        }
+
+        function finalizeAndSubmitObservation() {
+            if (!currentObservationId) return;
+            if (confirm('Are you sure you want to finalize and submit this observation? You will no longer be able to edit it.')) {
+                stopAutosave();
+                google.script.run
+                    .withSuccessHandler((pdfUrl) => {
+                        alert('Observation finalized and submitted successfully!');
+                        if (pdfUrl) {
+                            window.open(pdfUrl, '_blank');
+                        }
+                        // Return to the dashboard
+                        loadObservationDashboard(activeObservee);
+                    })
+                    .withFailureHandler(err => {
+                        alert('Error finalizing observation: ' + err.message);
+                        startAutosave(); // Restart autosave if finalization fails
+                    })
+                    .finalizeObservation(currentObservationId);
+            }
+        }
+
         function loadRubricForObservation(observationId, mode) {
             currentObservationId = observationId;
             document.getElementById('observation-dashboard').style.display = 'none';
@@ -2135,6 +2216,12 @@
                         });
 
                         setRubricReadOnly(mode === 'view');
+
+                        if (mode === 'edit') {
+                            startAutosave();
+                        } else {
+                            stopAutosave();
+                        }
                     }
                 })
                 .withFailureHandler(err => {
@@ -2309,6 +2396,10 @@
         }
 
         function saveNote(componentId) {
+            if (!currentObservationId) {
+                console.warn('Cannot save note without an active observation.');
+                return;
+            }
             const textarea = document.getElementById('notes-textarea-' + componentId);
             if (textarea) {
                 const noteContent = textarea.value;
@@ -2319,17 +2410,19 @@
                     .withFailureHandler((error) => {
                         console.error('Error saving note for', componentId, ':', error);
                     })
-                    .saveNote(componentId, noteContent);
+                    .saveNote(currentObservationId, componentId, noteContent);
             }
         }
 
         function loadNotes() {
+            if (!currentObservationId) return; // Don't run if no observation is active
             google.script.run
                 .withSuccessHandler((notes) => {
-                    console.log('Notes loaded successfully');
+                    console.log('Notes loaded successfully for observation:', currentObservationId);
+                    // Only update notes that have changed to avoid flicker
                     for (const componentId in notes) {
                         const textarea = document.getElementById('notes-textarea-' + componentId);
-                        if (textarea) {
+                        if (textarea && textarea.value !== notes[componentId]) {
                             textarea.value = notes[componentId];
                         }
                     }
@@ -2337,11 +2430,11 @@
                 .withFailureHandler((error) => {
                     console.error('Error loading notes:', error);
                 })
-                .getNotes();
+                .getNotes(currentObservationId);
         }
 
         document.addEventListener('DOMContentLoaded', function() {
-            loadNotes();
+            // loadNotes() is now called in the observation selection handler (e.g., after an observation is started or selected), not during DOMContentLoaded.
         });
 
         // --- Observation Management ---

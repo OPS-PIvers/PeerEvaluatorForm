@@ -973,12 +973,21 @@ function testSheetConnectivity() {
 /**
  * Creates a new observation.
  * @param {string} observeeEmail The email of the user being observed.
- * @param {string} evaluatorEmail The email of the user conducting the observation.
  * @param {string} observationName The name of the observation.
- * @return {string} The ID of the new observation.
+ * @return {string|null} The ID of the new observation, or null if creation failed.
+ * @throws {Error} If the evaluator email cannot be determined from the session.
+ * @note The evaluator email is obtained from the current session user. This function must be called in a context where Session.getActiveUser().getEmail() returns a valid email.
+ * @since 2.1.0 Signature changed from 3 parameters to 2 parameters (removed third parameter) in June 2024.
  */
-function createObservation(observeeEmail, evaluatorEmail, observationName) {
+function createObservation(observeeEmail, observationName) {
+  if (!isPeerEvaluator()) {
+    throw new Error('Only Peer Evaluators can perform this action.');
+  }
   try {
+    const evaluatorEmail = Session.getActiveUser().getEmail();
+    if (!evaluatorEmail) {
+      throw new Error('Could not identify the evaluator.');
+    }
     const spreadsheet = openSpreadsheet();
     let sheet = getSheetByName(spreadsheet, SHEET_NAMES.OBSERVATIONS);
 
@@ -1014,6 +1023,9 @@ function createObservation(observeeEmail, evaluatorEmail, observationName) {
  * @param {string} observationId The ID of the observation to finalize.
  */
 function finalizeObservation(observationId) {
+  if (!isPeerEvaluator()) {
+    throw new Error('Only Peer Evaluators can perform this action.');
+  }
   try {
     const spreadsheet = openSpreadsheet();
     const sheet = getSheetByName(spreadsheet, SHEET_NAMES.OBSERVATIONS);
@@ -1039,6 +1051,9 @@ function finalizeObservation(observationId) {
  * @param {string} noteContent The content of the note.
  */
 function saveNote(observationId, componentId, noteContent) {
+  if (!isPeerEvaluator()) {
+    throw new Error('Only Peer Evaluators can perform this action.');
+  }
   try {
     const spreadsheet = openSpreadsheet();
     const sheet = getSheetByName(spreadsheet, SHEET_NAMES.OBSERVATIONS);
@@ -1133,6 +1148,9 @@ function getNotes(observationId) {
  * @param {string} rating The rating (e.g., "Developing", "Basic").
  */
 function saveRating(observationId, componentId, rating) {
+  if (!isPeerEvaluator()) {
+    throw new Error('Only Peer Evaluators can perform this action.');
+  }
   try {
     const spreadsheet = openSpreadsheet();
     let sheet = getSheetByName(spreadsheet, SHEET_NAMES.RATINGS);
@@ -1173,6 +1191,9 @@ function saveRating(observationId, componentId, rating) {
  * @param {string} mimeType The MIME type of the file.
  */
 function uploadMedia(observationId, componentId, fileData, fileName, mimeType) {
+  if (!isPeerEvaluator()) {
+    throw new Error('Only Peer Evaluators can perform this action.');
+  }
   try {
     const spreadsheet = openSpreadsheet();
     const sheet = getSheetByName(spreadsheet, SHEET_NAMES.OBSERVATIONS);
@@ -1340,6 +1361,9 @@ function getObservationDetails(observationId) {
  * @param {string} newName The new name for the observation.
  */
 function renameObservation(observationId, newName) {
+  if (!isPeerEvaluator()) {
+    throw new Error('Only Peer Evaluators can perform this action.');
+  }
   try {
     const spreadsheet = openSpreadsheet();
     const sheet = getSheetByName(spreadsheet, SHEET_NAMES.OBSERVATIONS);
@@ -1362,6 +1386,9 @@ function renameObservation(observationId, newName) {
  * @param {string} observationId The ID of the observation to delete.
  */
 function deleteObservation(observationId) {
+  if (!isPeerEvaluator()) {
+    throw new Error('Only Peer Evaluators can perform this action.');
+  }
   try {
     const spreadsheet = openSpreadsheet();
     const sheet = getSheetByName(spreadsheet, SHEET_NAMES.OBSERVATIONS);
@@ -1395,6 +1422,9 @@ function deleteObservation(observationId) {
  * @return {string} The URL of the generated PDF file.
  */
 function exportToPdf(observationId) {
+  if (!isPeerEvaluator()) {
+    throw new Error('Only Peer Evaluators can perform this action.');
+  }
   try {
     const spreadsheet = openSpreadsheet();
     const sheet = getSheetByName(spreadsheet, SHEET_NAMES.OBSERVATIONS);

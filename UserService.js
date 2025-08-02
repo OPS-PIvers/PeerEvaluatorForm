@@ -30,6 +30,11 @@ function getUserFromSession() {
   }
 }
 
+function isPeerEvaluator() {
+  const userContext = createUserContext();
+  return userContext.role === 'Peer Evaluator';
+}
+
 /**
  * Gets user information by email from the Staff sheet
  * REPLACE THIS FUNCTION in UserService.js
