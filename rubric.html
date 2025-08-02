@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Permissions-Policy" content="ambient-light-sensor=(), camera=(), microphone=(), speaker=(), vibrate=(), vr=()">
 
     <!-- Cache Control Headers -->
     <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate, max-age=0">
@@ -1156,10 +1157,10 @@
                                 <div class="level-content">
                                     <?= component.basic ?>
                                 </div>
-                                <div class="level-content" data-rating="Proficient" onclick="selectRating(this, '<?= componentId ?>')">
+                                <div class="level-content" data-rating="Proficient" onclick="selectRating(this, <?= JSON.stringify(componentId) ?>)">
                                     <?= component.proficient ?>
                                 </div>
-                                <div class="level-content" data-rating="Distinguished" onclick="selectRating(this, '<?= componentId ?>')">
+                                <div class="level-content" data-rating="Distinguished" onclick="selectRating(this, <?= JSON.stringify(componentId) ?>)">
                                     <?= component.distinguished ?>
                                 </div>
                             </div>
@@ -1167,12 +1168,12 @@
                             <!-- Media Upload -->
                             <div class="media-upload-section">
                                 <label for="media-upload-<?= componentId ?>" class="media-upload-label">Upload Media</label>
-                                <input type="file" id="media-upload-<?= componentId ?>" class="media-upload-input" onchange="uploadMedia('<?= componentId ?>')" multiple>
+                                <input type="file" id="media-upload-<?= componentId ?>" class="media-upload-input" onchange="uploadMedia(<?= JSON.stringify(componentId) ?>)" multiple>
                             </div>
                             
                             <? if (component.bestPractices && component.bestPractices.length > 0) { ?>
                             <div class="look-fors-section">
-                                <div class="look-fors-header" onclick="toggleLookFors('domain-<?= domainIdx ?>-component-<?= i ?>')">
+                                <div class="look-fors-header" onclick="toggleLookFors(<?= JSON.stringify('domain-' + domainIdx + '-component-' + i) ?>)">
                                     <span>Best Practices aligned with 5D+ and PELSB Standards</span>
                                     <span class="chevron" id="chevron-<?= domainIdx ?>-<?= i ?>">▼</span>
                                 </div>
@@ -1191,12 +1192,12 @@
 
                             <!-- Notes Section -->
                             <div class="notes-section">
-                                <div class="notes-header" onclick="toggleNotes('<?= componentId ?>')">
+                                <div class="notes-header" onclick="toggleNotes(<?= JSON.stringify(componentId) ?>)">
                                     <span>Notes</span>
                                     <span class="notes-chevron" id="notes-chevron-<?= componentId ?>">▼</span>
                                 </div>
                                 <div class="notes-content" id="notes-content-<?= componentId ?>">
-                                    <textarea class="notes-textarea" id="notes-textarea-<?= componentId ?>" placeholder="Enter your notes here..." onblur="saveNote('<?= componentId ?>')"></textarea>
+                                    <textarea class="notes-textarea" id="notes-textarea-<?= componentId ?>" placeholder="Enter your notes here..." onblur="saveNote(<?= JSON.stringify(componentId) ?>)"></textarea>
                                 </div>
                             </div>
                         </div>
@@ -1557,9 +1558,9 @@
         window.pageLoadInfo = {
             timestamp: Date.now(),
             userAgent: navigator.userAgent,
-            role: '<?= data.userContext ? data.userContext.role : "unknown" ?>',
-            cacheVersion: '<?= data.userContext ? data.userContext.cacheVersion : "unknown" ?>',
-            requestId: '<?= data.userContext ? data.userContext.requestId : "unknown" ?>'
+            role: <?= JSON.stringify(data.userContext ? data.userContext.role : "unknown") ?>,
+            cacheVersion: <?= JSON.stringify(data.userContext ? data.userContext.cacheVersion : "unknown") ?>,
+            requestId: <?= JSON.stringify(data.userContext ? data.userContext.requestId : "unknown") ?>
         };
 
         function initializeFiltersFromURL() {
@@ -1617,7 +1618,7 @@
         // The following functions manage the view mode (full/assigned) dynamically on the client-side
         // without a page reload. The preference is saved in sessionStorage for the current session.
         // View Mode Toggle Functions
-        let currentViewMode = '<?= data.userContext?.viewMode || "full" ?>';
+        let currentViewMode = <?= JSON.stringify(data.userContext?.viewMode || "full") ?>;
         const userAssignedSubdomains = <?= data.userContext?.assignedSubdomains ? JSON.stringify(data.userContext.assignedSubdomains) : 'null' ?>;
 
         function toggleViewMode() {

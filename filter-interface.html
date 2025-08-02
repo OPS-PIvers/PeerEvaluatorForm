@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Permissions-Policy" content="ambient-light-sensor=(), camera=(), microphone=(), speaker=(), vibrate=(), vr=()">
     <title><?= userContext.role ?> - Select Rubric View</title>
     <style>
         * {
@@ -834,7 +835,7 @@
         function loadMyOwnView() {
             showLoading('Loading your assigned areas...');
             currentFilters = { 
-                role: '<?= userContext.role ?>', 
+                role: <?= JSON.stringify(userContext.role) ?>, 
                 year: <?= userContext.year || 1 ?>, 
                 staff: null, 
                 viewType: 'assigned' 
@@ -1264,8 +1265,8 @@
         // Initialize
         console.log('Filter interface loaded successfully!');
         console.log('User Context:', {
-            role: '<?= userContext.role ?>',
-            specialRoleType: '<?= userContext.specialRoleType ?>',
+            role: <?= JSON.stringify(userContext.role) ?>,
+            specialRoleType: <?= JSON.stringify(userContext.specialRoleType) ?>,
             year: <?= userContext.year || 1 ?>
         });
 
