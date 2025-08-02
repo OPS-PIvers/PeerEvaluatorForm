@@ -2332,12 +2332,10 @@
             google.script.run
                 .withSuccessHandler((notes) => {
                     console.log('Notes loaded successfully for observation:', currentObservationId);
-                    // Clear all existing notes first
-                    document.querySelectorAll('.notes-textarea').forEach(ta => ta.value = '');
-                    // Populate with new notes
+                    // Only update notes that have changed to avoid flicker
                     for (const componentId in notes) {
                         const textarea = document.getElementById('notes-textarea-' + componentId);
-                        if (textarea) {
+                        if (textarea && textarea.value !== notes[componentId]) {
                             textarea.value = notes[componentId];
                         }
                     }
