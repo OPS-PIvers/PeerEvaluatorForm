@@ -2347,7 +2347,7 @@
         }
 
         document.addEventListener('DOMContentLoaded', function() {
-            // loadNotes() is called when an observation is selected, not during DOMContentLoaded.
+            // loadNotes() is now called in the observation selection handler (e.g., after an observation is started or selected), not during DOMContentLoaded.
         });
 
         // --- Observation Management ---
