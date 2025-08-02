@@ -2014,19 +2014,7 @@
         }
 
         function initializeApp() {
-            let userContextData = <?= JSON.stringify(data.userContext) ?>;
-            // Ensure userContextData is an object, not a string
-            if (typeof userContextData === 'string') {
-                try {
-                    currentUser = JSON.parse(userContextData);
-                } catch (e) {
-                    console.error("Failed to parse user context data:", e);
-                    currentUser = { role: 'Teacher', isError: true }; // Fallback
-                }
-            } else {
-                currentUser = userContextData;
-            }
-            
+            currentUser = <?= data.userContext ?>;
             console.log('Client-side currentUser:', currentUser);
             console.log('Initializing app for role:', currentUser.role);
 
