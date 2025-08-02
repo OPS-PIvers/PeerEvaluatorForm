@@ -10,7 +10,7 @@
 function getUserFromSession() {
   try {
     const user = Session.getActiveUser();
-    const email = user.getEmail();
+    const email = user.getEmail().trim();
     
     if (!email || !isValidEmail(email)) {
       debugLog('No valid user email found in session');

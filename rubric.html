@@ -2014,7 +2014,7 @@
         }
 
         function initializeApp() {
-            currentUser = <?= data.userContext ?>;
+            currentUser = <?= JSON.stringify(data.userContext) ?>;
             console.log('Client-side currentUser:', currentUser);
             console.log('Initializing app for role:', currentUser.role);
 
