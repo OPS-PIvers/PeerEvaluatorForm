@@ -1645,13 +1645,15 @@ function addStateTrackingHeaders(htmlOutput, userContext) {
 
 function addCacheBustingHeaders(htmlOutput, metadata) {
   try {
-    // Primary cache control headers
+    // Primary cache control headers - DISABLED due to meta tag errors
+    /*
     htmlOutput
       .addMetaTag('cache-control', 'no-cache, no-store, must-revalidate, max-age=0')
       .addMetaTag('pragma', 'no-cache')
       .addMetaTag('expires', '0')
       .addMetaTag('last-modified', metadata.lastModified)
       .addMetaTag('etag', metadata.etag);
+    */
 
     // Custom headers for debugging and version tracking
     htmlOutput
