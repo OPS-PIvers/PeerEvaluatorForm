@@ -25,6 +25,9 @@ jobs:
     - name: Push code to Apps Script
       # Use --force if you encounter issues with minor version bumps
       run: clasp push --force
+    - name: List deployments
+      id: list_deployments
+      run: clasp deployments
     - name: Update deployment
       # If you have a specific deployment ID to update, use this format
       run: |
@@ -33,6 +36,11 @@ jobs:
         else
           clasp deploy --description "Auto-deployment $(date)"
         fi
+    - name: Get web app URL
+      id: get_url
+      run: |
+        URL=$(clasp deployments | grep -o 'https://script.google.com/macros/s/.*/exec')
+        echo "WEBAPP_URL=$URL" >> $GITHUB_OUTPUT
     # Optional: Clean up the credentials file (good practice)
     - name: Clean up credentials
       if: always() # Run even if previous steps failed
