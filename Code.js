@@ -1945,12 +1945,66 @@ function createBestPracticesMap(domainNumber, config) {
 }
 
 /**
- * Process role-specific domains (placeholder for future implementation)
+ * Process role-specific domains dynamically from the sheet data.
+ * This function is designed to work for any role, not just 'Teacher'.
+ * @param {object} roleSheetData - The object containing the sheet data for the role.
+ * @param {string} role - The name of the role being processed.
+ * @param {number} year - The observation year.
+ * @return {Array} An array of domain objects.
  */
 function processRoleDomains(roleSheetData, role, year) {
-  // For now, fall back to legacy processing
-  debugLog(`Processing role domains for ${role} - falling back to legacy processing`);
-  return processLegacyTeacherDomains(roleSheetData.data);
+  debugLog(`Processing domains for role "${role}" using dynamic processor.`);
+  const domains = [];
+  let currentDomain = null;
+
+  // Assuming the sheet format is:
+  // - Domain headers are in column A (e.g., "Domain 1: ...")
+  // - Component IDs are in column A (e.g., "1a:", "2b:")
+  // - Performance levels are in columns B, C, D, E
+  
+  const sheetData = roleSheetData.data;
+
+  for (let i = 0; i < sheetData.length; i++) {
+    const row = sheetData[i];
+    const firstCell = row[0] ? row[0].toString().trim() : '';
+
+    // Check for a new domain header
+    if (firstCell.toLowerCase().startsWith('domain')) {
+      const domainNumberMatch = firstCell.match(/(\d+)/);
+      if (domainNumberMatch) {
+        currentDomain = {
+          number: parseInt(domainNumberMatch[1], 10),
+          name: firstCell,
+          components: []
+        };
+        domains.push(currentDomain);
+        debugLog(`Found ${currentDomain.name}`);
+      }
+    }
+    // Check for a component ID
+    else if (VALIDATION_PATTERNS.COMPONENT_ID.test(firstCell)) {
+      if (currentDomain) {
+        const component = {
+          title: firstCell,
+          developing: sanitizeText(row[1]),
+          basic: sanitizeText(row[2]),
+          proficient: sanitizeText(row[3]),
+          distinguished: sanitizeText(row[4]),
+          bestPractices: [] // Note: Best practices are not handled by this generic processor yet.
+        };
+        currentDomain.components.push(component);
+      } else {
+        debugLog(`Found component "${firstCell}" but no current domain is set. Skipping.`);
+      }
+    }
+  }
+  
+  debugLog(`Finished processing for role "${role}". Found ${domains.length} domains.`);
+  domains.forEach(d => {
+    debugLog(`- ${d.name}: Found ${d.components.length} components.`);
+  });
+
+  return domains;
 }
 
 /**
