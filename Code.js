@@ -1645,29 +1645,10 @@ function addStateTrackingHeaders(htmlOutput, userContext) {
 
 function addCacheBustingHeaders(htmlOutput, metadata) {
   try {
-    // Primary cache control headers - DISABLED due to meta tag errors
-    /*
-    htmlOutput
-      .addMetaTag('cache-control', 'no-cache, no-store, must-revalidate, max-age=0')
-      .addMetaTag('pragma', 'no-cache')
-      .addMetaTag('expires', '0')
-      .addMetaTag('last-modified', metadata.lastModified)
-      .addMetaTag('etag', metadata.etag);
-    */
-
-    // Custom headers for debugging and version tracking
-    htmlOutput
-      .addMetaTag('x-app-version', SYSTEM_INFO.VERSION)
-      .addMetaTag('x-cache-version', metadata.cacheVersion)
-      .addMetaTag('x-request-id', metadata.requestId)
-      .addMetaTag('x-timestamp', metadata.timestamp.toString())
-      .addMetaTag('x-role', metadata.role)
-      .addMetaTag('x-year', metadata.year.toString());
-
-    // Viewport and mobile optimization
+    // Viewport and mobile optimization is the only safe meta tag to set here.
     htmlOutput.addMetaTag('viewport', 'width=device-width, initial-scale=1.0');
 
-    debugLog('Cache-busting headers added', {
+    debugLog('Cache-busting headers (meta tags) skipped to prevent errors. Viewport set.', {
       etag: metadata.etag,
       requestId: metadata.requestId
     });
