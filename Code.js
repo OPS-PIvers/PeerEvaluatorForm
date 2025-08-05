@@ -102,18 +102,18 @@ function generateResponseMetadata(userContext, requestId, debugMode = false) {
 function addStateTrackingHeaders(htmlOutput, userContext) {
   try {
     if (userContext.roleChangeDetected) {
-      htmlOutput.addMetaTag('x-role-change-detected', 'true');
-      htmlOutput.addMetaTag('x-previous-role', userContext.previousState?.role || 'unknown');
-      htmlOutput.addMetaTag('x-state-changes', userContext.stateChanges.length.toString());
+      // htmlOutput.addMetaTag('x-role-change-detected', 'true');
+      // htmlOutput.addMetaTag('x-previous-role', userContext.previousState?.role || 'unknown');
+      // htmlOutput.addMetaTag('x-state-changes', userContext.stateChanges.length.toString());
     }
 
     if (userContext.isNewUser) {
-      htmlOutput.addMetaTag('x-new-user', 'true');
+      // htmlOutput.addMetaTag('x-new-user', 'true');
     }
 
-    htmlOutput.addMetaTag('x-session-id', userContext.metadata.sessionId);
-    htmlOutput.addMetaTag('x-context-version', userContext.metadata.contextVersion);
-    htmlOutput.addMetaTag('x-has-staff-record', userContext.hasStaffRecord.toString());
+    // htmlOutput.addMetaTag('x-session-id', userContext.metadata.sessionId);
+    // htmlOutput.addMetaTag('x-context-version', userContext.metadata.contextVersion);
+    // htmlOutput.addMetaTag('x-has-staff-record', userContext.hasStaffRecord.toString());
 
     debugLog('State tracking headers added', {
       roleChangeDetected: userContext.roleChangeDetected,
@@ -156,13 +156,13 @@ function addCacheBustingHeaders(htmlOutput, metadata) {
  */
 function addDebugHeaders(htmlOutput, userContext, metadata) {
   try {
-    htmlOutput
-      .addMetaTag('x-debug-mode', 'true')
-      .addMetaTag('x-user-email', userContext.email || 'anonymous')
-      .addMetaTag('x-user-authenticated', userContext.isAuthenticated.toString())
-      .addMetaTag('x-user-default', userContext.isDefaultUser.toString())
-      .addMetaTag('x-role-override', (userContext.isRoleOverride || false).toString())
-      .addMetaTag('x-execution-time', (Date.now() - metadata.timestamp).toString());
+    // htmlOutput
+    //   .addMetaTag('x-debug-mode', 'true')
+    //   .addMetaTag('x-user-email', userContext.email || 'anonymous')
+    //   .addMetaTag('x-user-authenticated', userContext.isAuthenticated.toString())
+    //   .addMetaTag('x-user-default', userContext.isDefaultUser.toString())
+    //   .addMetaTag('x-role-override', (userContext.isRoleOverride || false).toString())
+    //   .addMetaTag('x-execution-time', (Date.now() - metadata.timestamp).toString());
 
     debugLog('Debug headers added', { requestId: metadata.requestId });
 
