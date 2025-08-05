@@ -758,6 +758,10 @@ function createFilteredUserContext(targetEmail, requestingRole) {
       requestedBy: requestingRole
     };
 
+    if (requestingRole === SPECIAL_ROLES.PEER_EVALUATOR) {
+      context.isEvaluator = true;
+    }
+
     debugLog('Filtered user context created and adjusted', {
       targetEmail: targetEmail,
       targetRole: context.role, // Use context.role as it might have been finalized by createUserContext
