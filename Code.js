@@ -2345,7 +2345,8 @@ function createEnhancedErrorPage(error, requestId, userContext, userAgent) {
             forceRefresh();
         }, 30000);
 
-        console.error('System Error Details:', ${JSON.stringify(errorDetails)});
+        var errorData = ${JSON.stringify(errorDetails)};
+        console.error('System Error Details:', errorData);
     </script>
 </body>
 </html>`;
