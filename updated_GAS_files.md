@@ -1,3 +1,562 @@
+Excellent. This is a significant feature enhancement that will require careful implementation. Let's build this strategically to ensure a stable and scalable solution.
+
+Here is the to-do list for the first phase of this implementation, which focuses on setting up the backend data structures and the initial user interface flow for Peer Evaluators.
+
+### To-Do List: Phase 1 - Observation Flow Foundation
+
+1.  **Update `appsscript.json`**: Add the necessary Google Drive scope to allow the script to create folders and upload files in the future.
+2.  **Update `Constants.js`**: Define new constants for managing observation statuses (e.g., "Draft", "Finalized") and the name of the root folder for evidence uploads in Google Drive.
+3.  **New File: `ObservationService.js`**: Create a new script file to handle all logic related to creating, retrieving, and updating observations. For this initial phase, we will use `PropertiesService` as a simple database.
+4.  **Update `Code.js`**:
+    *   Modify the primary data loading function (`loadRubricData`) to intercept requests from "Peer Evaluators" who are viewing a specific staff member. Instead of returning a rubric, it will instruct the frontend to display a new observation selection screen.
+    *   Add new functions that the frontend can call to get a list of a user's existing observations and to create a new, blank observation record.
+5.  **Update `filter-interface.html`**:
+    *   Enhance the client-side JavaScript to understand the new response from the server for Peer Evaluators.
+    *   Add a new, hidden UI section that will serve as the "observation selector" screen.
+    *   When triggered, this screen will call the new server functions to display a "New Observation" button and a list of any existing observations for the selected staff member.
+
+This plan establishes the core framework for the observation feature. Once you approve this list, I will provide the complete, updated code for all necessary files.
+
+---
+
+### File Updates
+
+Here are the complete, updated files based on the plan above.
+
+#### 1. `appsscript.json`
+
+I've added the `https://www.googleapis.com/auth/drive` scope, which is required for the upcoming file upload and folder creation functionality.
+
+```json
+{
+  "timeZone": "America/Chicago",
+  "dependencies": {
+    "enabledAdvancedServices": [
+      {
+        "userSymbol": "Drive",
+        "serviceId": "drive",
+        "version": "v2"
+      }
+    ]
+  },
+  "exceptionLogging": "STACKDRIVER",
+  "runtimeVersion": "V8",
+  "webapp": {
+    "executeAs": "USER_ACCESSING",
+    "access": "DOMAIN"
+  },
+  "oauthScopes": [
+    "https://www.googleapis.com/auth/script.webapp.deploy",
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/userinfo.email",
+    "https://www.googleapis.com/auth/script.scriptapp",
+    "https://www.googleapis.com/auth/drive"
+  ]
+}
+```
+
+---
+
+#### 2. `Constants.js`
+
+New constants have been added for observation statuses and the root Drive folder configuration.
+
+```javascript
+/**
+ * Constants.js
+ * Configuration constants and default settings for the Danielson Framework Multi-Role System
+ */
+
+/**
+ * Sheet names used in the system
+ */
+const SHEET_NAMES = {
+  STAFF: 'Staff',
+  SETTINGS: 'Settings',
+  TEACHER: 'Teacher',
+  OBSERVATIONS: 'Observations' // Future use for dedicated sheet
+};
+
+/**
+ * Column mappings for the Staff sheet
+ */
+const STAFF_COLUMNS = {
+  NAME: 0,     // Column A: "Name" [LAST, FIRST]
+  EMAIL: 1,    // Column B: "Email" [first.last@orono.k12.mn.us]
+  ROLE: 2,     // Column C: "Role" 
+  YEAR: 3      // Column D: "Year"
+};
+
+/**
+ * Column mappings for the Settings sheet
+ */
+const SETTINGS_COLUMNS = {
+  ROLE: 0,        // Column A: "Roles"
+  YEAR_1: 1,      // Column B: Year 1 Domains
+  YEAR_2: 2,      // Column C: Year 2 Domains  
+  YEAR_3: 3       // Column D: Year 3 Domains
+};
+
+/**
+ * Available roles in the system
+ */
+const AVAILABLE_ROLES = [
+  'Teacher',
+  'Nurse', 
+  'Therapeutic Specialist',
+  'Library/Media Specialist',
+  'Counselor',
+  'School Psychologist',
+  'Instructional Specialist',
+  'Early Childhood',
+  'Parent Educator',
+  'Social Worker',
+  'Sp.Ed.',
+  'Peer Evaluator',
+  'Administrator',
+  'Full Access'
+];
+
+/**
+ * Default role configuration (Teacher - maintains backward compatibility)
+ */
+const DEFAULT_ROLE_CONFIG = {
+  role: 'Teacher',
+  sheetName: 'Teacher',
+  title: "Danielson's Framework for Teaching",
+  subtitle: "Best practices aligned with 5D+ and PELSB lookfors",
+  domains: {
+    1: {
+      name: 'Domain 1: Planning and Preparation',
+      startRow: 3,   // 1-indexed - Domain 1 starts at row 3
+      endRow: 22,    // 1-indexed - estimated end row (adjust as needed)
+      subdomains: ['1a:', '1b:', '1c:', '1d:', '1e:', '1f:']
+    },
+    2: {
+      name: 'Domain 2: The Classroom Environment',
+      startRow: 23,  // 1-indexed - Domain 2 starts at row 23
+      endRow: 39,    // 1-indexed - estimated end row (adjust as needed)
+      subdomains: ['2a:', '2b:', '2c:', '2d:', '2e:']
+    },
+    3: {
+      name: 'Domain 3: Instruction',
+      startRow: 40,  // 1-indexed - Domain 3 starts at row 40
+      endRow: 56,    // 1-indexed - estimated end row (adjust as needed)
+      subdomains: ['3a:', '3b:', '3c:', '3d:', '3e:']
+    },
+    4: {
+      name: 'Domain 4: Professional Responsibilities',
+      startRow: 57,  // 1-indexed - Domain 4 starts at row 57
+      endRow: 76,    // 1-indexed - estimated end row (adjust as needed)
+      subdomains: ['4a:', '4b:', '4c:', '4d:', '4e:', '4f:']
+    }
+  }
+};
+
+/**
+ * Validation patterns for data integrity
+ */
+const VALIDATION_PATTERNS = {
+  EMAIL: /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
+  COMPONENT_ID: /^[1-4][a-fA-F]:/, // Matches patterns like "1a:", "2b:", etc.
+  SUBDOMAIN_PATTERN: /^[1-4][a-fA-F]:/,
+  SUBDOMAIN_LIST: /^[1-4][a-fA-F](,\s*[1-4][a-fA-F])*$/ // Matches "1a, 1c, 1f"
+};
+
+/**
+ * Error messages for consistent user communication
+ */
+const ERROR_MESSAGES = {
+  SHEET_ID_MISSING: 'SHEET_ID not found in Script Properties. Please set it in the Apps Script editor.',
+  SHEET_NOT_FOUND: 'Required sheet not found. Please check your spreadsheet configuration.',
+  USER_NOT_FOUND: 'User not found in Staff sheet. Using default Teacher rubric.',
+  INVALID_ROLE: 'Invalid role specified. Using default Teacher rubric.',
+  STAFF_SHEET_MISSING: 'Staff sheet not found. All users will see the Teacher rubric.',
+  SETTINGS_SHEET_MISSING: 'Settings sheet not found. All domains will be visible.',
+  INVALID_EMAIL: 'Invalid email format detected.',
+  DATA_PARSING_ERROR: 'Error parsing sheet data. Please check data format.',
+  ROLE_SHEET_MISSING: 'Role-specific sheet not found. Using Teacher rubric as fallback.',
+  PERMISSION_DENIED: 'Permission denied. You do not have the required role to perform this action.'
+};
+
+/**
+ * Cache settings for performance optimization
+ */
+const CACHE_SETTINGS = {
+  USER_DATA_TTL: 300,        // 5 minutes for user data
+  ROLE_CONFIG_TTL: 600,      // 10 minutes for role configurations
+  SHEET_DATA_TTL: 180,       // 3 minutes for sheet data
+  DEFAULT_TTL: 300           // Default cache time
+};
+
+/**
+ * Performance and debugging settings
+ */
+const PERFORMANCE_SETTINGS = {
+  MAX_EXECUTION_TIME: 25000,  // 25 seconds (Apps Script limit is 30s)
+  ENABLE_PERFORMANCE_LOGGING: true,
+  ENABLE_DEBUG_LOGGING: true,
+  MAX_RETRY_ATTEMPTS: 3
+};
+
+/**
+ * Component structure template for data validation
+ */
+const COMPONENT_TEMPLATE = {
+  title: '',
+  developing: '',
+  basic: '',
+  proficient: '',
+  distinguished: '',
+  bestPractices: []
+};
+
+/**
+ * Domain structure template for data validation
+ */
+const DOMAIN_TEMPLATE = {
+  number: 0,
+  name: '',
+  components: []
+};
+
+/**
+ * String identifier for probationary status
+ */
+const PROBATIONARY_STATUS_STRING = 'probationary';
+
+/**
+ * Numeric representation for probationary observation year
+ */
+const PROBATIONARY_OBSERVATION_YEAR = 0;
+
+/**
+ * Default years for observation cycle
+ */
+const OBSERVATION_YEARS = [1, 2, 3, PROBATIONARY_OBSERVATION_YEAR];
+
+/**
+ * Special access roles that can filter and view other users' data
+ */
+const SPECIAL_ACCESS_ROLES = [
+  'Peer Evaluator',
+  'Administrator', 
+  'Full Access'
+];
+
+/**
+ * View modes for rubric display
+ */
+const VIEW_MODES = {
+  FULL: 'full',
+  ASSIGNED: 'assigned'
+};
+
+/**
+ * Default best practices offset (for legacy Teacher sheet compatibility)
+ */
+const LEGACY_BEST_PRACTICES_OFFSET = {
+  ROW_OFFSET: 4,    // Best practices are 4 rows below component
+  COLUMN: 1,        // Column B (0-indexed)
+  ROW_SPACING: 3    // Components are 3 rows apart
+};
+
+/**
+ * HTML template settings
+ */
+const HTML_SETTINGS = {
+  DEFAULT_TITLE: 'Danielson Framework - All Domains',
+  VIEWPORT_META: 'width=device-width, initial-scale=1.0',
+  AUTO_REFRESH_INTERVAL: 300000  // 5 minutes
+};
+
+/**
+ * Regular expressions for content parsing
+ */
+const CONTENT_PATTERNS = {
+  BEST_PRACTICES_HEADER: /best\s+practices/i,
+  DOMAIN_HEADER: /^domain\s+[1-4]/i,
+  COMPONENT_PATTERN: /^[1-4][a-f]:/,
+  LINE_BREAKS: /\r?\n|\r/,
+  EMPTY_LINES: /^\s*$/
+};
+
+/**
+ * System metadata
+ */
+const SYSTEM_INFO = {
+  VERSION: '2.1.0', // Version updated for new features
+  NAME: 'Danielson Framework Multi-Role System',
+  AUTHOR: 'Apps Script Multi-Role Implementation',
+  LAST_UPDATED: new Date().toISOString()
+};
+
+/**
+ * Contact settings
+ */
+const CONTACT_SETTINGS = {
+  SUPPORT_EMAIL: 'admin@example.com'
+};
+
+/**
+ * Auto-trigger system settings
+ */
+const AUTO_TRIGGER_SETTINGS = {
+  ENABLED: true,
+  MAX_PROCESSING_TIME: 10000, // 10 seconds max for trigger processing
+  RETRY_ATTEMPTS: 2,
+  LOG_ALL_EDITS: false, // Set to true for debugging
+  BATCH_PROCESSING: true, // Process multiple role changes efficiently
+  WARM_CACHE_ON_CHANGE: true // Pre-load new role data
+};
+
+/**
+ * Trigger monitoring settings
+ */
+const TRIGGER_MONITORING = {
+  LOG_SUCCESSFUL_CHANGES: true,
+  LOG_IGNORED_EDITS: false, // Set to true for debugging
+  ALERT_ON_ERRORS: true,
+  TRACK_PERFORMANCE: true
+};
+
+/**
+ * Validation error types for consistent error reporting
+ */
+const VALIDATION_ERROR_TYPES = {
+  // General Configuration and Access
+  CONFIGURATION_ERROR: 'configuration_error', // Generic configuration issue
+  PERMISSION_ERROR: 'permission_error',       // Errors related to script/user permissions
+  SHEET_ID_MISSING: 'sheet_id_missing',       // SHEET_ID not set in properties
+  SPREADSHEET_NOT_FOUND: 'spreadsheet_not_found', // Cannot open spreadsheet by ID
+  SHEET_NOT_FOUND: 'sheet_not_found',           // A required sheet (e.g., Staff, Settings) is missing
+
+  // Data Integrity and Format
+  DATA_CORRUPTION: 'data_corruption',     // General data format or integrity issue
+  INVALID_EMAIL: 'invalid_email',         // Email format is incorrect
+  INVALID_ROLE: 'invalid_role',           // Role is not in AVAILABLE_ROLES
+  INVALID_YEAR: 'invalid_year',           // Year is not in OBSERVATION_YEARS
+  MISSING_HEADER: 'missing_header',       // Expected header not found in a sheet
+  UNEXPECTED_FORMAT: 'unexpected_format', // Data doesn't match expected structure
+
+  // User and Role Specific
+  MISSING_USER: 'missing_user',           // User not found in Staff sheet
+  ROLE_SHEET_MISSING: 'role_sheet_missing', // Specific role sheet (e.g., Nurse) not found
+  ROLE_CONFIG_INVALID: 'role_config_invalid', // Role configuration (e.g. in Settings) is bad
+
+  // Cache and Session
+  CACHE_ERROR: 'cache_error',             // Problem with caching service
+  SESSION_ERROR: 'session_error',         // Problem with user session
+
+  // Trigger and Automation
+  TRIGGER_ERROR: 'trigger_error'          // Error within an automated trigger
+};
+
+/**
+ * Special role types for filtering
+ */
+const SPECIAL_ROLE_TYPES = {
+  ADMINISTRATOR: 'administrator',
+  PEER_EVALUATOR: 'peer_evaluator',
+  FULL_ACCESS: 'full_access'
+};
+
+/**
+ * Names of roles that have special access permissions
+ */
+const SPECIAL_ROLES = {
+  ADMINISTRATOR: 'Administrator',
+  PEER_EVALUATOR: 'Peer Evaluator',
+  FULL_ACCESS: 'Full Access'
+};
+
+const SPECIAL_ACTIONS = {
+  VIEW_PROBATIONARY: 'view_probationary',
+  VIEW_OWN_STAFF: 'view_own_staff',
+  VIEW_ANY: 'view_any',
+  FILTER_BY_ROLE: 'filter_by_role',
+  FILTER_BY_YEAR: 'filter_by_year',
+  FILTER_BY_STAFF: 'filter_by_staff',
+  ADMIN_FUNCTIONS: 'admin_functions',
+  GENERAL_ACCESS: 'general_access'
+};
+
+/**
+ * Filter types for special roles
+ */
+const FILTER_TYPES = {
+  ALL_STAFF: 'all',
+  PROBATIONARY_ONLY: 'probationary',
+  BY_ROLE: 'by_role',
+  BY_YEAR: 'by_year',
+  BY_STAFF_MEMBER: 'by_staff_member'
+};
+
+/**
+ * UI text for view mode toggle
+ */
+const VIEW_MODE_TEXT = {
+  FULL: 'View: Full Rubric',
+  ASSIGNED: 'View: My Assigned Areas'
+};
+
+/**
+ * Observation constants
+ */
+const OBSERVATION_STATUS = {
+  DRAFT: 'Draft',
+  FINALIZED: 'Finalized'
+};
+
+const DRIVE_FOLDER_INFO = {
+  ROOT_FOLDER_NAME: 'Danielson Rubric Observations'
+};
+```
+
+---
+
+#### 3. `ObservationService.js` (New File)
+
+Create a new script file named `ObservationService.js` and add the following code. This service manages the lifecycle of an observation.
+
+```javascript
+/**
+ * ObservationService.js
+ * Manages observation data for the Peer Evaluator role.
+ * For Phase 1, this uses PropertiesService as a mock database.
+ */
+
+const OBSERVATIONS_DB_KEY = 'OBSERVATIONS_DATABASE';
+
+/**
+ * Retrieves the entire observations database from PropertiesService.
+ * @returns {Array<Object>} The array of all observation objects.
+ * @private
+ */
+function _getObservationsDb() {
+  try {
+    const properties = PropertiesService.getScriptProperties();
+    const dbString = properties.getProperty(OBSERVATIONS_DB_KEY);
+    return dbString ? JSON.parse(dbString) : [];
+  } catch (error) {
+    console.error('Error getting observations DB:', error);
+    return []; // Return empty DB on error
+  }
+}
+
+/**
+ * Saves the entire observations database to PropertiesService.
+ * @param {Array<Object>} db The array of all observation objects to save.
+ * @private
+ */
+function _saveObservationsDb(db) {
+  try {
+    const properties = PropertiesService.getScriptProperties();
+    properties.setProperty(OBSERVATIONS_DB_KEY, JSON.stringify(db));
+  } catch (error) {
+    console.error('Error saving observations DB:', error);
+  }
+}
+
+/**
+ * Retrieves all observations for a given staff member.
+ * @param {string} observedEmail The email of the staff member being observed.
+ * @param {string|null} status Optional. Filter observations by status (e.g., "Draft", "Finalized").
+ * @returns {Array<Object>} An array of matching observation objects.
+ */
+function getObservationsForUser(observedEmail, status = null) {
+  if (!observedEmail) return [];
+
+  try {
+    const db = _getObservationsDb();
+    let userObservations = db.filter(obs => obs.observedEmail === observedEmail);
+
+    if (status) {
+      userObservations = userObservations.filter(obs => obs.status === status);
+    }
+
+    // Sort by creation date, newest first
+    userObservations.sort((a, b) => b.createdAt - a.createdAt);
+
+    return userObservations;
+  } catch (error) {
+    console.error(`Error in getObservationsForUser for ${observedEmail}:`, error);
+    return [];
+  }
+}
+
+/**
+ * Creates a new, empty observation record in a "Draft" state.
+ * @param {string} observerEmail The email of the Peer Evaluator creating the observation.
+ * @param {string} observedEmail The email of the staff member being observed.
+ * @returns {Object|null} The newly created observation object or null on error.
+ */
+function createNewObservation(observerEmail, observedEmail) {
+  if (!observerEmail || !observedEmail) {
+    console.error('Observer and Observed emails are required to create an observation.');
+    return null;
+  }
+
+  try {
+    const observedUser = getUserByEmail(observedEmail);
+    if (!observedUser) {
+      console.error(`Could not create observation: Observed user ${observedEmail} not found.`);
+      return null;
+    }
+
+    const db = _getObservationsDb();
+    const observationId = generateUniqueId('obs');
+
+    const newObservation = {
+      observationId: observationId,
+      observerEmail: observerEmail,
+      observedEmail: observedEmail,
+      observedName: observedUser.name,
+      observedRole: observedUser.role,
+      observedYear: observedUser.year,
+      status: OBSERVATION_STATUS.DRAFT,
+      createdAt: Date.now(),
+      finalizedAt: null,
+      observationData: {}, // e.g., { "1a:": "proficient", "1b:": "basic" }
+      evidenceLinks: {} // e.g., { "1a:": ["http://drive.link1", "http://drive.link2"] }
+    };
+
+    db.push(newObservation);
+    _saveObservationsDb(db);
+
+    debugLog('New observation draft created', newObservation);
+    return newObservation;
+
+  } catch (error) {
+    console.error(`Error in createNewObservation for ${observedEmail}:`, error);
+    return null;
+  }
+}
+
+/**
+ * A test function to clear all observations from the properties service.
+ * USE WITH CAUTION.
+ */
+function deleteAllObservations_DANGEROUS() {
+    try {
+        const properties = PropertiesService.getScriptProperties();
+        properties.deleteProperty(OBSERVATIONS_DB_KEY);
+        console.log('DELETED ALL OBSERVATIONS from PropertiesService.');
+        return { success: true, message: 'All observations deleted.' };
+    } catch (error) {
+        console.error('Error deleting observations:', error);
+        return { success: false, error: error.message };
+    }
+}
+```
+
+---
+
+#### 4. `Code.js`
+
+This file has been updated with new server-side functions `getObservationOptions` and `createNewObservation`, and the `loadRubricData` function has been modified to handle the new Peer Evaluator flow.
+
+```javascript
 /**
  * Code.js - Main Orchestrator (Clean Production Version)
  * Google Apps Script Web App for Danielson Framework - Multi-Role Rubric System
@@ -1717,7 +2276,7 @@ function getAllDomainsData(role = null, year = null, viewMode = 'full', assigned
       console.error(`Invalid role: ${role}. Returning error structure.`);
       return {
         title: "Error Loading Data",
-        subtitle: `Invalid role specified: ${role}. Please select a valid role.`, 
+        subtitle: `Invalid role specified: ${role}. Please select a valid role.`,
         role: role,
         year: year,
         viewMode: viewMode,
@@ -1735,7 +2294,7 @@ function getAllDomainsData(role = null, year = null, viewMode = 'full', assigned
       console.error(`Invalid year: ${year}. Returning error structure.`);
       return {
         title: "Error Loading Data",
-        subtitle: `Invalid year specified: ${year}. Please select a valid year.`, 
+        subtitle: `Invalid year specified: ${year}. Please select a valid year.`,
       role: role,
         year: year,     // original invalid year
       viewMode: viewMode,
@@ -1894,7 +2453,7 @@ function processDomainData(sheetData, domainNumber, config) {
   const bestPracticesMap = createBestPracticesMap(domainNumber, config);
   
   // Convert 1-indexed row numbers to 0-indexed for array access
-  const startIdx = config.startRow - 1; // Convert to 0-indexed
+  const startIdx = config.startRow - 1;
   const endIdx = config.endRow - 1;
   
   // Look for components within the domain range
@@ -2129,7 +2688,9 @@ function createSyntheticUserContext(targetRole, targetYear, originalContext, fil
         }
 
         // Create a safe copy of the original context
-        const syntheticContext = { ...originalContext,
+        const syntheticContext = {
+            // Copy all original properties first
+            ...originalContext,
             
             // Override with synthetic values
             role: targetRole,
@@ -2233,13 +2794,15 @@ function createEnhancedErrorPage(error, requestId, userContext, userAgent) {
     <meta http-equiv="expires" content="0">
     <title>System Error - Danielson Framework</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background-color: #f8f9fa;
             margin: 0;
             padding: 20px;
             color: #333;
         }
-        .error-container { max-width: 600px;
+        .error-container {
+            max-width: 600px;
             margin: 50px auto;
             background: white;
             border-radius: 8px;
@@ -2247,26 +2810,31 @@ function createEnhancedErrorPage(error, requestId, userContext, userAgent) {
             padding: 40px;
             text-align: center;
         }
-        .error-icon { font-size: 4rem;
+        .error-icon {
+            font-size: 4rem;
             color: #dc3545;
             margin-bottom: 20px;
         }
-        .error-title { color: #dc3545;
+        .error-title {
+            color: #dc3545;
             font-size: 1.5rem;
             font-weight: 600;
             margin-bottom: 15px;
         }
-        .error-message { color: #666;
+        .error-message {
+            color: #666;
             font-size: 1rem;
             line-height: 1.6;
             margin-bottom: 30px;
         }
-        .error-actions { display: flex;
+        .error-actions {
+            display: flex;
             gap: 15px;
             justify-content: center;
             flex-wrap: wrap;
         }
-        .btn { padding: 12px 24px;
+        .btn {
+            padding: 12px 24px;
             border: none;
             border-radius: 6px;
             font-size: 0.9rem;
@@ -2276,15 +2844,22 @@ function createEnhancedErrorPage(error, requestId, userContext, userAgent) {
             display: inline-block;
             transition: all 0.3s ease;
         }
-        .btn-primary { background: #007bff;
+        .btn-primary {
+            background: #007bff;
             color: white;
         }
-        .btn-primary:hover { background: #0056b3; }
-        .btn-secondary { background: #6c757d;
+        .btn-primary:hover {
+            background: #0056b3;
+        }
+        .btn-secondary {
+            background: #6c757d;
             color: white;
         }
-        .btn-secondary:hover { background: #545b62; }
-        .error-details { margin-top: 30px;
+        .btn-secondary:hover {
+            background: #545b62;
+        }
+        .error-details {
+            margin-top: 30px;
             padding: 20px;
             background: #f8f9fa;
             border-radius: 6px;
@@ -2296,10 +2871,12 @@ function createEnhancedErrorPage(error, requestId, userContext, userAgent) {
             overflow-y: auto;
         }
         @media (max-width: 768px) {
-            .error-container { margin: 20px auto;
+            .error-container {
+                margin: 20px auto;
                 padding: 20px;
             }
-            .btn { width: 100%;
+            .btn {
+                width: 100%;
                 margin-bottom: 10px;
             }
         }
@@ -2366,14 +2943,14 @@ function createEnhancedErrorPage(error, requestId, userContext, userAgent) {
     console.error('Error creating enhanced error page:', createErrorPageError);
     
     // Fallback to basic error response
-    return HtmlService.createHtmlOutput(
-      '<div style="text-align: center; padding: 50px; font-family: Arial, sans-serif;">
+    return HtmlService.createHtmlOutput(`
+      <div style="text-align: center; padding: 50px; font-family: Arial, sans-serif;">
         <h2 style="color: #dc3545;">System Error</h2>
         <p>An error occurred while loading the application.</p>
         <p>Please refresh the page or contact your administrator.</p>
         <button onclick="window.location.reload()" style="padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">Refresh Page</button>
-      </div>'
-    ).setTitle('System Error');
+      </div>
+    `).setTitle('System Error');
   }
 }
 
@@ -2450,6 +3027,18 @@ function loadRubricData(filterParams) {
         debugLog('Loading rubric data via AJAX', { filterParams });
 
         const { role, year, viewType, filterType, staff } = filterParams;
+        const userContext = createUserContext();
+
+        // Handle Peer Evaluator observation flow
+        if (userContext.role === 'Peer Evaluator' && staff && isValidEmail(staff)) {
+            const staffUser = getUserByEmail(staff);
+            return {
+                success: true,
+                action: 'show_observation_selector',
+                observedEmail: staff,
+                observedName: staffUser ? staffUser.name : 'Unknown Staff'
+            };
+        }
 
         // Handle probationary staff filter (Administrator feature)
         if (filterType === 'probationary') {
@@ -2636,3 +3225,1343 @@ function getMyOwnRubricData() {
         };
     }
 }
+
+
+/**
+ * Gets the list of observations for a user, for the Peer Evaluator flow.
+ * @param {string} observedEmail The email of the staff member being observed.
+ * @returns {Object} A response object with success status and observation list.
+ */
+function getObservationOptions(observedEmail) {
+    try {
+        const userContext = createUserContext();
+        if (userContext.role !== 'Peer Evaluator') {
+            return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
+        }
+
+        const observations = getObservationsForUser(observedEmail);
+        
+        return {
+            success: true,
+            observations: observations,
+            observedEmail: observedEmail
+        };
+    } catch (error) {
+        console.error('Error in getObservationOptions:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Creates a new draft observation for a user, for the Peer Evaluator flow.
+ * @param {string} observedEmail The email of the staff member being observed.
+ * @returns {Object} A response object with success status and the new observation object.
+ */
+function createNewObservationForPeerEvaluator(observedEmail) {
+    try {
+        const userContext = createUserContext();
+        if (userContext.role !== 'Peer Evaluator') {
+            return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
+        }
+
+        const newObservation = createNewObservation(userContext.email, observedEmail);
+        if (!newObservation) {
+            return { success: false, error: 'Failed to create a new observation record.' };
+        }
+        
+        const rubricData = getAllDomainsData(
+            newObservation.observedRole,
+            newObservation.observedYear,
+            'full' // Start with full rubric
+        );
+
+        return { 
+            success: true, 
+            observation: newObservation,
+            rubricData: rubricData
+        };
+
+    } catch (error) {
+        console.error('Error in createNewObservationForPeerEvaluator:', error);
+        return { success: false, error: error.message };
+    }
+}
+```
+
+---
+
+#### 5. `filter-interface.html`
+
+This file's JavaScript has been significantly updated to handle the new observation flow for Peer Evaluators. New UI containers have been added to manage the different views (filters, observation selector, and the rubric editor).
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><?= userContext.role ?> - Select Rubric View</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #4a5568, #2d3748);
+            color: white;
+            padding: 40px 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2rem;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+        
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+        
+        .content {
+            padding: 40px 30px;
+        }
+        
+        .quick-actions {
+            margin-bottom: 40px;
+        }
+        
+        .section-title {
+            color: #4a5568;
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .actions-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+        }
+        
+        .action-card, .observation-card {
+            background: white;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 25px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        
+        .action-card:hover, .observation-card:hover {
+            border-color: #3182ce;
+            background: #f7fafc;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+        }
+
+        .observation-card .action-title { text-align: left; }
+        .observation-card .action-desc { text-align: left; }
+        .observation-card .action-icon { display: none; }
+        
+        .action-icon {
+            font-size: 2.5rem;
+            margin-bottom: 15px;
+            display: block;
+        }
+        
+        .action-title {
+            font-weight: 600;
+            color: #2d3748;
+            font-size: 1.1rem;
+            margin-bottom: 8px;
+        }
+        
+        .action-desc {
+            color: #718096;
+            font-size: 0.95rem;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            border-radius: 9999px;
+            margin-top: 10px;
+        }
+        .status-draft { background-color: #feefc7; color: #8c5d02; }
+        .status-finalized { background-color: #dcfce7; color: #166534; }
+        
+        .custom-filters, .observation-selector {
+            background: #f8fafc;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 30px;
+            display: none;
+        }
+        
+        .filter-row {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .filter-select, .filter-btn {
+            padding: 12px 15px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 1rem;
+            background: white;
+            transition: all 0.3s ease;
+        }
+        
+        .filter-select {
+            flex: 1;
+            min-width: 200px;
+        }
+        
+        .filter-select:focus {
+            outline: none;
+            border-color: #3182ce;
+            box-shadow: 0 0 0 3px rgba(49, 130, 206, 0.1);
+        }
+        
+        .filter-btn {
+            background: #3182ce;
+            color: white;
+            border: 2px solid #3182ce;
+            cursor: pointer;
+            font-weight: 600;
+            min-width: 140px;
+        }
+        
+        .filter-btn:hover:not(:disabled) {
+            background: #2c5aa0;
+            border-color: #2c5aa0;
+        }
+        
+        .filter-btn:disabled {
+            background: #cbd5e0;
+            border-color: #cbd5e0;
+            cursor: not-allowed;
+        }
+        
+        .btn-secondary {
+            background: #6b7280;
+            border-color: #6b7280;
+        }
+        
+        .btn-secondary:hover {
+            background: #4b5563;
+            border-color: #4b5563;
+        }
+        
+        .loading, .error {
+            text-align: center;
+            padding: 40px;
+            margin: 20px 0;
+            border-radius: 12px;
+            display: none;
+        }
+        
+        .loading {
+            background: #f0f9ff;
+            color: #0369a1;
+            border: 2px solid #bae6fd;
+        }
+        
+        .error {
+            background: #fef2f2;
+            color: #dc2626;
+            border: 2px solid #fecaca;
+        }
+        
+        .loading-spinner {
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            border: 3px solid rgba(3, 105, 161, 0.3);
+            border-radius: 50%;
+            border-top-color: #0369a1;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 10px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .filter-status {
+            background: #dbeafe;
+            border: 2px solid #3b82f6;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+            color: #1e40af;
+            font-weight: 500;
+            display: none;
+        }
+        
+        .rubric-container {
+            display: none;
+            margin-top: 30px;
+        }
+        
+        @media (max-width: 768px) {
+            .content {
+                padding: 20px;
+            }
+            
+            .actions-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .filter-row {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .filter-select, .filter-btn {
+                min-width: auto;
+                width: 100%;
+            }
+        }
+
+        /* === COPIED FROM MAIN RUBRIC === */
+        .domain-section {
+            border-bottom: 3px solid #e2e8f0;
+        }
+
+        .domain-header {
+            background: linear-gradient(135deg, #7c9ac5, #5a82b8);
+            color: white;
+            padding: 15px 20px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .component-section {
+            border-bottom: 1px solid #e2e8f0;
+            position: relative;
+        }
+
+        .performance-levels-header {
+            position: sticky;
+            top: 56px;
+            z-index: 40;
+            background: white;
+            border-bottom: 2px solid #e2e8f0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .performance-levels {
+            display: grid;
+            grid-template-columns: 200px 1fr 1fr 1fr 1fr;
+            min-height: 50px;
+        }
+
+        .performance-levels-content {
+            display: grid;
+            grid-template-columns: 200px 1fr 1fr 1fr 1fr;
+            min-height: 120px;
+        }
+
+        .level-header {
+            background: #e2e8f0;
+            padding: 12px;
+            font-weight: 600;
+            text-align: center;
+            border-bottom: 1px solid #cbd5e0;
+            color: #4a5568;
+            font-size: 0.9rem;
+        }
+
+        .level-content {
+            padding: 20px;
+            border-right: 1px solid #e2e8f0;
+            border-bottom: 1px solid #e2e8f0;
+            background: white;
+            color: #4a5568;
+            font-size: 0.9rem;
+        }
+
+        .level-content:last-child {
+            border-right: none;
+        }
+
+        .row-label {
+            background: #64748b;
+            padding: 20px;
+            font-weight: 600;
+            color: white;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+            font-size: 0.9rem;
+        }
+
+        .look-fors-section {
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .look-fors-header {
+            background: linear-gradient(135deg, #3182ce, #2b77cb);
+            color: white;
+            padding: 10px 20px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 600;
+            transition: background 0.3s ease;
+            font-size: 0.85rem;
+        }
+
+        .look-fors-header:hover {
+            background: linear-gradient(135deg, #2b77cb, #2c5aa0);
+        }
+
+        .chevron {
+            transition: transform 0.3s ease;
+            font-size: 1rem;
+        }
+
+        .chevron.expanded {
+            transform: rotate(180deg);
+        }
+
+        .look-fors-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+            background: #f8fafc;
+        }
+
+        .look-fors-content.expanded {
+            max-height: 250px;
+        }
+
+        .look-fors-grid {
+            padding: 12px 20px;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 8px;
+        }
+
+        .look-for-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            padding: 8px 12px;
+            background: white;
+            border-radius: 4px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+            border-left: 3px solid #3182ce;
+        }
+
+        .look-for-item input[type="checkbox"] {
+            margin-top: 2px;
+            transform: scale(1.1);
+            accent-color: #3182ce;
+        }
+
+        .look-for-item label {
+            cursor: pointer;
+            color: #4a5568;
+            font-weight: 500;
+            font-size: 0.85rem;
+            line-height: 1.4;
+        }
+
+        /* Assignment styling */
+        .component-assigned {
+            border-left: 4px solid #10b981;
+            background: #f0fdf4;
+        }
+
+        .component-not-assigned {
+            background: #f8fafc;
+            border-left: 4px solid #e5e7eb;
+        }
+
+        .assignment-indicator {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background: #10b981;
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            font-weight: bold;
+        }
+
+        .assignment-indicator.not-assigned {
+            background: #e5e7eb;
+            color: #6b7280;
+        }
+
+        .assigned-badge {
+            background-color: #dbeafe;
+            color: #1e40af;
+            padding: 0.2em 0.6em;
+            border-radius: 0.25rem;
+            font-size: 0.8em;
+            margin-left: 8px;
+            font-weight: 500;
+            vertical-align: middle;
+            display: inline-block;
+        }
+
+        /* Mobile responsive updates */
+        @media (max-width: 768px) {
+            .performance-levels, .performance-levels-content {
+                grid-template-columns: 1fr;
+                gap: 1px;
+            }
+            
+            .level-header, .row-label, .level-content {
+                border-right: none;
+                padding: 15px;
+            }
+            
+            .level-header {
+                font-size: 0.8rem;
+            }
+            
+            .row-label {
+                font-size: 0.8rem;
+            }
+            
+            .level-content {
+                font-size: 0.8rem;
+            }
+        }
+
+        /* Floating Navigation Widget */
+        .floating-nav {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+            pointer-events: none;
+        }
+
+        .floating-nav.visible {
+            opacity: 1;
+            visibility: visible;
+            pointer-events: auto;
+        }
+
+        .floating-nav-button {
+            background: #3182ce;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 10px 15px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+            min-width: 120px;
+        }
+
+        .floating-nav-button:hover {
+            background: #2c5aa0;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(0,0,0,0.2);
+        }
+
+        .nav-icon {
+            font-size: 1.1rem;
+            line-height: 1;
+        }
+
+        .nav-text {
+            font-size: 0.85rem;
+        }
+
+        .floating-nav-menu {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+            margin-top: 8px;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-10px);
+            transition: all 0.3s ease;
+            min-width: 180px;
+            max-height: 60vh;
+            overflow-y: auto;
+        }
+
+        .floating-nav-menu.open {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .floating-nav-item {
+            display: block;
+            width: 100%;
+            background: none;
+            border: none;
+            padding: 12px 16px;
+            text-align: left;
+            cursor: pointer;
+            font-size: 0.9rem;
+            color: #4a5568;
+            transition: background 0.2s ease;
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+        .floating-nav-item:last-child {
+            border-bottom: none;
+        }
+
+        .floating-nav-item:hover {
+            background: #f8fafc;
+            color: #3182ce;
+        }
+
+        .floating-nav-item:first-child {
+            border-top-left-radius: 8px;
+            border-top-right-radius: 8px;
+        }
+
+        .floating-nav-item:last-child {
+            border-bottom-left-radius: 8px;
+            border-bottom-right-radius: 8px;
+        }
+
+        /* Mobile adjustments */
+        @media (max-width: 768px) {
+            .floating-nav {
+                top: 15px;
+                left: 15px;
+            }
+
+            .floating-nav-button {
+                padding: 8px 12px;
+                min-width: 100px;
+                font-size: 0.8rem;
+            }
+
+            .floating-nav-menu {
+                min-width: 160px;
+                max-height: 50vh;
+            }
+
+            .floating-nav-item {
+                padding: 10px 14px;
+                font-size: 0.85rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>👥 <?= userContext.role ?> Dashboard</h1>
+            <p>Select how you'd like to view rubric information</p>
+        </div>
+        
+        <div class="content">
+            <!-- VIEW: Quick Actions (Default View) -->
+            <div id="quickActionsView">
+                <div class="quick-actions">
+                    <h2 class="section-title">
+                        <span>🎯</span>
+                        Quick Actions
+                    </h2>
+                    
+                    <div class="actions-grid">
+                        <!-- Administrator Only Actions -->
+                        <? if (userContext.specialRoleType === 'administrator') { ?>
+                        <div class="action-card" onclick="loadProbationaryView()">
+                            <span class="action-icon">👨‍🏫</span>
+                            <div class="action-title">Probationary Staff</div>
+                            <div class="action-desc">View all staff members in probationary status</div>
+                        </div>
+                        <? } ?>
+                        
+                        <!-- Peer Evaluator and Full Access Actions -->
+                        <? if (userContext.specialRoleType === 'peer_evaluator' || userContext.specialRoleType === 'full_access') { ?>
+                        <div class="action-card" onclick="showCustomFilters()">
+                            <span class="action-icon">🔍</span>
+                            <div class="action-title">Find Staff & Start Observation</div>
+                            <div class="action-desc">Filter by role, year, or specific staff member</div>
+                        </div>
+                        
+                        <div class="action-card" onclick="loadMyOwnView()">
+                            <span class="action-icon">📋</span>
+                            <div class="action-title">My Own Rubric</div>
+                            <div class="action-desc">View your personal assigned areas</div>
+                        </div>
+                        <? } ?>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW: Custom Filters -->
+            <div class="custom-filters" id="customFiltersView">
+                <h2 class="section-title">
+                    <span>🔍</span>
+                    Find Staff Member
+                </h2>
+                
+                <div class="filter-row">
+                    <select id="roleSelect" class="filter-select" onchange="handleRoleChange()">
+                        <option value="">1. Select Role...</option>
+                        <? for (var i = 0; i < availableRoles.length; i++) { ?>
+                        <option value="<?= availableRoles[i] ?>"><?= availableRoles[i] ?></option>
+                        <? } ?>
+                    </select>
+                </div>
+                
+                <div class="filter-row">
+                    <select id="yearSelect" class="filter-select" style="display: none;" onchange="handleYearChange()">
+                        <option value="">2. Select Year...</option>
+                        <option value="1">Year 1</option>
+                        <option value="2">Year 2</option>
+                        <option value="3">Year 3</option>
+                        <option value="Probationary">Probationary</option>
+                    </select>
+                </div>
+                
+                <div class="filter-row">
+                    <select id="staffSelect" class="filter-select" style="display: none;" onchange="handleStaffChange()">
+                        <option value="">3. Select Staff Member...</option>
+                    </select>
+                </div>
+                
+                <div class="filter-row">
+                    <button class="filter-btn" id="loadBtn" onclick="loadSelectedView()" disabled>
+                        📖 Select Staff
+                    </button>
+                    <button class="filter-btn btn-secondary" onclick="clearFilters()">
+                        🗑️ Clear & Go Back
+                    </button>
+                </div>
+            </div>
+
+            <!-- VIEW: Observation Selector -->
+            <div class="observation-selector" id="observationSelectorView">
+                 <!-- Content generated by JS -->
+            </div>
+            
+            <!-- Status and Loading Indicators -->
+            <div class="loading" id="loading">
+                <div class="loading-spinner"></div>
+                Loading...
+            </div>
+            
+            <div class="error" id="error">
+                <div id="errorMessage"></div>
+                <button class="filter-btn btn-secondary" onclick="hideError()" style="margin-top: 15px;">
+                    Dismiss
+                </button>
+            </div>
+            
+            <div class="filter-status" id="filterStatus">
+                <strong>Currently Viewing:</strong> <span id="filterStatusText"></span>
+            </div>
+            
+            <!-- VIEW: Rubric Content / Editor -->
+            <div class="rubric-container" id="rubricContainer">
+                <!-- Rubric content will be loaded here via JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Floating Navigation Widget Functions
+        let floatingNavOpen = false;
+
+        function toggleFloatingNav() {
+            const menu = document.getElementById('floatingNavMenu');
+            if (menu) {
+                floatingNavOpen = !floatingNavOpen;
+                if (floatingNavOpen) {
+                    menu.classList.add('open');
+                } else {
+                    menu.classList.remove('open');
+                }
+            }
+        }
+
+        function closeFloatingNav() {
+            const menu = document.getElementById('floatingNavMenu');
+            if (menu) {
+                menu.classList.remove('open');
+                floatingNavOpen = false;
+            }
+        }
+
+        function scrollToDomain(domainIdx) {
+            const element = document.getElementById('domain-' + domainIdx);
+            if (element) {
+                let offset = 0;
+                const header = document.querySelector('.header');
+                if (header && getComputedStyle(header).position === 'sticky') {
+                    offset = header.offsetHeight;
+                }
+
+                const bodyRect = document.body.getBoundingClientRect().top;
+                const elementRect = element.getBoundingClientRect().top;
+                const elementPosition = elementRect - bodyRect;
+                const offsetPosition = elementPosition - offset;
+
+                window.scrollTo({
+                    top: offsetPosition,
+                    behavior: 'smooth'
+                });
+                closeFloatingNav();
+            }
+        }
+
+        document.addEventListener('click', function(e) {
+            const floatingNav = document.getElementById('floatingNav');
+            if (floatingNav && !floatingNav.contains(e.target)) {
+                closeFloatingNav();
+            }
+        });
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeFloatingNav();
+            }
+        });
+
+        function populateFloatingNavMenu(rubricData) {
+            const menu = document.getElementById('floatingNavMenu');
+            if (!menu) {
+                console.error('Floating nav menu element not found.');
+                return;
+            }
+            menu.innerHTML = '';
+
+            if (rubricData && rubricData.domains && rubricData.domains.length > 0) {
+                rubricData.domains.forEach(function(domain, index) {
+                    const item = document.createElement('button');
+                    item.className = 'floating-nav-item';
+                    let domainNumberDisplay = `Domain ${index + 1}`;
+                    if (domain.number) {
+                        domainNumberDisplay = `Domain ${domain.number}`;
+                    } else {
+                        const nameMatch = domain.name ? domain.name.match(/^Domain\s*(\d+)/i) : null;
+                        if (nameMatch && nameMatch[1]) {
+                            domainNumberDisplay = `Domain ${nameMatch[1]}`;
+                        }
+                    }
+                    item.textContent = `${domainNumberDisplay}: ${domain.name.replace(/^Domain\s*\d+:\s*/i, '')}`;
+                    item.onclick = function() { scrollToDomain(index); };
+                    menu.appendChild(item);
+                });
+            } else {
+                const noDomainsItem = document.createElement('div');
+                noDomainsItem.className = 'floating-nav-item';
+                noDomainsItem.textContent = 'No domains loaded.';
+                noDomainsItem.style.textAlign = 'center';
+                noDomainsItem.style.cursor = 'default';
+                menu.appendChild(noDomainsItem);
+            }
+        }
+
+        // Global state
+        let currentFilters = {
+            role: null,
+            year: null,
+            staff: null,
+            viewType: 'full'
+        };
+
+        // --- View Management ---
+        function showView(viewId) {
+            ['quickActionsView', 'customFiltersView', 'observationSelectorView', 'rubricContainer'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.style.display = 'none';
+            });
+            const viewToShow = document.getElementById(viewId);
+            if(viewToShow) viewToShow.style.display = 'block';
+        }
+
+        // --- Quick Action Handlers ---
+        function loadProbationaryView() {
+            showLoading('Loading probationary staff...');
+            currentFilters = { filterType: 'probationary' };
+            google.script.run
+                .withSuccessHandler(handleRubricData)
+                .withFailureHandler(handleError)
+                .loadRubricData(currentFilters);
+        }
+
+        function loadMyOwnView() {
+            showLoading('Loading your assigned areas...');
+            google.script.run
+                .withSuccessHandler(handleRubricData)
+                .withFailureHandler(handleError)
+                .getMyOwnRubricData();
+        }
+
+        function showCustomFilters() {
+            showView('customFiltersView');
+            document.getElementById('customFiltersView').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        // --- Filter Handlers ---
+        function handleRoleChange() {
+            const roleSelect = document.getElementById('roleSelect');
+            const yearSelect = document.getElementById('yearSelect');
+            const staffSelect = document.getElementById('staffSelect');
+            const loadBtn = document.getElementById('loadBtn');
+            
+            currentFilters.role = roleSelect.value;
+            currentFilters.year = null;
+            currentFilters.staff = null;
+            
+            yearSelect.value = '';
+            staffSelect.value = '';
+            staffSelect.style.display = 'none';
+            
+            if (roleSelect.value) {
+                yearSelect.style.display = 'block';
+            } else {
+                yearSelect.style.display = 'none';
+                loadBtn.disabled = true;
+            }
+        }
+
+        function handleYearChange() {
+            const yearSelect = document.getElementById('yearSelect');
+            const staffSelect = document.getElementById('staffSelect');
+            
+            currentFilters.year = yearSelect.value;
+            currentFilters.staff = null;
+            staffSelect.value = '';
+            
+            if (yearSelect.value) {
+                staffSelect.style.display = 'block';
+                loadStaffOptions();
+            } else {
+                staffSelect.style.display = 'none';
+                document.getElementById('loadBtn').disabled = true;
+            }
+        }
+
+        function handleStaffChange() {
+            const staffSelect = document.getElementById('staffSelect');
+            currentFilters.staff = staffSelect.value;
+            document.getElementById('loadBtn').disabled = !staffSelect.value;
+        }
+
+        function loadStaffOptions() {
+            const staffSelect = document.getElementById('staffSelect');
+            staffSelect.innerHTML = '<option value="">Loading staff...</option>';
+            staffSelect.disabled = true;
+            
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    populateStaffDropdown(result);
+                    staffSelect.disabled = false;
+                })
+                .withFailureHandler(function(error) {
+                    console.error('Error loading staff:', error);
+                    staffSelect.innerHTML = '<option value="">Error loading staff</option>';
+                    staffSelect.disabled = false;
+                    showError('Failed to load staff list: ' + (error.message || error));
+                })
+                .getStaffForFilters(currentFilters.role, currentFilters.year);
+        }
+
+        function loadSelectedView() {
+            if (!currentFilters.staff) return;
+            showLoading('Loading...');
+            google.script.run
+                .withSuccessHandler(handleRubricData)
+                .withFailureHandler(handleError)
+                .loadRubricData(currentFilters);
+        }
+
+        function clearFilters() {
+            document.getElementById('roleSelect').value = '';
+            document.getElementById('yearSelect').value = '';
+            document.getElementById('staffSelect').value = '';
+            document.getElementById('yearSelect').style.display = 'none';
+            document.getElementById('staffSelect').style.display = 'none';
+            document.getElementById('loadBtn').disabled = true;
+            
+            showView('quickActionsView');
+            hideError();
+            hideLoading();
+            document.getElementById('filterStatus').style.display = 'none';
+
+            currentFilters = { role: null, year: null, staff: null, viewType: 'full' };
+        }
+
+        function populateStaffDropdown(result) {
+            const staffSelect = document.getElementById('staffSelect');
+            
+            if (!result.success) {
+                staffSelect.innerHTML = '<option value="">Error: ' + result.error + '</option>';
+                return;
+            }
+            
+            staffSelect.innerHTML = '<option value="">3. Select Staff Member...</option>';
+            
+            if (result.staff && result.staff.length > 0) {
+                result.staff.forEach(function(staff) {
+                    if (staff.email && staff.name) {
+                        const option = document.createElement('option');
+                        option.value = staff.email;
+                        option.textContent = staff.displayText || `${staff.name} (${staff.role}, Year ${staff.year})`;
+                        staffSelect.appendChild(option);
+                    }
+                });
+            } else {
+                const noStaffOption = document.createElement('option');
+                noStaffOption.value = '';
+                noStaffOption.textContent = 'No staff found for this selection';
+                noStaffOption.disabled = true;
+                staffSelect.appendChild(noStaffOption);
+            }
+        }
+
+        // --- Observation Flow Handlers ---
+        function displayObservationOptions(observedEmail, observedName) {
+            showLoading(`Loading observation options for ${observedName}...`);
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    hideLoading();
+                    if (!result.success) {
+                        showError(result.error);
+                        return;
+                    }
+                    
+                    const container = document.getElementById('observationSelectorView');
+                    container.innerHTML = `
+                        <h2 class="section-title">
+                            <span>📝</span>
+                            Observations for ${observedName}
+                        </h2>
+                        <div class="actions-grid" id="observationList">
+                            <div class="action-card" onclick="handleNewObservation('${observedEmail}')">
+                                <span class="action-icon">➕</span>
+                                <div class="action-title">Start New Observation</div>
+                                <div class="action-desc">Begin a new observation for this staff member.</div>
+                            </div>
+                        </div>
+                        <div style="margin-top: 20px;">
+                            <button class="filter-btn btn-secondary" onclick="showView('customFiltersView')">Back to Filters</button>
+                        </div>
+                    `;
+
+                    const list = document.getElementById('observationList');
+                    if(result.observations && result.observations.length > 0) {
+                        result.observations.forEach(obs => {
+                            const date = new Date(obs.createdAt).toLocaleDateString();
+                            const card = document.createElement('div');
+                            card.className = 'observation-card';
+                            // In a future step, this onclick would load the editor with this observation's data
+                            card.onclick = () => alert('Editing observation ' + obs.observationId + ' is not yet implemented.');
+                            card.innerHTML = `
+                                <div class="action-title">${obs.status} Observation</div>
+                                <div class="action-desc">Created on ${date}</div>
+                                <div class="status-badge ${obs.status === 'Draft' ? 'status-draft' : 'status-finalized'}">
+                                    ${obs.status}
+                                </div>
+                            `;
+                            list.appendChild(card);
+                        });
+                    }
+
+                    showView('observationSelectorView');
+                })
+                .withFailureHandler(handleError)
+                .getObservationOptions(observedEmail);
+        }
+
+        function handleNewObservation(observedEmail) {
+            showLoading(`Creating new observation draft...`);
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    hideLoading();
+                    if (!result.success) {
+                        showError(result.error);
+                        return;
+                    }
+                    renderObservationEditor(result.observation, result.rubricData);
+                })
+                .withFailureHandler(handleError)
+                .createNewObservationForPeerEvaluator(observedEmail);
+        }
+
+        function renderObservationEditor(observation, rubricData) {
+            updateFilterStatus({ data: { filterContext: { isStaffView: true, staffName: observation.observedName, staffRole: observation.observedRole, staffYear: observation.observedYear } } }, `Observation Draft (ID: ${observation.observationId})`);
+            
+            // For now, just render the standard rubric. It will be made interactive later.
+            const rubricHtml = generateStandardRubricHtml(rubricData);
+            document.getElementById('rubricContainer').innerHTML = rubricHtml;
+            
+            showView('rubricContainer');
+        }
+
+        // --- Main Data Handler ---
+        function handleRubricData(result) {
+            hideLoading();
+            
+            if (!result.success) {
+                showError(result.error || 'Failed to load data');
+                return;
+            }
+
+            if (result.action === 'show_observation_selector') {
+                displayObservationOptions(result.observedEmail, result.observedName);
+                return;
+            }
+            
+            updateFilterStatus(result);
+            
+            const rubricHtml = generateRubricHtml(result.data);
+            document.getElementById('rubricContainer').innerHTML = rubricHtml;
+            showView('rubricContainer');
+            
+            document.getElementById('rubricContainer').scrollIntoView({ behavior: 'smooth' });
+
+            if (result.data && !result.data.isProbationaryView) {
+                populateFloatingNavMenu(result.data);
+            } else {
+                const menu = document.getElementById('floatingNavMenu');
+                if (menu) menu.innerHTML = '<div class="floating-nav-item" style="text-align:center; cursor:default;">N/A</div>';
+            }
+        }
+
+        function handleError(error) {
+            console.error('AJAX Error:', error);
+            hideLoading();
+            let errorMessage = (error && error.message) ? error.message : 'An unknown error occurred.';
+            showError(errorMessage);
+        }
+
+        function updateFilterStatus(result, customTitle) {
+            const status = document.getElementById('filterStatus');
+            const statusText = document.getElementById('filterStatusText');
+            
+            let text = '';
+            if (customTitle) {
+                text = customTitle;
+            } else if (result.data && result.data.filterContext) {
+                const fc = result.data.filterContext;
+                if (fc.isOwnView) text = `Your Assigned Areas (${fc.role}, Year ${fc.year})`;
+                else if (fc.isStaffView) text = `${fc.staffName} (${fc.staffRole}, Year ${fc.staffYear})`;
+                else if (fc.role && fc.year) text = `${fc.role} - Year ${fc.year} (${fc.viewType === 'assigned' ? 'Assigned' : 'Full Rubric'})`;
+                else if (fc.role) text = `${fc.role} (Full Rubric)`;
+            } else if (result.data && result.data.isProbationaryView) {
+                text = `Probationary Staff (${result.data.staff.length} staff members)`;
+            }
+            
+            if (text) {
+                statusText.textContent = text;
+                status.style.display = 'block';
+            } else {
+                status.style.display = 'none';
+            }
+        }
+
+        function generateRubricHtml(rubricData) {
+            if (rubricData.isProbationaryView) {
+                return generateProbationaryStaffHtml(rubricData);
+            }
+            return generateStandardRubricHtml(rubricData);
+        }
+
+        function generateProbationaryStaffHtml(data) {
+            const probationaryYear = <?= userContext.probationaryYearValue ?>;
+            let html = `
+                <div style="background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
+                    <div style="background: linear-gradient(135deg, #dc2626, #b91c1c); color: white; padding: 30px; text-align: center;">
+                        <h2 style="margin: 0; font-size: 1.8rem;">📋 ${data.title}</h2>
+                        <p style="margin: 10px 0 0 0; opacity: 0.9;">${data.subtitle}</p>
+                    </div>
+                    <div style="padding: 30px;">`;
+            
+            if (data.staff && data.staff.length > 0) {
+                html += '<div style="display: grid; gap: 15px;">';
+                data.staff.forEach(function(staff) {
+                    const onclickAttribute = `onclick="loadStaffMemberRubric('${staff.email}', '${staff.role}', ${staff.year})"`;
+                    html += `
+                        <div style="background: #fef2f2; border: 2px solid #fecaca; border-radius: 8px; padding: 20px; cursor: pointer;" ${onclickAttribute}>
+                            <h4 style="margin: 0 0 10px 0; color: #dc2626; font-size: 1.1rem;">${staff.name || 'Unknown Name'}</h4>
+                            <div style="color: #7f1d1d; font-size: 0.95rem;">
+                                <div><strong>Email:</strong> ${staff.email || 'No email'}</div>
+                                <div><strong>Role:</strong> ${staff.role || 'Unknown Role'}</div>
+                                <div><strong>Year:</strong> ${staff.year === probationaryYear ? 'Probationary' : (staff.year || 'Unknown Year')}</div>
+                            </div>
+                        </div>`;
+                });
+                html += '</div>';
+            } else {
+                html += `
+                    <div style="text-align: center; padding: 40px; color: #059669;">
+                        <div style="font-size: 3rem; margin-bottom: 15px;">🎉</div>
+                        <h3 style="color: #065f46; margin-bottom: 10px;">Great News!</h3>
+                        <p style="color: #047857;">No staff members are currently in probationary status.</p>
+                    </div>`;
+            }
+            
+            html += '</div></div>';
+            return html;
+        }
+
+        function generateStandardRubricHtml(rubricData) {
+            let html = `
+                <div style="background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
+                    <div style="background: linear-gradient(135deg, #4a5568, #2d3748); color: white; padding: 30px; text-align: center;">
+                        <h2 style="margin: 0; font-size: 1.8rem;">${rubricData.title}</h2>
+                        <p style="margin: 10px 0 0 0; opacity: 0.9;">${rubricData.subtitle}</p>
+                    </div>
+                    <div style="padding: 0;">`;
+            
+            if (rubricData.domains && rubricData.domains.length > 0) {
+                rubricData.domains.forEach(function(domain, domainIndex) {
+                    html += `
+                        <div class="domain-section" id="domain-${domainIndex}">
+                            <div class="domain-header">${domain.name}</div>
+                            <div class="performance-levels-header">
+                                <div class="performance-levels">
+                                    <div class="level-header"></div>
+                                    <div class="level-header">Developing</div>
+                                    <div class="level-header">Basic</div>
+                                    <div class="level-header">Proficient</div>
+                                    <div class="level-header">Distinguished</div>
+                                </div>
+                            </div>`;
+                    
+                    if (domain.components && domain.components.length > 0) {
+                        domain.components.forEach(function(component, componentIndex) {
+                            html += `
+                                <div class="component-section" data-component-id="${component.componentId || ''}">
+                                    <div class="performance-levels-content">
+                                        <div class="row-label">${component.title}</div>
+                                        <div class="level-content">${component.developing || ''}</div>
+                                        <div class="level-content">${component.basic || ''}</div>
+                                        <div class="level-content">${component.proficient || ''}</div>
+                                        <div class="level-content">${component.distinguished || ''}</div>
+                                    </div>
+                                    ${component.bestPractices && component.bestPractices.length > 0 ? `
+                                    <div class="look-fors-section">
+                                        <div class="look-fors-header" onclick="toggleLookFors('domain-${domainIndex}-component-${componentIndex}')">
+                                            <span>Best Practices</span>
+                                            <span class="chevron" id="chevron-${domainIndex}-${componentIndex}">▼</span>
+                                        </div>
+                                        <div class="look-fors-content" id="lookForsContent-${domainIndex}-${componentIndex}">
+                                            <div class="look-fors-grid">
+                                                ${component.bestPractices.map((p, pIdx) => `<div class="look-for-item"><input type="checkbox" id="p-${domainIndex}-${componentIndex}-${pIdx}"><label for="p-${domainIndex}-${componentIndex}-${pIdx}">${p}</label></div>`).join('')}
+                                            </div>
+                                        </div>
+                                    </div>` : ''}
+                                </div>`;
+                        });
+                    }
+                    html += '</div>';
+                });
+            }
+            html += `</div></div>`;
+            return html;
+        }
+
+        // --- UI Helper Functions ---
+        function showLoading(message = 'Loading...') {
+            const loading = document.getElementById('loading');
+            loading.innerHTML = `<div class="loading-spinner"></div>${message}`;
+            loading.style.display = 'block';
+            hideError();
+        }
+
+        function hideLoading() {
+            document.getElementById('loading').style.display = 'none';
+        }
+
+        function showError(message) {
+            document.getElementById('errorMessage').textContent = message;
+            document.getElementById('error').style.display = 'block';
+            hideLoading();
+        }
+
+        function hideError() {
+            document.getElementById('error').style.display = 'none';
+        }
+
+        function loadStaffMemberRubric(email, role, year) {
+            showLoading(`Loading ${role} rubric...`);
+            google.script.run
+                .withSuccessHandler(handleRubricData)
+                .withFailureHandler(handleError)
+                .loadRubricData({ staff: email });
+        }
+
+        function toggleLookFors(componentId) {
+            const parts = componentId.split('-');
+            const content = document.getElementById(`lookForsContent-${parts[1]}-${parts[3]}`);
+            const chevron = document.getElementById(`chevron-${parts[1]}-${parts[3]}`);
+            if (content && chevron) {
+                content.classList.toggle('expanded');
+                chevron.classList.toggle('expanded');
+            }
+        }
+
+        // --- Initialization ---
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Filter interface loaded successfully!');
+            showView('quickActionsView');
+        });
+    </script>
+</body>
+</html>
+```

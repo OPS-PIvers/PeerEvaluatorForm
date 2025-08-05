@@ -69,7 +69,7 @@
             gap: 20px;
         }
         
-        .action-card {
+        .action-card, .observation-card {
             background: white;
             border: 2px solid #e2e8f0;
             border-radius: 12px;
@@ -80,12 +80,16 @@
             position: relative;
         }
         
-        .action-card:hover {
+        .action-card:hover, .observation-card:hover {
             border-color: #3182ce;
             background: #f7fafc;
             transform: translateY(-2px);
             box-shadow: 0 8px 25px rgba(0,0,0,0.1);
         }
+
+        .observation-card .action-title { text-align: left; }
+        .observation-card .action-desc { text-align: left; }
+        .observation-card .action-icon { display: none; }
         
         .action-icon {
             font-size: 2.5rem;
@@ -104,8 +108,19 @@
             color: #718096;
             font-size: 0.95rem;
         }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            border-radius: 9999px;
+            margin-top: 10px;
+        }
+        .status-draft { background-color: #feefc7; color: #8c5d02; }
+        .status-finalized { background-color: #dcfce7; color: #166534; }
         
-        .custom-filters {
+        .custom-filters, .observation-selector {
             background: #f8fafc;
             border: 2px solid #e2e8f0;
             border-radius: 12px;
@@ -601,45 +616,47 @@
         </div>
         
         <div class="content">
-            <!-- Quick Actions Section -->
-            <div class="quick-actions">
-                <h2 class="section-title">
-                    <span>🎯</span>
-                    Quick Actions
-                </h2>
-                
-                <div class="actions-grid">
-                    <!-- Administrator Only Actions -->
-                    <? if (userContext.specialRoleType === 'administrator') { ?>
-                    <div class="action-card" onclick="loadProbationaryView()">
-                        <span class="action-icon">👨‍🏫</span>
-                        <div class="action-title">Probationary Staff</div>
-                        <div class="action-desc">View all staff members in probationary status</div>
-                    </div>
-                    <? } ?>
+            <!-- VIEW: Quick Actions (Default View) -->
+            <div id="quickActionsView">
+                <div class="quick-actions">
+                    <h2 class="section-title">
+                        <span>🎯</span>
+                        Quick Actions
+                    </h2>
                     
-                    <!-- Peer Evaluator and Full Access Actions -->
-                    <? if (userContext.specialRoleType === 'peer_evaluator' || userContext.specialRoleType === 'full_access') { ?>
-                    <div class="action-card" onclick="showCustomFilters()">
-                        <span class="action-icon">🔍</span>
-                        <div class="action-title">Custom Filters</div>
-                        <div class="action-desc">Filter by role, year, or specific staff member</div>
+                    <div class="actions-grid">
+                        <!-- Administrator Only Actions -->
+                        <? if (userContext.specialRoleType === 'administrator') { ?>
+                        <div class="action-card" onclick="loadProbationaryView()">
+                            <span class="action-icon">👨‍🏫</span>
+                            <div class="action-title">Probationary Staff</div>
+                            <div class="action-desc">View all staff members in probationary status</div>
+                        </div>
+                        <? } ?>
+                        
+                        <!-- Peer Evaluator and Full Access Actions -->
+                        <? if (userContext.specialRoleType === 'peer_evaluator' || userContext.specialRoleType === 'full_access') { ?>
+                        <div class="action-card" onclick="showCustomFilters()">
+                            <span class="action-icon">🔍</span>
+                            <div class="action-title">Find Staff & Start Observation</div>
+                            <div class="action-desc">Filter by role, year, or specific staff member</div>
+                        </div>
+                        
+                        <div class="action-card" onclick="loadMyOwnView()">
+                            <span class="action-icon">📋</span>
+                            <div class="action-title">My Own Rubric</div>
+                            <div class="action-desc">View your personal assigned areas</div>
+                        </div>
+                        <? } ?>
                     </div>
-                    
-                    <div class="action-card" onclick="loadMyOwnView()">
-                        <span class="action-icon">📋</span>
-                        <div class="action-title">My Own Rubric</div>
-                        <div class="action-desc">View your personal assigned areas</div>
-                    </div>
-                    <? } ?>
                 </div>
             </div>
-            
-            <!-- Custom Filters Section -->
-            <div class="custom-filters" id="customFilters">
+
+            <!-- VIEW: Custom Filters -->
+            <div class="custom-filters" id="customFiltersView">
                 <h2 class="section-title">
                     <span>🔍</span>
-                    Custom Filtering
+                    Find Staff Member
                 </h2>
                 
                 <div class="filter-row">
@@ -653,7 +670,7 @@
                 
                 <div class="filter-row">
                     <select id="yearSelect" class="filter-select" style="display: none;" onchange="handleYearChange()">
-                        <option value="">2. Select Year (Optional)...</option>
+                        <option value="">2. Select Year...</option>
                         <option value="1">Year 1</option>
                         <option value="2">Year 2</option>
                         <option value="3">Year 3</option>
@@ -663,24 +680,29 @@
                 
                 <div class="filter-row">
                     <select id="staffSelect" class="filter-select" style="display: none;" onchange="handleStaffChange()">
-                        <option value="">3. Select Staff Member (Optional)...</option>
+                        <option value="">3. Select Staff Member...</option>
                     </select>
                 </div>
                 
                 <div class="filter-row">
                     <button class="filter-btn" id="loadBtn" onclick="loadSelectedView()" disabled>
-                        📖 Load Rubric
+                        📖 Select Staff
                     </button>
                     <button class="filter-btn btn-secondary" onclick="clearFilters()">
-                        🗑️ Clear All
+                        🗑️ Clear & Go Back
                     </button>
                 </div>
             </div>
+
+            <!-- VIEW: Observation Selector -->
+            <div class="observation-selector" id="observationSelectorView">
+                 <!-- Content generated by JS -->
+            </div>
             
-            <!-- Status and Loading -->
+            <!-- Status and Loading Indicators -->
             <div class="loading" id="loading">
                 <div class="loading-spinner"></div>
-                Loading rubric data...
+                Loading...
             </div>
             
             <div class="error" id="error">
@@ -694,7 +716,7 @@
                 <strong>Currently Viewing:</strong> <span id="filterStatusText"></span>
             </div>
             
-            <!-- Rubric Content -->
+            <!-- VIEW: Rubric Content / Editor -->
             <div class="rubric-container" id="rubricContainer">
                 <!-- Rubric content will be loaded here via JavaScript -->
             </div>
@@ -728,9 +750,8 @@
         function scrollToDomain(domainIdx) {
             const element = document.getElementById('domain-' + domainIdx);
             if (element) {
-                // Adjust for sticky header if present and visible
                 let offset = 0;
-                const header = document.querySelector('.header'); // Or any other sticky element
+                const header = document.querySelector('.header');
                 if (header && getComputedStyle(header).position === 'sticky') {
                     offset = header.offsetHeight;
                 }
@@ -744,20 +765,17 @@
                     top: offsetPosition,
                     behavior: 'smooth'
                 });
-                closeFloatingNav(); // Close nav after scrolling
+                closeFloatingNav();
             }
         }
 
-        // Close floating nav when clicking outside
         document.addEventListener('click', function(e) {
             const floatingNav = document.getElementById('floatingNav');
-            // Check if the click is outside the floatingNav and not on the toggle button itself
             if (floatingNav && !floatingNav.contains(e.target)) {
                 closeFloatingNav();
             }
         });
 
-        // Close floating nav when pressing Escape
         document.addEventListener('keydown', function(e) {
             if (e.key === 'Escape') {
                 closeFloatingNav();
@@ -770,17 +788,13 @@
                 console.error('Floating nav menu element not found.');
                 return;
             }
-
-            // Clear existing items
             menu.innerHTML = '';
 
             if (rubricData && rubricData.domains && rubricData.domains.length > 0) {
                 rubricData.domains.forEach(function(domain, index) {
                     const item = document.createElement('button');
                     item.className = 'floating-nav-item';
-                    // Attempt to get domain number from domain.name if domain.number is not directly available
-                    // This is an assumption based on typical naming like "Domain 1: Teaching..."
-                    let domainNumberDisplay = `Domain ${index + 1}`; // Fallback
+                    let domainNumberDisplay = `Domain ${index + 1}`;
                     if (domain.number) {
                         domainNumberDisplay = `Domain ${domain.number}`;
                     } else {
@@ -789,15 +803,11 @@
                             domainNumberDisplay = `Domain ${nameMatch[1]}`;
                         }
                     }
-                    item.textContent = `${domainNumberDisplay}: ${domain.name.replace(/^Domain\s*\d+:\s*/i, '')}`; // Display name without "Domain X:" prefix
-                    item.onclick = function() {
-                        scrollToDomain(index);
-                        // closeFloatingNav(); // closeFloatingNav is already called within scrollToDomain
-                    };
+                    item.textContent = `${domainNumberDisplay}: ${domain.name.replace(/^Domain\s*\d+:\s*/i, '')}`;
+                    item.onclick = function() { scrollToDomain(index); };
                     menu.appendChild(item);
                 });
             } else {
-                // Optionally, add a message if there are no domains
                 const noDomainsItem = document.createElement('div');
                 noDomainsItem.className = 'floating-nav-item';
                 noDomainsItem.textContent = 'No domains loaded.';
@@ -815,31 +825,28 @@
             viewType: 'full'
         };
 
-        // Quick Action Handlers
+        // --- View Management ---
+        function showView(viewId) {
+            ['quickActionsView', 'customFiltersView', 'observationSelectorView', 'rubricContainer'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.style.display = 'none';
+            });
+            const viewToShow = document.getElementById(viewId);
+            if(viewToShow) viewToShow.style.display = 'block';
+        }
+
+        // --- Quick Action Handlers ---
         function loadProbationaryView() {
             showLoading('Loading probationary staff...');
-            currentFilters = { 
-                role: null, 
-                year: null, 
-                staff: null, 
-                viewType: 'probationary' 
-            };
-            
+            currentFilters = { filterType: 'probationary' };
             google.script.run
                 .withSuccessHandler(handleRubricData)
                 .withFailureHandler(handleError)
-                .loadRubricData({ filterType: 'probationary' });
+                .loadRubricData(currentFilters);
         }
 
         function loadMyOwnView() {
             showLoading('Loading your assigned areas...');
-            currentFilters = { 
-                role: '<?= userContext.role ?>', 
-                year: <?= userContext.year || 1 ?>, 
-                staff: null, 
-                viewType: 'assigned' 
-            };
-            
             google.script.run
                 .withSuccessHandler(handleRubricData)
                 .withFailureHandler(handleError)
@@ -847,14 +854,11 @@
         }
 
         function showCustomFilters() {
-            document.getElementById('customFilters').style.display = 'block';
-            document.getElementById('customFilters').scrollIntoView({ 
-                behavior: 'smooth', 
-                block: 'start' 
-            });
+            showView('customFiltersView');
+            document.getElementById('customFiltersView').scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
 
-        // Filter Handlers
+        // --- Filter Handlers ---
         function handleRoleChange() {
             const roleSelect = document.getElementById('roleSelect');
             const yearSelect = document.getElementById('yearSelect');
@@ -865,16 +869,12 @@
             currentFilters.year = null;
             currentFilters.staff = null;
             
-            // Reset dependent dropdowns
             yearSelect.value = '';
             staffSelect.value = '';
             staffSelect.style.display = 'none';
             
             if (roleSelect.value) {
                 yearSelect.style.display = 'block';
-                loadBtn.disabled = false;
-                loadBtn.textContent = '📖 Load Full Rubric';
-                currentFilters.viewType = 'full';
             } else {
                 yearSelect.style.display = 'none';
                 loadBtn.disabled = true;
@@ -884,7 +884,6 @@
         function handleYearChange() {
             const yearSelect = document.getElementById('yearSelect');
             const staffSelect = document.getElementById('staffSelect');
-            const loadBtn = document.getElementById('loadBtn');
             
             currentFilters.year = yearSelect.value;
             currentFilters.staff = null;
@@ -892,21 +891,17 @@
             
             if (yearSelect.value) {
                 staffSelect.style.display = 'block';
-                loadBtn.textContent = '📋 Load Assigned Areas';
-                currentFilters.viewType = 'assigned';
-                
-                // Load staff for this role/year combination
                 loadStaffOptions();
             } else {
                 staffSelect.style.display = 'none';
-                loadBtn.textContent = '📖 Load Full Rubric';
-                currentFilters.viewType = 'full';
+                document.getElementById('loadBtn').disabled = true;
             }
         }
 
         function handleStaffChange() {
             const staffSelect = document.getElementById('staffSelect');
             currentFilters.staff = staffSelect.value;
+            document.getElementById('loadBtn').disabled = !staffSelect.value;
         }
 
         function loadStaffOptions() {
@@ -929,10 +924,8 @@
         }
 
         function loadSelectedView() {
-            if (!currentFilters.role) return;
-            
-            showLoading('Loading rubric data...');
-            
+            if (!currentFilters.staff) return;
+            showLoading('Loading...');
             google.script.run
                 .withSuccessHandler(handleRubricData)
                 .withFailureHandler(handleError)
@@ -940,7 +933,6 @@
         }
 
         function clearFilters() {
-            // Reset all form elements
             document.getElementById('roleSelect').value = '';
             document.getElementById('yearSelect').value = '';
             document.getElementById('staffSelect').value = '';
@@ -948,14 +940,12 @@
             document.getElementById('staffSelect').style.display = 'none';
             document.getElementById('loadBtn').disabled = true;
             
-            // Hide results
-            document.getElementById('rubricContainer').style.display = 'none';
+            showView('quickActionsView');
+            hideError();
+            hideLoading();
             document.getElementById('filterStatus').style.display = 'none';
-            
-            // Reset state
+
             currentFilters = { role: null, year: null, staff: null, viewType: 'full' };
-            
-            console.log('Filters cleared');
         }
 
         function populateStaffDropdown(result) {
@@ -966,7 +956,7 @@
                 return;
             }
             
-            staffSelect.innerHTML = '<option value="">3. Select Staff Member (Optional)...</option>';
+            staffSelect.innerHTML = '<option value="">3. Select Staff Member...</option>';
             
             if (result.staff && result.staff.length > 0) {
                 result.staff.forEach(function(staff) {
@@ -977,7 +967,6 @@
                         staffSelect.appendChild(option);
                     }
                 });
-                console.log(`Loaded ${result.staff.length} staff members`);
             } else {
                 const noStaffOption = document.createElement('option');
                 noStaffOption.value = '';
@@ -987,32 +976,110 @@
             }
         }
 
+        // --- Observation Flow Handlers ---
+        function displayObservationOptions(observedEmail, observedName) {
+            showLoading(`Loading observation options for ${observedName}...`);
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    hideLoading();
+                    if (!result.success) {
+                        showError(result.error);
+                        return;
+                    }
+                    
+                    const container = document.getElementById('observationSelectorView');
+                    container.innerHTML = `
+                        <h2 class="section-title">
+                            <span>📝</span>
+                            Observations for ${observedName}
+                        </h2>
+                        <div class="actions-grid" id="observationList">
+                            <div class="action-card" onclick="handleNewObservation('${observedEmail}')">
+                                <span class="action-icon">➕</span>
+                                <div class="action-title">Start New Observation</div>
+                                <div class="action-desc">Begin a new observation for this staff member.</div>
+                            </div>
+                        </div>
+                        <div style="margin-top: 20px;">
+                            <button class="filter-btn btn-secondary" onclick="showView('customFiltersView')">Back to Filters</button>
+                        </div>
+                    `;
+
+                    const list = document.getElementById('observationList');
+                    if(result.observations && result.observations.length > 0) {
+                        result.observations.forEach(obs => {
+                            const date = new Date(obs.createdAt).toLocaleDateString();
+                            const card = document.createElement('div');
+                            card.className = 'observation-card';
+                            // In a future step, this onclick would load the editor with this observation's data
+                            card.onclick = () => alert('Editing observation ' + obs.observationId + ' is not yet implemented.');
+                            card.innerHTML = `
+                                <div class="action-title">${obs.status} Observation</div>
+                                <div class="action-desc">Created on ${date}</div>
+                                <div class="status-badge ${obs.status === 'Draft' ? 'status-draft' : 'status-finalized'}">
+                                    ${obs.status}
+                                </div>
+                            `;
+                            list.appendChild(card);
+                        });
+                    }
+
+                    showView('observationSelectorView');
+                })
+                .withFailureHandler(handleError)
+                .getObservationOptions(observedEmail);
+        }
+
+        function handleNewObservation(observedEmail) {
+            showLoading(`Creating new observation draft...`);
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    hideLoading();
+                    if (!result.success) {
+                        showError(result.error);
+                        return;
+                    }
+                    renderObservationEditor(result.observation, result.rubricData);
+                })
+                .withFailureHandler(handleError)
+                .createNewObservationForPeerEvaluator(observedEmail);
+        }
+
+        function renderObservationEditor(observation, rubricData) {
+            updateFilterStatus({ data: { filterContext: { isStaffView: true, staffName: observation.observedName, staffRole: observation.observedRole, staffYear: observation.observedYear } } }, `Observation Draft (ID: ${observation.observationId})`);
+            
+            // For now, just render the standard rubric. It will be made interactive later.
+            const rubricHtml = generateStandardRubricHtml(rubricData);
+            document.getElementById('rubricContainer').innerHTML = rubricHtml;
+            
+            showView('rubricContainer');
+        }
+
+        // --- Main Data Handler ---
         function handleRubricData(result) {
             hideLoading();
             
             if (!result.success) {
-                showError(result.error || 'Failed to load rubric data');
+                showError(result.error || 'Failed to load data');
+                return;
+            }
+
+            if (result.action === 'show_observation_selector') {
+                displayObservationOptions(result.observedEmail, result.observedName);
                 return;
             }
             
-            console.log('Rubric data loaded successfully:', result);
-            
-            // Update filter status
             updateFilterStatus(result);
             
-            // Generate and display rubric HTML
             const rubricHtml = generateRubricHtml(result.data);
             document.getElementById('rubricContainer').innerHTML = rubricHtml;
-            document.getElementById('rubricContainer').style.display = 'block';
+            showView('rubricContainer');
             
-            // Scroll to rubric
             document.getElementById('rubricContainer').scrollIntoView({ behavior: 'smooth' });
 
-            // Populate the floating navigation menu
-            if (result.data && !result.data.isProbationaryView) { // Only populate if it's a standard rubric view
+            if (result.data && !result.data.isProbationaryView) {
                 populateFloatingNavMenu(result.data);
             } else {
-                // Clear or hide nav menu if not applicable (e.g., probationary view)
                 const menu = document.getElementById('floatingNavMenu');
                 if (menu) menu.innerHTML = '<div class="floating-nav-item" style="text-align:center; cursor:default;">N/A</div>';
             }
@@ -1021,36 +1088,25 @@
         function handleError(error) {
             console.error('AJAX Error:', error);
             hideLoading();
-            
-            let errorMessage = 'An error occurred while loading the data.';
-            if (error && error.message) {
-                errorMessage = error.message;
-            } else if (typeof error === 'string') {
-                errorMessage = error;
-            }
-            
+            let errorMessage = (error && error.message) ? error.message : 'An unknown error occurred.';
             showError(errorMessage);
         }
 
-        function updateFilterStatus(result) {
+        function updateFilterStatus(result, customTitle) {
             const status = document.getElementById('filterStatus');
             const statusText = document.getElementById('filterStatusText');
             
             let text = '';
-            const data = result.data;
-            
-            if (data.isProbationaryView) {
-                text = `Probationary Staff (${data.staff.length} staff members)`;
-            } else if (data.filterContext) {
-                if (data.filterContext.isOwnView) {
-                    text = `Your Assigned Areas (${data.filterContext.role}, Year ${data.filterContext.year})`;
-                } else if (data.filterContext.isStaffView) {
-                    text = `${data.filterContext.staffName} (${data.filterContext.staffRole}, Year ${data.filterContext.staffYear})`;
-                } else if (data.filterContext.role && data.filterContext.year) {
-                    text = `${data.filterContext.role} - Year ${data.filterContext.year} (${data.filterContext.viewType === 'assigned' ? 'Assigned Areas' : 'Full Rubric'})`;
-                } else if (data.filterContext.role) {
-                    text = `${data.filterContext.role} (Full Rubric)`;
-                }
+            if (customTitle) {
+                text = customTitle;
+            } else if (result.data && result.data.filterContext) {
+                const fc = result.data.filterContext;
+                if (fc.isOwnView) text = `Your Assigned Areas (${fc.role}, Year ${fc.year})`;
+                else if (fc.isStaffView) text = `${fc.staffName} (${fc.staffRole}, Year ${fc.year})`;
+                else if (fc.role && fc.year) text = `${fc.role} - Year ${fc.year} (${fc.viewType === 'assigned' ? 'Assigned' : 'Full Rubric'})`;
+                else if (fc.role) text = `${fc.role} (Full Rubric)`;
+            } else if (result.data && result.data.isProbationaryView) {
+                text = `Probationary Staff (${result.data.staff.length} staff members)`;
             }
             
             if (text) {
@@ -1065,7 +1121,6 @@
             if (rubricData.isProbationaryView) {
                 return generateProbationaryStaffHtml(rubricData);
             }
-            
             return generateStandardRubricHtml(rubricData);
         }
 
@@ -1077,26 +1132,21 @@
                         <h2 style="margin: 0; font-size: 1.8rem;">📋 ${data.title}</h2>
                         <p style="margin: 10px 0 0 0; opacity: 0.9;">${data.subtitle}</p>
                     </div>
-                    <div style="padding: 30px;">
-            `;
+                    <div style="padding: 30px;">`;
             
             if (data.staff && data.staff.length > 0) {
                 html += '<div style="display: grid; gap: 15px;">';
                 data.staff.forEach(function(staff) {
-                    // Make all staff members clickable
                     const onclickAttribute = `onclick="loadStaffMemberRubric('${staff.email}', '${staff.role}', ${staff.year})"`;
-                    const cursorStyle = 'cursor: pointer;';
-
                     html += `
-                        <div style="background: #fef2f2; border: 2px solid #fecaca; border-radius: 8px; padding: 20px; ${cursorStyle}" ${onclickAttribute}>
+                        <div style="background: #fef2f2; border: 2px solid #fecaca; border-radius: 8px; padding: 20px; cursor: pointer;" ${onclickAttribute}>
                             <h4 style="margin: 0 0 10px 0; color: #dc2626; font-size: 1.1rem;">${staff.name || 'Unknown Name'}</h4>
                             <div style="color: #7f1d1d; font-size: 0.95rem;">
                                 <div><strong>Email:</strong> ${staff.email || 'No email'}</div>
                                 <div><strong>Role:</strong> ${staff.role || 'Unknown Role'}</div>
                                 <div><strong>Year:</strong> ${staff.year === probationaryYear ? 'Probationary' : (staff.year || 'Unknown Year')}</div>
                             </div>
-                        </div>
-                    `;
+                        </div>`;
                 });
                 html += '</div>';
             } else {
@@ -1105,8 +1155,7 @@
                         <div style="font-size: 3rem; margin-bottom: 15px;">🎉</div>
                         <h3 style="color: #065f46; margin-bottom: 10px;">Great News!</h3>
                         <p style="color: #047857;">No staff members are currently in probationary status.</p>
-                    </div>
-                `;
+                    </div>`;
             }
             
             html += '</div></div>';
@@ -1120,18 +1169,13 @@
                         <h2 style="margin: 0; font-size: 1.8rem;">${rubricData.title}</h2>
                         <p style="margin: 10px 0 0 0; opacity: 0.9;">${rubricData.subtitle}</p>
                     </div>
-                    <div style="padding: 0;">
-            `;
+                    <div style="padding: 0;">`;
             
             if (rubricData.domains && rubricData.domains.length > 0) {
                 rubricData.domains.forEach(function(domain, domainIndex) {
                     html += `
                         <div class="domain-section" id="domain-${domainIndex}">
-                            <div class="domain-header">
-                                ${domain.name}
-                            </div>
-                            
-                            <!-- Sticky column headers for this domain -->
+                            <div class="domain-header">${domain.name}</div>
                             <div class="performance-levels-header">
                                 <div class="performance-levels">
                                     <div class="level-header"></div>
@@ -1140,90 +1184,42 @@
                                     <div class="level-header">Proficient</div>
                                     <div class="level-header">Distinguished</div>
                                 </div>
-                            </div>
-                    `;
+                            </div>`;
                     
                     if (domain.components && domain.components.length > 0) {
                         domain.components.forEach(function(component, componentIndex) {
-                            const isAssigned = component.isAssigned || false;
-                            const componentClass = isAssigned ? 'component-assigned' : 'component-not-assigned';
-                            const componentId = component.componentId || '';
-                            
                             html += `
-                                <div class="component-section ${componentClass}" 
-                                    data-component-id="${componentId}"
-                                    data-assigned="${isAssigned ? 'true' : 'false'}">
-
-                                    <!-- Assignment Indicator -->
-                                    ${isAssigned ? `
-                                    <div class="assignment-indicator assigned" aria-label="Component assigned">
-                                        ✓
-                                    </div>
-                                    ` : `
-                                    <div class="assignment-indicator not-assigned" aria-label="Component not assigned">
-                                        ○
-                                    </div>
-                                    `}
-
+                                <div class="component-section" data-component-id="${component.componentId || ''}">
                                     <div class="performance-levels-content">
-                                        <div class="row-label">
-                                            ${component.title}
-                                            ${isAssigned ? '<span class="assigned-badge">📋 Assigned</span>' : ''}
-                                        </div>
-                                        <div class="level-content">
-                                            ${component.developing || 'No description available'}
-                                        </div>
-                                        <div class="level-content">
-                                            ${component.basic || 'No description available'}
-                                        </div>
-                                        <div class="level-content">
-                                            ${component.proficient || 'No description available'}
-                                        </div>
-                                        <div class="level-content">
-                                            ${component.distinguished || 'No description available'}
-                                        </div>
+                                        <div class="row-label">${component.title}</div>
+                                        <div class="level-content">${component.developing || ''}</div>
+                                        <div class="level-content">${component.basic || ''}</div>
+                                        <div class="level-content">${component.proficient || ''}</div>
+                                        <div class="level-content">${component.distinguished || ''}</div>
                                     </div>
-                                    
                                     ${component.bestPractices && component.bestPractices.length > 0 ? `
                                     <div class="look-fors-section">
                                         <div class="look-fors-header" onclick="toggleLookFors('domain-${domainIndex}-component-${componentIndex}')">
-                                            <span>Best Practices aligned with 5D+ and PELSB Standards</span>
+                                            <span>Best Practices</span>
                                             <span class="chevron" id="chevron-${domainIndex}-${componentIndex}">▼</span>
                                         </div>
                                         <div class="look-fors-content" id="lookForsContent-${domainIndex}-${componentIndex}">
                                             <div class="look-fors-grid">
-                                                ${component.bestPractices.map((practice, practiceIndex) => `
-                                                    <div class="look-for-item">
-                                                        <input type="checkbox" id="practice-${domainIndex}-${componentIndex}-${practiceIndex}" name="practice-${domainIndex}-${componentIndex}-${practiceIndex}">
-                                                        <label for="practice-${domainIndex}-${componentIndex}-${practiceIndex}">${practice}</label>
-                                                    </div>
-                                                `).join('')}
+                                                ${component.bestPractices.map((p, pIdx) => `<div class="look-for-item"><input type="checkbox" id="p-${domainIndex}-${componentIndex}-${pIdx}"><label for="p-${domainIndex}-${componentIndex}-${pIdx}">${p}</label></div>`).join('')}
                                             </div>
                                         </div>
-                                    </div>
-                                    ` : ''}
-                                </div>
-                            `;
+                                    </div>` : ''}
+                                </div>`;
                         });
-                    } else {
-                        html += '<p style="color: #6b7280; font-style: italic; text-align: center; padding: 20px;">No components available for this domain.</p>';
                     }
-                    
-                    html += '</div>'; // Close domain-section
+                    html += '</div>';
                 });
-            } else {
-                html += '<p style="color: #6b7280; font-style: italic; text-align: center; padding: 40px;">No domains found.</p>';
             }
-            
-            html += `
-                    </div>
-                </div>
-            `;
-            
+            html += `</div></div>`;
             return html;
         }
 
-        // UI Helper Functions
+        // --- UI Helper Functions ---
         function showLoading(message = 'Loading...') {
             const loading = document.getElementById('loading');
             loading.innerHTML = `<div class="loading-spinner"></div>${message}`;
@@ -1245,78 +1241,29 @@
             document.getElementById('error').style.display = 'none';
         }
 
-        function showTempMessage(message) {
-            const container = document.getElementById('rubricContainer');
-            container.innerHTML = `
-                <div style="background: #f0f9ff; border: 2px solid #0ea5e9; border-radius: 12px; padding: 30px; text-align: center; color: #0369a1;">
-                    <div style="font-size: 2rem; margin-bottom: 15px;">🚀</div>
-                    <h3 style="margin-bottom: 10px; color: #0369a1;">Coming Soon!</h3>
-                    <p>${message}</p>
-                </div>
-            `;
-            container.style.display = 'block';
-            
-            // Update status
-            document.getElementById('filterStatusText').textContent = 'Preview Mode';
-            document.getElementById('filterStatus').style.display = 'block';
-        }
-
-        // Initialize
-        console.log('Filter interface loaded successfully!');
-        console.log('User Context:', {
-            role: '<?= userContext.role ?>',
-            specialRoleType: '<?= userContext.specialRoleType ?>',
-            year: <?= userContext.year || 1 ?>
-        });
-
         function loadStaffMemberRubric(email, role, year) {
-            // Attempt to load rubric for any role
-            showLoading(`Loading ${role} rubric...`); // More generic message
-            const filterParams = {
-                role: role,
-                year: year,
-                staff: email,
-                viewType: 'assigned' // Default to assigned areas for a specific staff member
-            };
+            showLoading(`Loading ${role} rubric...`);
             google.script.run
                 .withSuccessHandler(handleRubricData)
                 .withFailureHandler(handleError)
-                .loadRubricData(filterParams);
-            console.log(`Attempting to load rubric for ${email}, Role: ${role}, Year: ${year}`);
+                .loadRubricData({ staff: email });
         }
 
-        // Function to toggle look-fors sections (copied from main rubric)
         function toggleLookFors(componentId) {
             const parts = componentId.split('-');
-            const domainIdx = parts[1];
-            const componentIdx = parts[3];
-            
-            const content = document.getElementById('lookForsContent-' + domainIdx + '-' + componentIdx);
-            const chevron = document.getElementById('chevron-' + domainIdx + '-' + componentIdx);
-            
+            const content = document.getElementById(`lookForsContent-${parts[1]}-${parts[3]}`);
+            const chevron = document.getElementById(`chevron-${parts[1]}-${parts[3]}`);
             if (content && chevron) {
                 content.classList.toggle('expanded');
                 chevron.classList.toggle('expanded');
             }
         }
-    </script>
 
-    <div class="floating-nav visible" id="floatingNav">
-        <button class="floating-nav-button" onclick="toggleFloatingNav()">
-            <span class="nav-icon">≡</span>
-            <span class="nav-text">Domains</span>
-        </button>
-        <div class="floating-nav-menu" id="floatingNavMenu">
-    <? if (typeof data !== 'undefined' && data && data.domains && data.domains.length > 0) { ?>
-        <? for (var d = 0; d < data.domains.length; d++) { ?>
-            <button class="floating-nav-item" onclick="scrollToDomain(<?= d ?>); closeFloatingNav();">
-                Domain <?= data.domains[d].number ?>
-            </button>
-        <? } ?>
-    <? } else { ?>
-        <div class="floating-nav-item" style="text-align:center; cursor:default;">Domains will appear here</div>
-            <? } ?>
-        </div>
-    </div>
+        // --- Initialization ---
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Filter interface loaded successfully!');
+            showView('quickActionsView');
+        });
+    </script>
 </body>
 </html>

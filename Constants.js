@@ -9,7 +9,8 @@
 const SHEET_NAMES = {
   STAFF: 'Staff',
   SETTINGS: 'Settings',
-  TEACHER: 'Teacher'
+  TEACHER: 'Teacher',
+  OBSERVATIONS: 'Observations' // Future use for dedicated sheet
 };
 
 /**
@@ -110,7 +111,8 @@ const ERROR_MESSAGES = {
   SETTINGS_SHEET_MISSING: 'Settings sheet not found. All domains will be visible.',
   INVALID_EMAIL: 'Invalid email format detected.',
   DATA_PARSING_ERROR: 'Error parsing sheet data. Please check data format.',
-  ROLE_SHEET_MISSING: 'Role-specific sheet not found. Using Teacher rubric as fallback.'
+  ROLE_SHEET_MISSING: 'Role-specific sheet not found. Using Teacher rubric as fallback.',
+  PERMISSION_DENIED: 'Permission denied. You do not have the required role to perform this action.'
 };
 
 /**
@@ -219,7 +221,7 @@ const CONTENT_PATTERNS = {
  * System metadata
  */
 const SYSTEM_INFO = {
-  VERSION: '2.0.0',
+  VERSION: '2.1.0', // Version updated for new features
   NAME: 'Danielson Framework Multi-Role System',
   AUTHOR: 'Apps Script Multi-Role Implementation',
   LAST_UPDATED: new Date().toISOString()
@@ -332,4 +334,16 @@ const FILTER_TYPES = {
 const VIEW_MODE_TEXT = {
   FULL: 'View: Full Rubric',
   ASSIGNED: 'View: My Assigned Areas'
+};
+
+/**
+ * Observation constants
+ */
+const OBSERVATION_STATUS = {
+  DRAFT: 'Draft',
+  FINALIZED: 'Finalized'
+};
+
+const DRIVE_FOLDER_INFO = {
+  ROOT_FOLDER_NAME: 'Danielson Rubric Observations'
 };
