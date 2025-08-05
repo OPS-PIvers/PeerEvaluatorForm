@@ -255,6 +255,12 @@ function doGet(e) {
             requestId: requestId
         });
         
+        // Ensure the user context has a role before creating the filter interface
+        if (!userContext.role) {
+            const user = getUserByEmail(userContext.email);
+            userContext.role = user ? user.role : 'Teacher';
+        }
+
         return createFilterSelectionInterface(userContext, requestId);
     }
     // Enhanced filter logic for role-only vs role+year scenarios
