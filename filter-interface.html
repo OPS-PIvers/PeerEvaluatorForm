@@ -485,9 +485,7 @@
                         html += `<div class="look-fors-grid">`;
                         comp.bestPractices.forEach((practice, practiceIdx) => {
                             const practiceId = `practice-${domainIdx}-${compIdx}-${practiceIdx}`;
-                            const tempEl = document.createElement('span');
-                            tempEl.textContent = practice;
-                            const sanitizedPractice = tempEl.innerHTML;
+                            const sanitizedPractice = escapeHtml(practice);
                             html += `<div class="look-for-item">`;
                             html += `<input type="checkbox" id="${practiceId}" name="${practiceId}"><label for="${practiceId}">${sanitizedPractice}</label>`;
                             html += `</div>`;
