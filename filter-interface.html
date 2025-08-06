@@ -920,7 +920,7 @@
                     staffSelect.disabled = false;
                     showError('Failed to load staff list: ' + (error.message || error));
                 })
-                .getStaffForFilters(currentFilters.role, currentFilters.year);
+                .getStaffListForDropdown(currentFilters.role, currentFilters.year);
         }
 
         function loadSelectedView() {
