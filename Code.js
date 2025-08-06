@@ -1278,12 +1278,12 @@ function getStaffListForDropdown(role, year) {
 
     debugLog(`Found ${result.length} staff members for role '${role}' and year '${year}'.`);
     
-    return result;
+    return { success: true, staff: result };
 
   } catch (error) {
     console.error('Error in getStaffListForDropdown:', error.toString(), error.stack);
     debugLog(`Error in getStaffListForDropdown: ${error.toString()} Stack: ${error.stack || 'N/A'}`);
-    return []; // Return empty array on error
+    return { success: false, error: error.message, staff: [] }; // Return empty array on error
   }
 }
 
