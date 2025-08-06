@@ -726,27 +726,33 @@ function createFilteredUserContext(targetEmail, requestingRole) {
     // Create context as if we're the target user
     const context = createUserContext(targetEmail);
 
-    // Explicitly set assignedSubdomains and viewMode for the filtered context
-    // based on the targetUser's (staffUser's) year.
-    let assignedSubdomainsResult = null;
-    let viewModeResult = VIEW_MODES.FULL; // Default to full view
-
-    if (targetUser && targetUser.year === PROBATIONARY_OBSERVATION_YEAR) {
-      assignedSubdomainsResult = null; // Probationary staff viewed by admin/special role sees all subdomains
-      viewModeResult = VIEW_MODES.FULL;
-      debugLog('Filtered context for Probationary user: full view, no assigned subdomains', { targetEmail: targetEmail, requestingRole: requestingRole });
-    } else if (targetUser) {
-      assignedSubdomainsResult = getAssignedSubdomainsForRoleYear(targetUser.role, targetUser.year);
-      // For non-probationary, default to assigned view when being filtered
-      viewModeResult = VIEW_MODES.ASSIGNED;
-      debugLog('Filtered context for Non-Probationary user: assigned view', { targetEmail: targetEmail, targetYear: targetUser.year, requestingRole: requestingRole });
+    // --- PERMISSION OVERRIDE LOGIC ---
+    // If the requesting user is a Peer Evaluator, force a full, editable view
+    if (requestingRole === SPECIAL_ROLES.PEER_EVALUATOR) {
+      context.viewMode = VIEW_MODES.FULL;
+      context.assignedSubdomains = null; // Ensure all subdomains are loaded
+      context.isObservationMode = true; // Flag for the UI to enable editing
+      debugLog('Peer Evaluator observation mode enabled.', {
+        targetEmail: targetEmail,
+        requestingRole: requestingRole
+      });
     } else {
-      // Should not happen if targetUser was validated before, but as a fallback:
-      debugLog('Target user not found within createFilteredUserContext after initial check, defaulting to full view', { targetEmail: targetEmail, requestingRole: requestingRole });
-    }
+      // Original logic for other special roles (e.g., Administrator just viewing)
+      let assignedSubdomainsResult = null;
+      let viewModeResult = VIEW_MODES.FULL; // Default to full view
 
-    context.assignedSubdomains = assignedSubdomainsResult;
-    context.viewMode = viewModeResult;
+      if (targetUser && targetUser.year === PROBATIONARY_OBSERVATION_YEAR) {
+        assignedSubdomainsResult = null;
+        viewModeResult = VIEW_MODES.FULL;
+        debugLog('Filtered context for Probationary user: full view', { targetEmail: targetEmail, requestingRole: requestingRole });
+      } else if (targetUser) {
+        assignedSubdomainsResult = getAssignedSubdomainsForRoleYear(targetUser.role, targetUser.year);
+        viewModeResult = VIEW_MODES.ASSIGNED;
+        debugLog('Filtered context for Non-Probationary user: assigned view', { targetEmail: targetEmail, requestingRole: requestingRole });
+      }
+      context.assignedSubdomains = assignedSubdomainsResult;
+      context.viewMode = viewModeResult;
+    }
 
     // Add metadata about the filtering
     context.isFiltered = true;
@@ -764,10 +770,10 @@ function createFilteredUserContext(targetEmail, requestingRole) {
 
     debugLog('Filtered user context created and adjusted', {
       targetEmail: targetEmail,
-      targetRole: context.role, // Use context.role as it might have been finalized by createUserContext
-      targetYear: context.year, // Same for year
-      assignedSubdomains: context.assignedSubdomains,
+      targetRole: context.role,
+      targetYear: context.year,
       viewMode: context.viewMode,
+      isObservationMode: context.isObservationMode || false,
       requestingRole: requestingRole
     });
 
