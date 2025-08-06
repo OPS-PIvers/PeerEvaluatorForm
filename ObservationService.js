@@ -1,7 +1,7 @@
 /**
  * ObservationService.js
  * Manages observation data for the Peer Evaluator role.
- * For Phase 1, this uses PropertiesService as a mock database.
+ * This uses PropertiesService as a simple database.
  */
 
 const OBSERVATIONS_DB_KEY = 'OBSERVATIONS_DATABASE';
@@ -35,6 +35,23 @@ function _saveObservationsDb(db) {
     console.error('Error saving observations DB:', error);
   }
 }
+
+/**
+ * Retrieves a single observation by its unique ID.
+ * @param {string} observationId The ID of the observation to retrieve.
+ * @returns {Object|null} The observation object or null if not found.
+ */
+function getObservationById(observationId) {
+    if (!observationId) return null;
+    try {
+        const db = _getObservationsDb();
+        return db.find(obs => obs.observationId === observationId) || null;
+    } catch (error) {
+        console.error(`Error in getObservationById for ${observationId}:`, error);
+        return null;
+    }
+}
+
 
 /**
  * Retrieves all observations for a given staff member.
@@ -97,7 +114,7 @@ function createNewObservation(observerEmail, observedEmail) {
       lastModifiedAt: new Date().toISOString(),
       finalizedAt: null,
       observationData: {}, // e.g., { "1a:": "proficient", "1b:": "basic" }
-      evidenceLinks: {} // e.g., { "1a:": ["http://drive.link1", "http://drive.link2"] }
+      evidenceLinks: {} // e.g., { "1a:": [{url: "...", name: "...", uploadedAt: "..."}, ...] }
     };
 
     db.push(newObservation);
@@ -170,11 +187,7 @@ function uploadMediaEvidence(observationId, componentId, base64Data, fileName, m
 
     // Get the root folder for all observations
     let rootFolderIterator = DriveApp.getFoldersByName(DRIVE_FOLDER_INFO.ROOT_FOLDER_NAME);
-    let rootFolder = rootFolderIterator.hasNext() ? rootFolderIterator.next() : rootFolderIterator.next();
-    if (!rootFolder) {
-      rootFolder = DriveApp.createFolder(DRIVE_FOLDER_INFO.ROOT_FOLDER_NAME);
-      debugLog('Created root Drive folder', { name: DRIVE_FOLDER_INFO.ROOT_FOLDER_NAME });
-    }
+    let rootFolder = rootFolderIterator.hasNext() ? rootFolderIterator.next() : DriveApp.createFolder(DRIVE_FOLDER_INFO.ROOT_FOLDER_NAME);
 
     // Get or create a folder for the observed user
     const userFolderName = `${observation.observedName} (${observation.observedEmail})`;
@@ -192,6 +205,7 @@ function uploadMediaEvidence(observationId, componentId, base64Data, fileName, m
     // Create the file in the observation folder
     const file = obsFolder.createFile(blob);
     const fileUrl = file.getUrl();
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); // Make it viewable
 
     // Update the observation record with the evidence link
     if (!observation.evidenceLinks[componentId]) {
@@ -213,6 +227,86 @@ function uploadMediaEvidence(observationId, componentId, base64Data, fileName, m
     console.error('Error in uploadMediaEvidence:', error);
     return { success: false, error: 'Failed to upload media: ' + error.message };
   }
+}
+
+/**
+ * Deletes an observation record.
+ * @param {string} observationId The ID of the observation to delete.
+ * @param {string} requestingUserEmail The email of the user requesting deletion.
+ * @returns {Object} A response object with success status.
+ */
+function deleteObservationRecord(observationId, requestingUserEmail) {
+    if (!observationId || !requestingUserEmail) {
+        return { success: false, error: 'Observation ID and requesting user email are required.' };
+    }
+    try {
+        const db = _getObservationsDb();
+        const observationIndex = db.findIndex(obs => obs.observationId === observationId);
+        if (observationIndex === -1) {
+            return { success: false, error: 'Observation not found.' };
+        }
+        const observation = db[observationIndex];
+
+        // Permission check: only the observer who created it can delete.
+        if (observation.observerEmail !== requestingUserEmail) {
+            return { success: false, error: 'Permission denied. You did not create this observation.' };
+        }
+
+        // Only drafts can be deleted.
+        if (observation.status !== OBSERVATION_STATUS.DRAFT) {
+            return { success: false, error: 'Only draft observations can be deleted.' };
+        }
+
+        db.splice(observationIndex, 1);
+        _saveObservationsDb(db);
+
+        debugLog('Observation deleted', { observationId, requestingUserEmail });
+        return { success: true };
+    } catch (error) {
+        console.error(`Error deleting observation ${observationId}:`, error);
+        return { success: false, error: 'An unexpected error occurred during deletion.' };
+    }
+}
+
+/**
+ * Updates the status of an observation (e.g., to "Finalized").
+ * @param {string} observationId The ID of the observation to update.
+ * @param {string} newStatus The new status to set.
+ * @param {string} requestingUserEmail The email of the user requesting the status change.
+ * @returns {Object} A response object with success status.
+ */
+function updateObservationStatus(observationId, newStatus, requestingUserEmail) {
+    if (!observationId || !newStatus || !requestingUserEmail) {
+        return { success: false, error: 'Observation ID, new status, and requesting user email are required.' };
+    }
+
+    try {
+        const db = _getObservationsDb();
+        const observationIndex = db.findIndex(obs => obs.observationId === observationId);
+        if (observationIndex === -1) {
+            return { success: false, error: 'Observation not found.' };
+        }
+
+        const observation = db[observationIndex];
+        if (observation.observerEmail !== requestingUserEmail) {
+            return { success: false, error: 'Permission denied. You did not create this observation.' };
+        }
+
+        // Update status and timestamps
+        observation.status = newStatus;
+        observation.lastModifiedAt = new Date().toISOString();
+        if (newStatus === OBSERVATION_STATUS.FINALIZED) {
+            observation.finalizedAt = new Date().toISOString();
+        }
+
+        _saveObservationsDb(db);
+        debugLog('Observation status updated', { observationId, newStatus });
+        return { success: true, observation: observation };
+
+    } catch (error) {
+        console.error(`Error updating status for observation ${observationId}:`, error);
+        return { success: false, error: 'An unexpected error occurred while updating status.' };
+    }
 }
 
 

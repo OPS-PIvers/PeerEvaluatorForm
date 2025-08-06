@@ -60,302 +60,263 @@ function doGet(e) {
     // Parse URL parameters for cache control
     const params = e.parameter || {};
 
-    // Handle AJAX API requests
-    if (params.getStaffList === 'true') {
-      const staffResponse = handleStaffListRequest(e);
-      return ContentService.createTextOutput(JSON.stringify(staffResponse))
-        .setMimeType(ContentService.MimeType.JSON);
-    }
-
     const forceRefresh = params.refresh === 'true' || params.nocache === 'true';
     const debugMode = params.debug === 'true';
-    const urlTimestamp = params.t || null;
-    const urlRole = params.role || null;
-    const proactiveCheck = params.proactive !== 'false'; // Default to true
 
-    // ADD THESE NEW PARAMETERS:
-    const viewMode = params.view || 'full';
-    const filterRole = params.filterRole || null;
-    const filterYear = params.filterYear || null;
-    const filterStaff = params.filterStaff || null;
-    const filterType = params.filterType || 'all';
+    debugLog('Web app request received', { requestId, forceRefresh, debugMode });
 
-    debugLog('Enhanced web app request received', {
-      requestId: requestId,
-      forceRefresh: forceRefresh,
-      debugMode: debugMode,
-      urlTimestamp: urlTimestamp,
-      urlRole: urlRole,
-      proactiveCheck: proactiveCheck,
-      userAgent: e.userAgent || 'Unknown'
-    });
-
-    // Handle force refresh - clear all relevant caches
     if (forceRefresh) {
-      debugLog('Force refresh requested - clearing caches', { requestId });
-
-      const sessionUser = getUserFromSession();
-      if (sessionUser && sessionUser.email) {
-        clearUserCaches(sessionUser.email);
-      } else {
-        forceCleanAllCaches();
-      }
+      forceCleanAllCaches();
     }
 
-    // Create enhanced user context with proactive role change detection
     const userContext = createUserContext();
 
-    // Check if this is a special access user without active filters
-    if (userContext.hasSpecialAccess && !hasActiveFilters(params)) {
-        debugLog('Special access user detected - showing filter interface', {
-            role: userContext.role,
-            specialRoleType: userContext.specialRoleType,
-            requestId: requestId
-        });
-        
+    // If the user has special access and no specific staff member is being targeted,
+    // show the filter interface instead of a rubric.
+    if (userContext.hasSpecialAccess && !params.filterStaff) {
+        debugLog('Special access user detected - showing filter interface', { role: userContext.role, requestId });
         return createFilterSelectionInterface(userContext, requestId);
     }
-    // Enhanced filter logic for role-only vs role+year scenarios
-    let effectiveRole = userContext.role;  // Default to user's actual role
-    let effectiveYear = userContext.year;  // Default to user's actual year
-    let shouldShowFullRubric = false;
-    let shouldShowAssignedAreas = false;
-
-    // Handle special role filtering scenarios
-    if (userContext.hasSpecialAccess) {
-        if (filterRole && filterRole !== '' && AVAILABLE_ROLES.includes(filterRole)) {
-            // Role filter is applied
-            effectiveRole = filterRole;
-            
-            if (filterYear && filterYear !== '') {
-                // Both role and year filters applied - show assigned areas
-                effectiveYear = parseInt(filterYear) || filterYear; // Handle 'Probationary' string
-                shouldShowAssignedAreas = true;
-                
-                debugLog('Special role filtering: Role + Year mode', {
-                    filterRole: filterRole,
-                    filterYear: filterYear,
-                    effectiveRole: effectiveRole,
-                    effectiveYear: effectiveYear
-                });
-            } else {
-                // Only role filter applied - show full rubric for that role
-                shouldShowFullRubric = true;
-                
-                debugLog('Special role filtering: Role-only mode', {
-                    filterRole: filterRole,
-                    effectiveRole: effectiveRole
-                });
-            }
-        }
-    }
-
-    // Handle special role filtering
-    let finalUserContext = userContext;
-
-    if (userContext.hasSpecialAccess) {
-        if (filterStaff && isValidEmail(filterStaff)) {
-            // Staff-specific filtering (existing behavior)
-            const filteredContext = createFilteredUserContext(filterStaff, userContext.role);
-            if (filteredContext) {
-                finalUserContext = filteredContext;
-                debugLog('Using filtered user context for staff member', {
-                    originalRole: userContext.role,
-                    viewingAs: filteredContext.filterInfo.viewingAs,
-                    viewingRole: filteredContext.filterInfo.viewingRole
-                });
-            }
-        } else if (shouldShowFullRubric || shouldShowAssignedAreas) {
-            // Role or Role+Year filtering - create synthetic context
-            finalUserContext = createSyntheticUserContext(effectiveRole, effectiveYear, userContext, {
-                isRoleFiltered: true,
-                showFullRubric: shouldShowFullRubric,
-                showAssignedAreas: shouldShowAssignedAreas,
-                originalRole: userContext.role
-            });
-            
-            debugLog('Using synthetic user context for role filtering', {
-                originalRole: userContext.role,
-                effectiveRole: effectiveRole,
-                effectiveYear: effectiveYear,
-                showFullRubric: shouldShowFullRubric,
-                showAssignedAreas: shouldShowAssignedAreas
-            });
-        }
-    }
-
-    // Set view mode (URL parameter can override filter logic)
-    if (viewMode && (viewMode === 'full' || viewMode === 'assigned')) {
-        finalUserContext.viewMode = viewMode;
-    } else if (!finalUserContext.isSynthetic) {
-        // Only set default view mode if not already set by synthetic context
-        finalUserContext.viewMode = 'full';
-    }
-
-    // Add filter parameters to context
-    finalUserContext.activeFilters = {
-      role: filterRole,
-      year: filterYear,
-      staff: filterStaff,
-      type: filterType
-    };
     
-    // Override role if specified in URL (for testing)
-    if (urlRole && AVAILABLE_ROLES.includes(urlRole)) {
-      debugLog('URL role override detected', {
-        originalRole: userContext.role,
-        urlRole: urlRole,
-        requestId
-      });
-      userContext.role = urlRole;
-      userContext.isRoleOverride = true;
-    }
-
-    // Warm cache for the current role if role change was detected
-    if (userContext.roleChangeDetected && userContext.email) {
-      warmCacheForRoleChange(userContext.email, userContext.role);
-    }
-
-    debugLog('Enhanced user context created', {
-      email: userContext.email,
-      role: userContext.role,
-      year: userContext.year,
-      isDefaultUser: userContext.isDefaultUser,
-      roleChangeDetected: userContext.roleChangeDetected,
-      stateChanges: userContext.stateChanges.length,
-      isRoleOverride: userContext.isRoleOverride || false,
-      sessionId: userContext.metadata.sessionId,
-      requestId: requestId
-    });
-    
-    // Fallback check
-    // If we tried to show filter interface but it failed, continue with normal flow
-    if (userContext.hasSpecialAccess && !hasActiveFilters(params)) {
-        console.log('⚠️ Filter interface should have been shown but continuing with normal flow');
-    }
-    // Get role-specific rubric data
+    // For users who land here directly (not through the filter UI) or for non-special roles
     const rubricData = getAllDomainsData(
-      finalUserContext.role,
-      finalUserContext.year,
-      finalUserContext.viewMode,      // Pass viewMode
-      finalUserContext.assignedSubdomains // Pass assignedSubdomains
+      userContext.role, 
+      userContext.year, 
+      userContext.viewMode, 
+      userContext.assignedSubdomains
     );
-
-    // Add special role data if needed
-    if (finalUserContext.hasSpecialAccess) {
-      rubricData.specialRoleData = {
-        availableRoles: AVAILABLE_ROLES.filter(role => role !== finalUserContext.role),
-        availableYears: OBSERVATION_YEARS,
-        probationaryStaff: finalUserContext.specialRoleType === 'administrator' ?
-          getProbationaryStaff() : null,
-        accessValidation: validateSpecialRoleAccess(finalUserContext.role, 'general_access')
-      };
-    }
     
-    // Generate enhanced response metadata
-    const responseMetadata = generateResponseMetadata(finalUserContext, requestId, debugMode);
+    // Attach the full user context to the data payload for the template
+    rubricData.userContext = userContext;
 
-    // Add comprehensive user context to the data for the HTML template
-    rubricData.userContext = {
-      // Basic user info
-      email: finalUserContext.email,
-      role: finalUserContext.role,
-      year: finalUserContext.year,
-      isAuthenticated: finalUserContext.isAuthenticated,
-      displayName: finalUserContext.email ? finalUserContext.email.split('@')[0] : 'Guest',
-
-      // Enhanced view mode and assignment properties
-      viewMode: finalUserContext.viewMode,
-      assignedSubdomains: finalUserContext.assignedSubdomains,
-      hasSpecialAccess: finalUserContext.hasSpecialAccess,
-      canFilter: finalUserContext.canFilter,
-      specialRoleType: finalUserContext.specialRoleType,
-      activeFilters: finalUserContext.activeFilters,
-      isFiltered: finalUserContext.isFiltered || false,
-      filterInfo: finalUserContext.filterInfo || null,
-      isEvaluator: finalUserContext.isEvaluator || false,
-
-      // Special role data
-      availableRoles: rubricData.specialRoleData?.availableRoles || [],
-      availableYears: rubricData.specialRoleData?.availableYears || [],
-      probationaryStaff: rubricData.specialRoleData?.probationaryStaff || [],
-
-      // Assignment metadata
-      assignmentMetadata: rubricData.assignmentMetadata || null,
-
-      // Request context
-      requestId: requestId,
-      timestamp: Date.now(),
-      forceRefresh: forceRefresh,
-      debugMode: debugMode,
-      isRoleOverride: userContext.isRoleOverride || false,
-
-      // State tracking
-      roleChangeDetected: userContext.roleChangeDetected,
-      stateChanges: userContext.stateChanges,
-      isNewUser: userContext.isNewUser,
-      previousRole: userContext.previousState?.role || null,
-
-      // Session info
-      sessionId: userContext.metadata.sessionId,
-      sessionActive: userContext.sessionInfo?.isActive || false,
-
-      // Cache info
-      cacheVersion: userContext.metadata.cacheVersion,
-      responseMetadata: responseMetadata,
-
-      // Enhanced metadata
-      contextVersion: userContext.metadata.contextVersion,
-      hasStaffRecord: userContext.hasStaffRecord
-    };
+    // Generate response metadata for headers
+    const responseMetadata = generateResponseMetadata(userContext, requestId, debugMode);
     
     // Create and configure the HTML template
-    const htmlTemplate = HtmlService.createTemplateFromFile('rubric');
+    const htmlTemplate = HtmlService.createTemplateFromFile('rubric.html'); // This is now a fallback view
     htmlTemplate.data = rubricData;
     
     // Generate the HTML output
     const htmlOutput = htmlTemplate.evaluate()
       .setTitle(getPageTitle(userContext.role))
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-
-    // Add comprehensive cache-busting headers
+      
     addCacheBustingHeaders(htmlOutput, responseMetadata);
 
-    // Add enhanced debug headers if requested
-    if (debugMode) {
-      addDebugHeaders(htmlOutput, userContext, responseMetadata);
-      addStateTrackingHeaders(htmlOutput, userContext);
-    }
-    
     const executionTime = Date.now() - startTime;
-    logPerformanceMetrics('doGet', executionTime, {
-      role: userContext.role,
-      year: userContext.year,
-      domainCount: rubricData.domains ? rubricData.domains.length : 0,
-      isDefaultUser: userContext.isDefaultUser,
-      forceRefresh: forceRefresh,
-      roleChangeDetected: userContext.roleChangeDetected,
-      stateChanges: userContext.stateChanges.length,
-      requestId: requestId
-    });
-    
-    debugLog('Enhanced web app request completed successfully', {
-      role: userContext.role,
-      executionTime: executionTime,
-      requestId: requestId,
-      responseETag: responseMetadata.etag,
-      roleChangeDetected: userContext.roleChangeDetected
-    });
+    logPerformanceMetrics('doGet', executionTime, { role: userContext.role, requestId });
     
     return htmlOutput;
     
   } catch (error) {
-    console.error('Error in enhanced doGet:', formatErrorMessage(error, 'doGet'));
-    
-    // Return enhanced error page with cache busting
+    console.error('Fatal error in doGet:', formatErrorMessage(error, 'doGet'));
     return createEnhancedErrorPage(error, requestId, null, e.userAgent);
   }
 }
+
+
+/**
+ * =================================================================
+ * SERVER-SIDE FUNCTIONS CALLABLE FROM CLIENT (google.script.run)
+ * =================================================================
+ */
+
+/**
+ * Main data loading function for the filter interface.
+ * This function orchestrates what data or action to return based on user filters.
+ * @param {Object} filterParams Parameters from the client (e.g., {staff: 'email@...'}).
+ * @returns {Object} A response object for the client.
+ */
+function loadRubricData(filterParams) {
+    try {
+        debugLog('Loading rubric data via AJAX', { filterParams });
+        const userContext = createUserContext();
+
+        // Handle Peer Evaluator selecting a staff member to observe
+        if (userContext.role === SPECIAL_ROLES.PEER_EVALUATOR && filterParams.staff) {
+            const staffUser = getUserByEmail(filterParams.staff);
+            if (!staffUser) return { success: false, error: `Staff not found: ${filterParams.staff}` };
+            
+            return {
+                success: true,
+                action: 'show_observation_selector',
+                observedEmail: staffUser.email,
+                observedName: staffUser.name
+            };
+        }
+        
+        // Handle loading current user's own rubric
+        if (filterParams.myOwnView) {
+            const rubricData = getAllDomainsData(userContext.role, userContext.year, 'assigned', userContext.assignedSubdomains);
+            rubricData.userContext = userContext; // Attach user context
+            return { success: true, rubricData: rubricData };
+        }
+
+        // Default behavior (could be expanded for other roles like Admin)
+        return { success: false, error: 'Invalid filter request.' };
+
+    } catch (error) {
+        console.error('Error in loadRubricData:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Gets the list of staff members for the filter dropdowns.
+ * @param {string} role The role to filter by.
+ * @param {string} year The year to filter by.
+ * @returns {Object} A response object with success status and the staff list.
+ */
+function getStaffListForDropdown(role, year) {
+  try {
+    const staffList = getStaffByRoleAndYear(role, year);
+    return { success: true, staff: staffList };
+  } catch (error) {
+    console.error('Error in getStaffListForDropdown:', error);
+    return { success: false, error: error.message, staff: [] };
+  }
+}
+
+
+/**
+ * Gets the list of observations for a user.
+ * @param {string} observedEmail The email of the staff member.
+ * @returns {Object} A response object with success status and observations list.
+ */
+function getObservationOptions(observedEmail) {
+    try {
+        const userContext = createUserContext();
+        if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
+            return { success: false, error: 'Permission denied.' };
+        }
+        const observations = getObservationsForUser(observedEmail);
+        return { success: true, observations: observations };
+    } catch (error) {
+        console.error('Error in getObservationOptions:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Creates a new observation draft and returns the data needed to render the editor.
+ * @param {string} observedEmail The email of the staff member to be observed.
+ * @returns {Object} A response object containing the new observation and the rubric data.
+ */
+function createNewObservationForPeerEvaluator(observedEmail) {
+  try {
+    const userContext = createUserContext();
+    if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
+      return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
+    }
+
+    const newObservation = createNewObservation(userContext.email, observedEmail);
+    if (!newObservation) {
+      return { success: false, error: 'Failed to create a new observation record.' };
+    }
+    
+    // Get assigned subdomains for the observed user to enhance the rubric
+    const assignedSubdomains = getAssignedSubdomainsForRoleYear(newObservation.observedRole, newObservation.observedYear);
+
+    // Get the FULL rubric data, but enhance it with assignment flags so the UI can toggle views
+    const rubricData = getAllDomainsData(
+      newObservation.observedRole,
+      newObservation.observedYear,
+      'full',
+      assignedSubdomains
+    );
+    
+    // Create a special context for this observation session
+    const evaluatorContext = createFilteredUserContext(observedEmail, userContext.role);
+    rubricData.userContext = evaluatorContext;
+
+    return { 
+        success: true, 
+        observation: newObservation,
+        rubricData: rubricData
+    };
+
+  } catch (error) {
+    console.error('Error in createNewObservationForPeerEvaluator:', error);
+    return { success: false, error: 'An unexpected error occurred: ' + error.message };
+  }
+}
+
+/**
+ * Loads an existing observation draft for editing.
+ * @param {string} observationId The ID of the observation to load.
+ * @returns {Object} A response object with the observation and rubric data.
+ */
+function loadObservationForEditing(observationId) {
+    try {
+        const userContext = createUserContext();
+        if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
+            return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
+        }
+
+        const observation = getObservationById(observationId);
+        if (!observation) {
+            return { success: false, error: 'Observation not found.' };
+        }
+        if (observation.observerEmail !== userContext.email) {
+            return { success: false, error: 'You do not have permission to edit this observation.' };
+        }
+        
+        const assignedSubdomains = getAssignedSubdomainsForRoleYear(observation.observedRole, observation.observedYear);
+        const rubricData = getAllDomainsData(observation.observedRole, observation.observedYear, 'full', assignedSubdomains);
+        
+        const evaluatorContext = createFilteredUserContext(observation.observedEmail, userContext.role);
+        rubricData.userContext = evaluatorContext;
+
+        return { success: true, observation: observation, rubricData: rubricData };
+
+    } catch (error) {
+        console.error('Error in loadObservationForEditing:', error);
+        return { success: false, error: 'An unexpected error occurred: ' + error.message };
+    }
+}
+
+/**
+ * Deletes an observation draft.
+ * @param {string} observationId The ID of the observation to delete.
+ * @returns {Object} A response object indicating success or failure.
+ */
+function deleteObservation(observationId) {
+    try {
+        const userContext = createUserContext();
+        if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
+            return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
+        }
+        return deleteObservationRecord(observationId, userContext.email);
+    } catch (error) {
+        console.error('Error in deleteObservation wrapper:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Finalizes an observation draft.
+ * @param {string} observationId The ID of the observation to finalize.
+ * @returns {Object} A response object indicating success or failure.
+ */
+function finalizeObservation(observationId) {
+    try {
+        const userContext = createUserContext();
+        if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
+            return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
+        }
+        return updateObservationStatus(observationId, OBSERVATION_STATUS.FINALIZED, userContext.email);
+    } catch (error) {
+        console.error('Error in finalizeObservation wrapper:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+
+/**
+ * =================================================================
+ * CORE DATA & UI RENDERING FUNCTIONS
+ * =================================================================
+ */
 
 /**
  * Handle AJAX requests for staff data (used by special role filters)
@@ -1052,93 +1013,6 @@ function checkAllUsersForRoleChanges() {
   } catch (error) {
     console.error('Error checking users for role changes:', error);
     return { error: error.message };
-  }
-}
-
-/**
- * Retrieves a list of staff members filtered by role and year, formatted for a dropdown.
- * This function is intended to be called from client-side JavaScript via google.script.run.
- *
- * @param {string} role The role to filter by (e.g., "Teacher", "Counselor").
- * @param {string} year The year to filter by (e.g., "1", "2", "Probationary").
- * @return {Object} An object containing the success status and staff list or an error message.
- */
-function getStaffListForDropdown(role, year) {
-  try {
-    debugLog(`getStaffListForDropdown called with role: ${role}, year: ${year}`);
-
-    // Enhanced input validation
-    if (!role || typeof role !== 'string' || role.trim() === '') {
-      debugLog('Invalid role provided to getStaffListForDropdown', { role: role });
-      return { success: false, error: 'Invalid role provided.', staff: [] };
-    }
-
-    if (!year || typeof year !== 'string' || year.trim() === '') {
-      debugLog('Invalid year provided to getStaffListForDropdown', { year: year });
-      return { success: false, error: 'Invalid year provided.', staff: [] };
-    }
-
-    const staffData = getStaffData();
-
-    if (!staffData || !staffData.users || staffData.users.length === 0) {
-      debugLog('No staff data available in getStaffListForDropdown.');
-      return { success: true, staff: [] };
-    }
-
-    let filteredStaff = staffData.users;
-
-    // Filter by role (handle "Any" specially)
-    if (role.toLowerCase() !== 'any') {
-      const targetRole = role.trim();
-      
-      // Validate that the role exists in AVAILABLE_ROLES
-      if (!AVAILABLE_ROLES.includes(targetRole)) {
-        debugLog(`Invalid role provided: ${targetRole}. Valid roles are:`, AVAILABLE_ROLES);
-        return { success: false, error: `Invalid role: ${targetRole}`, staff: [] };
-      }
-      
-      filteredStaff = filteredStaff.filter(user => {
-        return user.role && user.role.trim() === targetRole;
-      });
-      
-      debugLog(`After role filter (${targetRole}):`, filteredStaff.length, 'staff members');
-    }
-
-    // Filter by year (handle "Any" specially)
-    if (year.toLowerCase() !== 'any') {
-      const targetYear = year.trim();
-      
-      filteredStaff = filteredStaff.filter(user => {
-        return _isUserYearMatching(user.year, targetYear);
-      });
-      
-      debugLog(`After year filter (${targetYear}):`, filteredStaff.length, 'staff members');
-    }
-
-    // Format results for dropdown
-    const result = filteredStaff.map(user => ({
-      name: user.name || 'Unknown Name',
-      email: user.email || '',
-      role: user.role || 'Unknown Role',
-      year: user.year || 'Unknown Year',
-      displayText: `${user.name || 'Unknown'} (${user.role || 'Unknown'}, Year ${user.year || 'N/A'})`
-    }));
-
-    // Sort by name for better user experience
-    result.sort((a, b) => {
-      const nameA = a.name.toLowerCase();
-      const nameB = b.name.toLowerCase();
-      return nameA.localeCompare(nameB);
-    });
-
-    debugLog(`Found ${result.length} staff members for role '${role}' and year '${year}'.`);
-    
-    return { success: true, staff: result };
-
-  } catch (error) {
-    console.error('Error in getStaffListForDropdown:', error.toString(), error.stack);
-    debugLog(`Error in getStaffListForDropdown: ${error.toString()} Stack: ${error.stack || 'N/A'}`);
-    return { success: false, error: error.message, staff: [] };
   }
 }
 
@@ -1860,7 +1734,7 @@ function applyYearFiltering(domains, role, year) {
  */
 function createFilterSelectionInterface(userContext, requestId) {
   try {
-    const htmlTemplate = HtmlService.createTemplateFromFile('filter-interface');
+    const htmlTemplate = HtmlService.createTemplateFromFile('filter-interface.html');
     htmlTemplate.userContext = userContext;
     htmlTemplate.userContext.probationaryYearValue = PROBATIONARY_OBSERVATION_YEAR;
     htmlTemplate.availableRoles = AVAILABLE_ROLES;
@@ -1943,7 +1817,7 @@ function getPageTitle(role) {
  */
 function createEnhancedErrorPage(error, requestId, userContext, userAgent = 'Unknown') {
   try {
-    const htmlTemplate = HtmlService.createTemplateFromFile('error-page');
+    const htmlTemplate = HtmlService.createTemplateFromFile('error-page.html');
     htmlTemplate.error = {
       message: error.message,
       stack: error.stack,
@@ -1968,112 +1842,4 @@ function createEnhancedErrorPage(error, requestId, userContext, userAgent = 'Unk
       `<h1>An unexpected error occurred</h1><p>Additionally, the error page itself failed to render.</p><pre>${e.stack}</pre><pre>${error.stack}</pre>`
     );
   }
-}
-
-/**
- * Creates a new observation draft for a Peer Evaluator.
- * This function is called from the client-side filter interface.
- * @param {string} observedEmail The email of the staff member to be observed.
- * @returns {Object} An object containing the new observation and the required rubric data.
- */
-function createNewObservationForPeerEvaluator(observedEmail) {
-  try {
-    const observerContext = createUserContext();
-    if (observerContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
-      return { success: false, error: 'You do not have permission to create observations.' };
-    }
-
-    const newObservation = createNewObservation(observerContext.email, observedEmail);
-    if (!newObservation) {
-      return { success: false, error: 'Failed to create a new observation record.' };
-    }
-
-    // Get the assigned subdomains for the observed user
-    const observedUsersAssignedSubdomains = getAssignedSubdomainsForRoleYear(newObservation.observedRole, newObservation.observedYear);
-
-    // Get the FULL rubric data, but include the assignment info so the client can toggle
-    const rubricData = getAllDomainsData(
-      newObservation.observedRole,
-      newObservation.observedYear,
-      'full', // Always get the full data
-      observedUsersAssignedSubdomains // But enhance it with assignment flags
-    );
-
-    // Create a special context for the evaluator view
-    const evaluatorContext = createFilteredUserContext(observedEmail, SPECIAL_ROLES.PEER_EVALUATOR);
-    evaluatorContext.observationId = newObservation.observationId; // Pass the observation ID
-    evaluatorContext.viewMode = 'assigned'; // Set the INITIAL view to 'assigned'
-
-    // Attach the evaluator context to the rubric data payload
-    rubricData.userContext = evaluatorContext;
-
-    return {
-      success: true,
-      observation: newObservation,
-      rubricData: rubricData
-    };
-
-  } catch (error) {
-    console.error('Error in createNewObservationForPeerEvaluator:', error);
-    return { success: false, error: 'An unexpected error occurred: ' + error.message };
-  }
-}
-
-/**
- * Main data loading function for the filter interface.
- * @param {Object} filterParams Parameters from the client (e.g., {staff: 'email@...'}).
- * @returns {Object} A response object for the client.
- */
-function loadRubricData(filterParams) {
-    try {
-        debugLog('Loading rubric data via AJAX', { filterParams });
-
-        const userContext = createUserContext(); // The person using the interface
-
-        // Handle Peer Evaluator selecting a staff member to observe
-        if (userContext.role === SPECIAL_ROLES.PEER_EVALUATOR && filterParams.staff) {
-            const staffUser = getUserByEmail(filterParams.staff);
-            if (!staffUser) return { success: false, error: `Staff not found: ${filterParams.staff}` };
-            
-            return {
-                success: true,
-                action: 'show_observation_selector',
-                observedEmail: staffUser.email,
-                observedName: staffUser.name
-            };
-        }
-        
-        // Handle loading current user's own rubric
-        if (filterParams.myOwnView) {
-            const rubricData = getAllDomainsData(userContext.role, userContext.year, 'assigned', userContext.assignedSubdomains);
-            rubricData.filterContext = { isOwnView: true, role: userContext.role, year: userContext.year, viewType: 'assigned' };
-            return { success: true, data: rubricData };
-        }
-
-        // Default behavior (could be expanded for other roles like Admin)
-        return { success: false, error: 'Invalid filter request.' };
-
-    } catch (error) {
-        console.error('Error in loadRubricData:', error);
-        return { success: false, error: error.message };
-    }
-}
-
-/**
- * Gets the list of observations for a user.
- * @param {string} observedEmail The email of the staff member.
- * @returns {Object} A response object with success status and observations list.
- */
-function getObservationOptions(observedEmail) {
-    try {
-        const userContext = createUserContext();
-        if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
-            return { success: false, error: 'Permission denied.' };
-        }
-        const observations = getObservationsForUser(observedEmail);
-        return { success: true, observations: observations };
-    } catch (error) {
-        console.error('Error in getObservationOptions:', error);
-        return { success: false, error: error.message };
-    }
 }
