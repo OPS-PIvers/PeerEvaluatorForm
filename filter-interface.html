@@ -393,6 +393,7 @@
                 const isExpanded = content.classList.toggle('expanded');
                 chevron.classList.toggle('expanded');
                 try {
+                    if (!window.pageLoadInfo) return;
                     const storageKey = `lookForsState_${window.pageLoadInfo.cacheVersion}`;
                     const allStates = JSON.parse(sessionStorage.getItem(storageKey) || '{}');
                     allStates[componentId] = isExpanded;
