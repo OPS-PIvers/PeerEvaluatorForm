@@ -1943,45 +1943,43 @@
         <? if (data.userContext && data.userContext.isEvaluator) { ?>
           // This script will run only if the user is an evaluator
           // It will add the necessary controls for editing proficiency levels and uploading media
-          document.addEventListener('DOMContentLoaded', function() { 
-            console.log('Evaluator mode enabled');
+          console.log('Evaluator mode enabled');
 
-            // Add a file input to each component for media uploads
-            const components = document.querySelectorAll('.component-section');
-            components.forEach(function(component) {
-              const uploadContainer = document.createElement('div');
-              uploadContainer.className = 'media-upload-container';
+          // Add a file input to each component for media uploads
+          const components = document.querySelectorAll('.component-section');
+          components.forEach(function(component) {
+            const uploadContainer = document.createElement('div');
+            uploadContainer.className = 'media-upload-container';
 
-              const fileInput = document.createElement('input');
-              fileInput.type = 'file';
-              fileInput.className = 'media-upload-input';
-              fileInput.accept = 'image/*,video/*'; // Accept images and videos
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.className = 'media-upload-input';
+            fileInput.accept = 'image/*,video/*'; // Accept images and videos
 
-              const uploadButton = document.createElement('button');
-              uploadButton.className = 'media-upload-button';
-              uploadButton.textContent = 'Upload Media';
+            const uploadButton = document.createElement('button');
+            uploadButton.className = 'media-upload-button';
+            uploadButton.textContent = 'Upload Media';
 
-              uploadContainer.appendChild(fileInput);
-              uploadContainer.appendChild(uploadButton);
+            uploadContainer.appendChild(fileInput);
+            uploadContainer.appendChild(uploadButton);
 
-              component.appendChild(uploadContainer);
-            });
+            component.appendChild(uploadContainer);
+          });
 
-            // Make proficiency level cells selectable
-            const levelCells = document.querySelectorAll('.level-content');
-            levelCells.forEach(function(cell) {
-              cell.classList.add('selectable-cell');
-              cell.addEventListener('click', function() {
-                // Remove selected class from all cells in the same component
-                const parentComponent = cell.closest('.component-section');
-                const allCellsInComponent = parentComponent.querySelectorAll('.level-content');
-                allCellsInComponent.forEach(function(c) {
-                  c.classList.remove('selected-cell');
-                });
-
-                // Add selected class to the clicked cell
-                cell.classList.add('selected-cell');
+          // Make proficiency level cells selectable
+          const levelCells = document.querySelectorAll('.level-content');
+          levelCells.forEach(function(cell) {
+            cell.classList.add('selectable-cell');
+            cell.addEventListener('click', function() {
+              // Remove selected class from all cells in the same component
+              const parentComponent = cell.closest('.component-section');
+              const allCellsInComponent = parentComponent.querySelectorAll('.level-content');
+              allCellsInComponent.forEach(function(c) {
+                c.classList.remove('selected-cell');
               });
+
+              // Add selected class to the clicked cell
+              cell.classList.add('selected-cell');
             });
           });
         <? } ?>
