@@ -252,18 +252,16 @@ function getStaffData() {
 }
 
 /**
- * Reads data from the Settings sheet with 4-row role pattern
+ * Enhanced getSettingsData function with change detection and improved caching
  * @return {Object|null} Settings data with role-year mappings
  */
 function getSettingsData() {
-  const cacheKey = 'settings_data';
-  
   try {
-    // Check cache first
-    const cachedData = getCachedData(cacheKey);
-    if (cachedData) {
-      debugLog('Settings data retrieved from cache');
-      return cachedData;
+    // Check enhanced cache first
+    const cachedData = getCachedDataEnhanced('settings_data');
+    if (cachedData && cachedData.data) {
+      debugLog('Settings data retrieved from enhanced cache');
+      return cachedData.data;
     }
     
     const startTime = Date.now();
@@ -284,6 +282,19 @@ function getSettingsData() {
     // Read all data (assuming row 1 has headers)
     const range = sheet.getRange(2, 1, lastRow - 1, 4); // Rows 2 to end, columns A-D
     const values = range.getValues();
+    
+    // Check if data has changed
+    const dataChanged = hasSheetDataChanged('Settings', values);
+    if (dataChanged) {
+      if (typeof invalidateDependentCaches === 'function') {
+        debugLog('Settings sheet data change detected - invalidating related caches');
+        // Settings data change may affect various dependent caches
+        invalidateDependentCaches('settings_data');
+      } else {
+        console.warn('invalidateDependentCaches is not a function, skipping cache invalidation for Settings data change.');
+        debugLog('invalidateDependentCaches not found, cannot invalidate for Settings data change.');
+      }
+    }
     
     const roleYearMappings = {};
     
@@ -355,16 +366,18 @@ function getSettingsData() {
       rolesConfigured: Object.keys(roleYearMappings).length
     };
     
-    // Cache the data
-    setCachedData(cacheKey, settingsData, CACHE_SETTINGS.SHEET_DATA_TTL);
+    // Cache the data using enhanced caching system
+    setCachedDataEnhanced('settings_data', {}, settingsData, CACHE_SETTINGS.SHEET_DATA_TTL);
     
     const executionTime = Date.now() - startTime;
     logPerformanceMetrics('getSettingsData', executionTime, {
-      rolesConfigured: Object.keys(roleYearMappings).length
+      rolesConfigured: Object.keys(roleYearMappings).length,
+      dataChanged: dataChanged
     });
     
     debugLog('Settings data loaded successfully', {
-      rolesConfigured: Object.keys(roleYearMappings).length
+      rolesConfigured: Object.keys(roleYearMappings).length,
+      dataChanged: dataChanged
     });
     
     return settingsData;
