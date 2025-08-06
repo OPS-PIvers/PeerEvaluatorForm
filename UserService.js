@@ -732,6 +732,7 @@ function createFilteredUserContext(targetEmail, requestingRole) {
       context.viewMode = VIEW_MODES.FULL;
       context.assignedSubdomains = null; // Ensure all subdomains are loaded
       context.isObservationMode = true; // Flag for the UI to enable editing
+      context.isEvaluator = true; // Explicitly set evaluator status
       debugLog('Peer Evaluator observation mode enabled.', {
         targetEmail: targetEmail,
         requestingRole: requestingRole
@@ -752,6 +753,7 @@ function createFilteredUserContext(targetEmail, requestingRole) {
       }
       context.assignedSubdomains = assignedSubdomainsResult;
       context.viewMode = viewModeResult;
+      context.isEvaluator = false; // Ensure this is false for other roles
     }
 
     // Add metadata about the filtering
@@ -764,15 +766,12 @@ function createFilteredUserContext(targetEmail, requestingRole) {
       requestedBy: requestingRole
     };
 
-    if (requestingRole === SPECIAL_ROLES.PEER_EVALUATOR) {
-      context.isEvaluator = true;
-    }
-
     debugLog('Filtered user context created and adjusted', {
       targetEmail: targetEmail,
       targetRole: context.role,
       targetYear: context.year,
       viewMode: context.viewMode,
+      isEvaluator: context.isEvaluator,
       isObservationMode: context.isObservationMode || false,
       requestingRole: requestingRole
     });

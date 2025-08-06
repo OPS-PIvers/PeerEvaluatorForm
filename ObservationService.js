@@ -115,7 +115,7 @@ function createNewObservation(observerEmail, observedEmail) {
  * A test function to clear all observations from the properties service.
  * USE WITH CAUTION.
  */
-function deleteAllObservations_DANGEROUS() {
+/** function deleteAllObservations_DANGEROUS() {
     try {
         const properties = PropertiesService.getScriptProperties();
         properties.deleteProperty(OBSERVATIONS_DB_KEY);
@@ -125,4 +125,118 @@ function deleteAllObservations_DANGEROUS() {
         console.error('Error deleting observations:', error);
         return { success: false, error: error.message };
     }
+}
+*/
+
+/**
+ * Saves the observation data (proficiency levels, etc.) for a given observation.
+ * @param {string} observationId The ID of the observation to update.
+ * @param {Object} observationData The data to save.
+ * @returns {Object} A success or failure object.
+ */
+/** function saveObservationData(observationId, observationData) {
+  if (!observationId || !observationData) {
+    return { success: false, error: 'Observation ID and data are required.' };
+  }
+
+  try {
+    const db = _getObservationsDb();
+    const observationIndex = db.findIndex(obs => obs.observationId === observationId);
+
+    if (observationIndex === -1) {
+      return { success: false, error: 'Observation not found.' };
+    }
+
+    // Update the observation data
+    db[observationIndex].observationData = observationData;
+    db[observationIndex].lastModifiedAt = Date.now();
+
+    _saveObservationsDb(db);
+
+    debugLog('Observation data saved', { observationId: observationId });
+    return { success: true };
+
+  } catch (error) {
+    console.error(`Error in saveObservationData for ${observationId}:`, error);
+    return { success: false, error: 'An unexpected error occurred: ' + error.message };
+  }
+}
+*/
+
+/**
+ * Uploads media evidence to Google Drive and links it to an observation.
+ * @param {string} observationId The ID of the observation.
+ * @param {string} componentId The ID of the rubric component (e.g., "1a:").
+ * @param {string} base64Data The base64 encoded file data.
+ * @param {string} fileName The original file name.
+ * @param {string} mimeType The MIME type of the file.
+ * @returns {Object} A success or failure object with the file link.
+ */
+function uploadMediaEvidence(observationId, componentId, base64Data, fileName, mimeType) {
+  if (!observationId || !componentId || !base64Data || !fileName || !mimeType) {
+    return { success: false, error: 'Missing required parameters for upload.' };
+  }
+
+  try {
+    const db = _getObservationsDb();
+    const observationIndex = db.findIndex(obs => obs.observationId === observationId);
+
+    if (observationIndex === -1) {
+      return { success: false, error: 'Observation not found for media upload.' };
+    }
+
+    const observation = db[observationIndex];
+
+    // Ensure the root folder exists
+    let rootFolderIterator = DriveApp.getFoldersByName(DRIVE_FOLDER_INFO.ROOT_FOLDER_NAME);
+    let rootFolder = rootFolderIterator.hasNext() ? rootFolderIterator.next() : null;
+    if (!rootFolder) {
+      rootFolder = DriveApp.createFolder(DRIVE_FOLDER_INFO.ROOT_FOLDER_NAME);
+      debugLog('Created root Drive folder:', DRIVE_FOLDER_INFO.ROOT_FOLDER_NAME);
+    }
+
+    // Create a subfolder for the observed user if it doesn't exist
+    const userFolderName = `${observation.observedName} (${observation.observedEmail})`;
+    let userFolderIterator = rootFolder.getFoldersByName(userFolderName);
+    let userFolder = userFolderIterator.hasNext() ? userFolderIterator.next() : null;
+    if (!userFolder) {
+      userFolder = rootFolder.createFolder(userFolderName);
+      debugLog('Created user-specific Drive folder:', userFolderName);
+    }
+
+    // Create a subfolder for the specific observation if it doesn't exist
+    const observationFolderName = `Observation_${observation.observationId.substring(0, 8)}`;
+    let observationFolderIterator = userFolder.getFoldersByName(observationFolderName);
+    let observationFolder = observationFolderIterator.hasNext() ? observationFolderIterator.next() : null;
+    if (!observationFolder) {
+      observationFolder = userFolder.createFolder(observationFolderName);
+      debugLog('Created observation-specific Drive folder:', observationFolderName);
+    }
+
+    // Convert base64 to Blob
+    const blob = Utilities.newBlob(Utilities.base64Decode(base64Data), mimeType, fileName);
+
+    // Create file in Drive
+    const file = observationFolder.createFile(blob);
+    const fileLink = file.getUrl();
+
+    // Update observation record with the file link
+    if (!observation.evidenceLinks) {
+      observation.evidenceLinks = {};
+    }
+    if (!observation.evidenceLinks[componentId]) {
+      observation.evidenceLinks[componentId] = [];
+    }
+    observation.evidenceLinks[componentId].push(fileLink);
+    observation.lastModifiedAt = Date.now();
+
+    _saveObservationsDb(db);
+
+    debugLog('Media uploaded and linked', { observationId, componentId, fileLink });
+    return { success: true, fileLink: fileLink };
+
+  } catch (error) {
+    console.error(`Error in uploadMediaEvidence for ${observationId}, component ${componentId}:`, error);
+    return { success: false, error: 'Failed to upload media: ' + error.message };
+  }
 }

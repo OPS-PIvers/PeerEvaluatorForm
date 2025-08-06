@@ -776,6 +776,59 @@
             opacity: 0.8;
             margin-left: 10px;
         }
+
+        /* Media Upload Styles */
+        .media-upload-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 20px;
+            background: #f0f4f8;
+            border-top: 1px solid #e2e8f0;
+            margin-top: 10px;
+        }
+
+        .media-upload-input {
+            flex-grow: 1;
+            padding: 8px;
+            border: 1px solid #cbd5e0;
+            border-radius: 4px;
+        }
+
+        .media-upload-button {
+            background: #3182ce;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: background 0.3s ease;
+        }
+
+        .media-upload-button:hover {
+            background: #2c5aa0;
+        }
+
+        .media-links-container {
+            padding: 10px 20px;
+            background: #f8fafc;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .media-link-item {
+            margin-bottom: 5px;
+        }
+
+        .media-link-item a {
+            color: #3182ce;
+            text-decoration: none;
+        }
+
+        .media-link-item a:hover {
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
@@ -1683,11 +1736,6 @@
                     if (savedMode === 'assigned' || savedMode === 'full') {
                         currentViewMode = savedMode;
                         console.log('View mode restored from sessionStorage:', currentViewMode);
-                    } else {
-                        // currentViewMode remains as initialized from server (<?= data.userContext?.viewMode || "full" ?>)
-                        // or defaults to 'full' if server value is not set/reliable.
-                        // It's already initialized with this value, so no explicit 'else' needed to set it again.
-                        console.log('View mode initialized (no URL param or session storage, using server/default):', currentViewMode);
                     }
                 } catch (e) {
                     console.warn('Could not access sessionStorage for view mode preference:', e);
@@ -1954,34 +2002,60 @@
             const fileInput = document.createElement('input');
             fileInput.type = 'file';
             fileInput.className = 'media-upload-input';
-            fileInput.accept = 'image/*,video/*'; // Accept images and videos
+            fileInput.accept = 'image/*,video/*,application/pdf';
 
             const uploadButton = document.createElement('button');
             uploadButton.className = 'media-upload-button';
-            uploadButton.textContent = 'Upload Media';
+            uploadButton.textContent = 'Upload';
+            uploadButton.onclick = function() {
+              uploadMedia(component, fileInput);
+            };
 
             uploadContainer.appendChild(fileInput);
             uploadContainer.appendChild(uploadButton);
-
             component.appendChild(uploadContainer);
+
+            const linksContainer = document.createElement('div');
+            linksContainer.className = 'media-links-container';
+            component.appendChild(linksContainer);
           });
 
-          // Make proficiency level cells selectable
-          const levelCells = document.querySelectorAll('.level-content');
-          levelCells.forEach(function(cell) {
-            cell.classList.add('selectable-cell');
-            cell.addEventListener('click', function() {
-              // Remove selected class from all cells in the same component
-              const parentComponent = cell.closest('.component-section');
-              const allCellsInComponent = parentComponent.querySelectorAll('.level-content');
-              allCellsInComponent.forEach(function(c) {
-                c.classList.remove('selected-cell');
-              });
+          function uploadMedia(component, fileInput) {
+            const file = fileInput.files[0];
+            if (!file) {
+              alert('Please select a file to upload.');
+              return;
+            }
 
-              // Add selected class to the clicked cell
-              cell.classList.add('selected-cell');
-            });
-          });
+            const reader = new FileReader();
+            reader.onload = function(e) {
+              const base64Data = e.target.result.split(',')[1];
+              const componentId = component.getAttribute('data-component-id');
+              const observationId = '...'; // This needs to be retrieved from the current observation context
+
+              google.script.run
+                .withSuccessHandler(function(result) {
+                  if (result.success) {
+                    addMediaLink(component, result.fileLink);
+                  } else {
+                    alert('Upload failed: ' + result.error);
+                  }
+                })
+                .withFailureHandler(function(error) {
+                  alert('Upload failed: ' + error.message);
+                })
+                .uploadMediaEvidence(observationId, componentId, base64Data, file.name, file.type);
+            };
+            reader.readAsDataURL(file);
+          }
+
+          function addMediaLink(component, link) {
+            const linksContainer = component.querySelector('.media-links-container');
+            const linkItem = document.createElement('div');
+            linkItem.className = 'media-link-item';
+            linkItem.innerHTML = `<a href="${link}" target="_blank">${link}</a>`;
+            linksContainer.appendChild(linkItem);
+          }
         <? } ?>
     </script>
 </body>

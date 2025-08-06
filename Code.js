@@ -438,7 +438,8 @@ function doGet(e) {
 
       // Enhanced metadata
       contextVersion: userContext.metadata.contextVersion,
-      hasStaffRecord: userContext.hasStaffRecord
+      hasStaffRecord: userContext.hasStaffRecord,
+      isEvaluator: finalUserContext.isEvaluator || false
     };
     
     // Create and configure the HTML template
@@ -613,7 +614,7 @@ function getFilteredStaffList(filterType = 'all', role = null, year = null) {
     }
 
     // Format for frontend use
-    const formattedUsers = formattedUsers.map(user => ({
+    const formattedUsers = filteredUsers.map(user => ({
       name: user.name || 'Unknown Name',
       email: user.email,
       role: user.role || 'Unknown Role',
@@ -1992,11 +1993,181 @@ function processRoleDomains(roleSheetData, role, year) {
 /**
  * Apply year-based filtering to domains (placeholder for future implementation)
  */
-function applyYearFiltering(domains, role, year) {
+'''function applyYearFiltering(domains, role, year) {
   // Placeholder - future implementation will filter domains/components based on year
   debugLog('Year filtering not yet implemented - returning all domains', { role, year });
   return domains;
 }
+
+/**
+ * =================================================================
+ * MISSING HELPER FUNCTIONS (PLACEHOLDERS)
+ * =================================================================
+ */
+
+/**
+ * Creates the filter selection interface for special access roles.
+ * @param {Object} userContext - The context of the current user.
+ * @param {string} requestId - The unique ID for the current request.
+ * @returns {HtmlOutput} The HTML output for the filter interface.
+ */
+function createFilterSelectionInterface(userContext, requestId) {
+  try {
+    const htmlTemplate = HtmlService.createTemplateFromFile('filter-interface');
+    htmlTemplate.data = { userContext: userContext, requestId: requestId };
+    const htmlOutput = htmlTemplate.evaluate()
+      .setTitle(`${userContext.role} - Filter View`)
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+    
+    // Add cache busting headers
+    const metadata = generateResponseMetadata(userContext, requestId, userContext.debugMode);
+    addCacheBustingHeaders(htmlOutput, metadata);
+    
+    return htmlOutput;
+  } catch (error) {
+    console.error('Error creating filter selection interface:', error);
+    return createEnhancedErrorPage(error, requestId, userContext);
+  }
+}
+
+/**
+ * Checks if any filters are active in the URL parameters.
+ * @param {Object} params - The URL parameters from the event object.
+ * @returns {boolean} True if any filter parameter is present.
+ */
+function hasActiveFilters(params) {
+  return !!(params.filterRole || params.filterYear || params.filterStaff || params.filterType !== 'all');
+}
+
+/**
+ * Creates a synthetic user context for special role filtering scenarios.
+ * @param {string} effectiveRole - The role to view as.
+ * @param {string|number} effectiveYear - The year to view as.
+ * @param {Object} originalContext - The original user's context.
+ * @param {Object} filterDetails - Additional details about the filter.
+ * @returns {Object} A new user context object.
+ */
+function createSyntheticUserContext(effectiveRole, effectiveYear, originalContext, filterDetails) {
+  const syntheticContext = JSON.parse(JSON.stringify(originalContext)); // Deep copy
+  
+  syntheticContext.role = effectiveRole;
+  syntheticContext.year = effectiveYear;
+  syntheticContext.isSynthetic = true;
+  syntheticContext.isFiltered = true;
+  syntheticContext.filterInfo = {
+    viewingAs: `Role: ${effectiveRole}`,
+    viewingRole: effectiveRole,
+    viewingYear: effectiveYear,
+    requestedBy: originalContext.role,
+    ...filterDetails
+  };
+  
+  if (filterDetails.showFullRubric) {
+    syntheticContext.viewMode = VIEW_MODES.FULL;
+    syntheticContext.assignedSubdomains = null;
+  } else if (filterDetails.showAssignedAreas) {
+    syntheticContext.viewMode = VIEW_MODES.ASSIGNED;
+    syntheticContext.assignedSubdomains = getAssignedSubdomainsForRoleYear(effectiveRole, effectiveYear);
+  }
+  
+  return syntheticContext;
+}
+
+/**
+ * Generates a page title based on the user's role.
+ * @param {string} role - The user's role.
+ * @returns {string} The title for the HTML page.
+ */
+function getPageTitle(role) {
+  return `${role} - Danielson Framework Rubric`;
+}
+
+/**
+ * Creates an enhanced error page with debugging information.
+ * @param {Error} error - The error object.
+ * @param {string} requestId - The unique ID for the request.
+ * @param {Object} userContext - The user context at the time of the error.
+ * @param {string} userAgent - The user agent string.
+ * @returns {HtmlOutput} The HTML output for the error page.
+ */
+function createEnhancedErrorPage(error, requestId, userContext, userAgent = 'Unknown') {
+  try {
+    const htmlTemplate = HtmlService.createTemplateFromFile('error-page');
+    htmlTemplate.error = {
+      message: error.message,
+      stack: error.stack,
+      requestId: requestId,
+      timestamp: new Date().toISOString(),
+      version: SYSTEM_INFO.VERSION,
+      userEmail: userContext ? userContext.email : (Session.getActiveUser().getEmail() || 'N/A'),
+      userAgent: userAgent
+    };
+    
+    const htmlOutput = htmlTemplate.evaluate()
+      .setTitle('Application Error')
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+      
+    // Add cache busting headers to prevent caching of the error page
+    htmlOutput
+      .addMetaTag('cache-control', 'no-cache, no-store, must-revalidate, max-age=0')
+      .addMetaTag('pragma', 'no-cache')
+      .addMetaTag('expires', '0');
+      
+    return htmlOutput;
+  } catch (e) {
+    console.error('FATAL: Could not create error page.', e);
+    return HtmlService.createHtmlOutput(
+      `<h1>An unexpected error occurred</h1><p>Additionally, the error page itself failed to render.</p><pre>${e.stack}</pre><pre>${error.stack}</pre>`
+    );
+  }
+}
+
+/**
+ * Creates a new observation draft for a Peer Evaluator.
+ * This function is called from the client-side filter interface.
+ * @param {string} observedEmail The email of the staff member to be observed.
+ * @returns {Object} An object containing the new observation and the required rubric data.
+ */
+function createNewObservationForPeerEvaluator(observedEmail) {
+  try {
+    const observerSession = getUserFromSession();
+    if (!observerSession || !observerSession.email) {
+      return { success: false, error: 'Could not identify the observer. Please refresh and try again.' };
+    }
+    const observerEmail = observerSession.email;
+
+    // Verify the observer is a Peer Evaluator
+    const observerUser = getUserByEmail(observerEmail);
+    if (!observerUser || observerUser.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
+      return { success: false, error: 'You do not have permission to create observations.' };
+    }
+
+    // Create the new observation draft
+    const newObservation = createNewObservation(observerEmail, observedEmail);
+    if (!newObservation) {
+      return { success: false, error: 'Failed to create a new observation record.' };
+    }
+
+    // Get the rubric data for the observed user
+    const observedUser = getUserByEmail(observedEmail);
+    const rubricData = getAllDomainsData(observedUser.role, observedUser.year, 'full', null);
+
+    // Set up the context to make the rubric editable
+    rubricData.userContext = createFilteredUserContext(observedEmail, SPECIAL_ROLES.PEER_EVALUATOR);
+    rubricData.userContext.isEvaluator = true; // Ensure the evaluator flag is set
+    rubricData.userContext.observationId = newObservation.observationId; // Pass the observation ID to the client
+
+    return {
+      success: true,
+      observation: newObservation,
+      rubricData: rubricData
+    };
+
+  } catch (error) {
+    console.error('Error in createNewObservationForPeerEvaluator:', error);
+    return { success: false, error: 'An unexpected error occurred: ' + error.message };
+  }
+}''
 
 /**
  * Create a synthetic user context for role-based filtering (not viewing a specific user)
