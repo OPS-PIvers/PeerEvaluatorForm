@@ -40,6 +40,10 @@
     --color-gray-component-not-assigned-border: #e5e7eb;
     --color-gray-assignment-indicator-not-assigned-bg: #e5e7eb;
     --color-text-deemphasized: #718096;
+
+    /* Reds for destructive actions */
+    --color-red-base: #dc2626;
+    --color-red-dark: #b91c1c;
 }
 
         * {
@@ -120,7 +124,7 @@
             box-shadow: 0 8px 25px rgba(0,0,0,0.1);
         }
         .action-icon { font-size: 2.5rem; margin-bottom: 15px; display: block; }
-        .action-title { font-weight: 600; color: #2d3748; font-size: 1.1rem; margin-bottom: 8px; }
+        .action-title { font-weight: 600; color: var(--color-gray-text-light); font-size: 1.1rem; margin-bottom: 8px; }
         .action-desc { color: var(--color-text-deemphasized); font-size: 0.95rem; }
 
         /* Filter controls */
@@ -184,19 +188,19 @@
         }
         .observation-card:hover { box-shadow: 0 8px 25px rgba(0,0,0,0.08); transform: translateY(-2px); }
         .obs-card-content { padding: 20px; flex-grow: 1; }
-        .obs-card-title { font-weight: 600; color: #2d3748; font-size: 1.1rem; margin-bottom: 4px; }
+        .obs-card-title { font-weight: 600; color: var(--color-gray-text-light); font-size: 1.1rem; margin-bottom: 4px; }
         .obs-card-desc { color: var(--color-text-deemphasized); font-size: 0.9rem; margin-bottom: 12px; }
         .status-badge { display: inline-block; padding: 4px 10px; font-size: 0.8rem; font-weight: 600; border-radius: 9999px; }
         .status-draft { background-color: var(--color-amber-light-bg); color: var(--color-amber-text-dark); }
-        .status-finalized { background-color: var(--color-green-light-bg); color: #166534; }
+        .status-finalized { background-color: var(--color-green-light-bg); color: var(--color-green-darker); }
         .obs-card-actions { background: var(--color-gray-bg-light); border-top: 1px solid var(--color-gray-border-medium); padding: 15px 20px; display: flex; gap: 10px; justify-content: flex-end; }
         .obs-card-actions .filter-btn { padding: 8px 16px; font-size: 0.9rem; min-width: auto; }
         .btn-edit { background: #3b82f6; border-color: #3b82f6; }
         .btn-edit:hover { background: #2563eb; border-color: #2563eb; }
         .btn-finalize { background: var(--color-green-base); border-color: var(--color-green-base); }
         .btn-finalize:hover { background: var(--color-green-dark); border-color: var(--color-green-dark); }
-        .btn-delete { background: #dc2626; border-color: #dc2626; }
-        .btn-delete:hover { background: #b91c1c; border-color: #b91c1c; }
+        .btn-delete { background: var(--color-red-base); border-color: var(--color-red-base); }
+        .btn-delete:hover { background: var(--color-red-dark); border-color: var(--color-red-dark); }
 
         /* === Rubric Styles (from rubric.html) === */
         .rubric-container { display: none; margin-top: 30px; }
@@ -218,7 +222,7 @@
         .chevron { transition: transform 0.3s ease; font-size: 1rem; }
         .chevron.expanded { transform: rotate(180deg); }
         .look-fors-content { max-height: 0; overflow: hidden; transition: max-height 0.3s ease; background: var(--color-gray-bg-light); }
-        .look-fors-content.expanded { max-height: 250px; }
+        .look-fors-content.expanded { max-height: 1000px; }
         .look-fors-grid { padding: 12px 20px; display: grid; grid-template-columns: 1fr; gap: 8px; }
         .look-for-item { display: flex; align-items: flex-start; gap: 8px; padding: 8px 12px; background: var(--color-white); border-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.08); border-left: 3px solid var(--color-blue-base); }
         .look-for-item label { cursor: pointer; color: var(--color-gray-text); font-weight: 500; font-size: 0.85rem; line-height: 1.4; }
@@ -389,8 +393,10 @@
                 const isExpanded = content.classList.toggle('expanded');
                 chevron.classList.toggle('expanded');
                 try {
-                    const storageKey = `lookFors_${componentId}_${window.pageLoadInfo.cacheVersion}`;
-                    sessionStorage.setItem(storageKey, isExpanded);
+                    const storageKey = `lookForsState_${window.pageLoadInfo.cacheVersion}`;
+                    const allStates = JSON.parse(sessionStorage.getItem(storageKey) || '{}');
+                    allStates[componentId] = isExpanded;
+                    sessionStorage.setItem(storageKey, JSON.stringify(allStates));
                 } catch (e) {
                     console.warn('SessionStorage not available for look-fors state.');
                 }
@@ -400,17 +406,16 @@
         function restoreLookForsState() {
             try {
                 if (!window.pageLoadInfo) return;
-                for (let i = 0; i < sessionStorage.length; i++) {
-                    const key = sessionStorage.key(i);
-                    if (key && key.startsWith('lookFors_') && key.endsWith(window.pageLoadInfo.cacheVersion)) {
-                        if (sessionStorage.getItem(key) === 'true') {
-                            const componentId = key.replace('lookFors_', '').replace(`_${window.pageLoadInfo.cacheVersion}`, '');
-                            const content = document.getElementById(`lookForsContent-${componentId}`);
-                            const chevron = document.getElementById(`chevron-${componentId}`);
-                            if (content && chevron) {
-                                content.classList.add('expanded');
-                                chevron.classList.add('expanded');
-                            }
+                const storageKey = `lookForsState_${window.pageLoadInfo.cacheVersion}`;
+                const allStates = JSON.parse(sessionStorage.getItem(storageKey) || '{}');
+
+                for (const componentId in allStates) {
+                    if (allStates[componentId] === true) {
+                        const content = document.getElementById(`lookForsContent-${componentId}`);
+                        const chevron = document.getElementById(`chevron-${componentId}`);
+                        if (content && chevron) {
+                            content.classList.add('expanded');
+                            chevron.classList.add('expanded');
                         }
                     }
                 }
@@ -479,8 +484,11 @@
                         html += `<div class="look-fors-grid">`;
                         comp.bestPractices.forEach((practice, practiceIdx) => {
                             const practiceId = `practice-${domainIdx}-${compIdx}-${practiceIdx}`;
+                            const tempEl = document.createElement('span');
+                            tempEl.textContent = practice;
+                            const sanitizedPractice = tempEl.innerHTML;
                             html += `<div class="look-for-item">`;
-                            html += `<input type="checkbox" id="${practiceId}" name="${practiceId}"><label for="${practiceId}">${practice}</label>`;
+                            html += `<input type="checkbox" id="${practiceId}" name="${practiceId}"><label for="${practiceId}">${sanitizedPractice}</label>`;
                             html += `</div>`;
                         });
                         html += `</div></div></div>`;
