@@ -119,9 +119,9 @@ const ERROR_MESSAGES = {
  * Cache settings for performance optimization
  */
 const CACHE_SETTINGS = {
-  USER_DATA_TTL: 300,        // 5 minutes for user data
+  USER_DATA_TTL: 14400,      // 4 hours for user data
   ROLE_CONFIG_TTL: 600,      // 10 minutes for role configurations
-  SHEET_DATA_TTL: 180,       // 3 minutes for sheet data
+  SHEET_DATA_TTL: 14400,     // 4 hours for sheet data
   DEFAULT_TTL: 300           // Default cache time
 };
 
