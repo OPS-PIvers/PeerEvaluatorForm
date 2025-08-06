@@ -40,139 +40,6 @@ const DOMAIN_CONFIGS = {
 
 /**
  * =================================================================
- * HELPER FUNCTIONS FOR RESPONSE ENHANCEMENT
- * Moved here to ensure they are defined before being called.
- * =================================================================
- */
-
-/**
- * Generate response metadata including a unique ETag for caching.
- */
-function generateResponseMetadata(userContext, requestId, debugMode = false) {
-  try {
-    const timestamp = Date.now();
-    const cacheVersion = getMasterCacheVersion();
-
-    // Generate ETag based on user state and data version
-    const etagData = {
-      role: userContext.role,
-      year: userContext.year,
-      email: userContext.email,
-      cacheVersion: cacheVersion,
-      timestamp: Math.floor(timestamp / 60000) // Round to minute for some caching
-    };
-
-    const etag = Utilities.base64Encode(
-      Utilities.computeDigest(
-        Utilities.DigestAlgorithm.MD5,
-        JSON.stringify(etagData)
-      )
-    ).substring(0, 16);
-
-    const metadata = {
-      requestId: requestId,
-      timestamp: timestamp,
-      cacheVersion: cacheVersion,
-      etag: etag,
-      role: userContext.role,
-      year: userContext.year,
-      debugMode: debugMode,
-      lastModified: new Date().toUTCString(),
-      maxAge: 0,
-      mustRevalidate: true
-    };
-
-    debugLog('Response metadata generated', metadata);
-    return metadata;
-
-  } catch (error) {
-    console.error('Error generating response metadata:', error);
-    return {
-      requestId: requestId,
-      timestamp: Date.now(),
-      etag: 'error-' + Date.now(),
-      error: error.message
-    };
-  }
-}
-
-/**
- * Add state tracking headers to the HTML output for advanced debugging.
- */
-function addStateTrackingHeaders(htmlOutput, userContext) {
-  try {
-    if (userContext.roleChangeDetected) {
-      // htmlOutput.addMetaTag('x-role-change-detected', 'true');
-      // htmlOutput.addMetaTag('x-previous-role', userContext.previousState?.role || 'unknown');
-      // htmlOutput.addMetaTag('x-state-changes', userContext.stateChanges.length.toString());
-    }
-
-    if (userContext.isNewUser) {
-      // htmlOutput.addMetaTag('x-new-user', 'true');
-    }
-
-    // htmlOutput.addMetaTag('x-session-id', userContext.metadata.sessionId);
-    // htmlOutput.addMetaTag('x-context-version', userContext.metadata.contextVersion);
-    // htmlOutput.addMetaTag('x-has-staff-record', userContext.hasStaffRecord.toString());
-
-    debugLog('State tracking headers added', {
-      roleChangeDetected: userContext.roleChangeDetected,
-      sessionId: userContext.metadata.sessionId
-    });
-
-  } catch (error) {
-    console.error('Error adding state tracking headers:', error);
-  }
-}
-
-/**
- * Add cache-busting headers to the HTML output to prevent browser caching issues.
- */
-function addCacheBustingHeaders(htmlOutput, metadata) {
-  try {
-    // Primary cache control headers
-    htmlOutput
-      .addMetaTag('cache-control', 'no-cache, no-store, must-revalidate, max-age=0')
-      .addMetaTag('pragma', 'no-cache')
-      .addMetaTag('expires', '0')
-      .addMetaTag('last-modified', metadata.lastModified)
-      .addMetaTag('etag', metadata.etag);
-
-    // Viewport and mobile optimization
-    htmlOutput.addMetaTag('viewport', 'width=device-width, initial-scale=1.0');
-
-    debugLog('Cache-busting headers added', {
-      etag: metadata.etag,
-      requestId: metadata.requestId
-    });
-
-  } catch (error) {
-    console.error('Error adding cache-busting headers:', error);
-  }
-}
-
-/**
- * Add debug-specific headers to the HTML output when debug mode is active.
- */
-function addDebugHeaders(htmlOutput, userContext, metadata) {
-  try {
-    // htmlOutput
-    //   .addMetaTag('x-debug-mode', 'true')
-    //   .addMetaTag('x-user-email', userContext.email || 'anonymous')
-    //   .addMetaTag('x-user-authenticated', userContext.isAuthenticated.toString())
-    //   .addMetaTag('x-user-default', userContext.isDefaultUser.toString())
-    //   .addMetaTag('x-role-override', (userContext.isRoleOverride || false).toString())
-    //   .addMetaTag('x-execution-time', (Date.now() - metadata.timestamp).toString());
-
-    debugLog('Debug headers added', { requestId: metadata.requestId });
-
-  } catch (error) {
-    console.error('Error adding debug headers:', error);
-  }
-}
-
-/**
- * =================================================================
  * MAIN WEB APP ENTRY POINT (doGet)
  * =================================================================
  */
@@ -406,6 +273,7 @@ function doGet(e) {
       activeFilters: finalUserContext.activeFilters,
       isFiltered: finalUserContext.isFiltered || false,
       filterInfo: finalUserContext.filterInfo || null,
+      isEvaluator: finalUserContext.isEvaluator || false,
 
       // Special role data
       availableRoles: rubricData.specialRoleData?.availableRoles || [],
@@ -438,8 +306,7 @@ function doGet(e) {
 
       // Enhanced metadata
       contextVersion: userContext.metadata.contextVersion,
-      hasStaffRecord: userContext.hasStaffRecord,
-      isEvaluator: finalUserContext.isEvaluator || false
+      hasStaffRecord: userContext.hasStaffRecord
     };
     
     // Create and configure the HTML template
@@ -710,19 +577,6 @@ function validateSpecialRoleAccess(requestingRole, requestType) {
     validation.message = 'Validation error: ' + error.message;
     return validation;
   }
-}
-
-/**
- * Extracts the component ID (e.g., "1a:") from a component title string.
- * @param {string} componentTitle The title of the component.
- * @return {string|null} The extracted component ID, or null if not found.
- */
-function extractComponentId(componentTitle) {
-  if (!componentTitle || typeof componentTitle !== 'string') {
-    return null;
-  }
-  const match = componentTitle.match(/^([1-4][a-fA-F]:)/);
-  return match ? match[1] : null;
 }
 
 /**
@@ -1207,7 +1061,7 @@ function checkAllUsersForRoleChanges() {
  *
  * @param {string} role The role to filter by (e.g., "Teacher", "Counselor").
  * @param {string} year The year to filter by (e.g., "1", "2", "Probationary").
- * @return {Array<{name: string, email: string}>} An array of staff objects, or an empty array if none found or on error.
+ * @return {Object} An object containing the success status and staff list or an error message.
  */
 function getStaffListForDropdown(role, year) {
   try {
@@ -1216,19 +1070,19 @@ function getStaffListForDropdown(role, year) {
     // Enhanced input validation
     if (!role || typeof role !== 'string' || role.trim() === '') {
       debugLog('Invalid role provided to getStaffListForDropdown', { role: role });
-      return [];
+      return { success: false, error: 'Invalid role provided.', staff: [] };
     }
 
     if (!year || typeof year !== 'string' || year.trim() === '') {
       debugLog('Invalid year provided to getStaffListForDropdown', { year: year });
-      return [];
+      return { success: false, error: 'Invalid year provided.', staff: [] };
     }
 
     const staffData = getStaffData();
 
     if (!staffData || !staffData.users || staffData.users.length === 0) {
       debugLog('No staff data available in getStaffListForDropdown.');
-      return [];
+      return { success: true, staff: [] };
     }
 
     let filteredStaff = staffData.users;
@@ -1240,7 +1094,7 @@ function getStaffListForDropdown(role, year) {
       // Validate that the role exists in AVAILABLE_ROLES
       if (!AVAILABLE_ROLES.includes(targetRole)) {
         debugLog(`Invalid role provided: ${targetRole}. Valid roles are:`, AVAILABLE_ROLES);
-        return [];
+        return { success: false, error: `Invalid role: ${targetRole}`, staff: [] };
       }
       
       filteredStaff = filteredStaff.filter(user => {
@@ -1284,7 +1138,7 @@ function getStaffListForDropdown(role, year) {
   } catch (error) {
     console.error('Error in getStaffListForDropdown:', error.toString(), error.stack);
     debugLog(`Error in getStaffListForDropdown: ${error.toString()} Stack: ${error.stack || 'N/A'}`);
-    return { success: false, error: error.message, staff: [] }; // Return empty array on error
+    return { success: false, error: error.message, staff: [] };
   }
 }
 
@@ -1857,7 +1711,7 @@ function getAllDomainsData(role = null, year = null, viewMode = 'full', assigned
     
     return {
       title: "Error Loading Data",
-      subtitle: `An error occurred. Please see details below.`, // Subtitle can be generic
+      subtitle: `An unexpected error occurred. Please see details below.`, // Subtitle can be generic
       role: role || 'Teacher', // Keep role if available
       year: year, // Keep year if available
       viewMode: viewMode || 'full', // Keep viewMode if available
@@ -1929,8 +1783,7 @@ function processDomainData(sheetData, domainNumber, config) {
       };
       
       // Extract component identifier (e.g., "1a:", "2b:", etc.)
-      const componentId = componentTitle.substring(0, 3);
-      debugLog(`Component ID extracted: "${componentId}"`);
+      const componentId = extractComponentId(component.title);
       
       // Look up best practices for this component
       const practicesLocation = bestPracticesMap[componentId];
@@ -1993,17 +1846,11 @@ function processRoleDomains(roleSheetData, role, year) {
 /**
  * Apply year-based filtering to domains (placeholder for future implementation)
  */
-'''function applyYearFiltering(domains, role, year) {
+function applyYearFiltering(domains, role, year) {
   // Placeholder - future implementation will filter domains/components based on year
   debugLog('Year filtering not yet implemented - returning all domains', { role, year });
   return domains;
 }
-
-/**
- * =================================================================
- * MISSING HELPER FUNCTIONS (PLACEHOLDERS)
- * =================================================================
- */
 
 /**
  * Creates the filter selection interface for special access roles.
@@ -2014,12 +1861,16 @@ function processRoleDomains(roleSheetData, role, year) {
 function createFilterSelectionInterface(userContext, requestId) {
   try {
     const htmlTemplate = HtmlService.createTemplateFromFile('filter-interface');
-    htmlTemplate.data = { userContext: userContext, requestId: requestId };
+    htmlTemplate.userContext = userContext;
+    htmlTemplate.userContext.probationaryYearValue = PROBATIONARY_OBSERVATION_YEAR;
+    htmlTemplate.availableRoles = AVAILABLE_ROLES;
+    htmlTemplate.availableYears = OBSERVATION_YEARS;
+    htmlTemplate.requestId = requestId;
+
     const htmlOutput = htmlTemplate.evaluate()
       .setTitle(`${userContext.role} - Filter View`)
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
     
-    // Add cache busting headers
     const metadata = generateResponseMetadata(userContext, requestId, userContext.debugMode);
     addCacheBustingHeaders(htmlOutput, metadata);
     
@@ -2036,7 +1887,7 @@ function createFilterSelectionInterface(userContext, requestId) {
  * @returns {boolean} True if any filter parameter is present.
  */
 function hasActiveFilters(params) {
-  return !!(params.filterRole || params.filterYear || params.filterStaff || params.filterType !== 'all');
+  return !!(params.filterRole || params.filterYear || params.filterStaff || (params.filterType && params.filterType !== 'all'));
 }
 
 /**
@@ -2107,11 +1958,8 @@ function createEnhancedErrorPage(error, requestId, userContext, userAgent = 'Unk
       .setTitle('Application Error')
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
       
-    // Add cache busting headers to prevent caching of the error page
-    htmlOutput
-      .addMetaTag('cache-control', 'no-cache, no-store, must-revalidate, max-age=0')
-      .addMetaTag('pragma', 'no-cache')
-      .addMetaTag('expires', '0');
+    const metadata = generateResponseMetadata(userContext || {}, requestId);
+    addCacheBustingHeaders(htmlOutput, metadata);
       
     return htmlOutput;
   } catch (e) {
@@ -2130,32 +1978,34 @@ function createEnhancedErrorPage(error, requestId, userContext, userAgent = 'Unk
  */
 function createNewObservationForPeerEvaluator(observedEmail) {
   try {
-    const observerSession = getUserFromSession();
-    if (!observerSession || !observerSession.email) {
-      return { success: false, error: 'Could not identify the observer. Please refresh and try again.' };
-    }
-    const observerEmail = observerSession.email;
-
-    // Verify the observer is a Peer Evaluator
-    const observerUser = getUserByEmail(observerEmail);
-    if (!observerUser || observerUser.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
+    const observerContext = createUserContext();
+    if (observerContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
       return { success: false, error: 'You do not have permission to create observations.' };
     }
 
-    // Create the new observation draft
-    const newObservation = createNewObservation(observerEmail, observedEmail);
+    const newObservation = createNewObservation(observerContext.email, observedEmail);
     if (!newObservation) {
       return { success: false, error: 'Failed to create a new observation record.' };
     }
 
-    // Get the rubric data for the observed user
-    const observedUser = getUserByEmail(observedEmail);
-    const rubricData = getAllDomainsData(observedUser.role, observedUser.year, 'full', null);
+    // Get the assigned subdomains for the observed user
+    const observedUsersAssignedSubdomains = getAssignedSubdomainsForRoleYear(newObservation.observedRole, newObservation.observedYear);
 
-    // Set up the context to make the rubric editable
-    rubricData.userContext = createFilteredUserContext(observedEmail, SPECIAL_ROLES.PEER_EVALUATOR);
-    rubricData.userContext.isEvaluator = true; // Ensure the evaluator flag is set
-    rubricData.userContext.observationId = newObservation.observationId; // Pass the observation ID to the client
+    // Get the FULL rubric data, but include the assignment info so the client can toggle
+    const rubricData = getAllDomainsData(
+      newObservation.observedRole,
+      newObservation.observedYear,
+      'full', // Always get the full data
+      observedUsersAssignedSubdomains // But enhance it with assignment flags
+    );
+
+    // Create a special context for the evaluator view
+    const evaluatorContext = createFilteredUserContext(observedEmail, SPECIAL_ROLES.PEER_EVALUATOR);
+    evaluatorContext.observationId = newObservation.observationId; // Pass the observation ID
+    evaluatorContext.viewMode = 'assigned'; // Set the INITIAL view to 'assigned'
+
+    // Attach the evaluator context to the rubric data payload
+    rubricData.userContext = evaluatorContext;
 
     return {
       success: true,
@@ -2167,156 +2017,63 @@ function createNewObservationForPeerEvaluator(observedEmail) {
     console.error('Error in createNewObservationForPeerEvaluator:', error);
     return { success: false, error: 'An unexpected error occurred: ' + error.message };
   }
-}''
+}
 
 /**
- * Create a synthetic user context for role-based filtering (not viewing a specific user)
- * @param {string} effectiveRole - The role to display the rubric for
- * @param {number|string} effectiveYear - The year to filter by (optional)
- * @param {Object} originalContext - The original user's context
- * @param {Object} filterParams - Additional parameters for filtering
- * @return {Object} Synthetic user context
+ * Main data loading function for the filter interface.
+ * @param {Object} filterParams Parameters from the client (e.g., {staff: 'email@...'}).
+ * @returns {Object} A response object for the client.
  */
-function createSyntheticUserContext(effectiveRole, effectiveYear, originalContext, filterParams = {}) {
-  try {
-    // Start with a copy of the original context
-    const syntheticContext = { ...originalContext };
+function loadRubricData(filterParams) {
+    try {
+        debugLog('Loading rubric data via AJAX', { filterParams });
 
-    // Override key properties with filtered values
-    syntheticContext.role = effectiveRole;
-    syntheticContext.year = effectiveYear;
-    syntheticContext.isSynthetic = true;
-    syntheticContext.isFiltered = true;
+        const userContext = createUserContext(); // The person using the interface
 
-    // Set view mode and assigned subdomains based on filter parameters
-    if (filterParams.showFullRubric) {
-      syntheticContext.viewMode = VIEW_MODES.FULL;
-      syntheticContext.assignedSubdomains = null;
-    } else if (filterParams.showAssignedAreas) {
-      syntheticContext.viewMode = VIEW_MODES.ASSIGNED;
-      syntheticContext.assignedSubdomains = getAssignedSubdomainsForRoleYear(effectiveRole, effectiveYear);
-    } else {
-      // Default behavior if no specific view mode is requested
-      syntheticContext.viewMode = VIEW_MODES.FULL;
-      syntheticContext.assignedSubdomains = null;
+        // Handle Peer Evaluator selecting a staff member to observe
+        if (userContext.role === SPECIAL_ROLES.PEER_EVALUATOR && filterParams.staff) {
+            const staffUser = getUserByEmail(filterParams.staff);
+            if (!staffUser) return { success: false, error: `Staff not found: ${filterParams.staff}` };
+            
+            return {
+                success: true,
+                action: 'show_observation_selector',
+                observedEmail: staffUser.email,
+                observedName: staffUser.name
+            };
+        }
+        
+        // Handle loading current user's own rubric
+        if (filterParams.myOwnView) {
+            const rubricData = getAllDomainsData(userContext.role, userContext.year, 'assigned', userContext.assignedSubdomains);
+            rubricData.filterContext = { isOwnView: true, role: userContext.role, year: userContext.year, viewType: 'assigned' };
+            return { success: true, data: rubricData };
+        }
+
+        // Default behavior (could be expanded for other roles like Admin)
+        return { success: false, error: 'Invalid filter request.' };
+
+    } catch (error) {
+        console.error('Error in loadRubricData:', error);
+        return { success: false, error: error.message };
     }
-
-    // Add metadata about the filtering
-    syntheticContext.filterInfo = {
-      isRoleFiltered: true,
-      originalRole: filterParams.originalRole,
-      effectiveRole: effectiveRole,
-      effectiveYear: effectiveYear,
-      showFullRubric: filterParams.showFullRubric || false,
-      showAssignedAreas: filterParams.showAssignedAreas || false
-    };
-
-    debugLog('Synthetic user context created', {
-      originalRole: filterParams.originalRole,
-      effectiveRole: effectiveRole,
-      effectiveYear: effectiveYear,
-      viewMode: syntheticContext.viewMode
-    });
-
-    return syntheticContext;
-
-  } catch (error) {
-    console.error('Error creating synthetic user context:', error);
-    return originalContext; // Return original context on error
-  }
 }
 
 /**
- * Check if any active filters are present in the URL parameters
- * @param {Object} params - URL parameters from e.parameter
- * @return {boolean} True if any filter is active
+ * Gets the list of observations for a user.
+ * @param {string} observedEmail The email of the staff member.
+ * @returns {Object} A response object with success status and observations list.
  */
-function hasActiveFilters(params) {
-  return !!(params.filterRole || params.filterYear || params.filterStaff);
-}
-
-/**
- * Create the filter selection interface for special roles
- * @param {Object} userContext - The user's context
- * @param {string} requestId - The request ID for debugging
- * @return {HtmlOutput} The HTML output for the filter page
- */
-function createFilterSelectionInterface(userContext, requestId) {
-  try {
-    const htmlTemplate = HtmlService.createTemplateFromFile('filter-interface');
-    
-    // Prepare data for the template
-    const templateData = {
-      userContext: {
-        email: userContext.email,
-        role: userContext.role,
-        specialRoleType: userContext.specialRoleType,
-        requestId: requestId,
-        availableRoles: AVAILABLE_ROLES,
-        availableYears: OBSERVATION_YEARS,
-        probationaryYear: PROBATIONARY_OBSERVATION_YEAR
-      },
-      validation: validateSpecialRoleAccess(userContext.role, 'general_access')
-    };
-
-    htmlTemplate.data = templateData;
-    
-    const htmlOutput = htmlTemplate.evaluate()
-      .setTitle('Select View - Peer Evaluator')
-      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-      
-    // Add cache-busting headers using the centralized helper function
-    const metadata = generateResponseMetadata(userContext, requestId);
-    addCacheBustingHeaders(htmlOutput, metadata);
-      
-    debugLog('Filter selection interface created successfully', {
-      role: userContext.role,
-      requestId: requestId
-    });
-      
-    return htmlOutput;
-    
-  } catch (error) {
-    console.error('Error creating filter selection interface:', error);
-    return createEnhancedErrorPage(error, requestId, userContext);
-  }
-}
-
-/**
- * Creates an enhanced error page with detailed information for debugging.
- * @param {Error} error The error object.
- * @param {string} requestId A unique ID for the request.
- * @param {object} userContext The user context object, if available.
- * @param {string} userAgent The user agent string.
- * @returns {HtmlOutput} The HTML output for the error page.
- */
-function createEnhancedErrorPage(error, requestId, userContext, userAgent) {
-  try {
-    const template = HtmlService.createTemplateFromFile('error-page');
-    template.error = {
-      message: error.message,
-      stack: error.stack,
-      requestId: requestId,
-      userEmail: userContext ? userContext.email : 'N/A',
-      userRole: userContext ? userContext.role : 'N/A',
-      userAgent: userAgent || 'N/A',
-      timestamp: new Date().toISOString(),
-      version: SYSTEM_INFO.VERSION
-    };
-
-    const output = template.evaluate()
-      .setTitle('Error - Danielson Framework')
-      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-
-    // Add cache-busting headers to ensure the error page is not cached
-    const metadata = generateResponseMetadata(userContext || {}, requestId);
-    addCacheBustingHeaders(output, metadata);
-
-    return output;
-  } catch (e) {
-    // Fallback to a very simple error message if the error page itself fails
-    return HtmlService.createHtmlOutput(
-      `<h1>An unexpected error occurred</h1><p>Could not generate the error page. Please contact support.</p><p>Request ID: ${requestId}</p>`
-    ).setTitle('Critical Error');
-  }
+function getObservationOptions(observedEmail) {
+    try {
+        const userContext = createUserContext();
+        if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
+            return { success: false, error: 'Permission denied.' };
+        }
+        const observations = getObservationsForUser(observedEmail);
+        return { success: true, observations: observations };
+    } catch (error) {
+        console.error('Error in getObservationOptions:', error);
+        return { success: false, error: error.message };
+    }
 }

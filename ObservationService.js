@@ -54,7 +54,7 @@ function getObservationsForUser(observedEmail, status = null) {
     }
 
     // Sort by creation date, newest first
-    userObservations.sort((a, b) => b.createdAt - a.createdAt);
+    userObservations.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
     return userObservations;
   } catch (error) {
@@ -93,7 +93,8 @@ function createNewObservation(observerEmail, observedEmail) {
       observedRole: observedUser.role,
       observedYear: observedUser.year,
       status: OBSERVATION_STATUS.DRAFT,
-      createdAt: Date.now(),
+      createdAt: new Date().toISOString(),
+      lastModifiedAt: new Date().toISOString(),
       finalizedAt: null,
       observationData: {}, // e.g., { "1a:": "proficient", "1b:": "basic" }
       evidenceLinks: {} // e.g., { "1a:": ["http://drive.link1", "http://drive.link2"] }
@@ -112,31 +113,15 @@ function createNewObservation(observerEmail, observedEmail) {
 }
 
 /**
- * A test function to clear all observations from the properties service.
- * USE WITH CAUTION.
- */
-/** function deleteAllObservations_DANGEROUS() {
-    try {
-        const properties = PropertiesService.getScriptProperties();
-        properties.deleteProperty(OBSERVATIONS_DB_KEY);
-        console.log('DELETED ALL OBSERVATIONS from PropertiesService.');
-        return { success: true, message: 'All observations deleted.' };
-    } catch (error) {
-        console.error('Error deleting observations:', error);
-        return { success: false, error: error.message };
-    }
-}
-*/
-
-/**
- * Saves the observation data (proficiency levels, etc.) for a given observation.
+ * Saves a proficiency level selection for a specific component in an observation.
  * @param {string} observationId The ID of the observation to update.
- * @param {Object} observationData The data to save.
- * @returns {Object} A success or failure object.
+ * @param {string} componentId The rubric component ID (e.g., "1a:").
+ * @param {string} proficiency The selected proficiency level (e.g., "proficient").
+ * @returns {Object} A response object with success status.
  */
-/** function saveObservationData(observationId, observationData) {
-  if (!observationId || !observationData) {
-    return { success: false, error: 'Observation ID and data are required.' };
+function saveProficiencySelection(observationId, componentId, proficiency) {
+  if (!observationId || !componentId || !proficiency) {
+    return { success: false, error: 'Observation ID, component ID, and proficiency level are required.' };
   }
 
   try {
@@ -148,29 +133,27 @@ function createNewObservation(observerEmail, observedEmail) {
     }
 
     // Update the observation data
-    db[observationIndex].observationData = observationData;
-    db[observationIndex].lastModifiedAt = Date.now();
+    db[observationIndex].observationData[componentId] = proficiency;
+    db[observationIndex].lastModifiedAt = new Date().toISOString();
 
     _saveObservationsDb(db);
 
-    debugLog('Observation data saved', { observationId: observationId });
+    debugLog('Proficiency selection saved', { observationId, componentId, proficiency });
     return { success: true };
-
   } catch (error) {
-    console.error(`Error in saveObservationData for ${observationId}:`, error);
-    return { success: false, error: 'An unexpected error occurred: ' + error.message };
+    console.error(`Error saving proficiency for observation ${observationId}:`, error);
+    return { success: false, error: 'An unexpected error occurred.' };
   }
 }
-*/
 
 /**
- * Uploads media evidence to Google Drive and links it to an observation.
+ * Uploads media evidence to Google Drive and links it to an observation component.
  * @param {string} observationId The ID of the observation.
  * @param {string} componentId The ID of the rubric component (e.g., "1a:").
  * @param {string} base64Data The base64 encoded file data.
  * @param {string} fileName The original file name.
  * @param {string} mimeType The MIME type of the file.
- * @returns {Object} A success or failure object with the file link.
+ * @returns {Object} A response object with success status and the file URL.
  */
 function uploadMediaEvidence(observationId, componentId, base64Data, fileName, mimeType) {
   if (!observationId || !componentId || !base64Data || !fileName || !mimeType) {
@@ -180,63 +163,71 @@ function uploadMediaEvidence(observationId, componentId, base64Data, fileName, m
   try {
     const db = _getObservationsDb();
     const observationIndex = db.findIndex(obs => obs.observationId === observationId);
-
     if (observationIndex === -1) {
-      return { success: false, error: 'Observation not found for media upload.' };
+      return { success: false, error: 'Observation not found.' };
     }
-
     const observation = db[observationIndex];
 
-    // Ensure the root folder exists
+    // Get the root folder for all observations
     let rootFolderIterator = DriveApp.getFoldersByName(DRIVE_FOLDER_INFO.ROOT_FOLDER_NAME);
-    let rootFolder = rootFolderIterator.hasNext() ? rootFolderIterator.next() : null;
+    let rootFolder = rootFolderIterator.hasNext() ? rootFolderIterator.next() : rootFolderIterator.next();
     if (!rootFolder) {
       rootFolder = DriveApp.createFolder(DRIVE_FOLDER_INFO.ROOT_FOLDER_NAME);
-      debugLog('Created root Drive folder:', DRIVE_FOLDER_INFO.ROOT_FOLDER_NAME);
+      debugLog('Created root Drive folder', { name: DRIVE_FOLDER_INFO.ROOT_FOLDER_NAME });
     }
 
-    // Create a subfolder for the observed user if it doesn't exist
+    // Get or create a folder for the observed user
     const userFolderName = `${observation.observedName} (${observation.observedEmail})`;
     let userFolderIterator = rootFolder.getFoldersByName(userFolderName);
-    let userFolder = userFolderIterator.hasNext() ? userFolderIterator.next() : null;
-    if (!userFolder) {
-      userFolder = rootFolder.createFolder(userFolderName);
-      debugLog('Created user-specific Drive folder:', userFolderName);
-    }
+    let userFolder = userFolderIterator.hasNext() ? userFolderIterator.next() : rootFolder.createFolder(userFolderName);
 
-    // Create a subfolder for the specific observation if it doesn't exist
-    const observationFolderName = `Observation_${observation.observationId.substring(0, 8)}`;
-    let observationFolderIterator = userFolder.getFoldersByName(observationFolderName);
-    let observationFolder = observationFolderIterator.hasNext() ? observationFolderIterator.next() : null;
-    if (!observationFolder) {
-      observationFolder = userFolder.createFolder(observationFolderName);
-      debugLog('Created observation-specific Drive folder:', observationFolderName);
-    }
-
-    // Convert base64 to Blob
+    // Get or create a folder for this specific observation
+    const obsFolderName = `Observation - ${observation.observationId}`;
+    let obsFolderIterator = userFolder.getFoldersByName(obsFolderName);
+    let obsFolder = obsFolderIterator.hasNext() ? obsFolderIterator.next() : userFolder.createFolder(obsFolderName);
+    
+    // Decode base64 and create a blob
     const blob = Utilities.newBlob(Utilities.base64Decode(base64Data), mimeType, fileName);
+    
+    // Create the file in the observation folder
+    const file = obsFolder.createFile(blob);
+    const fileUrl = file.getUrl();
 
-    // Create file in Drive
-    const file = observationFolder.createFile(blob);
-    const fileLink = file.getUrl();
-
-    // Update observation record with the file link
-    if (!observation.evidenceLinks) {
-      observation.evidenceLinks = {};
-    }
+    // Update the observation record with the evidence link
     if (!observation.evidenceLinks[componentId]) {
       observation.evidenceLinks[componentId] = [];
     }
-    observation.evidenceLinks[componentId].push(fileLink);
-    observation.lastModifiedAt = Date.now();
+    observation.evidenceLinks[componentId].push({
+        url: fileUrl,
+        name: fileName,
+        uploadedAt: new Date().toISOString()
+    });
+    observation.lastModifiedAt = new Date().toISOString();
 
     _saveObservationsDb(db);
 
-    debugLog('Media uploaded and linked', { observationId, componentId, fileLink });
-    return { success: true, fileLink: fileLink };
+    debugLog('Media evidence uploaded and linked', { observationId, componentId, fileUrl });
+    return { success: true, fileUrl: fileUrl, fileName: fileName };
 
   } catch (error) {
-    console.error(`Error in uploadMediaEvidence for ${observationId}, component ${componentId}:`, error);
+    console.error('Error in uploadMediaEvidence:', error);
     return { success: false, error: 'Failed to upload media: ' + error.message };
   }
+}
+
+
+/**
+ * A test function to clear all observations from the properties service.
+ * USE WITH CAUTION.
+ */
+function deleteAllObservations_DANGEROUS() {
+    try {
+        const properties = PropertiesService.getScriptProperties();
+        properties.deleteProperty(OBSERVATIONS_DB_KEY);
+        console.log('DELETED ALL OBSERVATIONS from PropertiesService.');
+        return { success: true, message: 'All observations deleted.' };
+    } catch (error) {
+        console.error('Error deleting observations:', error);
+        return { success: false, error: error.message };
+    }
 }

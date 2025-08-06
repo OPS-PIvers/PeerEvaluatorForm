@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?= data.userContext.role ?> - Select Rubric View</title>
+    <title><?= userContext.role ?> - Select Rubric View</title>
     <style>
         * {
             margin: 0;
@@ -241,377 +241,72 @@
             .content {
                 padding: 20px;
             }
-            
             .actions-grid {
                 grid-template-columns: 1fr;
             }
-            
             .filter-row {
                 flex-direction: column;
                 align-items: stretch;
             }
-            
             .filter-select, .filter-btn {
                 min-width: auto;
                 width: 100%;
             }
         }
 
-        /* === COPIED FROM MAIN RUBRIC === */
-        .domain-section {
-            border-bottom: 3px solid #e2e8f0;
-        }
+        /* === Styles for Interactive Rubric === */
+        .domain-section { border-bottom: 3px solid #e2e8f0; }
+        .domain-header { background: linear-gradient(135deg, #7c9ac5, #5a82b8); color: white; padding: 15px 20px; font-size: 1.1rem; font-weight: 600; position: sticky; top: 0; z-index: 50; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .component-section { border-bottom: 1px solid #e2e8f0; position: relative; transition: display 0.3s ease; }
+        .component-hidden { display: none; }
+        .performance-levels-header { position: sticky; top: 56px; z-index: 40; background: white; border-bottom: 2px solid #e2e8f0; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .performance-levels { display: grid; grid-template-columns: 200px 1fr 1fr 1fr 1fr; min-height: 50px; }
+        .performance-levels-content { display: grid; grid-template-columns: 200px 1fr 1fr 1fr 1fr; min-height: 120px; }
+        .level-header { background: #e2e8f0; padding: 12px; font-weight: 600; text-align: center; border-bottom: 1px solid #cbd5e0; color: #4a5568; font-size: 0.9rem; }
+        .level-content { padding: 20px; border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; background: white; color: #4a5568; font-size: 0.9rem; transition: background-color 0.2s ease; }
+        .level-content:last-child { border-right: none; }
+        .row-label { background: #64748b; padding: 20px; font-weight: 600; color: white; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; font-size: 0.9rem; }
+        
+        /* Interactive styles */
+        .level-content.editable { cursor: pointer; }
+        .level-content.editable:hover { background-color: #e9f5ff; }
+        .level-content.selected { background-color: #b3e0ff !important; border: 2px solid #007bff; font-weight: bold; }
 
-        .domain-header {
-            background: linear-gradient(135deg, #7c9ac5, #5a82b8);
-            color: white;
-            padding: 15px 20px;
-            font-size: 1.1rem;
-            font-weight: 600;
-            position: sticky;
-            top: 0;
-            z-index: 50;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
+        /* Media Upload Styles */
+        .media-upload-section { padding: 15px 20px; background-color: #f7fafc; border-top: 1px solid #e2e8f0; }
+        .media-upload-title { font-weight: 600; color: #4a5568; margin-bottom: 10px; font-size: 0.9rem; }
+        .media-upload-area { display: flex; gap: 10px; align-items: center; }
+        .media-upload-input { display: none; }
+        .media-upload-label { background: #6b7280; color: white; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.85rem; transition: background-color 0.2s; }
+        .media-upload-label:hover { background: #4b5563; }
+        .upload-status { font-size: 0.85rem; color: #4a5568; font-style: italic; }
+        .evidence-list { margin-top: 15px; }
+        .evidence-item { background: white; padding: 8px 12px; border-radius: 6px; border: 1px solid #e2e8f0; margin-bottom: 8px; font-size: 0.9rem; }
+        .evidence-item a { color: #007bff; text-decoration: none; }
+        .evidence-item a:hover { text-decoration: underline; }
 
-        .component-section {
-            border-bottom: 1px solid #e2e8f0;
-            position: relative;
-        }
-
-        .performance-levels-header {
-            position: sticky;
-            top: 56px;
-            z-index: 40;
-            background: white;
-            border-bottom: 2px solid #e2e8f0;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        }
-
-        .performance-levels {
-            display: grid;
-            grid-template-columns: 200px 1fr 1fr 1fr 1fr;
-            min-height: 50px;
-        }
-
-        .performance-levels-content {
-            display: grid;
-            grid-template-columns: 200px 1fr 1fr 1fr 1fr;
-            min-height: 120px;
-        }
-
-        .level-header {
-            background: #e2e8f0;
-            padding: 12px;
-            font-weight: 600;
-            text-align: center;
-            border-bottom: 1px solid #cbd5e0;
-            color: #4a5568;
-            font-size: 0.9rem;
-        }
-
-        .level-content {
-            padding: 20px;
-            border-right: 1px solid #e2e8f0;
-            border-bottom: 1px solid #e2e8f0;
-            background: white;
-            color: #4a5568;
-            font-size: 0.9rem;
-        }
-
-        .level-content:last-child {
-            border-right: none;
-        }
-
-        .row-label {
-            background: #64748b;
-            padding: 20px;
-            font-weight: 600;
-            color: white;
-            border-bottom: 1px solid #e2e8f0;
-            display: flex;
-            align-items: center;
-            font-size: 0.9rem;
-        }
-
-        .look-fors-section {
-            border-top: 1px solid #e2e8f0;
-        }
-
-        .look-fors-header {
-            background: linear-gradient(135deg, #3182ce, #2b77cb);
-            color: white;
-            padding: 10px 20px;
+        /* View Toggle Button */
+        .view-toggle-button {
+            background-color: #e9ecef;
+            border: 1px solid #ced4da;
+            padding: 8px 16px;
+            margin: 0px 0 20px 0;
+            border-radius: 6px;
             cursor: pointer;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-weight: 600;
-            transition: background 0.3s ease;
-            font-size: 0.85rem;
-        }
-
-        .look-fors-header:hover {
-            background: linear-gradient(135deg, #2b77cb, #2c5aa0);
-        }
-
-        .chevron {
-            transition: transform 0.3s ease;
-            font-size: 1rem;
-        }
-
-        .chevron.expanded {
-            transform: rotate(180deg);
-        }
-
-        .look-fors-content {
-            max-height: 0;
-            overflow: hidden;
-            transition: max-height 0.3s ease;
-            background: #f8fafc;
-        }
-
-        .look-fors-content.expanded {
-            max-height: 250px;
-        }
-
-        .look-fors-grid {
-            padding: 12px 20px;
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 8px;
-        }
-
-        .look-for-item {
-            display: flex;
-            align-items: flex-start;
-            gap: 8px;
-            padding: 8px 12px;
-            background: white;
-            border-radius: 4px;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.08);
-            border-left: 3px solid #3182ce;
-        }
-
-        .look-for-item input[type="checkbox"] {
-            margin-top: 2px;
-            transform: scale(1.1);
-            accent-color: #3182ce;
-        }
-
-        .look-for-item label {
-            cursor: pointer;
-            color: #4a5568;
             font-weight: 500;
-            font-size: 0.85rem;
-            line-height: 1.4;
+            color: #495057;
+            transition: all 0.2s ease;
         }
-
-        /* Assignment styling */
-        .component-assigned {
-            border-left: 4px solid #10b981;
-            background: #f0fdf4;
-        }
-
-        .component-not-assigned {
-            background: #f8fafc;
-            border-left: 4px solid #e5e7eb;
-        }
-
-        .assignment-indicator {
-            position: absolute;
-            top: 5px;
-            right: 5px;
-            background: #10b981;
-            color: white;
-            border-radius: 50%;
-            width: 20px;
-            height: 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.7rem;
-            font-weight: bold;
-        }
-
-        .assignment-indicator.not-assigned {
-            background: #e5e7eb;
-            color: #6b7280;
-        }
-
-        .assigned-badge {
-            background-color: #dbeafe;
-            color: #1e40af;
-            padding: 0.2em 0.6em;
-            border-radius: 0.25rem;
-            font-size: 0.8em;
-            margin-left: 8px;
-            font-weight: 500;
-            vertical-align: middle;
-            display: inline-block;
-        }
-
-        /* Mobile responsive updates */
-        @media (max-width: 768px) {
-            .performance-levels, .performance-levels-content {
-                grid-template-columns: 1fr;
-                gap: 1px;
-            }
-            
-            .level-header, .row-label, .level-content {
-                border-right: none;
-                padding: 15px;
-            }
-            
-            .level-header {
-                font-size: 0.8rem;
-            }
-            
-            .row-label {
-                font-size: 0.8rem;
-            }
-            
-            .level-content {
-                font-size: 0.8rem;
-            }
-        }
-
-        /* Floating Navigation Widget */
-        .floating-nav {
-            position: fixed;
-            top: 20px;
-            left: 20px;
-            z-index: 1000;
-            opacity: 0;
-            visibility: hidden;
-            transition: all 0.3s ease;
-            pointer-events: none;
-        }
-
-        .floating-nav.visible {
-            opacity: 1;
-            visibility: visible;
-            pointer-events: auto;
-        }
-
-        .floating-nav-button {
-            background: #3182ce;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            padding: 10px 15px;
-            cursor: pointer;
-            font-size: 0.9rem;
-            font-weight: 600;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            transition: all 0.3s ease;
-            min-width: 120px;
-        }
-
-        .floating-nav-button:hover {
-            background: #2c5aa0;
-            transform: translateY(-2px);
-            box-shadow: 0 6px 16px rgba(0,0,0,0.2);
-        }
-
-        .nav-icon {
-            font-size: 1.1rem;
-            line-height: 1;
-        }
-
-        .nav-text {
-            font-size: 0.85rem;
-        }
-
-        .floating-nav-menu {
-            position: absolute;
-            top: 100%;
-            left: 0;
-            background: white;
-            border: 1px solid #e2e8f0;
-            border-radius: 8px;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.12);
-            margin-top: 8px;
-            opacity: 0;
-            visibility: hidden;
-            transform: translateY(-10px);
-            transition: all 0.3s ease;
-            min-width: 180px;
-            max-height: 60vh;
-            overflow-y: auto;
-        }
-
-        .floating-nav-menu.open {
-            opacity: 1;
-            visibility: visible;
-            transform: translateY(0);
-        }
-
-        .floating-nav-item {
-            display: block;
-            width: 100%;
-            background: none;
-            border: none;
-            padding: 12px 16px;
-            text-align: left;
-            cursor: pointer;
-            font-size: 0.9rem;
-            color: #4a5568;
-            transition: background 0.2s ease;
-            border-bottom: 1px solid #f1f5f9;
-        }
-
-        .floating-nav-item:last-child {
-            border-bottom: none;
-        }
-
-        .floating-nav-item:hover {
-            background: #f8fafc;
-            color: #3182ce;
-        }
-
-        .floating-nav-item:first-child {
-            border-top-left-radius: 8px;
-            border-top-right-radius: 8px;
-        }
-
-        .floating-nav-item:last-child {
-            border-bottom-left-radius: 8px;
-            border-bottom-right-radius: 8px;
-        }
-
-        /* Mobile adjustments */
-        @media (max-width: 768px) {
-            .floating-nav {
-                top: 15px;
-                left: 15px;
-            }
-
-            .floating-nav-button {
-                padding: 8px 12px;
-                min-width: 100px;
-                font-size: 0.8rem;
-            }
-
-            .floating-nav-menu {
-                min-width: 160px;
-                max-height: 50vh;
-            }
-
-            .floating-nav-item {
-                padding: 10px 14px;
-                font-size: 0.85rem;
-            }
+        .view-toggle-button:hover {
+            background-color: #dee2e6;
+            border-color: #adb5bd;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>👥 <?= data.userContext.role ?> Dashboard</h1>
+            <h1>👥 <?= userContext.role ?> Dashboard</h1>
             <p>Select how you'd like to view rubric information</p>
         </div>
         
@@ -619,29 +314,14 @@
             <!-- VIEW: Quick Actions (Default View) -->
             <div id="quickActionsView">
                 <div class="quick-actions">
-                    <h2 class="section-title">
-                        <span>🎯</span>
-                        Quick Actions
-                    </h2>
-                    
+                    <h2 class="section-title"><span>🎯</span> Quick Actions</h2>
                     <div class="actions-grid">
-                        <!-- Administrator Only Actions -->
-                        <? if (data.userContext.specialRoleType === 'administrator') { ?>
-                        <div class="action-card" onclick="loadProbationaryView()">
-                            <span class="action-icon">👨‍🏫</span>
-                            <div class="action-title">Probationary Staff</div>
-                            <div class="action-desc">View all staff members in probationary status</div>
-                        </div>
-                        <? } ?>
-                        
-                        <!-- Peer Evaluator and Full Access Actions -->
-                        <? if (data.userContext.specialRoleType === 'peer_evaluator' || data.userContext.specialRoleType === 'full_access') { ?>
+                        <? if (userContext.specialRoleType === 'peer_evaluator' || userContext.specialRoleType === 'full_access') { ?>
                         <div class="action-card" onclick="showCustomFilters()">
                             <span class="action-icon">🔍</span>
                             <div class="action-title">Find Staff & Start Observation</div>
                             <div class="action-desc">Filter by role, year, or specific staff member</div>
                         </div>
-                        
                         <div class="action-card" onclick="loadMyOwnView()">
                             <span class="action-icon">📋</span>
                             <div class="action-title">My Own Rubric</div>
@@ -654,247 +334,119 @@
 
             <!-- VIEW: Custom Filters -->
             <div class="custom-filters" id="customFiltersView">
-                <h2 class="section-title">
-                    <span>🔍</span>
-                    Find Staff Member
-                </h2>
-                
+                <h2 class="section-title"><span>🔍</span> Find Staff Member</h2>
                 <div class="filter-row">
                     <select id="roleSelect" class="filter-select" onchange="handleRoleChange()">
                         <option value="">1. Select Role...</option>
-                        <? for (var i = 0; i < data.userContext.availableRoles.length; i++) { ?>
-                        <option value="<?= data.userContext.availableRoles[i] ?>"><?= data.userContext.availableRoles[i] ?></option>
+                        <? for (var i = 0; i < availableRoles.length; i++) { ?>
+                        <option value="<?= availableRoles[i] ?>"><?= availableRoles[i] ?></option>
                         <? } ?>
                     </select>
                 </div>
-                
                 <div class="filter-row">
                     <select id="yearSelect" class="filter-select" style="display: none;" onchange="handleYearChange()">
                         <option value="">2. Select Year...</option>
                         <option value="1">Year 1</option>
                         <option value="2">Year 2</option>
                         <option value="3">Year 3</option>
-                        <option value="Probationary">Probationary</option>
+                        <option value="0">Probationary</option>
                     </select>
                 </div>
-                
                 <div class="filter-row">
                     <select id="staffSelect" class="filter-select" style="display: none;" onchange="handleStaffChange()">
                         <option value="">3. Select Staff Member...</option>
                     </select>
                 </div>
-                
                 <div class="filter-row">
-                    <button class="filter-btn" id="loadBtn" onclick="loadSelectedView()" disabled>
-                        📖 Select Staff
-                    </button>
-                    <button class="filter-btn btn-secondary" onclick="clearFilters()">
-                        🗑️ Clear & Go Back
-                    </button>
+                    <button class="filter-btn" id="loadBtn" onclick="loadSelectedView()" disabled>📖 Select Staff</button>
+                    <button class="filter-btn btn-secondary" onclick="clearFilters()">🗑️ Clear & Go Back</button>
                 </div>
             </div>
 
             <!-- VIEW: Observation Selector -->
-            <div class="observation-selector" id="observationSelectorView">
-                 <!-- Content generated by JS -->
-            </div>
+            <div class="observation-selector" id="observationSelectorView"></div>
             
             <!-- Status and Loading Indicators -->
-            <div class="loading" id="loading">
-                <div class="loading-spinner"></div>
-                Loading...
-            </div>
-            
-            <div class="error" id="error">
-                <div id="errorMessage"></div>
-                <button class="filter-btn btn-secondary" onclick="hideError()" style="margin-top: 15px;">
-                    Dismiss
-                </button>
-            </div>
-            
-            <div class="filter-status" id="filterStatus">
-                <strong>Currently Viewing:</strong> <span id="filterStatusText"></span>
-            </div>
+            <div class="loading" id="loading"><div class="loading-spinner"></div>Loading...</div>
+            <div class="error" id="error"><div id="errorMessage"></div><button class="filter-btn btn-secondary" onclick="hideError()" style="margin-top: 15px;">Dismiss</button></div>
+            <div class="filter-status" id="filterStatus"><strong>Currently Viewing:</strong> <span id="filterStatusText"></span></div>
             
             <!-- VIEW: Rubric Content / Editor -->
-            <div class="rubric-container" id="rubricContainer">
-                <!-- Rubric content will be loaded here via JavaScript -->
-            </div>
+            <div class="rubric-container" id="rubricContainer"></div>
         </div>
     </div>
 
     <script>
-        // Floating Navigation Widget Functions
-        let floatingNavOpen = false;
-
-        function toggleFloatingNav() {
-            const menu = document.getElementById('floatingNavMenu');
-            if (menu) {
-                floatingNavOpen = !floatingNavOpen;
-                if (floatingNavOpen) {
-                    menu.classList.add('open');
-                } else {
-                    menu.classList.remove('open');
-                }
-            }
+        // --- UI Helper Functions (defined first) ---
+        function showLoading(message = 'Loading...') {
+            const loadingEl = document.getElementById('loading');
+            loadingEl.innerHTML = `<div class="loading-spinner"></div>${message}`;
+            loadingEl.style.display = 'block';
+            hideError();
         }
 
-        function closeFloatingNav() {
-            const menu = document.getElementById('floatingNavMenu');
-            if (menu) {
-                menu.classList.remove('open');
-                floatingNavOpen = false;
-            }
+        function hideLoading() {
+            document.getElementById('loading').style.display = 'none';
         }
 
-        function scrollToDomain(domainIdx) {
-            const element = document.getElementById('domain-' + domainIdx);
-            if (element) {
-                let offset = 0;
-                const header = document.querySelector('.header');
-                if (header && getComputedStyle(header).position === 'sticky') {
-                    offset = header.offsetHeight;
-                }
-
-                const bodyRect = document.body.getBoundingClientRect().top;
-                const elementRect = element.getBoundingClientRect().top;
-                const elementPosition = elementRect - bodyRect;
-                const offsetPosition = elementPosition - offset;
-
-                window.scrollTo({
-                    top: offsetPosition,
-                    behavior: 'smooth'
-                });
-                closeFloatingNav();
-            }
+        function showError(error) {
+            const errorEl = document.getElementById('error');
+            const errorMessageEl = document.getElementById('errorMessage');
+            errorMessageEl.textContent = error.message || String(error);
+            errorEl.style.display = 'block';
+            hideLoading();
         }
 
-        document.addEventListener('click', function(e) {
-            const floatingNav = document.getElementById('floatingNav');
-            if (floatingNav && !floatingNav.contains(e.target)) {
-                closeFloatingNav();
-            }
-        });
-
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') {
-                closeFloatingNav();
-            }
-        });
-
-        function populateFloatingNavMenu(rubricData) {
-            const menu = document.getElementById('floatingNavMenu');
-            if (!menu) {
-                console.error('Floating nav menu element not found.');
-                return;
-            }
-            menu.innerHTML = '';
-
-            if (rubricData && rubricData.domains && rubricData.domains.length > 0) {
-                rubricData.domains.forEach(function(domain, index) {
-                    const item = document.createElement('button');
-                    item.className = 'floating-nav-item';
-                    let domainNumberDisplay = `Domain ${index + 1}`;
-                    if (domain.number) {
-                        domainNumberDisplay = `Domain ${domain.number}`;
-                    } else {
-                        const nameMatch = domain.name ? domain.name.match(/^Domain\s*(\d+)/i) : null;
-                        if (nameMatch && nameMatch[1]) {
-                            domainNumberDisplay = `Domain ${nameMatch[1]}`;
-                        }
-                    }
-                    item.textContent = `${domainNumberDisplay}: ${domain.name.replace(/^Domain\s*\d+:\s*/i, '')}`;
-                    item.onclick = function() { scrollToDomain(index); };
-                    menu.appendChild(item);
-                });
-            } else {
-                const noDomainsItem = document.createElement('div');
-                noDomainsItem.className = 'floating-nav-item';
-                noDomainsItem.textContent = 'No domains loaded.';
-                noDomainsItem.style.textAlign = 'center';
-                noDomainsItem.style.cursor = 'default';
-                menu.appendChild(noDomainsItem);
-            }
+        function hideError() {
+            document.getElementById('error').style.display = 'none';
+        }
+        
+        // --- Main Error Handler ---
+        function handleError(error) {
+            console.error('AJAX Error:', error);
+            showError(error);
         }
 
         // Global state
-        let currentFilters = {
-            role: null,
-            year: null,
-            staff: null,
-            viewType: 'full'
-        };
+        let currentFilters = { role: null, year: null, staff: null };
+        let currentObservationId = null;
+        let observationViewMode = 'assigned'; // Default for observation view
 
         // --- View Management ---
         function showView(viewId) {
             ['quickActionsView', 'customFiltersView', 'observationSelectorView', 'rubricContainer'].forEach(id => {
-                const el = document.getElementById(id);
-                if (el) el.style.display = 'none';
+                document.getElementById(id).style.display = 'none';
             });
-            const viewToShow = document.getElementById(viewId);
-            if(viewToShow) viewToShow.style.display = 'block';
+            document.getElementById(viewId).style.display = 'block';
         }
 
         // --- Quick Action Handlers ---
-        function loadProbationaryView() {
-            showLoading('Loading probationary staff...');
-            currentFilters = { filterType: 'probationary' };
-            google.script.run
-                .withSuccessHandler(handleRubricData)
-                .withFailureHandler(handleError)
-                .loadRubricData(currentFilters);
-        }
-
+        function showCustomFilters() { showView('customFiltersView'); }
         function loadMyOwnView() {
-            showLoading('Loading your assigned areas...');
-            google.script.run
-                .withSuccessHandler(handleRubricData)
-                .withFailureHandler(handleError)
-                .getMyOwnRubricData();
-        }
-
-        function showCustomFilters() {
-            showView('customFiltersView');
-            document.getElementById('customFiltersView').scrollIntoView({ behavior: 'smooth', block: 'start' });
+            showLoading('Loading your assigned rubric...');
+            google.script.run.withSuccessHandler(handleRubricData).withFailureHandler(handleError).loadRubricData({ myOwnView: true });
         }
 
         // --- Filter Handlers ---
         function handleRoleChange() {
             const roleSelect = document.getElementById('roleSelect');
             const yearSelect = document.getElementById('yearSelect');
-            const staffSelect = document.getElementById('staffSelect');
-            const loadBtn = document.getElementById('loadBtn');
-            
             currentFilters.role = roleSelect.value;
-            currentFilters.year = null;
-            currentFilters.staff = null;
-            
             yearSelect.value = '';
-            staffSelect.value = '';
-            staffSelect.style.display = 'none';
-            
-            if (roleSelect.value) {
-                yearSelect.style.display = 'block';
-            } else {
-                yearSelect.style.display = 'none';
-                loadBtn.disabled = true;
-            }
+            yearSelect.style.display = roleSelect.value ? 'block' : 'none';
+            handleYearChange();
         }
 
         function handleYearChange() {
             const yearSelect = document.getElementById('yearSelect');
             const staffSelect = document.getElementById('staffSelect');
-            
             currentFilters.year = yearSelect.value;
-            currentFilters.staff = null;
             staffSelect.value = '';
-            
+            staffSelect.style.display = yearSelect.value ? 'block' : 'none';
             if (yearSelect.value) {
-                staffSelect.style.display = 'block';
                 loadStaffOptions();
             } else {
-                staffSelect.style.display = 'none';
-                document.getElementById('loadBtn').disabled = true;
+                handleStaffChange();
             }
         }
 
@@ -908,122 +460,54 @@
             const staffSelect = document.getElementById('staffSelect');
             staffSelect.innerHTML = '<option value="">Loading staff...</option>';
             staffSelect.disabled = true;
-            
             google.script.run
-                .withSuccessHandler(function(result) {
-                    populateStaffDropdown(result);
-                    staffSelect.disabled = false;
-                })
-                .withFailureHandler(function(error) {
-                    console.error('Error loading staff:', error);
-                    staffSelect.innerHTML = '<option value="">Error loading staff</option>';
-                    staffSelect.disabled = false;
-                    showError('Failed to load staff list: ' + (error.message || error));
-                })
+                .withSuccessHandler(populateStaffDropdown)
+                .withFailureHandler(handleError)
                 .getStaffListForDropdown(currentFilters.role, currentFilters.year);
+        }
+
+        function populateStaffDropdown(result) {
+            const staffSelect = document.getElementById('staffSelect');
+            staffSelect.disabled = false;
+            if (!result.success) {
+                staffSelect.innerHTML = `<option value="">Error: ${result.error}</option>`;
+                return;
+            }
+            staffSelect.innerHTML = '<option value="">3. Select Staff Member...</option>';
+            if (result.staff && result.staff.length > 0) {
+                result.staff.forEach(staff => staffSelect.appendChild(new Option(staff.displayText, staff.email)));
+            } else {
+                staffSelect.appendChild(new Option('No staff found', '', true, true));
+            }
         }
 
         function loadSelectedView() {
             if (!currentFilters.staff) return;
             showLoading('Loading...');
-            google.script.run
-                .withSuccessHandler(handleRubricData)
-                .withFailureHandler(handleError)
-                .loadRubricData(currentFilters);
+            google.script.run.withSuccessHandler(handleRubricData).withFailureHandler(handleError).loadRubricData(currentFilters);
         }
 
         function clearFilters() {
-            document.getElementById('roleSelect').value = '';
-            document.getElementById('yearSelect').value = '';
-            document.getElementById('staffSelect').value = '';
-            document.getElementById('yearSelect').style.display = 'none';
-            document.getElementById('staffSelect').style.display = 'none';
-            document.getElementById('loadBtn').disabled = true;
-            
             showView('quickActionsView');
             hideError();
             hideLoading();
             document.getElementById('filterStatus').style.display = 'none';
-
-            currentFilters = { role: null, year: null, staff: null, viewType: 'full' };
         }
 
-        function populateStaffDropdown(result) {
-            const staffSelect = document.getElementById('staffSelect');
-            
-            if (!result.success) {
-                staffSelect.innerHTML = '<option value="">Error: ' + result.error + '</option>';
-                return;
-            }
-            
-            staffSelect.innerHTML = '<option value="">3. Select Staff Member...</option>';
-            
-            if (result.staff && result.staff.length > 0) {
-                result.staff.forEach(function(staff) {
-                    if (staff.email && staff.name) {
-                        const option = document.createElement('option');
-                        option.value = staff.email;
-                        option.textContent = staff.displayText || `${staff.name} (${staff.role}, Year ${staff.year})`;
-                        staffSelect.appendChild(option);
-                    }
-                });
-            } else {
-                const noStaffOption = document.createElement('option');
-                noStaffOption.value = '';
-                noStaffOption.textContent = 'No staff found for this selection';
-                noStaffOption.disabled = true;
-                staffSelect.appendChild(noStaffOption);
-            }
-        }
-
-        // --- Observation Flow Handlers ---
+        // --- Observation Flow ---
         function displayObservationOptions(observedEmail, observedName) {
-            showLoading(`Loading observation options for ${observedName}...`);
+            showLoading(`Loading options for ${observedName}...`);
             google.script.run
-                .withSuccessHandler(function(result) {
+                .withSuccessHandler(result => {
                     hideLoading();
-                    if (!result.success) {
-                        showError(result.error);
-                        return;
-                    }
-                    
+                    if (!result.success) return showError(result.error);
                     const container = document.getElementById('observationSelectorView');
-                    container.innerHTML = `
-                        <h2 class="section-title">
-                            <span>📝</span>
-                            Observations for ${observedName}
-                        </h2>
-                        <div class="actions-grid" id="observationList">
-                            <div class="action-card" onclick="handleNewObservation('${observedEmail}')">
-                                <span class="action-icon">➕</span>
-                                <div class="action-title">Start New Observation</div>
-                                <div class="action-desc">Begin a new observation for this staff member.</div>
-                            </div>
-                        </div>
-                        <div style="margin-top: 20px;">
-                            <button class="filter-btn btn-secondary" onclick="showView('customFiltersView')">Back to Filters</button>
-                        </div>
-                    `;
-
-                    const list = document.getElementById('observationList');
-                    if(result.observations && result.observations.length > 0) {
-                        result.observations.forEach(obs => {
-                            const date = new Date(obs.createdAt).toLocaleDateString();
-                            const card = document.createElement('div');
-                            card.className = 'observation-card';
-                            // In a future step, this onclick would load the editor with this observation's data
-                            card.onclick = () => alert('Editing observation ' + obs.observationId + ' is not yet implemented.');
-                            card.innerHTML = `
-                                <div class="action-title">${obs.status} Observation</div>
-                                <div class="action-desc">Created on ${date}</div>
-                                <div class="status-badge ${obs.status === 'Draft' ? 'status-draft' : 'status-finalized'}">
-                                    ${obs.status}
-                                </div>
-                            `;
-                            list.appendChild(card);
-                        });
-                    }
-
+                    let cardsHtml = `<div class="action-card" onclick="handleNewObservation('${observedEmail}')"><span class="action-icon">➕</span><div class="action-title">Start New Observation</div><div class="action-desc">Begin a new evaluation.</div></div>`;
+                    result.observations.forEach(obs => {
+                        const date = new Date(obs.createdAt).toLocaleDateString();
+                        cardsHtml += `<div class="observation-card" onclick="alert('Editing not yet implemented.')"><div class="action-title">${obs.status} Observation</div><div class="action-desc">Created on ${date}</div><div class="status-badge ${obs.status === 'Draft' ? 'status-draft' : 'status-finalized'}">${obs.status}</div></div>`;
+                    });
+                    container.innerHTML = `<h2 class="section-title"><span>📝</span> Observations for ${observedName}</h2><div class="actions-grid">${cardsHtml}</div><div style="margin-top: 20px;"><button class="filter-btn btn-secondary" onclick="showView('customFiltersView')">Back to Filters</button></div>`;
                     showView('observationSelectorView');
                 })
                 .withFailureHandler(handleError)
@@ -1031,239 +515,145 @@
         }
 
         function handleNewObservation(observedEmail) {
-            showLoading(`Creating new observation draft...`);
-            google.script.run
-                .withSuccessHandler(function(result) {
-                    hideLoading();
-                    if (!result.success) {
-                        showError(result.error);
-                        return;
-                    }
-                    renderObservationEditor(result.observation, result.rubricData);
-                })
-                .withFailureHandler(handleError)
-                .createNewObservationForPeerEvaluator(observedEmail);
+            showLoading('Creating new observation draft...');
+            google.script.run.withSuccessHandler(handleRubricData).withFailureHandler(handleError).createNewObservationForPeerEvaluator(observedEmail);
         }
 
-        function renderObservationEditor(observation, rubricData) {
-            updateFilterStatus({ data: { filterContext: { isStaffView: true, staffName: observation.observedName, staffRole: observation.observedRole, staffYear: observation.observedYear } } }, `Observation Draft (ID: ${observation.observationId})`);
-            
-            // For now, just render the standard rubric. It will be made interactive later.
-            const rubricHtml = generateStandardRubricHtml(rubricData);
-            document.getElementById('rubricContainer').innerHTML = rubricHtml;
-            
-            showView('rubricContainer');
-        }
-
-        // --- Main Data Handler ---
+        // --- Main Data Handler & UI Generation ---
         function handleRubricData(result) {
             hideLoading();
-            
-            if (!result.success) {
-                showError(result.error || 'Failed to load data');
-                return;
-            }
+            if (!result.success) return showError(result.error);
 
             if (result.action === 'show_observation_selector') {
-                displayObservationOptions(result.observedEmail, result.observedName);
-                return;
+                return displayObservationOptions(result.observedEmail, result.observedName);
             }
+
+            const { observation, rubricData } = result;
+            currentObservationId = observation ? observation.observationId : null;
+            observationViewMode = (rubricData.userContext && rubricData.userContext.viewMode) || 'assigned';
             
-            updateFilterStatus(result);
-            
-            const rubricHtml = generateRubricHtml(result.data);
+            updateFilterStatus(rubricData);
+            const rubricHtml = generateInteractiveRubricHtml(rubricData);
             document.getElementById('rubricContainer').innerHTML = rubricHtml;
+            updateComponentVisibility(); // Apply initial view
             showView('rubricContainer');
-            
-            document.getElementById('rubricContainer').scrollIntoView({ behavior: 'smooth' });
-
-            if (result.data && !result.data.isProbationaryView) {
-                populateFloatingNavMenu(result.data);
-            } else {
-                const menu = document.getElementById('floatingNavMenu');
-                if (menu) menu.innerHTML = '<div class="floating-nav-item" style="text-align:center; cursor:default;">N/A</div>';
-            }
         }
 
-        function handleError(error) {
-            console.error('AJAX Error:', error);
-            hideLoading();
-            let errorMessage = (error && error.message) ? error.message : 'An unknown error occurred.';
-            showError(errorMessage);
-        }
+        function generateInteractiveRubricHtml(data) {
+            const isEvaluator = data.userContext && data.userContext.isEvaluator;
+            let html = `<div style="background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">`;
+            
+            let headerHtml = `<div style="background: linear-gradient(135deg, #4a5568, #2d3748); color: white; padding: 30px; text-align: center;"><h2 style="margin: 0; font-size: 1.8rem;">${data.title}</h2><p style="margin: 10px 0 0 0; opacity: 0.9;">${data.subtitle}</p></div>`;
+            
+            let toggleButtonHtml = isEvaluator ? `<button id="viewToggleBtn" class="view-toggle-button" onclick="toggleObservationView()">View Full Rubric</button>` : '';
 
-        function updateFilterStatus(result, customTitle) {
-            const status = document.getElementById('filterStatus');
-            const statusText = document.getElementById('filterStatusText');
-            
-            let text = '';
-            if (customTitle) {
-                text = customTitle;
-            } else if (result.data && result.data.filterContext) {
-                const fc = result.data.filterContext;
-                if (fc.isOwnView) text = `Your Assigned Areas (${fc.role}, Year ${fc.year})`;
-                else if (fc.isStaffView) text = `${fc.staffName} (${fc.staffRole}, Year ${fc.year})`;
-                else if (fc.role && fc.year) text = `${fc.role} - Year ${fc.year} (${fc.viewType === 'assigned' ? 'Assigned' : 'Full Rubric'})`;
-                else if (fc.role) text = `${fc.role} (Full Rubric)`;
-            } else if (result.data && result.data.isProbationaryView) {
-                text = `Probationary Staff (${result.data.staff.length} staff members)`;
-            }
-            
-            if (text) {
-                statusText.textContent = text;
-                status.style.display = 'block';
-            } else {
-                status.style.display = 'none';
-            }
-        }
+            html += `${headerHtml}<div style="padding: 20px 20px 0 20px;">${toggleButtonHtml}</div><div style="padding: 0;">`;
 
-        function generateRubricHtml(rubricData) {
-            if (rubricData.isProbationaryView) {
-                return generateProbationaryStaffHtml(rubricData);
-            }
-            return generateStandardRubricHtml(rubricData);
-        }
-
-        function generateProbationaryStaffHtml(data) {
-            const probationaryYear = data.userContext.probationaryYearValue;
-            let html = `
-                <div style="background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
-                    <div style="background: linear-gradient(135deg, #dc2626, #b91c1c); color: white; padding: 30px; text-align: center;">
-                        <h2 style="margin: 0; font-size: 1.8rem;">📋 ${data.title}</h2>
-                        <p style="margin: 10px 0 0 0; opacity: 0.9;">${data.subtitle}</p>
-                    </div>
-                    <div style="padding: 30px;">`;
-            
-            if (data.staff && data.staff.length > 0) {
-                html += '<div style="display: grid; gap: 15px;">';
-                data.staff.forEach(function(staff) {
-                    const onclickAttribute = `onclick="loadStaffMemberRubric('${staff.email}', '${staff.role}', ${staff.year})"`;
-                    html += `
-                        <div style="background: #fef2f2; border: 2px solid #fecaca; border-radius: 8px; padding: 20px; cursor: pointer;" ${onclickAttribute}>
-                            <h4 style="margin: 0 0 10px 0; color: #dc2626; font-size: 1.1rem;">${staff.name || 'Unknown Name'}</h4>
-                            <div style="color: #7f1d1d; font-size: 0.95rem;">
-                                <div><strong>Email:</strong> ${staff.email || 'No email'}</div>
-                                <div><strong>Role:</strong> ${staff.role || 'Unknown Role'}</div>
-                                <div><strong>Year:</strong> ${staff.year === probationaryYear ? 'Probationary' : (staff.year || 'Unknown Year')}</div>
-                            </div>
-                        </div>`;
-                });
-                html += '</div>';
-            } else {
-                html += `
-                    <div style="text-align: center; padding: 40px; color: #059669;">
-                        <div style="font-size: 3rem; margin-bottom: 15px;">🎉</div>
-                        <h3 style="color: #065f46; margin-bottom: 10px;">Great News!</h3>
-                        <p style="color: #047857;">No staff members are currently in probationary status.</p>
-                    </div>`;
-            }
-            
-            html += '</div></div>';
-            return html;
-        }
-
-        function generateStandardRubricHtml(rubricData) {
-            let html = `
-                <div style="background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
-                    <div style="background: linear-gradient(135deg, #4a5568, #2d3748); color: white; padding: 30px; text-align: center;">
-                        <h2 style="margin: 0; font-size: 1.8rem;">${rubricData.title}</h2>
-                        <p style="margin: 10px 0 0 0; opacity: 0.9;">${rubricData.subtitle}</p>
-                    </div>
-                    <div style="padding: 0;">`;
-            
-            if (rubricData.domains && rubricData.domains.length > 0) {
-                rubricData.domains.forEach(function(domain, domainIndex) {
-                    html += `
-                        <div class="domain-section" id="domain-${domainIndex}">
-                            <div class="domain-header">${domain.name}</div>
-                            <div class="performance-levels-header">
-                                <div class="performance-levels">
-                                    <div class="level-header"></div>
-                                    <div class="level-header">Developing</div>
-                                    <div class="level-header">Basic</div>
-                                    <div class="level-header">Proficient</div>
-                                    <div class="level-header">Distinguished</div>
-                                </div>
-                            </div>`;
+            data.domains.forEach((domain, dIdx) => {
+                html += `<div class="domain-section" id="domain-${dIdx}"><div class="domain-header">${domain.name}</div>`;
+                html += `<div class="performance-levels-header"><div class="performance-levels"><div class="level-header"></div><div class="level-header">Developing</div><div class="level-header">Basic</div><div class="level-header">Proficient</div><div class="level-header">Distinguished</div></div></div>`;
+                
+                domain.components.forEach((comp, cIdx) => {
+                    const componentId = comp.componentId;
+                    html += `<div class="component-section" data-component-id="${componentId}" data-is-assigned="${comp.isAssigned}"><div class="performance-levels-content">`;
+                    html += `<div class="row-label">${comp.title}</div>`;
+                    ['developing', 'basic', 'proficient', 'distinguished'].forEach(level => {
+                        html += `<div class="level-content ${isEvaluator ? 'editable' : ''}" data-level="${level}" onclick="${isEvaluator ? `selectProficiency(this, '${componentId}', '${level}')` : ''}">${comp[level] || ''}</div>`;
+                    });
+                    html += `</div>`;
                     
-                    if (domain.components && domain.components.length > 0) {
-                        domain.components.forEach(function(component, componentIndex) {
-                            html += `
-                                <div class="component-section" data-component-id="${component.componentId || ''}">
-                                    <div class="performance-levels-content">
-                                        <div class="row-label">${component.title}</div>
-                                        <div class="level-content">${component.developing || ''}</div>
-                                        <div class="level-content">${component.basic || ''}</div>
-                                        <div class="level-content">${component.proficient || ''}</div>
-                                        <div class="level-content">${component.distinguished || ''}</div>
-                                    </div>
-                                    ${component.bestPractices && component.bestPractices.length > 0 ? `
-                                    <div class="look-fors-section">
-                                        <div class="look-fors-header" onclick="toggleLookFors('domain-${domainIndex}-component-${componentIndex}')">
-                                            <span>Best Practices</span>
-                                            <span class="chevron" id="chevron-${domainIndex}-${componentIndex}">▼</span>
-                                        </div>
-                                        <div class="look-fors-content" id="lookForsContent-${domainIndex}-${componentIndex}">
-                                            <div class="look-fors-grid">
-                                                ${component.bestPractices.map((p, pIdx) => `<div class="look-for-item"><input type="checkbox" id="p-${domainIndex}-${componentIndex}-${pIdx}"><label for="p-${domainIndex}-${componentIndex}-${pIdx}">${p}</label></div>`).join('')}
-                                            </div>
-                                        </div>
-                                    </div>` : ''}
-                                </div>`;
-                        });
+                    if (isEvaluator) {
+                        html += `<div class="media-upload-section"><div class="media-upload-title">📷 Upload Evidence for ${componentId}</div><div class="media-upload-area"><label class="media-upload-label" for="file-upload-${dIdx}-${cIdx}">Choose File</label><input class="media-upload-input" id="file-upload-${dIdx}-${cIdx}" type="file" onchange="uploadFile(this, '${componentId}')"><span class="upload-status" id="upload-status-${componentId}">No file selected.</span></div><div class="evidence-list" id="evidence-list-${componentId}"></div></div>`;
                     }
-                    html += '</div>';
+                    html += `</div>`;
                 });
-            }
+                html += `</div>`;
+            });
+
             html += `</div></div>`;
             return html;
         }
 
-        // --- UI Helper Functions ---
-        function showLoading(message = 'Loading...') {
-            const loading = document.getElementById('loading');
-            loading.innerHTML = `<div class="loading-spinner"></div>${message}`;
-            loading.style.display = 'block';
-            hideError();
+        function updateFilterStatus(data) {
+            const status = document.getElementById('filterStatus');
+            const statusText = document.getElementById('filterStatusText');
+            let text = 'Viewing Your Own Rubric';
+            if (data.userContext && data.userContext.filterInfo) {
+                const info = data.userContext.filterInfo;
+                text = `Viewing as: ${info.viewingAs} (${info.viewingRole}, Year ${info.viewingYear})`;
+            }
+            if (currentObservationId) {
+                text += ` - <strong>Observation Draft</strong>`;
+            }
+            statusText.innerHTML = text;
+            status.style.display = 'block';
         }
 
-        function hideLoading() {
-            document.getElementById('loading').style.display = 'none';
-        }
-
-        function showError(message) {
-            document.getElementById('errorMessage').textContent = message;
-            document.getElementById('error').style.display = 'block';
-            hideLoading();
-        }
-
-        function hideError() {
-            document.getElementById('error').style.display = 'none';
-        }
-
-        function loadStaffMemberRubric(email, role, year) {
-            showLoading(`Loading ${role} rubric...`);
+        // --- Interaction Handlers ---
+        function selectProficiency(element, componentId, proficiency) {
+            showLoading('Saving...');
             google.script.run
-                .withSuccessHandler(handleRubricData)
+                .withSuccessHandler(() => {
+                    hideLoading();
+                    const parent = element.parentElement;
+                    parent.querySelectorAll('.level-content').forEach(el => el.classList.remove('selected'));
+                    element.classList.add('selected');
+                })
                 .withFailureHandler(handleError)
-                .loadRubricData({ staff: email });
+                .saveProficiencySelection(currentObservationId, componentId, proficiency);
         }
 
-        function toggleLookFors(componentId) {
-            const parts = componentId.split('-');
-            const content = document.getElementById(`lookForsContent-${parts[1]}-${parts[3]}`);
-            const chevron = document.getElementById(`chevron-${parts[1]}-${parts[3]}`);
-            if (content && chevron) {
-                content.classList.toggle('expanded');
-                chevron.classList.toggle('expanded');
+        function uploadFile(fileInput, componentId) {
+            const file = fileInput.files[0];
+            if (!file) return;
+            const statusEl = document.getElementById(`upload-status-${componentId}`);
+            statusEl.textContent = 'Uploading...';
+            const reader = new FileReader();
+            reader.onload = e => {
+                const base64Data = e.target.result.split(',')[1];
+                google.script.run
+                    .withSuccessHandler(result => {
+                        if (result.success) {
+                            statusEl.textContent = 'Upload complete.';
+                            const listEl = document.getElementById(`evidence-list-${componentId}`);
+                            listEl.innerHTML += `<div class="evidence-item"><a href="${result.fileUrl}" target="_blank">${result.fileName}</a></div>`;
+                            setTimeout(() => { statusEl.textContent = 'Select another file?'; }, 3000);
+                        } else {
+                            handleError(result);
+                            statusEl.textContent = 'Upload failed.';
+                        }
+                    })
+                    .withFailureHandler(handleError)
+                    .uploadMediaEvidence(currentObservationId, componentId, base64Data, file.name, file.type);
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function toggleObservationView() {
+            observationViewMode = observationViewMode === 'assigned' ? 'full' : 'assigned';
+            updateComponentVisibility();
+        }
+
+        function updateComponentVisibility() {
+            const btn = document.getElementById('viewToggleBtn');
+            const components = document.querySelectorAll('.component-section');
+            if (observationViewMode === 'assigned') {
+                btn.textContent = 'View Full Rubric';
+                components.forEach(comp => {
+                    if (comp.dataset.isAssigned === 'false') {
+                        comp.classList.add('component-hidden');
+                    } else {
+                        comp.classList.remove('component-hidden');
+                    }
+                });
+            } else {
+                btn.textContent = 'View Assigned Areas Only';
+                components.forEach(comp => comp.classList.remove('component-hidden'));
             }
         }
-
+        
         // --- Initialization ---
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('Filter interface loaded successfully!');
-            showView('quickActionsView');
-        });
+        document.addEventListener('DOMContentLoaded', () => showView('quickActionsView'));
     </script>
 </body>
 </html>
