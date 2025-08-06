@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?= userContext.role ?> - Select Rubric View</title>
+    <title><?= data.userContext.role ?> - Select Rubric View</title>
     <style>
         * {
             margin: 0;
@@ -611,7 +611,7 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>👥 <?= userContext.role ?> Dashboard</h1>
+            <h1>👥 <?= data.userContext.role ?> Dashboard</h1>
             <p>Select how you'd like to view rubric information</p>
         </div>
         
@@ -626,7 +626,7 @@
                     
                     <div class="actions-grid">
                         <!-- Administrator Only Actions -->
-                        <? if (userContext.specialRoleType === 'administrator') { ?>
+                        <? if (data.userContext.specialRoleType === 'administrator') { ?>
                         <div class="action-card" onclick="loadProbationaryView()">
                             <span class="action-icon">👨‍🏫</span>
                             <div class="action-title">Probationary Staff</div>
@@ -635,7 +635,7 @@
                         <? } ?>
                         
                         <!-- Peer Evaluator and Full Access Actions -->
-                        <? if (userContext.specialRoleType === 'peer_evaluator' || userContext.specialRoleType === 'full_access') { ?>
+                        <? if (data.userContext.specialRoleType === 'peer_evaluator' || data.userContext.specialRoleType === 'full_access') { ?>
                         <div class="action-card" onclick="showCustomFilters()">
                             <span class="action-icon">🔍</span>
                             <div class="action-title">Find Staff & Start Observation</div>
@@ -662,8 +662,8 @@
                 <div class="filter-row">
                     <select id="roleSelect" class="filter-select" onchange="handleRoleChange()">
                         <option value="">1. Select Role...</option>
-                        <? for (var i = 0; i < availableRoles.length; i++) { ?>
-                        <option value="<?= availableRoles[i] ?>"><?= availableRoles[i] ?></option>
+                        <? for (var i = 0; i < data.userContext.availableRoles.length; i++) { ?>
+                        <option value="<?= data.userContext.availableRoles[i] ?>"><?= data.userContext.availableRoles[i] ?></option>
                         <? } ?>
                     </select>
                 </div>
@@ -1125,7 +1125,7 @@
         }
 
         function generateProbationaryStaffHtml(data) {
-            const probationaryYear = <?= userContext.probationaryYearValue ?>;
+            const probationaryYear = data.userContext.probationaryYearValue;
             let html = `
                 <div style="background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
                     <div style="background: linear-gradient(135deg, #dc2626, #b91c1c); color: white; padding: 30px; text-align: center;">

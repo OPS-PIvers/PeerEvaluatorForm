@@ -39,6 +39,145 @@ const DOMAIN_CONFIGS = {
 };
 
 /**
+ * =================================================================
+ * HELPER FUNCTIONS FOR RESPONSE ENHANCEMENT
+ * Moved here to ensure they are defined before being called.
+ * =================================================================
+ */
+
+/**
+ * Generate response metadata including a unique ETag for caching.
+ */
+function generateResponseMetadata(userContext, requestId, debugMode = false) {
+  try {
+    const timestamp = Date.now();
+    const cacheVersion = getMasterCacheVersion();
+
+    // Generate ETag based on user state and data version
+    const etagData = {
+      role: userContext.role,
+      year: userContext.year,
+      email: userContext.email,
+      cacheVersion: cacheVersion,
+      timestamp: Math.floor(timestamp / 60000) // Round to minute for some caching
+    };
+
+    const etag = Utilities.base64Encode(
+      Utilities.computeDigest(
+        Utilities.DigestAlgorithm.MD5,
+        JSON.stringify(etagData)
+      )
+    ).substring(0, 16);
+
+    const metadata = {
+      requestId: requestId,
+      timestamp: timestamp,
+      cacheVersion: cacheVersion,
+      etag: etag,
+      role: userContext.role,
+      year: userContext.year,
+      debugMode: debugMode,
+      lastModified: new Date().toUTCString(),
+      maxAge: 0,
+      mustRevalidate: true
+    };
+
+    debugLog('Response metadata generated', metadata);
+    return metadata;
+
+  } catch (error) {
+    console.error('Error generating response metadata:', error);
+    return {
+      requestId: requestId,
+      timestamp: Date.now(),
+      etag: 'error-' + Date.now(),
+      error: error.message
+    };
+  }
+}
+
+/**
+ * Add state tracking headers to the HTML output for advanced debugging.
+ */
+function addStateTrackingHeaders(htmlOutput, userContext) {
+  try {
+    if (userContext.roleChangeDetected) {
+      // htmlOutput.addMetaTag('x-role-change-detected', 'true');
+      // htmlOutput.addMetaTag('x-previous-role', userContext.previousState?.role || 'unknown');
+      // htmlOutput.addMetaTag('x-state-changes', userContext.stateChanges.length.toString());
+    }
+
+    if (userContext.isNewUser) {
+      // htmlOutput.addMetaTag('x-new-user', 'true');
+    }
+
+    // htmlOutput.addMetaTag('x-session-id', userContext.metadata.sessionId);
+    // htmlOutput.addMetaTag('x-context-version', userContext.metadata.contextVersion);
+    // htmlOutput.addMetaTag('x-has-staff-record', userContext.hasStaffRecord.toString());
+
+    debugLog('State tracking headers added', {
+      roleChangeDetected: userContext.roleChangeDetected,
+      sessionId: userContext.metadata.sessionId
+    });
+
+  } catch (error) {
+    console.error('Error adding state tracking headers:', error);
+  }
+}
+
+/**
+ * Add cache-busting headers to the HTML output to prevent browser caching issues.
+ */
+function addCacheBustingHeaders(htmlOutput, metadata) {
+  try {
+    // Primary cache control headers
+    htmlOutput
+      .addMetaTag('cache-control', 'no-cache, no-store, must-revalidate, max-age=0')
+      .addMetaTag('pragma', 'no-cache')
+      .addMetaTag('expires', '0')
+      .addMetaTag('last-modified', metadata.lastModified)
+      .addMetaTag('etag', metadata.etag);
+
+    // Viewport and mobile optimization
+    htmlOutput.addMetaTag('viewport', 'width=device-width, initial-scale=1.0');
+
+    debugLog('Cache-busting headers added', {
+      etag: metadata.etag,
+      requestId: metadata.requestId
+    });
+
+  } catch (error) {
+    console.error('Error adding cache-busting headers:', error);
+  }
+}
+
+/**
+ * Add debug-specific headers to the HTML output when debug mode is active.
+ */
+function addDebugHeaders(htmlOutput, userContext, metadata) {
+  try {
+    // htmlOutput
+    //   .addMetaTag('x-debug-mode', 'true')
+    //   .addMetaTag('x-user-email', userContext.email || 'anonymous')
+    //   .addMetaTag('x-user-authenticated', userContext.isAuthenticated.toString())
+    //   .addMetaTag('x-user-default', userContext.isDefaultUser.toString())
+    //   .addMetaTag('x-role-override', (userContext.isRoleOverride || false).toString())
+    //   .addMetaTag('x-execution-time', (Date.now() - metadata.timestamp).toString());
+
+    debugLog('Debug headers added', { requestId: metadata.requestId });
+
+  } catch (error) {
+    console.error('Error adding debug headers:', error);
+  }
+}
+
+/**
+ * =================================================================
+ * MAIN WEB APP ENTRY POINT (doGet)
+ * =================================================================
+ */
+
+/**
  * Enhanced doGet function with proactive role change detection
  */
 function doGet(e) {
@@ -541,7 +680,7 @@ function validateSpecialRoleAccess(requestingRole, requestType) {
 
       case SPECIAL_ROLES.PEER_EVALUATOR:
         validation.hasAccess = true;
-        validation.allowedActions = [SPECIAL_ACTIONS.VIEW_ANY, SPECIAL_ACTIONS.FILTER_BY_ROLE, SPECIAL_ACTIONS.FILTER_BY_YEAR, SPECIAL_ACTIONS.FILTER_BY_STAFF];
+        validation.allowedActions = [SPECIAL_ACTIONS.VIEW_ANY, SPECIAL_ACTIONS.FILTER_BY_ROLE, SPECIAL_ACTIONS.FILTER_BY_YEAR, SPECIAL_ACTIONS.FILTER_BY_STAFF, SPECIAL_ACTIONS.GENERAL_ACCESS];
         validation.message = 'Peer Evaluator access granted';
         break;
 
