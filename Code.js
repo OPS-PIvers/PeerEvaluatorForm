@@ -39,145 +39,6 @@ const DOMAIN_CONFIGS = {
 };
 
 /**
- * =================================================================
- * HELPER FUNCTIONS FOR RESPONSE ENHANCEMENT
- * Moved here to ensure they are defined before being called.
- * =================================================================
- */
-
-/**
- * Generate response metadata including a unique ETag for caching.
- */
-function generateResponseMetadata(userContext, requestId, debugMode = false) {
-  try {
-    const timestamp = Date.now();
-    const cacheVersion = getMasterCacheVersion();
-
-    // Generate ETag based on user state and data version
-    const etagData = {
-      role: userContext.role,
-      year: userContext.year,
-      email: userContext.email,
-      cacheVersion: cacheVersion,
-      timestamp: Math.floor(timestamp / 60000) // Round to minute for some caching
-    };
-
-    const etag = Utilities.base64Encode(
-      Utilities.computeDigest(
-        Utilities.DigestAlgorithm.MD5,
-        JSON.stringify(etagData)
-      )
-    ).substring(0, 16);
-
-    const metadata = {
-      requestId: requestId,
-      timestamp: timestamp,
-      cacheVersion: cacheVersion,
-      etag: etag,
-      role: userContext.role,
-      year: userContext.year,
-      debugMode: debugMode,
-      lastModified: new Date().toUTCString(),
-      maxAge: 0,
-      mustRevalidate: true
-    };
-
-    debugLog('Response metadata generated', metadata);
-    return metadata;
-
-  } catch (error) {
-    console.error('Error generating response metadata:', error);
-    return {
-      requestId: requestId,
-      timestamp: Date.now(),
-      etag: 'error-' + Date.now(),
-      error: error.message
-    };
-  }
-}
-
-/**
- * Add state tracking headers to the HTML output for advanced debugging.
- */
-function addStateTrackingHeaders(htmlOutput, userContext) {
-  try {
-    if (userContext.roleChangeDetected) {
-      // htmlOutput.addMetaTag('x-role-change-detected', 'true');
-      // htmlOutput.addMetaTag('x-previous-role', userContext.previousState?.role || 'unknown');
-      // htmlOutput.addMetaTag('x-state-changes', userContext.stateChanges.length.toString());
-    }
-
-    if (userContext.isNewUser) {
-      // htmlOutput.addMetaTag('x-new-user', 'true');
-    }
-
-    // htmlOutput.addMetaTag('x-session-id', userContext.metadata.sessionId);
-    // htmlOutput.addMetaTag('x-context-version', userContext.metadata.contextVersion);
-    // htmlOutput.addMetaTag('x-has-staff-record', userContext.hasStaffRecord.toString());
-
-    debugLog('State tracking headers added', {
-      roleChangeDetected: userContext.roleChangeDetected,
-      sessionId: userContext.metadata.sessionId
-    });
-
-  } catch (error) {
-    console.error('Error adding state tracking headers:', error);
-  }
-}
-
-/**
- * Add cache-busting headers to the HTML output to prevent browser caching issues.
- */
-function addCacheBustingHeaders(htmlOutput, metadata) {
-  try {
-    // Primary cache control headers
-    htmlOutput
-      .addMetaTag('cache-control', 'no-cache, no-store, must-revalidate, max-age=0')
-      .addMetaTag('pragma', 'no-cache')
-      .addMetaTag('expires', '0')
-      .addMetaTag('last-modified', metadata.lastModified)
-      .addMetaTag('etag', metadata.etag);
-
-    // Viewport and mobile optimization
-    htmlOutput.addMetaTag('viewport', 'width=device-width, initial-scale=1.0');
-
-    debugLog('Cache-busting headers added', {
-      etag: metadata.etag,
-      requestId: metadata.requestId
-    });
-
-  } catch (error) {
-    console.error('Error adding cache-busting headers:', error);
-  }
-}
-
-/**
- * Add debug-specific headers to the HTML output when debug mode is active.
- */
-function addDebugHeaders(htmlOutput, userContext, metadata) {
-  try {
-    // htmlOutput
-    //   .addMetaTag('x-debug-mode', 'true')
-    //   .addMetaTag('x-user-email', userContext.email || 'anonymous')
-    //   .addMetaTag('x-user-authenticated', userContext.isAuthenticated.toString())
-    //   .addMetaTag('x-user-default', userContext.isDefaultUser.toString())
-    //   .addMetaTag('x-role-override', (userContext.isRoleOverride || false).toString())
-    //   .addMetaTag('x-execution-time', (Date.now() - metadata.timestamp).toString());
-
-    debugLog('Debug headers added', { requestId: metadata.requestId });
-
-  } catch (error) {
-    console.error('Error adding debug headers:', error);
-  }
-}
-
-/**
- * =================================================================
- * MAIN WEB APP ENTRY POINT (doGet)
- * =================================================================
- */
-
-/**
  * Enhanced doGet function with proactive role change detection
  */
 function doGet(e) {
@@ -246,12 +107,6 @@ function doGet(e) {
             requestId: requestId
         });
         
-        // Ensure the user context has a role before creating the filter interface
-        if (!userContext.role) {
-            const user = getUserByEmail(userContext.email);
-            userContext.role = user ? user.role : 'Teacher';
-        }
-
         return createFilterSelectionInterface(userContext, requestId);
     }
     // Enhanced filter logic for role-only vs role+year scenarios
@@ -619,7 +474,7 @@ function getFilteredStaffList(filterType = 'all', role = null, year = null) {
     }
 
     // Format for frontend use
-    const formattedUsers = filteredUsers.map(user => ({
+    const formattedUsers = formattedUsers.map(user => ({
       name: user.name || 'Unknown Name',
       email: user.email,
       role: user.role || 'Unknown Role',
@@ -1999,659 +1854,159 @@ function processRoleDomains(roleSheetData, role, year) {
  * Apply year-based filtering to domains (placeholder for future implementation)
  */
 function applyYearFiltering(domains, role, year) {
-  // For now, return all domains (no filtering)
-  debugLog(`Year filtering not yet implemented - returning all domains for ${role}, year ${year}`);
+  // Placeholder - future implementation will filter domains/components based on year
+  debugLog('Year filtering not yet implemented - returning all domains', { role, year });
   return domains;
 }
 
 /**
- * Get appropriate page title based on role
+ * Create a synthetic user context for role-based filtering (not viewing a specific user)
+ * @param {string} effectiveRole - The role to display the rubric for
+ * @param {number|string} effectiveYear - The year to filter by (optional)
+ * @param {Object} originalContext - The original user's context
+ * @param {Object} filterParams - Additional parameters for filtering
+ * @return {Object} Synthetic user context
  */
-function getPageTitle(role) {
-  if (role === 'Teacher') {
-    return HTML_SETTINGS.DEFAULT_TITLE;
-  }
-  return `${role} Framework - Professional Standards`;
-}
-
-/**
- * Generate cache-busted web app URL
- */
-function generateCacheBustedUrl(options = {}) {
+function createSyntheticUserContext(effectiveRole, effectiveYear, originalContext, filterParams = {}) {
   try {
-    const scriptId = ScriptApp.getScriptId();
-    const baseUrl = `https://script.google.com/macros/s/${scriptId}/exec`;
+    // Start with a copy of the original context
+    const syntheticContext = { ...originalContext };
 
-    const params = new URLSearchParams();
+    // Override key properties with filtered values
+    syntheticContext.role = effectiveRole;
+    syntheticContext.year = effectiveYear;
+    syntheticContext.isSynthetic = true;
+    syntheticContext.isFiltered = true;
 
-    // Always add cache busting
-    params.set('refresh', 'true');
-    params.set('nocache', 'true');
-    params.set('t', Date.now().toString());
-    params.set('r', Math.random().toString(36).substr(2, 9));
-
-    // Add optional parameters
-    if (options.role) params.set('role', options.role);
-    if (options.debug) params.set('debug', 'true');
-    if (options.year) params.set('year', options.year.toString());
-    if (options.mobile) params.set('mobile', 'true');
-
-    // Add cache version for tracking
-    params.set('cv', getMasterCacheVersion());
-
-    const fullUrl = `${baseUrl}?${params.toString()}`;
-
-    debugLog('Generated cache-busted URL', {
-      baseUrl: baseUrl,
-      options: options,
-      fullUrl: fullUrl
-    });
-
-    return fullUrl;
-
-  } catch (error) {
-    console.error('Error generating cache-busted URL:', error);
-    return 'https://script.google.com/macros/s/ERROR/exec';
-  }
-}
-
-/**
- * Generate multiple URL variations for different use cases
- */
-function generateAllUrlVariations(userContext = null) {
-  try {
-    const baseOptions = {};
-    if (userContext) {
-      baseOptions.role = userContext.role;
-      baseOptions.year = userContext.year;
+    // Set view mode and assigned subdomains based on filter parameters
+    if (filterParams.showFullRubric) {
+      syntheticContext.viewMode = VIEW_MODES.FULL;
+      syntheticContext.assignedSubdomains = null;
+    } else if (filterParams.showAssignedAreas) {
+      syntheticContext.viewMode = VIEW_MODES.ASSIGNED;
+      syntheticContext.assignedSubdomains = getAssignedSubdomainsForRoleYear(effectiveRole, effectiveYear);
+    } else {
+      // Default behavior if no specific view mode is requested
+      syntheticContext.viewMode = VIEW_MODES.FULL;
+      syntheticContext.assignedSubdomains = null;
     }
 
-    const urls = {
-      standard: generateCacheBustedUrl(baseOptions),
-      debug: generateCacheBustedUrl({ ...baseOptions, debug: true }),
-      mobile: generateCacheBustedUrl({ ...baseOptions, mobile: true }),
-      teacherOverride: generateCacheBustedUrl({ ...baseOptions, role: 'Teacher' }),
-      forceRefresh: generateCacheBustedUrl({ ...baseOptions, refresh: 'true', nocache: 'true' })
+    // Add metadata about the filtering
+    syntheticContext.filterInfo = {
+      isRoleFiltered: true,
+      originalRole: filterParams.originalRole,
+      effectiveRole: effectiveRole,
+      effectiveYear: effectiveYear,
+      showFullRubric: filterParams.showFullRubric || false,
+      showAssignedAreas: filterParams.showAssignedAreas || false
     };
 
-    // Add role-specific URLs for all available roles
-    urls.roleSpecific = {};
-    AVAILABLE_ROLES.forEach(role => {
-      urls.roleSpecific[role] = generateCacheBustedUrl({
-        ...baseOptions,
-        role: role
-      });
+    debugLog('Synthetic user context created', {
+      originalRole: filterParams.originalRole,
+      effectiveRole: effectiveRole,
+      effectiveYear: effectiveYear,
+      viewMode: syntheticContext.viewMode
     });
 
-    console.log('=== WEB APP URLS ===');
-    console.log('📌 STANDARD URL (with your current role):');
-    console.log(urls.standard);
-    console.log('');
-    console.log('🧪 DEBUG URL (shows debug info):');
-    console.log(urls.debug);
-    console.log('');
-    console.log('📱 MOBILE-OPTIMIZED URL:');
-    console.log(urls.mobile);
-
-    return urls;
+    return syntheticContext;
 
   } catch (error) {
-    console.error('Error generating URL variations:', error);
-    return { error: error.message };
+    console.error('Error creating synthetic user context:', error);
+    return originalContext; // Return original context on error
   }
 }
 
 /**
- * Create synthetic user context for role/year filtering by special access users
- * ENHANCED VERSION - Fixes blank screen issue
+ * Check if any active filters are present in the URL parameters
+ * @param {Object} params - URL parameters from e.parameter
+ * @return {boolean} True if any filter is active
  */
-function createSyntheticUserContext(targetRole, targetYear, originalContext, filterOptions = {}) {
-    try {
-        debugLog('Creating synthetic user context - Enhanced Version', {
-            targetRole: targetRole,
-            targetYear: targetYear,
-            filterOptions: filterOptions,
-            originalRole: originalContext?.role
-        });
-
-        // VALIDATION: Check if targetRole is valid
-        if (!targetRole || typeof targetRole !== 'string') {
-            console.error('Invalid targetRole provided:', targetRole);
-            return {
-                ...originalContext,
-                error: 'Invalid role specified',
-                isError: true
-            };
-        }
-
-        if (!AVAILABLE_ROLES.includes(targetRole)) {
-            console.error('Role not in AVAILABLE_ROLES:', targetRole, 'Available:', AVAILABLE_ROLES);
-            return {
-                ...originalContext,
-                error: `Role "${targetRole}" is not available. Available roles: ${AVAILABLE_ROLES.join(', ')}`,
-                isError: true
-            };
-        }
-
-        // VALIDATION: Check if originalContext exists
-        if (!originalContext) {
-            console.error('No original context provided');
-            return {
-                role: targetRole,
-                year: targetYear || 1,
-                isFiltered: true,
-                isSynthetic: true,
-                error: 'Missing user context',
-                isError: true
-            };
-        }
-
-        // Create a safe copy of the original context
-        const syntheticContext = { ...originalContext,
-            
-            // Override with synthetic values
-            role: targetRole,
-            year: targetYear || originalContext.year || 1,
-            isFiltered: true,
-            isSynthetic: true,
-            isError: false,
-            
-            // Set view mode based on filter type
-            viewMode: filterOptions.showAssignedAreas ? 'assigned' : 'full',
-            
-            // Get assigned subdomains if needed
-            assignedSubdomains: null,
-            
-            // Enhanced filter info
-            filterInfo: {
-                filterType: filterOptions.showFullRubric ? 'role_only' : 'role_and_year',
-                viewingRole: targetRole,
-                viewingYear: targetYear,
-                requestedBy: originalContext.role || 'Unknown',
-                showFullRubric: !!filterOptions.showFullRubric,
-                showAssignedAreas: !!filterOptions.showAssignedAreas,
-                originalRole: originalContext.role || 'Unknown'
-            },
-            
-            // Maintain special access from original context
-            hasSpecialAccess: originalContext.hasSpecialAccess || false,
-            canFilter: originalContext.canFilter || false,
-            specialRoleType: originalContext.specialRoleType || null
-        };
-
-        // Get assigned subdomains if showing assigned areas
-        if (filterOptions.showAssignedAreas && targetYear) {
-            try {
-                syntheticContext.assignedSubdomains = getAssignedSubdomainsForRoleYear(targetRole, targetYear);
-                debugLog('Assigned subdomains loaded for synthetic context', {
-                    role: targetRole,
-                    year: targetYear,
-                    subdomains: syntheticContext.assignedSubdomains
-                });
-            } catch (subdomainError) {
-                console.warn('Error loading assigned subdomains:', subdomainError);
-                // Continue without assigned subdomains rather than failing
-                syntheticContext.assignedSubdomains = null;
-            }
-        }
-
-        debugLog('Synthetic user context created successfully - Enhanced Version', {
-            role: syntheticContext.role,
-            year: syntheticContext.year,
-            viewMode: syntheticContext.viewMode,
-            hasAssignedSubdomains: !!syntheticContext.assignedSubdomains,
-            filterType: syntheticContext.filterInfo?.filterType
-        });
-
-        return syntheticContext;
-
-    } catch (error) {
-        console.error('Error creating synthetic user context - Enhanced Version:', error);
-        
-        // Return a safe fallback context instead of throwing
-        return {
-            ...originalContext,
-            role: originalContext?.role || 'Teacher', // Safe fallback
-            year: originalContext?.year || 1,
-            isFiltered: true,
-            isSynthetic: true,
-            isError: true,
-            error: `Error creating filtered view: ${error.message}`,
-            filterInfo: {
-                error: error.message,
-                requestedRole: targetRole,
-                fallbackUsed: true
-            }
-        };
-    }
+function hasActiveFilters(params) {
+  return !!(params.filterRole || params.filterYear || params.filterStaff);
 }
 
 /**
- * Create enhanced error page with cache busting and debug info
- * Add this function to the end of your Code.js file, before the final closing brace
+ * Create the filter selection interface for special roles
+ * @param {Object} userContext - The user's context
+ * @param {string} requestId - The request ID for debugging
+ * @return {HtmlOutput} The HTML output for the filter page
+ */
+function createFilterSelectionInterface(userContext, requestId) {
+  try {
+    const htmlTemplate = HtmlService.createTemplateFromFile('filter-interface');
+    
+    // Prepare data for the template
+    const templateData = {
+      userContext: {
+        email: userContext.email,
+        role: userContext.role,
+        specialRoleType: userContext.specialRoleType,
+        requestId: requestId,
+        availableRoles: AVAILABLE_ROLES,
+        availableYears: OBSERVATION_YEARS,
+        probationaryYear: PROBATIONARY_OBSERVATION_YEAR
+      },
+      validation: validateSpecialRoleAccess(userContext.role, 'general_access')
+    };
+
+    htmlTemplate.data = templateData;
+    
+    const htmlOutput = htmlTemplate.evaluate()
+      .setTitle('Select View - Peer Evaluator')
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+      
+    // Add cache-busting headers using the centralized helper function
+    const metadata = generateResponseMetadata(userContext, requestId);
+    addCacheBustingHeaders(htmlOutput, metadata);
+      
+    debugLog('Filter selection interface created successfully', {
+      role: userContext.role,
+      requestId: requestId
+    });
+      
+    return htmlOutput;
+    
+  } catch (error) {
+    console.error('Error creating filter selection interface:', error);
+    return createEnhancedErrorPage(error, requestId, userContext);
+  }
+}
+
+/**
+ * Creates an enhanced error page with detailed information for debugging.
+ * @param {Error} error The error object.
+ * @param {string} requestId A unique ID for the request.
+ * @param {object} userContext The user context object, if available.
+ * @param {string} userAgent The user agent string.
+ * @returns {HtmlOutput} The HTML output for the error page.
  */
 function createEnhancedErrorPage(error, requestId, userContext, userAgent) {
   try {
-    const errorDetails = {
-      message: error instanceof Error ? error.message : error.toString(),
+    const template = HtmlService.createTemplateFromFile('error-page');
+    template.error = {
+      message: error.message,
+      stack: error.stack,
+      requestId: requestId,
+      userEmail: userContext ? userContext.email : 'N/A',
+      userRole: userContext ? userContext.role : 'N/A',
+      userAgent: userAgent || 'N/A',
       timestamp: new Date().toISOString(),
-      requestId: requestId || generateUniqueId('error'),
-      userAgent: userAgent || 'Unknown',
-      stack: error.stack || 'No stack trace available'
+      version: SYSTEM_INFO.VERSION
     };
 
-    // Create simple HTML content directly instead of using template
-    const htmlContent = `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate, max-age=0">
-    <meta http-equiv="pragma" content="no-cache">
-    <meta http-equiv="expires" content="0">
-    <title>System Error - Danielson Framework</title>
-    <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background-color: #f8f9fa;
-            margin: 0;
-            padding: 20px;
-            color: #333;
-        }
-        .error-container { max-width: 600px;
-            margin: 50px auto;
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            padding: 40px;
-            text-align: center;
-        }
-        .error-icon { font-size: 4rem;
-            color: #dc3545;
-            margin-bottom: 20px;
-        }
-        .error-title { color: #dc3545;
-            font-size: 1.5rem;
-            font-weight: 600;
-            margin-bottom: 15px;
-        }
-        .error-message { color: #666;
-            font-size: 1rem;
-            line-height: 1.6;
-            margin-bottom: 30px;
-        }
-        .error-actions { display: flex;
-            gap: 15px;
-            justify-content: center;
-            flex-wrap: wrap;
-        }
-        .btn { padding: 12px 24px;
-            border: none;
-            border-radius: 6px;
-            font-size: 0.9rem;
-            font-weight: 500;
-            cursor: pointer;
-            text-decoration: none;
-            display: inline-block;
-            transition: all 0.3s ease;
-        }
-        .btn-primary { background: #007bff;
-            color: white;
-        }
-        .btn-primary:hover { background: #0056b3; }
-        .btn-secondary { background: #6c757d;
-            color: white;
-        }
-        .btn-secondary:hover { background: #545b62; }
-        .error-details { margin-top: 30px;
-            padding: 20px;
-            background: #f8f9fa;
-            border-radius: 6px;
-            font-family: monospace;
-            font-size: 0.8rem;
-            color: #666;
-            text-align: left;
-            max-height: 200px;
-            overflow-y: auto;
-        }
-        @media (max-width: 768px) {
-            .error-container { margin: 20px auto;
-                padding: 20px;
-            }
-            .btn { width: 100%;
-                margin-bottom: 10px;
-            }
-        }
-    </style>
-</head>
-<body>
-    <div class="error-container">
-        <div class="error-icon">⚠️</div>
-        <h1 class="error-title">System Error</h1>
-        <div class="error-message">
-            <p>We encountered an error while loading the Danielson Framework.</p>
-            <p>This is usually temporary. Please try refreshing the page or contact your administrator if the problem persists.</p>
-        </div>
-        
-        <div class="error-actions">
-            <button class="btn btn-primary" onclick="window.location.reload()">
-                🔄 Refresh Page
-            </button>
-            <button class="btn btn-secondary" onclick="forceRefresh()">
-                💨 Force Refresh
-            </button>
-        </div>
-
-        <div class="error-details">
-            <strong>Error Details:</strong><br>
-            Time: ${errorDetails.timestamp}<br>
-            Request ID: ${errorDetails.requestId}<br>
-            Message: ${errorDetails.message}<br>
-        </div>
-    </div>
-
-    <script>
-        function forceRefresh() {
-            const url = new URL(window.location);
-            url.searchParams.set('refresh', 'true');
-            url.searchParams.set('nocache', 'true');
-            url.searchParams.set('t', Date.now());
-            window.location.href = url.toString();
-        }
-
-        // Auto-refresh after 30 seconds
-        setTimeout(function() {
-            forceRefresh();
-        }, 30000);
-
-        var errorData = ${JSON.stringify(errorDetails)};
-        console.error('System Error Details:', errorData);
-    </script>
-</body>
-</html>`;
-
-    const htmlOutput = HtmlService.createHtmlOutput(htmlContent)
-      .setTitle('System Error - Danielson Framework')
+    const output = template.evaluate()
+      .setTitle('Error - Danielson Framework')
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 
-    console.error('Enhanced error page created:', {
-      requestId: errorDetails.requestId,
-      error: errorDetails.message,
-      timestamp: errorDetails.timestamp
-    });
+    // Add cache-busting headers to ensure the error page is not cached
+    const metadata = generateResponseMetadata(userContext || {}, requestId);
+    addCacheBustingHeaders(output, metadata);
 
-    return htmlOutput;
-
-  } catch (createErrorPageError) {
-    console.error('Error creating enhanced error page:', createErrorPageError);
-    
-    // Fallback to basic error response
+    return output;
+  } catch (e) {
+    // Fallback to a very simple error message if the error page itself fails
     return HtmlService.createHtmlOutput(
-      `<div style="text-align: center; padding: 50px; font-family: Arial, sans-serif;">
-        <h2 style="color: #dc3545;">System Error</h2>
-        <p>An error occurred while loading the application.</p>
-        <p>Please refresh the page or contact your administrator.</p>
-        <button onclick="window.location.reload()" style="padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">Refresh Page</button>
-      </div>`
-    ).setTitle('System Error');
+      `<h1>An unexpected error occurred</h1><p>Could not generate the error page. Please contact support.</p><p>Request ID: ${requestId}</p>`
+    ).setTitle('Critical Error');
   }
-}
-
-/**
- * Check if there are active filter parameters
- */
-function hasActiveFilters(params) {
-    const hasFilters = !!(
-        params.filterRole || 
-        params.filterYear || 
-        params.filterStaff || 
-        params.filterType === 'probationary' ||
-        params.view ||
-        params.role  // URL role override
-    );
-    
-    debugLog('Checking for active filters', {
-        params: params,
-        hasFilters: hasFilters
-    });
-    
-    return hasFilters;
-}
-
-/**
- * Create filter selection interface for special access users
- */
-function createFilterSelectionInterface(userContext, requestId) {
-    try {
-        debugLog('Creating filter selection interface', {
-            role: userContext.role,
-            specialRoleType: userContext.specialRoleType,
-            requestId: requestId
-        });
-
-        // Create the HTML template using the new filter-interface.html file
-        const htmlTemplate = HtmlService.createTemplateFromFile('filter-interface');
-        
-        // Pass data to the template
-        htmlTemplate.userContext = userContext;
-        htmlTemplate.userContext.probationaryYearValue = PROBATIONARY_OBSERVATION_YEAR;
-        htmlTemplate.availableRoles = AVAILABLE_ROLES;
-        htmlTemplate.availableYears = OBSERVATION_YEARS;
-
-        // Generate the HTML output
-        const htmlOutput = htmlTemplate.evaluate()
-            .setTitle(`${userContext.role} - Select Rubric View`)
-            .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-
-        // Add cache-busting headers (reuse existing function)
-        const responseMetadata = generateResponseMetadata(userContext, requestId, false);
-        addCacheBustingHeaders(htmlOutput, responseMetadata);
-
-        console.log(`✅ FILTER INTERFACE LOADED: ${userContext.role} (${userContext.specialRoleType}) - Request ID: ${requestId}`);
-        
-        debugLog('Filter selection interface created successfully', { requestId });
-        return htmlOutput;
-
-    } catch (error) {
-        console.error('Error creating filter selection interface:', error);
-        
-        // Fallback to the original rubric if the filter interface fails
-        console.log('⚠️ FILTER INTERFACE FAILED - Falling back to regular rubric');
-        return null; // This will cause the function to continue with normal rubric loading
-    }
-}
-
-/**
- * Server-side function for AJAX rubric loading - Phase 4
- * This function is called from the filter interface via google.script.run
- */
-function loadRubricData(filterParams) {
-    try {
-        debugLog('Loading rubric data via AJAX', { filterParams });
-
-        const { role, year, viewType, filterType, staff } = filterParams;
-
-        // Handle probationary staff filter (Administrator feature)
-        if (filterType === 'probationary') {
-            const probationaryStaff = getProbationaryStaff();
-            return {
-                success: true,
-                data: {
-                    title: "📋 Probationary Staff Overview",
-                    subtitle: "All staff members in probationary status",
-                    isProbationaryView: true,
-                    staff: probationaryStaff,
-                    domains: [], // No rubric domains for this view
-                    viewType: 'probationary'
-                },
-                filterParams: filterParams
-            };
-        }
-
-        // Handle staff member specific view
-        if (staff && isValidEmail(staff)) {
-            // Get the specific staff member's context
-            const staffUser = getUserByEmail(staff);
-            if (!staffUser) {
-                return { 
-                    success: false, 
-                    error: `Staff member not found: ${staff}` 
-                };
-            }
-
-            // Load rubric data for this specific staff member
-            const rubricData = getAllDomainsData(
-                staffUser.role,
-                staffUser.year,
-                'assigned', // Always show assigned areas for staff members
-                getAssignedSubdomainsForRoleYear(staffUser.role, staffUser.year)
-            );
-
-            rubricData.filterContext = {
-                isStaffView: true,
-                staffName: staffUser.name,
-                staffEmail: staffUser.email,
-                staffRole: staffUser.role,
-                staffYear: staffUser.year
-            };
-
-            return { 
-                success: true, 
-                data: rubricData,
-                filterParams: filterParams
-            };
-        }
-
-        // Validate role if provided
-        if (role && !AVAILABLE_ROLES.includes(role)) {
-            return { 
-                success: false, 
-                error: `Invalid role: ${role}. Valid roles are: ${AVAILABLE_ROLES.join(', ')}` 
-            };
-        }
-
-        // Determine effective parameters
-        let effectiveRole = role || 'Teacher';
-        let effectiveYear = year ? (parseInt(year) || year) : null;
-        let effectiveViewMode = viewType === 'assigned' ? 'assigned' : 'full';
-        let assignedSubdomains = null;
-
-        // Get assigned subdomains if needed
-        if (effectiveViewMode === 'assigned' && effectiveYear) {
-            assignedSubdomains = getAssignedSubdomainsForRoleYear(effectiveRole, effectiveYear);
-        }
-
-        // Get rubric data
-        const rubricData = getAllDomainsData(
-            effectiveRole,
-            effectiveYear,
-            effectiveViewMode,
-            assignedSubdomains
-        );
-
-        // Add filter context for the UI
-        rubricData.filterContext = {
-            role: effectiveRole,
-            year: effectiveYear,
-            viewType: effectiveViewMode,
-            isFiltered: true,
-            hasAssignedAreas: !!assignedSubdomains
-        };
-
-        console.log(`✅ AJAX RUBRIC LOADED: ${effectiveRole} (${effectiveViewMode}) - Year: ${effectiveYear || 'Any'}`);
-
-        return { 
-            success: true, 
-            data: rubricData,
-            filterParams: filterParams
-        };
-
-    } catch (error) {
-        console.error('Error loading rubric data via AJAX:', error);
-        return { 
-            success: false, 
-            error: error.message || 'An error occurred while loading rubric data'
-        };
-    }
-}
-
-/**
- * Server-side function for getting staff data for filters - Phase 4
- */
-function getStaffForFilters(role, year) {
-    try {
-        debugLog('Getting staff for filters via AJAX', { role, year });
-
-        if (!role || !AVAILABLE_ROLES.includes(role)) {
-            return { 
-                success: false, 
-                error: 'Valid role is required' 
-            };
-        }
-
-        // Get staff list for this role/year combination
-        const staff = getStaffByRoleAndYear(role, year);
-        
-        console.log(`✅ AJAX STAFF LOADED: ${staff.length} staff members for ${role}, Year ${year || 'Any'}`);
-
-        return {
-            success: true,
-            staff: staff,
-            role: role,
-            year: year,
-            count: staff.length
-        };
-
-    } catch (error) {
-        console.error('Error getting staff for filters via AJAX:', error);
-        return { 
-            success: false, 
-            error: error.message || 'An error occurred while loading staff data'
-        };
-    }
-}
-
-/**
- * Get current user's own rubric data - Phase 4
- */
-function getMyOwnRubricData() {
-    try {
-        debugLog('Getting current user own rubric data');
-        
-        const userContext = createUserContext();
-        if (!userContext || !userContext.email) {
-            return {
-                success: false,
-                error: 'User not authenticated'
-            };
-        }
-
-        const rubricData = getAllDomainsData(
-            userContext.role,
-            userContext.year,
-            'assigned',
-            userContext.assignedSubdomains
-        );
-
-        rubricData.filterContext = {
-            isOwnView: true,
-            role: userContext.role,
-            year: userContext.year,
-            viewType: 'assigned'
-        };
-
-        console.log(`✅ AJAX OWN RUBRIC LOADED: ${userContext.role}, Year ${userContext.year}`);
-
-        return {
-            success: true,
-            data: rubricData,
-            userContext: userContext
-        };
-
-    } catch (error) {
-        console.error('Error getting own rubric data:', error);
-        return {
-            success: false,
-            error: error.message || 'Error loading your rubric data'
-        };
-    }
 }
