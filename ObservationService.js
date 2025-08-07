@@ -23,6 +23,42 @@ function _getObservationsDb() {
 }
 
 /**
+ * Sends a notification email to the observed staff member when an observation is finalized.
+ * @param {Object} observation The finalized observation object.
+ * @private
+ */
+function _sendFinalizedEmail(observation) {
+  try {
+    const recipientEmail = observation.observedEmail;
+    const staffName = observation.observedName;
+    const subject = "Your Observation has been Finalized";
+
+    // Get the observation folder and its URL
+    const folder = _getObservationFolder(observation);
+    const folderUrl = folder.getUrl();
+
+    // Create the HTML content from the template
+    const template = HtmlService.createTemplateFromFile('finalized-observation-email');
+    template.staffName = staffName;
+    template.folderUrl = folderUrl;
+    const htmlBody = template.evaluate().getContent();
+
+    // Send the email using GmailApp
+    GmailApp.sendEmail(recipientEmail, subject, "", {
+      htmlBody: htmlBody,
+      from: Session.getActiveUser().getEmail(), // Send from the person who finalized it
+      name: 'Danielson Framework System'
+    });
+
+    debugLog(`Finalized observation email sent to ${recipientEmail}`, { observationId: observation.observationId });
+
+  } catch (error) {
+    console.error(`Failed to send finalized observation email for ${observation.observationId}:`, error);
+    // Do not block the finalization process if the email fails, just log the error.
+  }
+}
+
+/**
  * Saves the entire observations database to PropertiesService.
  * @param {Array<Object>} db The array of all observation objects to save.
  * @private
@@ -164,6 +200,66 @@ function saveProficiencySelection(observationId, componentId, proficiency) {
 }
 
 /**
+ * Retrieves or creates the specific Google Drive folder for a given observation.
+ * @param {Object} observation The observation object.
+ * @returns {GoogleAppsScript.Drive.Folder} The Google Drive folder for the observation.
+ * @private
+ */
+function _getObservationFolder(observation) {
+  // Get the root folder for all observations
+  let rootFolderIterator = DriveApp.getFoldersByName(DRIVE_FOLDER_INFO.ROOT_FOLDER_NAME);
+  let rootFolder = rootFolderIterator.hasNext() ? rootFolderIterator.next() : DriveApp.createFolder(DRIVE_FOLDER_INFO.ROOT_FOLDER_NAME);
+
+  // Get or create a folder for the observed user
+  const userFolderName = `${observation.observedName} (${observation.observedEmail})`;
+  let userFolderIterator = rootFolder.getFoldersByName(userFolderName);
+  let userFolder = userFolderIterator.hasNext() ? userFolderIterator.next() : rootFolder.createFolder(userFolderName);
+
+  // Get or create a folder for this specific observation
+  const obsFolderName = `Observation - ${observation.observationId}`;
+  let obsFolderIterator = userFolder.getFoldersByName(obsFolderName);
+  let obsFolder = obsFolderIterator.hasNext() ? obsFolderIterator.next() : userFolder.createFolder(obsFolderName);
+
+  return obsFolder;
+}
+
+/**
+ * Sends a notification email to the observed staff member when an observation is finalized.
+ * @param {Object} observation The finalized observation object.
+ * @private
+ */
+function _sendFinalizedEmail(observation) {
+  try {
+    const recipientEmail = observation.observedEmail;
+    const staffName = observation.observedName;
+    const subject = "Your Observation has been Finalized";
+
+    // Get the observation folder and its URL
+    const folder = _getObservationFolder(observation);
+    const folderUrl = folder.getUrl();
+
+    // Create the HTML content from the template
+    const template = HtmlService.createTemplateFromFile('finalized-observation-email');
+    template.staffName = staffName;
+    template.folderUrl = folderUrl;
+    const htmlBody = template.evaluate().getContent();
+
+    // Send the email using GmailApp
+    GmailApp.sendEmail(recipientEmail, subject, "", {
+      htmlBody: htmlBody,
+      from: Session.getActiveUser().getEmail(), // Send from the person who finalized it
+      name: 'Danielson Framework System'
+    });
+
+    debugLog(`Finalized observation email sent to ${recipientEmail}`, { observationId: observation.observationId });
+
+  } catch (error) {
+    console.error(`Failed to send finalized observation email for ${observation.observationId}:`, error);
+    // Do not block the finalization process if the email fails, just log the error.
+  }
+}
+
+/**
  * Uploads media evidence to Google Drive and links it to an observation component.
  * @param {string} observationId The ID of the observation.
  * @param {string} componentId The ID of the rubric component (e.g., "1a:").
@@ -185,19 +281,7 @@ function uploadMediaEvidence(observationId, componentId, base64Data, fileName, m
     }
     const observation = db[observationIndex];
 
-    // Get the root folder for all observations
-    let rootFolderIterator = DriveApp.getFoldersByName(DRIVE_FOLDER_INFO.ROOT_FOLDER_NAME);
-    let rootFolder = rootFolderIterator.hasNext() ? rootFolderIterator.next() : DriveApp.createFolder(DRIVE_FOLDER_INFO.ROOT_FOLDER_NAME);
-
-    // Get or create a folder for the observed user
-    const userFolderName = `${observation.observedName} (${observation.observedEmail})`;
-    let userFolderIterator = rootFolder.getFoldersByName(userFolderName);
-    let userFolder = userFolderIterator.hasNext() ? userFolderIterator.next() : rootFolder.createFolder(userFolderName);
-
-    // Get or create a folder for this specific observation
-    const obsFolderName = `Observation - ${observation.observationId}`;
-    let obsFolderIterator = userFolder.getFoldersByName(obsFolderName);
-    let obsFolder = obsFolderIterator.hasNext() ? obsFolderIterator.next() : userFolder.createFolder(obsFolderName);
+    const obsFolder = _getObservationFolder(observation);
     
     // Decode base64 and create a blob
     const blob = Utilities.newBlob(Utilities.base64Decode(base64Data), mimeType, fileName);
@@ -298,21 +382,12 @@ function deleteFinalizedObservationRecord(observationId, requestingUserEmail) {
 
         // Move associated Drive folder to trash
         try {
-            const rootFolderIterator = DriveApp.getFoldersByName(DRIVE_FOLDER_INFO.ROOT_FOLDER_NAME);
-            if (rootFolderIterator.hasNext()) {
-                const rootFolder = rootFolderIterator.next();
-                const userFolderName = `${observation.observedName} (${observation.observedEmail})`;
-                const userFolderIterator = rootFolder.getFoldersByName(userFolderName);
-                if (userFolderIterator.hasNext()) {
-                    const userFolder = userFolderIterator.next();
-                    const obsFolderName = `Observation - ${observation.observationId}`;
-                    const obsFolderIterator = userFolder.getFoldersByName(obsFolderName);
-                    if (obsFolderIterator.hasNext()) {
-                        const obsFolder = obsFolderIterator.next();
-                        obsFolder.setTrashed(true);
-                        debugLog('Observation Drive folder moved to trash', { observationId: observationId, folderId: obsFolder.getId() });
-                    }
-                }
+            // This attempts to get the folder without creating it, but _getObservationFolder will create it if it's missing.
+            // This is acceptable because this function deletes the record anyway.
+            const obsFolder = _getObservationFolder(observation);
+            if (obsFolder) {
+                obsFolder.setTrashed(true);
+                debugLog('Observation Drive folder moved to trash', { observationId: observationId, folderId: obsFolder.getId() });
             }
         } catch (driveError) {
             console.error(`Could not delete Drive folder for observation ${observationId}:`, driveError);
@@ -359,6 +434,7 @@ function updateObservationStatus(observationId, newStatus, requestingUserEmail) 
         observation.lastModifiedAt = new Date().toISOString();
         if (newStatus === OBSERVATION_STATUS.FINALIZED) {
             observation.finalizedAt = new Date().toISOString();
+            _sendFinalizedEmail(observation); // Send email notification
         }
 
         _saveObservationsDb(db);
