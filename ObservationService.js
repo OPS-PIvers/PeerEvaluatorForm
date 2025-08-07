@@ -162,6 +162,7 @@ function createNewObservation(observerEmail, observedEmail) {
       lastModifiedAt: new Date().toISOString(),
       finalizedAt: null,
       pdfUrl: null, // To store the link to the generated PDF
+      pdfStatus: null, // Track PDF generation status: null, 'generated', 'failed'
       observationData: {}, // e.g., { "1a:": "proficient", "1b:": "basic" }
       evidenceLinks: {} // e.g., { "1a:": [{url: "...", name: "...", uploadedAt: "..."}, ...] }
     };

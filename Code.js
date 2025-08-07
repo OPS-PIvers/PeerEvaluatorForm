@@ -325,10 +325,14 @@ function finalizeObservation(observationId) {
                 if (row !== -1) {
                     const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
                     const pdfUrlCol = headers.indexOf('pdfUrl') + 1;
+                    const pdfStatusCol = headers.indexOf('pdfStatus') + 1;
                     if (pdfUrlCol > 0) {
                         sheet.getRange(row, pdfUrlCol).setValue(pdfResult.pdfUrl);
-                        SpreadsheetApp.flush();
                     }
+                    if (pdfStatusCol > 0) {
+                        sheet.getRange(row, pdfStatusCol).setValue('generated');
+                    }
+                    SpreadsheetApp.flush();
                 }
                 // Get the updated observation to return
                 const updatedObservation = getObservationById(observationId);
@@ -336,9 +340,29 @@ function finalizeObservation(observationId) {
                     statusUpdateResult.observation = updatedObservation;
                 }
             }
+            debugLog('PDF successfully generated and saved for observation', { observationId, pdfUrl: pdfResult.pdfUrl });
         } else {
-            // Log the PDF generation error but don't fail the finalization
+            // PDF generation failed - mark the status and continue with finalization
             console.error('PDF generation failed after finalization:', pdfResult.error);
+            debugLog('PDF generation failed for finalized observation', { observationId, error: pdfResult.error });
+            
+            // Update PDF status to indicate failure
+            const spreadsheet = openSpreadsheet();
+            const sheet = getSheetByName(spreadsheet, OBSERVATION_SHEET_NAME);
+            if (sheet) {
+                const row = _findObservationRow(sheet, observationId);
+                if (row !== -1) {
+                    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+                    const pdfStatusCol = headers.indexOf('pdfStatus') + 1;
+                    if (pdfStatusCol > 0) {
+                        sheet.getRange(row, pdfStatusCol).setValue('failed');
+                        SpreadsheetApp.flush();
+                    }
+                }
+            }
+            
+            // Add PDF error to the response so UI can show appropriate message
+            statusUpdateResult.pdfError = pdfResult.error;
         }
 
         return statusUpdateResult;
@@ -430,47 +454,174 @@ function getObservationPdfUrl(observationId) {
  * @private
  */
 function _generateAndSavePdf(observationId, userContext) {
+    debugLog('Starting PDF generation', { observationId });
+    
     try {
         const observation = getObservationById(observationId);
         if (!observation) {
+            debugLog('PDF generation failed: Observation not found', { observationId });
             return { success: false, error: 'Observation not found for PDF generation.' };
         }
 
+        debugLog('Retrieved observation for PDF', { observationId, observedName: observation.observedName });
+
         const assignedSubdomains = getAssignedSubdomainsForRoleYear(observation.observedRole, observation.observedYear);
+        debugLog('Retrieved assigned subdomains', { observationId, subdomainCount: assignedSubdomains ? assignedSubdomains.length : 'null' });
+        
         const rubricData = getAllDomainsData(observation.observedRole, observation.observedYear, 'full', assignedSubdomains);
 
         if (rubricData.isError) {
+            debugLog('PDF generation failed: Rubric data error', { observationId, error: rubricData.errorMessage });
             return { success: false, error: `Failed to load rubric data for PDF: ${rubricData.errorMessage}` };
         }
 
+        debugLog('Retrieved rubric data for PDF', { observationId, domainCount: rubricData.domains ? rubricData.domains.length : 'null' });
+
         const docName = `Observation for ${observation.observedName} - ${new Date(observation.finalizedAt || Date.now()).toISOString().slice(0, 10)}`;
 
-        const template = HtmlService.createTemplateFromFile('pdf-rubric.html');
-        template.data = {
-            observation: observation,
-            rubricData: rubricData
-        };
-        const htmlContent = template.evaluate().getContent();
+        // Check if PDF template exists
+        try {
+            const template = HtmlService.createTemplateFromFile('pdf-rubric.html');
+            template.data = {
+                observation: observation,
+                rubricData: rubricData
+            };
+            const htmlContent = template.evaluate().getContent();
+            debugLog('Successfully generated HTML content for PDF', { observationId, contentLength: htmlContent.length });
 
-        const pdfBlob = Utilities.newBlob(htmlContent, 'text/html', docName + '.html').getAs('application/pdf');
+            // Generate PDF blob
+            const pdfBlob = Utilities.newBlob(htmlContent, 'text/html', docName + '.html').getAs('application/pdf');
+            debugLog('Successfully generated PDF blob', { observationId, blobSize: pdfBlob.getBytes().length });
 
-        const rootFolderIterator = DriveApp.getFoldersByName(DRIVE_FOLDER_INFO.ROOT_FOLDER_NAME);
-        let rootFolder = rootFolderIterator.hasNext() ? rootFolderIterator.next() : DriveApp.createFolder(DRIVE_FOLDER_INFO.ROOT_FOLDER_NAME);
-        const userFolderName = `${observation.observedName} (${observation.observedEmail})`;
-        let userFolderIterator = rootFolder.getFoldersByName(userFolderName);
-        let userFolder = userFolderIterator.hasNext() ? userFolderIterator.next() : rootFolder.createFolder(userFolderName);
-        const obsFolderName = `Observation - ${observation.observationId}`;
-        let obsFolderIterator = userFolder.getFoldersByName(obsFolderName);
-        let obsFolder = obsFolderIterator.hasNext() ? obsFolderIterator.next() : userFolder.createFolder(obsFolderName);
+        } catch (templateError) {
+            debugLog('PDF generation failed: Template error', { observationId, error: templateError.message });
+            return { success: false, error: `Failed to generate PDF template: ${templateError.message}` };
+        }
 
-        const pdfFile = obsFolder.createFile(pdfBlob).setName(docName + ".pdf");
+        // Create folder structure
+        try {
+            const rootFolderIterator = DriveApp.getFoldersByName(DRIVE_FOLDER_INFO.ROOT_FOLDER_NAME);
+            let rootFolder = rootFolderIterator.hasNext() ? rootFolderIterator.next() : DriveApp.createFolder(DRIVE_FOLDER_INFO.ROOT_FOLDER_NAME);
+            debugLog('Retrieved/created root folder', { observationId, rootFolderId: rootFolder.getId() });
+            
+            const userFolderName = `${observation.observedName} (${observation.observedEmail})`;
+            let userFolderIterator = rootFolder.getFoldersByName(userFolderName);
+            let userFolder = userFolderIterator.hasNext() ? userFolderIterator.next() : rootFolder.createFolder(userFolderName);
+            debugLog('Retrieved/created user folder', { observationId, userFolderId: userFolder.getId() });
+            
+            const obsFolderName = `Observation - ${observation.observationId}`;
+            let obsFolderIterator = userFolder.getFoldersByName(obsFolderName);
+            let obsFolder = obsFolderIterator.hasNext() ? obsFolderIterator.next() : userFolder.createFolder(obsFolderName);
+            debugLog('Retrieved/created observation folder', { observationId, obsFolderId: obsFolder.getId() });
 
-        debugLog('PDF generated and saved to Drive', { observationId: observationId, pdfUrl: pdfFile.getUrl() });
-        return { success: true, pdfUrl: pdfFile.getUrl() };
+            // Recreate the blob for file creation (needed after the try/catch block)
+            const template = HtmlService.createTemplateFromFile('pdf-rubric.html');
+            template.data = {
+                observation: observation,
+                rubricData: rubricData
+            };
+            const htmlContent = template.evaluate().getContent();
+            const pdfBlob = Utilities.newBlob(htmlContent, 'text/html', docName + '.html').getAs('application/pdf');
+            
+            const pdfFile = obsFolder.createFile(pdfBlob).setName(docName + ".pdf");
+            debugLog('Successfully created PDF file', { observationId, fileId: pdfFile.getId(), pdfUrl: pdfFile.getUrl() });
+
+            return { success: true, pdfUrl: pdfFile.getUrl() };
+
+        } catch (driveError) {
+            debugLog('PDF generation failed: Drive error', { observationId, error: driveError.message });
+            return { success: false, error: `Failed to save PDF to Drive: ${driveError.message}` };
+        }
 
     } catch (error) {
         console.error(`Error generating PDF for observation ${observationId}:`, error);
+        debugLog('PDF generation failed: Unexpected error', { observationId, error: error.message, stack: error.stack });
         return { success: false, error: 'An unexpected error occurred during PDF generation: ' + error.message };
+    }
+}
+
+/**
+ * Regenerates the PDF for a finalized observation.
+ * @param {string} observationId The ID of the observation to regenerate PDF for.
+ * @returns {Object} A response object with success status and PDF URL.
+ */
+function regenerateObservationPdf(observationId) {
+    try {
+        setupObservationSheet(); // Ensure the sheet is ready
+        const userContext = createUserContext();
+        if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
+            return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
+        }
+
+        const observation = getObservationById(observationId);
+        if (!observation) {
+            return { success: false, error: 'Observation not found.' };
+        }
+
+        if (observation.observerEmail !== userContext.email) {
+            return { success: false, error: 'Permission denied. You did not create this observation.' };
+        }
+
+        if (observation.status !== OBSERVATION_STATUS.FINALIZED) {
+            return { success: false, error: 'PDF can only be regenerated for finalized observations.' };
+        }
+
+        debugLog('Starting PDF regeneration', { observationId, requestedBy: userContext.email });
+
+        // Generate the PDF
+        const pdfResult = _generateAndSavePdf(observationId, userContext);
+        
+        if (pdfResult.success) {
+            // Update the observation with the new PDF URL and status
+            const spreadsheet = openSpreadsheet();
+            const sheet = getSheetByName(spreadsheet, OBSERVATION_SHEET_NAME);
+            if (sheet) {
+                const row = _findObservationRow(sheet, observationId);
+                if (row !== -1) {
+                    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+                    const pdfUrlCol = headers.indexOf('pdfUrl') + 1;
+                    const pdfStatusCol = headers.indexOf('pdfStatus') + 1;
+                    const lastModifiedCol = headers.indexOf('lastModifiedAt') + 1;
+                    
+                    if (pdfUrlCol > 0) {
+                        sheet.getRange(row, pdfUrlCol).setValue(pdfResult.pdfUrl);
+                    }
+                    if (pdfStatusCol > 0) {
+                        sheet.getRange(row, pdfStatusCol).setValue('generated');
+                    }
+                    if (lastModifiedCol > 0) {
+                        sheet.getRange(row, lastModifiedCol).setValue(new Date().toISOString());
+                    }
+                    SpreadsheetApp.flush();
+                }
+            }
+            
+            debugLog('PDF successfully regenerated', { observationId, pdfUrl: pdfResult.pdfUrl });
+            return { success: true, pdfUrl: pdfResult.pdfUrl };
+            
+        } else {
+            // PDF regeneration failed - update status
+            const spreadsheet = openSpreadsheet();
+            const sheet = getSheetByName(spreadsheet, OBSERVATION_SHEET_NAME);
+            if (sheet) {
+                const row = _findObservationRow(sheet, observationId);
+                if (row !== -1) {
+                    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+                    const pdfStatusCol = headers.indexOf('pdfStatus') + 1;
+                    if (pdfStatusCol > 0) {
+                        sheet.getRange(row, pdfStatusCol).setValue('failed');
+                        SpreadsheetApp.flush();
+                    }
+                }
+            }
+            
+            debugLog('PDF regeneration failed', { observationId, error: pdfResult.error });
+            return { success: false, error: pdfResult.error };
+        }
+
+    } catch (error) {
+        console.error(`Error regenerating PDF for observation ${observationId}:`, error);
+        return { success: false, error: 'An unexpected error occurred while regenerating the PDF.' };
     }
 }
 
