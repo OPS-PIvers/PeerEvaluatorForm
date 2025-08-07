@@ -423,11 +423,13 @@ function exportObservationToPdf(observationId) {
         let obsFolderIterator = userFolder.getFoldersByName(obsFolderName);
         let obsFolder = obsFolderIterator.hasNext() ? obsFolderIterator.next() : userFolder.createFolder(obsFolderName);
 
-        const docFile = DriveApp.getFileById(doc.getId());
+        const docFile = DriveApp.getFileById(docId);
         const pdfBlob = docFile.getAs('application/pdf');
         const pdfFile = obsFolder.createFile(pdfBlob).setName(docName + ".pdf");
 
-        DriveApp.getFileById(doc.getId()).setTrashed(true);
+        // Move the temporary Google Doc to trash after PDF creation.
+        // We trash (not permanently delete) to allow for recovery in case of errors or audit needs.
+        DriveApp.getFileById(docId).setTrashed(true);
 
         return { success: true, pdfUrl: pdfFile.getUrl() };
 
