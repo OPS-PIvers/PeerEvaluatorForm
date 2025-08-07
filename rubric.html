@@ -39,6 +39,27 @@
     <meta name="turbo-cache-control" content="no-cache">
 
     <style>
+.toast-notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background-color: #dc3545;
+    color: white;
+    padding: 15px 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    z-index: 10000;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-20px);
+    transition: all 0.3s ease-in-out;
+}
+
+.toast-notification.show {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
 :root {
     --color-white: white;
     --color-text-default: #333;
@@ -853,6 +874,7 @@
     </style>
 </head>
 <body>
+    <div id="toastNotification" class="toast-notification"></div>
     <!-- Debug Information (only visible in debug mode) -->
     <? if (data.userContext && data.userContext.debugMode) { ?>
     <div class="debug-info">
@@ -1027,16 +1049,16 @@
                                 <span class="assigned-badge">📋 Assigned</span>
                                 <? } ?>
                             </div>
-                            <div class="level-content rating-cell" data-component-id="<?= component.componentId ?>" data-rating="developing" onclick="handleRatingCellClick(this)">
+                            <div class="level-content rating-cell" data-component-id="<?= component.componentId ?>" data-rating="developing">
                                 <?= component.developing ?>
                             </div>
-                            <div class="level-content rating-cell" data-component-id="<?= component.componentId ?>" data-rating="basic" onclick="handleRatingCellClick(this)">
+                            <div class="level-content rating-cell" data-component-id="<?= component.componentId ?>" data-rating="basic">
                                 <?= component.basic ?>
                             </div>
-                            <div class="level-content rating-cell" data-component-id="<?= component.componentId ?>" data-rating="proficient" onclick="handleRatingCellClick(this)">
+                            <div class="level-content rating-cell" data-component-id="<?= component.componentId ?>" data-rating="proficient">
                                 <?= component.proficient ?>
                             </div>
-                            <div class="level-content rating-cell" data-component-id="<?= component.componentId ?>" data-rating="distinguished" onclick="handleRatingCellClick(this)">
+                            <div class="level-content rating-cell" data-component-id="<?= component.componentId ?>" data-rating="distinguished">
                                 <?= component.distinguished ?>
                             </div>
                         </div>
@@ -2009,6 +2031,15 @@
         console.log('User assigned subdomains:', userAssignedSubdomains);
         <? } ?>
 
+        function showToast(message) {
+            const toast = document.getElementById('toastNotification');
+            toast.textContent = message;
+            toast.classList.add('show');
+            setTimeout(function() {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
         function handleRatingCellClick(cell) {
             // Ensure this only runs in evaluator mode
             if (!data.userContext || !data.userContext.isEvaluator) {
@@ -2018,7 +2049,7 @@
 
             const componentId = cell.dataset.componentId;
             const rating = cell.dataset.rating;
-            const observationId = data.observationId; // Retrieve from current observation context
+            const observationId = '...'; // This needs to be retrieved from the current observation context
 
             if (!componentId || !rating || !observationId) {
                 console.error('Missing data for rating selection:', { componentId, rating, observationId });
@@ -2047,7 +2078,7 @@
                         if (currentlySelected) {
                             currentlySelected.classList.add('selected');
                         }
-                        alert('Error saving selection: ' + response.error);
+                        showToast('Error saving selection: ' + response.error);
                     }
                 })
                 .withFailureHandler(function(error) {
@@ -2057,8 +2088,7 @@
                     if (currentlySelected) {
                         currentlySelected.classList.add('selected');
                     }
-                    // Show a user-friendly error message
-                    showNotification('A server error occurred. Please try again later.', 'error');
+                    showToast('Server error: ' + error.message);
                 })
                 .saveProficiencySelection(observationId, componentId, rating);
         }
@@ -2132,6 +2162,15 @@
             linksContainer.appendChild(linkItem);
           }
         <? } ?>
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const ratingCells = document.querySelectorAll('.rating-cell');
+            ratingCells.forEach(function(cell) {
+                cell.addEventListener('click', function() {
+                    handleRatingCellClick(cell);
+                });
+            });
+        });
     </script>
 </body>
 </html>
