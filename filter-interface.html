@@ -379,22 +379,33 @@
     <div class="toast-notification" id="toastNotification"></div>
     <script>
         /**
-         * Escapes HTML entities in a string.
-         * @param {string} unsafe The string to escape.
-         * @returns {string} The escaped string.
+         * Escapes HTML entities in a string to prevent XSS and ensure safe HTML rendering.
+         * This implementation matches the server-side Utils.js version for consistency.
+         * @param {*} unsafe - The input to escape (will be converted to string if not already)
+         * @returns {string} The escaped string with HTML entities replaced
          */
         function escapeHtml(unsafe) {
-            if (typeof unsafe !== 'string') {
+            // Handle null and undefined by returning empty string
+            if (unsafe == null) {
                 return '';
             }
-            const map = {
+            
+            // Convert to string if not already a string
+            const str = String(unsafe);
+            
+            // Define the character mapping for HTML entities
+            const entityMap = {
                 '&': '&amp;',
                 '<': '&lt;',
                 '>': '&gt;',
                 '"': '&quot;',
-                "'": '&#039;'
+                "'": '&#39;'
             };
-            return unsafe.replace(/[&<>"']/g, m => map[m]);
+            
+            // Replace characters using the entity map
+            return str.replace(/[&<>"']/g, function(match) {
+                return entityMap[match];
+            });
         }
 
         function showLoading(message = 'Loading...') { document.getElementById('loading').innerHTML = `<div class="loading-spinner"></div>${message}`; document.getElementById('loading').style.display = 'block'; hideError(); }
