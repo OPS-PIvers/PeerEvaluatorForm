@@ -185,7 +185,6 @@ function getStaffListForDropdown(role, year) {
  */
 function getObservationOptions(observedEmail) {
     try {
-        setupObservationSheet(); // Ensure the sheet is ready
         const userContext = createUserContext();
         if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
             return { success: false, error: 'Permission denied.' };
@@ -205,7 +204,6 @@ function getObservationOptions(observedEmail) {
  */
 function createNewObservationForPeerEvaluator(observedEmail) {
   try {
-    setupObservationSheet(); // Ensure the sheet is ready
     const userContext = createUserContext();
     if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
       return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
@@ -250,7 +248,6 @@ function createNewObservationForPeerEvaluator(observedEmail) {
  */
 function loadObservationForEditing(observationId) {
     try {
-        setupObservationSheet(); // Ensure the sheet is ready
         const userContext = createUserContext();
         if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
             return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
@@ -304,7 +301,6 @@ function deleteObservation(observationId) {
  */
 function finalizeObservation(observationId) {
     try {
-        setupObservationSheet(); // Ensure the sheet is ready
         const userContext = createUserContext();
         if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
             return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
@@ -318,27 +314,23 @@ function finalizeObservation(observationId) {
         }
 
         // If finalization is successful, generate and save the PDF
-        try {
-            const pdfResult = _generateAndSavePdf(observationId, userContext);
-            if (pdfResult.success) {
-                // The PDF URL is now available, let's save it to the observation
-                const observation = getObservationById(observationId);
-                if (observation) {
-                    observation.pdfUrl = pdfResult.pdfUrl;
-                    const db = _getObservationsDb();
-                    const observationIndex = db.findIndex(obs => obs.observationId === observationId);
-                    if (observationIndex !== -1) {
-                        db[observationIndex] = observation;
-                        _saveObservationsDb(db);
-                        statusUpdateResult.observation = observation; // Ensure the returned observation has the URL
-                    }
+        const pdfResult = _generateAndSavePdf(observationId, userContext);
+        if (pdfResult.success) {
+            // The PDF URL is now available, let's save it to the observation
+            const observation = getObservationById(observationId);
+            if (observation) {
+                observation.pdfUrl = pdfResult.pdfUrl;
+                const db = _getObservationsDb();
+                const observationIndex = db.findIndex(obs => obs.observationId === observationId);
+                if (observationIndex !== -1) {
+                    db[observationIndex] = observation;
+                    _saveObservationsDb(db);
+                    statusUpdateResult.observation = observation; // Ensure the returned observation has the URL
                 }
-            } else {
-                // Log the PDF generation error but don't fail the finalization
-                console.error('PDF generation failed after finalization:', pdfResult.error);
             }
-        } catch (pdfError) {
-            console.error('Caught an error during PDF generation after finalization:', pdfError);
+        } else {
+            // Log the PDF generation error but don't fail the finalization
+            console.error('PDF generation failed after finalization:', pdfResult.error);
         }
 
         return statusUpdateResult;
