@@ -339,12 +339,35 @@ function uploadMediaEvidence(observationId, componentId, base64Data, fileName, m
   }
 
   try {
-    const db = _getObservationsDb();
-    const observationIndex = db.findIndex(obs => obs.observationId === observationId);
-    if (observationIndex === -1) {
+    const spreadsheet = openSpreadsheet();
+    const sheet = getSheetByName(spreadsheet, OBSERVATION_SHEET_NAME);
+    if (!sheet) {
+      throw new Error(`Sheet "${OBSERVATION_SHEET_NAME}" not found.`);
+    }
+
+    const row = _findObservationRow(sheet, observationId);
+    if (row === -1) {
       return { success: false, error: 'Observation not found.' };
     }
-    const observation = db[observationIndex];
+
+    // Get the current observation data from the sheet
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const evidenceLinksCol = headers.indexOf('evidenceLinks') + 1;
+    const lastModifiedCol = headers.indexOf('lastModifiedAt') + 1;
+    const observedNameCol = headers.indexOf('observedName') + 1;
+    const observedEmailCol = headers.indexOf('observedEmail') + 1;
+
+    if (evidenceLinksCol === 0) {
+      return { success: false, error: 'evidenceLinks column not found in the sheet.' };
+    }
+
+    // Get observation data for folder creation
+    const rowData = sheet.getRange(row, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const observation = {
+      observationId: rowData[headers.indexOf('observationId')],
+      observedName: rowData[observedNameCol - 1],
+      observedEmail: rowData[observedEmailCol - 1]
+    };
 
     const obsFolder = _getObservationFolder(observation);
     
@@ -356,18 +379,34 @@ function uploadMediaEvidence(observationId, componentId, base64Data, fileName, m
     const fileUrl = file.getUrl();
     file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); // Make it viewable
 
-    // Update the observation record with the evidence link
-    if (!observation.evidenceLinks[componentId]) {
-      observation.evidenceLinks[componentId] = [];
+    // Get current evidence links from the sheet
+    const evidenceLinksCell = sheet.getRange(row, evidenceLinksCol);
+    const currentLinksString = evidenceLinksCell.getValue();
+    let currentLinks = {};
+    try {
+      if (currentLinksString) {
+        currentLinks = JSON.parse(currentLinksString);
+      }
+    } catch (e) {
+      console.warn(`Could not parse evidenceLinks for ${observationId}. Starting fresh. Data: ${currentLinksString}`);
     }
-    observation.evidenceLinks[componentId].push({
-        url: fileUrl,
-        name: fileName,
-        uploadedAt: new Date().toISOString()
-    });
-    observation.lastModifiedAt = new Date().toISOString();
 
-    _saveObservationsDb(db);
+    // Add the new evidence link
+    if (!currentLinks[componentId]) {
+      currentLinks[componentId] = [];
+    }
+    currentLinks[componentId].push({
+      url: fileUrl,
+      name: fileName,
+      uploadedAt: new Date().toISOString()
+    });
+
+    // Update the sheet with the new evidence links and timestamp
+    evidenceLinksCell.setValue(JSON.stringify(currentLinks, null, 2));
+    if (lastModifiedCol > 0) {
+      sheet.getRange(row, lastModifiedCol).setValue(new Date().toISOString());
+    }
+    SpreadsheetApp.flush(); // Ensure the data is written immediately
 
     debugLog('Media evidence uploaded and linked', { observationId, componentId, fileUrl });
     return { success: true, fileUrl: fileUrl, fileName: fileName };
@@ -389,25 +428,43 @@ function deleteObservationRecord(observationId, requestingUserEmail) {
         return { success: false, error: 'Observation ID and requesting user email are required.' };
     }
     try {
-        const db = _getObservationsDb();
-        const observationIndex = db.findIndex(obs => obs.observationId === observationId);
-        if (observationIndex === -1) {
+        const spreadsheet = openSpreadsheet();
+        const sheet = getSheetByName(spreadsheet, OBSERVATION_SHEET_NAME);
+        if (!sheet) {
+            throw new Error(`Sheet "${OBSERVATION_SHEET_NAME}" not found.`);
+        }
+
+        const row = _findObservationRow(sheet, observationId);
+        if (row === -1) {
             return { success: false, error: 'Observation not found.' };
         }
-        const observation = db[observationIndex];
+
+        // Get the observation data to check permissions
+        const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+        const rowData = sheet.getRange(row, 1, 1, sheet.getLastColumn()).getValues()[0];
+        const observerEmailCol = headers.indexOf('observerEmail');
+        const statusCol = headers.indexOf('status');
+        
+        if (observerEmailCol === -1 || statusCol === -1) {
+            return { success: false, error: 'Required columns not found in the sheet.' };
+        }
+
+        const observerEmail = rowData[observerEmailCol];
+        const status = rowData[statusCol];
 
         // Permission check: only the observer who created it can delete.
-        if (observation.observerEmail !== requestingUserEmail) {
+        if (observerEmail !== requestingUserEmail) {
             return { success: false, error: 'Permission denied. You did not create this observation.' };
         }
 
         // Only drafts can be deleted.
-        if (observation.status !== OBSERVATION_STATUS.DRAFT) {
+        if (status !== OBSERVATION_STATUS.DRAFT) {
             return { success: false, error: 'Only draft observations can be deleted.' };
         }
 
-        db.splice(observationIndex, 1);
-        _saveObservationsDb(db);
+        // Delete the row from the sheet
+        sheet.deleteRow(row);
+        SpreadsheetApp.flush();
 
         debugLog('Observation deleted', { observationId, requestingUserEmail });
         return { success: true };
@@ -428,27 +485,51 @@ function deleteFinalizedObservationRecord(observationId, requestingUserEmail) {
         return { success: false, error: 'Observation ID and requesting user email are required.' };
     }
     try {
-        const db = _getObservationsDb();
-        const observationIndex = db.findIndex(obs => obs.observationId === observationId);
-        if (observationIndex === -1) {
+        const spreadsheet = openSpreadsheet();
+        const sheet = getSheetByName(spreadsheet, OBSERVATION_SHEET_NAME);
+        if (!sheet) {
+            throw new Error(`Sheet "${OBSERVATION_SHEET_NAME}" not found.`);
+        }
+
+        const row = _findObservationRow(sheet, observationId);
+        if (row === -1) {
             return { success: false, error: 'Observation not found.' };
         }
-        const observation = db[observationIndex];
+
+        // Get the observation data to check permissions and get folder info
+        const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+        const rowData = sheet.getRange(row, 1, 1, sheet.getLastColumn()).getValues()[0];
+        const observerEmailCol = headers.indexOf('observerEmail');
+        const statusCol = headers.indexOf('status');
+        const observedNameCol = headers.indexOf('observedName');
+        const observedEmailCol = headers.indexOf('observedEmail');
+        
+        if (observerEmailCol === -1 || statusCol === -1) {
+            return { success: false, error: 'Required columns not found in the sheet.' };
+        }
+
+        const observerEmail = rowData[observerEmailCol];
+        const status = rowData[statusCol];
 
         // Permission check: only the observer who created it can delete.
-        if (observation.observerEmail !== requestingUserEmail) {
+        if (observerEmail !== requestingUserEmail) {
             return { success: false, error: 'Permission denied. You did not create this observation.' };
         }
 
         // Only FINALIZED observations can be deleted by this function.
-        if (observation.status !== OBSERVATION_STATUS.FINALIZED) {
+        if (status !== OBSERVATION_STATUS.FINALIZED) {
             return { success: false, error: 'This function can only delete finalized observations.' };
         }
 
         // Move associated Drive folder to trash
         try {
-            // This attempts to get the folder without creating it, but _getObservationFolder will create it if it's missing.
-            // This is acceptable because this function deletes the record anyway.
+            // Create observation object for folder operations
+            const observation = {
+                observationId: observationId,
+                observedName: rowData[observedNameCol],
+                observedEmail: rowData[observedEmailCol]
+            };
+            
             const obsFolder = _getObservationFolder(observation);
             if (obsFolder) {
                 obsFolder.setTrashed(true);
@@ -459,8 +540,9 @@ function deleteFinalizedObservationRecord(observationId, requestingUserEmail) {
             // Do not block deletion if Drive operation fails, just log it.
         }
 
-        db.splice(observationIndex, 1);
-        _saveObservationsDb(db);
+        // Delete the row from the sheet
+        sheet.deleteRow(row);
+        SpreadsheetApp.flush();
 
         debugLog('Finalized observation DELETED', { observationId, requestingUserEmail });
         return { success: true };
@@ -483,27 +565,54 @@ function updateObservationStatus(observationId, newStatus, requestingUserEmail) 
     }
 
     try {
-        const db = _getObservationsDb();
-        const observationIndex = db.findIndex(obs => obs.observationId === observationId);
-        if (observationIndex === -1) {
+        const spreadsheet = openSpreadsheet();
+        const sheet = getSheetByName(spreadsheet, OBSERVATION_SHEET_NAME);
+        if (!sheet) {
+            throw new Error(`Sheet "${OBSERVATION_SHEET_NAME}" not found.`);
+        }
+
+        const row = _findObservationRow(sheet, observationId);
+        if (row === -1) {
             return { success: false, error: 'Observation not found.' };
         }
 
-        const observation = db[observationIndex];
-        if (observation.observerEmail !== requestingUserEmail) {
+        // Get the observation data to check permissions
+        const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+        const rowData = sheet.getRange(row, 1, 1, sheet.getLastColumn()).getValues()[0];
+        const observerEmailCol = headers.indexOf('observerEmail');
+        const statusCol = headers.indexOf('status');
+        const lastModifiedCol = headers.indexOf('lastModifiedAt');
+        const finalizedAtCol = headers.indexOf('finalizedAt');
+        
+        if (observerEmailCol === -1 || statusCol === -1) {
+            return { success: false, error: 'Required columns not found in the sheet.' };
+        }
+
+        const observerEmail = rowData[observerEmailCol];
+        if (observerEmail !== requestingUserEmail) {
             return { success: false, error: 'Permission denied. You did not create this observation.' };
         }
 
         // Update status and timestamps
-        observation.status = newStatus;
-        observation.lastModifiedAt = new Date().toISOString();
-        if (newStatus === OBSERVATION_STATUS.FINALIZED) {
-            observation.finalizedAt = new Date().toISOString();
-            _sendFinalizedEmail(observation); // Send email notification
+        const now = new Date().toISOString();
+        sheet.getRange(row, statusCol + 1).setValue(newStatus);
+        if (lastModifiedCol !== -1) {
+            sheet.getRange(row, lastModifiedCol + 1).setValue(now);
         }
+        if (newStatus === OBSERVATION_STATUS.FINALIZED && finalizedAtCol !== -1) {
+            sheet.getRange(row, finalizedAtCol + 1).setValue(now);
+            
+            // Send email notification - get the full observation data for the email
+            const updatedObservation = getObservationById(observationId);
+            if (updatedObservation) {
+                _sendFinalizedEmail(updatedObservation);
+            }
+        }
+        
+        SpreadsheetApp.flush();
 
-        db[observationIndex] = observation;
-        _saveObservationsDb(db);
+        // Get the updated observation to return
+        const observation = getObservationById(observationId);
         debugLog('Observation status updated', { observationId, newStatus });
         return { success: true, observation: observation };
 

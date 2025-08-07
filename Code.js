@@ -317,15 +317,23 @@ function finalizeObservation(observationId) {
         const pdfResult = _generateAndSavePdf(observationId, userContext);
         if (pdfResult.success) {
             // The PDF URL is now available, let's save it to the observation
-            const observation = getObservationById(observationId);
-            if (observation) {
-                observation.pdfUrl = pdfResult.pdfUrl;
-                const db = _getObservationsDb();
-                const observationIndex = db.findIndex(obs => obs.observationId === observationId);
-                if (observationIndex !== -1) {
-                    db[observationIndex] = observation;
-                    _saveObservationsDb(db);
-                    statusUpdateResult.observation = observation; // Ensure the returned observation has the URL
+            // Update the observation with the PDF URL directly in the sheet
+            const spreadsheet = openSpreadsheet();
+            const sheet = getSheetByName(spreadsheet, OBSERVATION_SHEET_NAME);
+            if (sheet) {
+                const row = _findObservationRow(sheet, observationId);
+                if (row !== -1) {
+                    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+                    const pdfUrlCol = headers.indexOf('pdfUrl') + 1;
+                    if (pdfUrlCol > 0) {
+                        sheet.getRange(row, pdfUrlCol).setValue(pdfResult.pdfUrl);
+                        SpreadsheetApp.flush();
+                    }
+                }
+                // Get the updated observation to return
+                const updatedObservation = getObservationById(observationId);
+                if (updatedObservation) {
+                    statusUpdateResult.observation = updatedObservation;
                 }
             }
         } else {
