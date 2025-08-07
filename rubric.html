@@ -215,6 +215,27 @@
             color: #4a5568;
             font-size: 0.9rem;
         }
+
+        .level-content.rating-cell {
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+        }
+
+        .level-content.rating-cell:hover {
+            background-color: #f0f4f8;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+        }
+
+        .level-content.rating-cell.selected {
+            background-color: var(--color-blue-light-bg);
+            border-color: var(--color-blue-base);
+            color: var(--color-blue-text-dark);
+            font-weight: 600;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+            transform: translateY(-2px);
+            border-left: 3px solid var(--color-blue-base);
+        }
         
         .level-content {
             padding: 20px;
@@ -1006,16 +1027,16 @@
                                 <span class="assigned-badge">📋 Assigned</span>
                                 <? } ?>
                             </div>
-                            <div class="level-content">
+                            <div class="level-content rating-cell" data-component-id="<?= component.componentId ?>" data-rating="developing" onclick="handleRatingCellClick(this)">
                                 <?= component.developing ?>
                             </div>
-                            <div class="level-content">
+                            <div class="level-content rating-cell" data-component-id="<?= component.componentId ?>" data-rating="basic" onclick="handleRatingCellClick(this)">
                                 <?= component.basic ?>
                             </div>
-                            <div class="level-content">
+                            <div class="level-content rating-cell" data-component-id="<?= component.componentId ?>" data-rating="proficient" onclick="handleRatingCellClick(this)">
                                 <?= component.proficient ?>
                             </div>
-                            <div class="level-content">
+                            <div class="level-content rating-cell" data-component-id="<?= component.componentId ?>" data-rating="distinguished" onclick="handleRatingCellClick(this)">
                                 <?= component.distinguished ?>
                             </div>
                         </div>
@@ -1987,6 +2008,59 @@
         console.log('Current view mode:', currentViewMode);
         console.log('User assigned subdomains:', userAssignedSubdomains);
         <? } ?>
+
+        function handleRatingCellClick(cell) {
+            // Ensure this only runs in evaluator mode
+            if (!data.userContext || !data.userContext.isEvaluator) {
+                console.log('Not in evaluator mode. Ignoring click.');
+                return;
+            }
+
+            const componentId = cell.dataset.componentId;
+            const rating = cell.dataset.rating;
+            const observationId = '...'; // This needs to be retrieved from the current observation context
+
+            if (!componentId || !rating || !observationId) {
+                console.error('Missing data for rating selection:', { componentId, rating, observationId });
+                return;
+            }
+
+            const parentRow = cell.parentNode;
+            const currentlySelected = parentRow.querySelector('.selected');
+
+            // --- Instant UI Update ---
+            if (currentlySelected) {
+                currentlySelected.classList.remove('selected');
+            }
+            cell.classList.add('selected');
+
+            // --- Background Save ---
+            google.script.run
+                .withSuccessHandler(function(response) {
+                    if (response.success) {
+                        console.log('Saved:', { componentId, rating });
+                        // Optionally show a small success indicator
+                    } else {
+                        console.error('Failed to save rating:', response.error);
+                        // --- Revert UI on Failure ---
+                        cell.classList.remove('selected');
+                        if (currentlySelected) {
+                            currentlySelected.classList.add('selected');
+                        }
+                        alert('Error saving selection: ' + response.error);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    console.error('Server error saving rating:', error);
+                    // --- Revert UI on Failure ---
+                    cell.classList.remove('selected');
+                    if (currentlySelected) {
+                        currentlySelected.classList.add('selected');
+                    }
+                    alert('Server error: ' + error.message);
+                })
+                .saveProficiencySelection(observationId, componentId, rating);
+        }
 
         <? if (data.userContext && data.userContext.isEvaluator) { ?>
           // This script will run only if the user is an evaluator
