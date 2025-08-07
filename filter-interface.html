@@ -317,6 +317,23 @@
         </div>
     </div>
     <script>
+        /**
+         * Escapes HTML entities in a string.
+         * @param {string} unsafe The string to escape.
+         * @returns {string} The escaped string.
+         */
+        function escapeHtml(unsafe) {
+            if (typeof unsafe !== 'string') {
+                return '';
+            }
+            return unsafe
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
         function showLoading(message = 'Loading...') { document.getElementById('loading').innerHTML = `<div class="loading-spinner"></div>${message}`; document.getElementById('loading').style.display = 'block'; hideError(); }
         function hideLoading() { document.getElementById('loading').style.display = 'none'; }
         function showError(error) { const msg = error.message || String(error); document.getElementById('errorMessage').textContent = msg; document.getElementById('error').style.display = 'block'; hideLoading(); }
