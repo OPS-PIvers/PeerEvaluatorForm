@@ -435,11 +435,10 @@ function exportObservationToPdf(observationId) {
         });
 
         // Save and close the document to finalize changes.
-        const docId = doc.getId();
-
-        // Save and close the document to finalize changes.
         doc.saveAndClose();
 
+        // Get the document ID after saving and closing.
+        const docId = doc.getId();
         // Find or create the folder structure in Google Drive.
         const rootFolderIterator = DriveApp.getFoldersByName(DRIVE_FOLDER_INFO.ROOT_FOLDER_NAME);
         let rootFolder = rootFolderIterator.hasNext() ? rootFolderIterator.next() : DriveApp.createFolder(DRIVE_FOLDER_INFO.ROOT_FOLDER_NAME);
