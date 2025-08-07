@@ -430,7 +430,6 @@ function exportObservationToPdf(observationId) {
                 [DocumentApp.Attribute.BOLD]: true,
                 [DocumentApp.Attribute.FONT_SIZE]: 10,
                 [DocumentApp.Attribute.FOREGROUND_COLOR]: '#4a5568'
-            },
             TABLE_CELL: {
                 [DocumentApp.Attribute.FONT_SIZE]: 10,
                 [DocumentApp.Attribute.PADDING_TOP]: 5,
