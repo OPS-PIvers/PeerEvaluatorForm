@@ -311,6 +311,132 @@ function finalizeObservation(observationId) {
     }
 }
 
+/**
+ * Deletes a finalized observation. This is a permanent action.
+ * @param {string} observationId The ID of the observation to delete.
+ * @returns {Object} A response object indicating success or failure.
+ */
+function deleteFinalizedObservation(observationId) {
+    try {
+        const userContext = createUserContext();
+        if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
+            return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
+        }
+        return deleteFinalizedObservationRecord(observationId, userContext.email);
+    } catch (error) {
+        console.error('Error in deleteFinalizedObservation wrapper:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Loads a finalized observation for read-only viewing.
+ * @param {string} observationId The ID of the observation to load.
+ * @returns {Object} A response object with the observation and rubric data.
+ */
+function loadFinalizedObservationForViewing(observationId) {
+    const result = loadObservationForEditing(observationId);
+    if (result.success && result.rubricData && result.rubricData.userContext) {
+        result.rubricData.userContext.isEvaluator = false;
+    }
+    return result;
+}
+
+/**
+ * Exports an observation to a styled PDF file in Google Drive.
+ * @param {string} observationId The ID of the observation to export.
+ * @returns {Object} A response object with success status and PDF URL.
+ */
+function exportObservationToPdf(observationId) {
+    try {
+        const userContext = createUserContext();
+        if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
+            return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
+        }
+
+        const observation = getObservationById(observationId);
+        if (!observation) {
+            return { success: false, error: 'Observation not found.' };
+        }
+
+        if (observation.observerEmail !== userContext.email) {
+            return { success: false, error: 'Permission denied. You did not create this observation.' };
+        }
+
+        const assignedSubdomains = getAssignedSubdomainsForRoleYear(observation.observedRole, observation.observedYear);
+        const rubricData = getAllDomainsData(observation.observedRole, observation.observedYear, 'full', assignedSubdomains);
+
+        if (rubricData.isError) {
+            return { success: false, error: `Failed to load rubric data: ${rubricData.errorMessage}` };
+        }
+
+        const docName = `Observation for ${observation.observedName} - ${new Date(observation.finalizedAt || Date.now()).toLocaleDateString()}`;
+        const doc = DocumentApp.create(docName);
+        const body = doc.getBody();
+
+        body.setAttributes({ [DocumentApp.Attribute.FONT_FAMILY]: 'Arial', [DocumentApp.Attribute.FONT_SIZE]: 11 });
+
+        body.appendParagraph(`Observation Report`).setHeading(DocumentApp.Attribute.HEADING1).setAlignment(DocumentApp.Attribute.HORIZONTAL_ALIGNMENT.CENTER);
+        body.appendParagraph(`${observation.observedName}`).setBold(true).setAlignment(DocumentApp.Attribute.HORIZONTAL_ALIGNMENT.CENTER);
+        body.appendParagraph(`Role: ${observation.observedRole} | Year: ${observation.observedYear || 'N/A'}`).setAlignment(DocumentApp.Attribute.HORIZONTAL_ALIGNMENT.CENTER);
+        body.appendParagraph(`Observer: ${observation.observerEmail}`).setAlignment(DocumentApp.Attribute.HORIZONTAL_ALIGNMENT.CENTER);
+        const finalizedDate = observation.finalizedAt ? new Date(observation.finalizedAt).toLocaleString() : 'N/A';
+        body.appendParagraph(`Finalized on: ${finalizedDate}`).setAlignment(DocumentApp.Attribute.HORIZONTAL_ALIGNMENT.CENTER);
+        body.appendHorizontalRule();
+
+        rubricData.domains.forEach(domain => {
+            if (domain.components.some(c => observation.observationData[c.componentId])) {
+                body.appendParagraph(domain.name).setHeading(DocumentApp.Attribute.HEADING2).setBold(true);
+                domain.components.forEach(component => {
+                    const proficiency = observation.observationData[component.componentId];
+                    if (proficiency) {
+                        body.appendParagraph(component.title).setHeading(DocumentApp.Attribute.HEADING3).setItalic(true);
+                        body.appendParagraph(`Selected Proficiency: ${proficiency.charAt(0).toUpperCase() + proficiency.slice(1)}`).setBold(true);
+                        const description = component[proficiency];
+                        if (description) {
+                            body.appendParagraph(description);
+                        }
+                        const evidence = observation.evidenceLinks[component.componentId];
+                        if (evidence && evidence.length > 0) {
+                            body.appendParagraph("Evidence:").setBold(true);
+                            evidence.forEach(item => {
+                                const li = body.appendListItem('');
+                                li.setGlyphType(DocumentApp.GlyphType.SQUARE_BULLET);
+                                li.setText(`${item.name}: `);
+                                li.appendText(item.url).setLinkUrl(item.url);
+                            });
+                        }
+                        body.appendParagraph("");
+                    }
+                });
+            }
+        });
+
+        doc.saveAndClose();
+
+        const rootFolderIterator = DriveApp.getFoldersByName(DRIVE_FOLDER_INFO.ROOT_FOLDER_NAME);
+        let rootFolder = rootFolderIterator.hasNext() ? rootFolderIterator.next() : DriveApp.createFolder(DRIVE_FOLDER_INFO.ROOT_FOLDER_NAME);
+        const userFolderName = `${observation.observedName} (${observation.observedEmail})`;
+        let userFolderIterator = rootFolder.getFoldersByName(userFolderName);
+        let userFolder = userFolderIterator.hasNext() ? userFolderIterator.next() : rootFolder.createFolder(userFolderName);
+        const obsFolderName = `Observation - ${observation.observationId}`;
+        let obsFolderIterator = userFolder.getFoldersByName(obsFolderName);
+        let obsFolder = obsFolderIterator.hasNext() ? obsFolderIterator.next() : userFolder.createFolder(obsFolderName);
+
+        const docFile = DriveApp.getFileById(doc.getId());
+        const pdfBlob = docFile.getAs('application/pdf');
+        const pdfFile = obsFolder.createFile(pdfBlob).setName(docName + ".pdf");
+
+        DriveApp.getFileById(doc.getId()).setTrashed(true);
+
+        return { success: true, pdfUrl: pdfFile.getUrl() };
+
+    } catch (error) {
+        console.error(`Error exporting PDF for observation ${observationId}:`, error);
+        return { success: false, error: 'An unexpected error occurred during PDF export: ' + error.message };
+    }
+}
+
 
 /**
  * =================================================================
