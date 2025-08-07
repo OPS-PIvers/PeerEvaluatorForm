@@ -4,35 +4,94 @@
  * This uses PropertiesService as a simple database.
  */
 
-const OBSERVATIONS_DB_KEY = 'OBSERVATIONS_DATABASE';
+const OBSERVATION_SHEET_NAME = "Observation_Data";
 
 /**
- * Retrieves the entire observations database from PropertiesService.
+ * Retrieves the entire observations database from the Google Sheet.
  * @returns {Array<Object>} The array of all observation objects.
  * @private
  */
 function _getObservationsDb() {
   try {
-    const properties = PropertiesService.getScriptProperties();
-    const dbString = properties.getProperty(OBSERVATIONS_DB_KEY);
-    return dbString ? JSON.parse(dbString) : [];
+    const spreadsheet = openSpreadsheet();
+    const sheet = getSheetByName(spreadsheet, OBSERVATION_SHEET_NAME);
+    if (!sheet || sheet.getLastRow() < 2) {
+      return []; // No headers or no data
+    }
+
+    const range = sheet.getRange(1, 1, sheet.getLastRow(), sheet.getLastColumn());
+    const values = range.getValues();
+
+    const headers = values[0].map(h => h.toString().trim());
+    const dataRows = values.slice(1);
+
+    return dataRows.map(row => {
+      const observation = {};
+      headers.forEach((header, index) => {
+        let value = row[index];
+        // Safely parse JSON fields
+        if ((header === 'observationData' || header === 'evidenceLinks') && typeof value === 'string' && value) {
+          try {
+            value = JSON.parse(value);
+          } catch (e) {
+            console.warn(`Could not parse JSON for ${header} in observation. Defaulting to empty object. Data: ${value}`);
+            value = {};
+          }
+        }
+        observation[header] = value;
+      });
+      return observation;
+    });
   } catch (error) {
-    console.error('Error getting observations DB:', error);
+    console.error('Error getting observations DB from Sheet:', error);
     return []; // Return empty DB on error
   }
 }
 
 /**
- * Saves the entire observations database to PropertiesService.
+ * Saves the entire observations database to the Google Sheet.
  * @param {Array<Object>} db The array of all observation objects to save.
  * @private
  */
 function _saveObservationsDb(db) {
   try {
-    const properties = PropertiesService.getScriptProperties();
-    properties.setProperty(OBSERVATIONS_DB_KEY, JSON.stringify(db));
+    const spreadsheet = openSpreadsheet();
+    const sheet = getSheetByName(spreadsheet, OBSERVATION_SHEET_NAME);
+    if (!sheet) {
+        throw new Error(`Sheet "${OBSERVATION_SHEET_NAME}" not found.`);
+    }
+
+    const headers = [
+      "observationId", "observerEmail", "observedEmail", "observedName",
+      "observedRole", "observedYear", "status", "createdAt",
+      "lastModifiedAt", "finalizedAt", "observationData", "evidenceLinks"
+    ];
+
+    // Clear old data but keep headers
+    if (sheet.getLastRow() > 1) {
+      sheet.getRange(2, 1, sheet.getLastRow() - 1, headers.length).clearContent();
+    }
+
+    if (db.length === 0) {
+      debugLog("No observations to save. Sheet cleared.");
+      return;
+    }
+
+    const data = db.map(obs => {
+      return headers.map(header => {
+        let value = obs[header];
+        if ((header === 'observationData' || header === 'evidenceLinks') && typeof value === 'object') {
+          return JSON.stringify(value, null, 2); // Pretty print JSON
+        }
+        return value;
+      });
+    });
+
+    sheet.getRange(2, 1, data.length, headers.length).setValues(data);
+    debugLog(`Saved ${db.length} observations to the sheet.`);
+
   } catch (error) {
-    console.error('Error saving observations DB:', error);
+    console.error('Error saving observations DB to Sheet:', error);
   }
 }
 
@@ -378,12 +437,15 @@ function updateObservationStatus(observationId, newStatus, requestingUserEmail) 
  */
 function deleteAllObservations_DANGEROUS() {
     try {
-        const properties = PropertiesService.getScriptProperties();
-        properties.deleteProperty(OBSERVATIONS_DB_KEY);
-        console.log('DELETED ALL OBSERVATIONS from PropertiesService.');
-        return { success: true, message: 'All observations deleted.' };
+        const spreadsheet = openSpreadsheet();
+        const sheet = getSheetByName(spreadsheet, OBSERVATION_SHEET_NAME);
+        if (sheet && sheet.getLastRow() > 1) {
+            sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).clearContent();
+        }
+        console.log('DELETED ALL OBSERVATIONS from Sheet.');
+        return { success: true, message: 'All observations deleted from sheet.' };
     } catch (error) {
-        console.error('Error deleting observations:', error);
+        console.error('Error deleting all observations from sheet:', error);
         return { success: false, error: error.message };
     }
 }
