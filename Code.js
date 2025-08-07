@@ -376,22 +376,44 @@ function exportObservationToPdf(observationId) {
 
         body.setAttributes({ [DocumentApp.Attribute.FONT_FAMILY]: 'Arial', [DocumentApp.Attribute.FONT_SIZE]: 11 });
 
-        body.appendParagraph(`Observation Report`).setHeading(DocumentApp.Attribute.HEADING1).setAlignment(DocumentApp.Attribute.HORIZONTAL_ALIGNMENT.CENTER);
-        body.appendParagraph(`${observation.observedName}`).setBold(true).setAlignment(DocumentApp.Attribute.HORIZONTAL_ALIGNMENT.CENTER);
-        body.appendParagraph(`Role: ${observation.observedRole} | Year: ${observation.observedYear || 'N/A'}`).setAlignment(DocumentApp.Attribute.HORIZONTAL_ALIGNMENT.CENTER);
-        body.appendParagraph(`Observer: ${observation.observerEmail}`).setAlignment(DocumentApp.Attribute.HORIZONTAL_ALIGNMENT.CENTER);
+        // Use an object to store styles, for cleaner code.
+        const styles = {};
+        styles[DocumentApp.Attribute.HORIZONTAL_ALIGNMENT] = DocumentApp.Attribute.HORIZONTAL_ALIGNMENT.CENTER;
+
+        // Append and style the main heading.
+        const heading1 = body.appendParagraph('Observation Report');
+        heading1.setHeading(DocumentApp.ParagraphHeading.HEADING1);
+        heading1.setAttributes(styles);
+
+        // Append and style the observed name.
+        const observedNamePara = body.appendParagraph(`${observation.observedName}`);
+        observedNamePara.setBold(true);
+        observedNamePara.setAttributes(styles);
+
+        // Append additional info.
+        body.appendParagraph(`Role: ${observation.observedRole} | Year: ${observation.observedYear || 'N/A'}`).setAttributes(styles);
+        body.appendParagraph(`Observer: ${observation.observerEmail}`).setAttributes(styles);
         const finalizedDate = observation.finalizedAt ? new Date(observation.finalizedAt).toLocaleString() : 'N/A';
-        body.appendParagraph(`Finalized on: ${finalizedDate}`).setAlignment(DocumentApp.Attribute.HORIZONTAL_ALIGNMENT.CENTER);
+        body.appendParagraph(`Finalized on: ${finalizedDate}`).setAttributes(styles);
         body.appendHorizontalRule();
 
+        // Loop through domains and components to add them to the document.
         rubricData.domains.forEach(domain => {
             if (domain.components.some(c => observation.observationData[c.componentId])) {
-                body.appendParagraph(domain.name).setHeading(DocumentApp.Attribute.HEADING2).setBold(true);
+                const domainPara = body.appendParagraph(domain.name);
+                domainPara.setHeading(DocumentApp.ParagraphHeading.HEADING2);
+                domainPara.setBold(true);
+
                 domain.components.forEach(component => {
                     const proficiency = observation.observationData[component.componentId];
                     if (proficiency) {
-                        body.appendParagraph(component.title).setHeading(DocumentApp.Attribute.HEADING3).setItalic(true);
-                        body.appendParagraph(`Selected Proficiency: ${proficiency.charAt(0).toUpperCase() + proficiency.slice(1)}`).setBold(true);
+                        const componentPara = body.appendParagraph(component.title);
+                        componentPara.setHeading(DocumentApp.ParagraphHeading.HEADING3);
+                        componentPara.setItalic(true);
+
+                        const proficiencyPara = body.appendParagraph(`Selected Proficiency: ${proficiency.charAt(0).toUpperCase() + proficiency.slice(1)}`);
+                        proficiencyPara.setBold(true);
+
                         const description = component[proficiency];
                         if (description) {
                             body.appendParagraph(description);
@@ -406,14 +428,19 @@ function exportObservationToPdf(observationId) {
                                 li.appendText(item.url).setLinkUrl(item.url);
                             });
                         }
-                        body.appendParagraph("");
+                        body.appendParagraph(""); // For spacing
                     }
                 });
             }
         });
 
+        // Save and close the document to finalize changes.
         doc.saveAndClose();
 
+        // Get the ID of the created document.
+        const docId = doc.getId();
+
+        // Find or create the folder structure in Google Drive.
         const rootFolderIterator = DriveApp.getFoldersByName(DRIVE_FOLDER_INFO.ROOT_FOLDER_NAME);
         let rootFolder = rootFolderIterator.hasNext() ? rootFolderIterator.next() : DriveApp.createFolder(DRIVE_FOLDER_INFO.ROOT_FOLDER_NAME);
         const userFolderName = `${observation.observedName} (${observation.observedEmail})`;
@@ -423,12 +450,12 @@ function exportObservationToPdf(observationId) {
         let obsFolderIterator = userFolder.getFoldersByName(obsFolderName);
         let obsFolder = obsFolderIterator.hasNext() ? obsFolderIterator.next() : userFolder.createFolder(obsFolderName);
 
+        // Create the PDF from the document.
         const docFile = DriveApp.getFileById(docId);
         const pdfBlob = docFile.getAs('application/pdf');
         const pdfFile = obsFolder.createFile(pdfBlob).setName(docName + ".pdf");
 
-        // Move the temporary Google Doc to trash after PDF creation.
-        // We trash (not permanently delete) to allow for recovery in case of errors or audit needs.
+        // Move the temporary Google Doc to trash.
         DriveApp.getFileById(docId).setTrashed(true);
 
         return { success: true, pdfUrl: pdfFile.getUrl() };
