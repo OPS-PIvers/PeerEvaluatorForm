@@ -281,6 +281,32 @@
             display: none;
         }
 
+        /* Toast Notification Styles */
+        .toast-notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background-color: var(--color-red-base);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 9999;
+            opacity: 0;
+            transform: translateX(100%);
+            transition: all 0.3s ease;
+            font-weight: 500;
+            max-width: 350px;
+            word-wrap: break-word;
+        }
+        .toast-notification.show {
+            opacity: 1;
+            transform: translateX(0);
+        }
+        .toast-notification.success {
+            background-color: var(--color-green-base);
+        }
+
         /* Responsive Styles */
         @media (max-width: 768px) {
             .content { padding: 20px; }
@@ -289,6 +315,7 @@
             .filter-select, .filter-btn { min-width: auto; width: 100%; }
             .performance-levels, .performance-levels-content { grid-template-columns: 1fr; gap: 1px; }
             .level-header, .row-label, .level-content { border-right: none; padding: 15px; font-size: 0.9rem; }
+            .toast-notification { top: 10px; right: 10px; left: 10px; right: 10px; max-width: none; }
         }
     </style>
 </head>
@@ -320,6 +347,7 @@
             <div class="rubric-container" id="rubricContainer"></div>
         </div>
     </div>
+    <div class="toast-notification" id="toastNotification"></div>
     <script>
         /**
          * Escapes HTML entities in a string.
@@ -345,6 +373,16 @@
         function showError(error) { const msg = error.message || String(error); document.getElementById('errorMessage').textContent = msg; document.getElementById('error').style.display = 'block'; hideLoading(); }
         function hideError() { document.getElementById('error').style.display = 'none'; }
         function handleError(error) { console.error('AJAX Error:', error); showError(error); }
+
+        function showToast(message, isSuccess = false) {
+            const toast = document.getElementById('toastNotification');
+            toast.textContent = message;
+            toast.className = 'toast-notification' + (isSuccess ? ' success' : '');
+            toast.classList.add('show');
+            setTimeout(function() {
+                toast.classList.remove('show');
+            }, 4000);
+        }
 
         let currentFilters = { role: null, year: null, staff: null };
         let currentObservationId = null;
@@ -589,13 +627,46 @@
         }
 
         function selectProficiency(element, componentId, proficiency) {
-            showLoading('Saving...');
-            google.script.run.withSuccessHandler(() => {
-                hideLoading();
-                const parentRow = element.closest('.performance-levels-content');
-                parentRow.querySelectorAll('.level-content').forEach(el => el.classList.remove('selected'));
-                element.classList.add('selected');
-            }).withFailureHandler(handleError).saveProficiencySelection(currentObservationId, componentId, proficiency);
+            if (!currentObservationId || !componentId || !proficiency) {
+                console.error('Missing data for proficiency selection:', { currentObservationId, componentId, proficiency });
+                return;
+            }
+
+            const parentRow = element.closest('.performance-levels-content');
+            const currentlySelected = parentRow.querySelector('.level-content.selected');
+
+            // --- Instant UI Update ---
+            if (currentlySelected) {
+                currentlySelected.classList.remove('selected');
+            }
+            element.classList.add('selected');
+
+            // --- Background Save ---
+            google.script.run
+                .withSuccessHandler(function(response) {
+                    if (response.success) {
+                        console.log('Proficiency saved:', { componentId, proficiency });
+                        // Optionally show a subtle success indicator
+                    } else {
+                        console.error('Failed to save proficiency:', response.error);
+                        // --- Revert UI on Failure ---
+                        element.classList.remove('selected');
+                        if (currentlySelected) {
+                            currentlySelected.classList.add('selected');
+                        }
+                        showToast('Error saving selection: ' + response.error);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    console.error('Server error saving proficiency:', error);
+                    // --- Revert UI on Failure ---
+                    element.classList.remove('selected');
+                    if (currentlySelected) {
+                        currentlySelected.classList.add('selected');
+                    }
+                    showToast('Server error: ' + error.message);
+                })
+                .saveProficiencySelection(currentObservationId, componentId, proficiency);
         }
         function uploadFile(fileInput, componentId) {
             const file = fileInput.files[0]; if (!file) return;
