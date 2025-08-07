@@ -120,6 +120,35 @@ function addDebugHeaders(htmlOutput, userContext, metadata) {
  */
 
 /**
+ * Escapes HTML entities in a string to prevent XSS and ensure safe HTML rendering.
+ * @param {*} unsafe - The input to escape (will be converted to string if not already)
+ * @returns {string} The escaped string with HTML entities replaced
+ */
+function escapeHtml(unsafe) {
+  // Handle null and undefined by returning empty string
+  if (unsafe == null) {
+    return '';
+  }
+  
+  // Convert to string if not already a string
+  const str = String(unsafe);
+  
+  // Define the character mapping for HTML entities
+  const entityMap = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  };
+  
+  // Replace characters using the entity map
+  return str.replace(/[&<>"']/g, function(match) {
+    return entityMap[match];
+  });
+}
+
+/**
  * Sanitizes text content by trimming whitespace and handling null values
  * @param {string|null|undefined} text - Text to sanitize
  * @return {string} Sanitized text

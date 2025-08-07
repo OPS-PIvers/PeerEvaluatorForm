@@ -97,15 +97,7 @@
     </style>
 </head>
 <%
-function escapeHtml(str) {
-    if (str == null) return '';
-    return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-}
+// Remove the duplicated escapeHtml function - now using the shared version from Utils.js
 %>
 <body>
     <div class="container">
