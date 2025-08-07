@@ -309,7 +309,40 @@ function finalizeObservation(observationId) {
         if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
             return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
         }
-        return updateObservationStatus(observationId, OBSERVATION_STATUS.FINALIZED, userContext.email);
+
+        // First, update the status to Finalized
+        const statusUpdateResult = updateObservationStatus(observationId, OBSERVATION_STATUS.FINALIZED, userContext.email);
+
+        if (!statusUpdateResult.success) {
+            return statusUpdateResult; // Return the error if finalization fails
+        }
+
+        // If finalization is successful, generate and save the PDF
+        try {
+            const pdfResult = _generateAndSavePdf(observationId, userContext);
+            if (pdfResult.success) {
+                // The PDF URL is now available, let's save it to the observation
+                const observation = getObservationById(observationId);
+                if (observation) {
+                    observation.pdfUrl = pdfResult.pdfUrl;
+                    const db = _getObservationsDb();
+                    const observationIndex = db.findIndex(obs => obs.observationId === observationId);
+                    if (observationIndex !== -1) {
+                        db[observationIndex] = observation;
+                        _saveObservationsDb(db);
+                        statusUpdateResult.observation = observation; // Ensure the returned observation has the URL
+                    }
+                }
+            } else {
+                // Log the PDF generation error but don't fail the finalization
+                console.error('PDF generation failed after finalization:', pdfResult.error);
+            }
+        } catch (pdfError) {
+            console.error('Caught an error during PDF generation after finalization:', pdfError);
+        }
+
+        return statusUpdateResult;
+
     } catch (error) {
         console.error('Error in finalizeObservation wrapper:', error);
         return { success: false, error: error.message };
@@ -350,11 +383,11 @@ function loadFinalizedObservationForViewing(observationId) {
 }
 
 /**
- * Exports an observation to a styled PDF file in Google Drive.
- * @param {string} observationId The ID of the observation to export.
- * @returns {Object} A response object with success status and PDF URL.
+ * Retrieves the URL for a previously generated PDF of a finalized observation.
+ * @param {string} observationId The ID of the observation.
+ * @returns {Object} A response object with success status and the PDF URL.
  */
-function exportObservationToPdf(observationId) {
+function getObservationPdfUrl(observationId) {
     try {
         setupObservationSheet(); // Ensure the sheet is ready
         const userContext = createUserContext();
@@ -371,17 +404,47 @@ function exportObservationToPdf(observationId) {
             return { success: false, error: 'Permission denied. You did not create this observation.' };
         }
 
+        if (observation.status !== OBSERVATION_STATUS.FINALIZED) {
+            return { success: false, error: 'PDF is only available for finalized observations.' };
+        }
+
+        if (!observation.pdfUrl) {
+            return { success: false, error: 'PDF has not been generated for this observation yet.' };
+        }
+
+        return { success: true, pdfUrl: observation.pdfUrl };
+
+    } catch (error) {
+        console.error(`Error getting PDF URL for observation ${observationId}:`, error);
+        return { success: false, error: 'An unexpected error occurred while retrieving the PDF URL.' };
+    }
+}
+
+
+/**
+ * Generates and saves a PDF for an observation to Google Drive.
+ * This is a private helper function.
+ * @param {string} observationId The ID of the observation to export.
+ * @param {object} userContext The user context object.
+ * @returns {Object} A response object with success status and PDF URL.
+ * @private
+ */
+function _generateAndSavePdf(observationId, userContext) {
+    try {
+        const observation = getObservationById(observationId);
+        if (!observation) {
+            return { success: false, error: 'Observation not found for PDF generation.' };
+        }
+
         const assignedSubdomains = getAssignedSubdomainsForRoleYear(observation.observedRole, observation.observedYear);
-        // We need 'full' view to get all component data, the template will filter based on observation data
         const rubricData = getAllDomainsData(observation.observedRole, observation.observedYear, 'full', assignedSubdomains);
 
         if (rubricData.isError) {
-            return { success: false, error: `Failed to load rubric data: ${rubricData.errorMessage}` };
+            return { success: false, error: `Failed to load rubric data for PDF: ${rubricData.errorMessage}` };
         }
 
         const docName = `Observation for ${observation.observedName} - ${new Date(observation.finalizedAt || Date.now()).toISOString().slice(0, 10)}`;
 
-        // Create HTML content from template
         const template = HtmlService.createTemplateFromFile('pdf-rubric.html');
         template.data = {
             observation: observation,
@@ -389,10 +452,8 @@ function exportObservationToPdf(observationId) {
         };
         const htmlContent = template.evaluate().getContent();
 
-        // Create PDF from HTML
         const pdfBlob = Utilities.newBlob(htmlContent, 'text/html', docName + '.html').getAs('application/pdf');
 
-        // Find or create the folder structure in Google Drive.
         const rootFolderIterator = DriveApp.getFoldersByName(DRIVE_FOLDER_INFO.ROOT_FOLDER_NAME);
         let rootFolder = rootFolderIterator.hasNext() ? rootFolderIterator.next() : DriveApp.createFolder(DRIVE_FOLDER_INFO.ROOT_FOLDER_NAME);
         const userFolderName = `${observation.observedName} (${observation.observedEmail})`;
@@ -404,11 +465,12 @@ function exportObservationToPdf(observationId) {
 
         const pdfFile = obsFolder.createFile(pdfBlob).setName(docName + ".pdf");
 
+        debugLog('PDF generated and saved to Drive', { observationId: observationId, pdfUrl: pdfFile.getUrl() });
         return { success: true, pdfUrl: pdfFile.getUrl() };
 
     } catch (error) {
-        console.error(`Error exporting PDF for observation ${observationId}:`, error);
-        return { success: false, error: 'An unexpected error occurred during PDF export: ' + error.message };
+        console.error(`Error generating PDF for observation ${observationId}:`, error);
+        return { success: false, error: 'An unexpected error occurred during PDF generation: ' + error.message };
     }
 }
 

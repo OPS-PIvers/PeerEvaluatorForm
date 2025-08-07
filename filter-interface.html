@@ -434,7 +434,7 @@
                                    <button class="filter-btn btn-delete" onclick="handleDeleteObservation('${obs.observationId}', '${observedEmail}', '${observedName}')">Delete</button>`;
                     } else if (obs.status === 'Finalized') {
                         buttons = `<button class="filter-btn btn-view" onclick="handleViewObservation('${obs.observationId}')">View</button>
-                                   <button class="filter-btn btn-export" onclick="handleExportToPdf('${obs.observationId}')">Export to PDF</button>
+                                   <button class="filter-btn btn-export" onclick="handleViewPdf('${obs.observationId}')">View PDF</button>
                                    <button class="filter-btn btn-delete" onclick="handleDeleteFinalizedObservation('${obs.observationId}', '${observedEmail}', '${observedName}')">Delete</button>`;
                     }
                     cardsHtml += `
@@ -474,8 +474,8 @@
             }
         }
 
-        function handleExportToPdf(obsId) {
-            showLoading('Generating PDF...');
+        function handleViewPdf(obsId) {
+            showLoading('Retrieving PDF...');
             google.script.run.withSuccessHandler(res => {
                 hideLoading();
                 if (res.success) {
@@ -483,7 +483,7 @@
                 } else {
                     showError(res.error);
                 }
-            }).withFailureHandler(handleError).exportObservationToPdf(obsId);
+            }).withFailureHandler(handleError).getObservationPdfUrl(obsId);
         }
 
         function toggleLookFors(componentId) {
