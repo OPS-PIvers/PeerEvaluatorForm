@@ -418,8 +418,7 @@ function exportObservationToPdf(observationId) {
             },
             EVIDENCE_ITEM: {
                 [DocumentApp.Attribute.FONT_FAMILY]: 'Arial',
-                [DocumentApp.Attribute.FONT_SIZE]: 10,
-                [DocumentApp.Attribute.LINK_URL]: null
+                [DocumentApp.Attribute.FONT_SIZE]: 10
             },
             TABLE: {
                 [DocumentApp.Attribute.BORDER_WIDTH]: 1,
@@ -430,12 +429,16 @@ function exportObservationToPdf(observationId) {
                 [DocumentApp.Attribute.BOLD]: true,
                 [DocumentApp.Attribute.FONT_SIZE]: 10,
                 [DocumentApp.Attribute.FOREGROUND_COLOR]: '#4a5568'
+            },
             TABLE_CELL: {
                 [DocumentApp.Attribute.FONT_SIZE]: 10,
                 [DocumentApp.Attribute.PADDING_TOP]: 5,
                 [DocumentApp.Attribute.PADDING_BOTTOM]: 5,
                 [DocumentApp.Attribute.PADDING_LEFT]: 5,
                 [DocumentApp.Attribute.PADDING_RIGHT]: 5
+            },
+            CENTERED_INFO: {
+                [DocumentApp.Attribute.HORIZONTAL_ALIGNMENT]: DocumentApp.HorizontalAlignment.CENTER
             }
         };
 
@@ -448,10 +451,10 @@ function exportObservationToPdf(observationId) {
         observedNamePara.setAttributes(styles.HEADING1);
         observedNamePara.setBold(true);
 
-        body.appendParagraph(`Role: ${observation.observedRole} | Year: ${observation.observedYear || 'N/A'}`).setAttributes({[DocumentApp.Attribute.HORIZONTAL_ALIGNMENT]: DocumentApp.HorizontalAlignment.CENTER});
-        body.appendParagraph(`Observer: ${observation.observerEmail}`).setAttributes({[DocumentApp.Attribute.HORIZONTAL_ALIGNMENT]: DocumentApp.HorizontalAlignment.CENTER});
+        body.appendParagraph(`Role: ${observation.observedRole} | Year: ${observation.observedYear || 'N/A'}`).setAttributes(styles.CENTERED_INFO);
+        body.appendParagraph(`Observer: ${observation.observerEmail}`).setAttributes(styles.CENTERED_INFO);
         const finalizedDate = observation.finalizedAt ? new Date(observation.finalizedAt).toLocaleString() : 'N/A';
-        body.appendParagraph(`Finalized on: ${finalizedDate}`).setAttributes({[DocumentApp.Attribute.HORIZONTAL_ALIGNMENT]: DocumentApp.HorizontalAlignment.CENTER});
+        body.appendParagraph(`Finalized on: ${finalizedDate}`).setAttributes(styles.CENTERED_INFO);
         body.appendHorizontalRule();
 
         rubricData.domains.forEach(domain => {
