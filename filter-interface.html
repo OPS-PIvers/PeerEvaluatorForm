@@ -368,7 +368,11 @@
             const staffSelect = document.getElementById('staffSelect'); staffSelect.disabled = false;
             if (!result.success) { staffSelect.innerHTML = `<option value="">Error: ${result.error}</option>`; return; }
             staffSelect.innerHTML = '<option value="">3. Select Staff Member...</option>';
-            if (result.staff && result.staff.length > 0) { result.staff.forEach(staff => staffSelect.appendChild(new Option(staff.displayText, staff.email))); } else { staffSelect.appendChild(new Option('No staff found', '', true, true)); }
+            if (result.staff?.length) {
+                result.staff.forEach(staff => staffSelect.appendChild(new Option(staff.displayName, staff.email)));
+            } else {
+                staffSelect.appendChild(new Option('No staff found', '', true, true));
+            }
         }
         function loadSelectedView() { if (!currentFilters.staff) return; showLoading('Loading...'); google.script.run.withSuccessHandler(handleRubricData).withFailureHandler(handleError).loadRubricData(currentFilters); }
         function clearFilters() { showView('quickActionsView'); hideError(); hideLoading(); document.getElementById('filterStatus').style.display = 'none'; }
