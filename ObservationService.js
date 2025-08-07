@@ -269,6 +269,68 @@ function deleteObservationRecord(observationId, requestingUserEmail) {
 }
 
 /**
+ * Deletes a FINALIZED observation record and its associated Google Drive folder.
+ * @param {string} observationId The ID of the observation to delete.
+ * @param {string} requestingUserEmail The email of the user requesting deletion.
+ * @returns {Object} A response object with success status.
+ */
+function deleteFinalizedObservationRecord(observationId, requestingUserEmail) {
+    if (!observationId || !requestingUserEmail) {
+        return { success: false, error: 'Observation ID and requesting user email are required.' };
+    }
+    try {
+        const db = _getObservationsDb();
+        const observationIndex = db.findIndex(obs => obs.observationId === observationId);
+        if (observationIndex === -1) {
+            return { success: false, error: 'Observation not found.' };
+        }
+        const observation = db[observationIndex];
+
+        // Permission check: only the observer who created it can delete.
+        if (observation.observerEmail !== requestingUserEmail) {
+            return { success: false, error: 'Permission denied. You did not create this observation.' };
+        }
+
+        // Only FINALIZED observations can be deleted by this function.
+        if (observation.status !== OBSERVATION_STATUS.FINALIZED) {
+            return { success: false, error: 'This function can only delete finalized observations.' };
+        }
+
+        // Move associated Drive folder to trash
+        try {
+            const rootFolderIterator = DriveApp.getFoldersByName(DRIVE_FOLDER_INFO.ROOT_FOLDER_NAME);
+            if (rootFolderIterator.hasNext()) {
+                const rootFolder = rootFolderIterator.next();
+                const userFolderName = `${observation.observedName} (${observation.observedEmail})`;
+                const userFolderIterator = rootFolder.getFoldersByName(userFolderName);
+                if (userFolderIterator.hasNext()) {
+                    const userFolder = userFolderIterator.next();
+                    const obsFolderName = `Observation - ${observation.observationId}`;
+                    const obsFolderIterator = userFolder.getFoldersByName(obsFolderName);
+                    if (obsFolderIterator.hasNext()) {
+                        const obsFolder = obsFolderIterator.next();
+                        obsFolder.setTrashed(true);
+                        debugLog('Observation Drive folder moved to trash', { observationId: observationId, folderId: obsFolder.getId() });
+                    }
+                }
+            }
+        } catch (driveError) {
+            console.error(`Could not delete Drive folder for observation ${observationId}:`, driveError);
+            // Do not block deletion if Drive operation fails, just log it.
+        }
+
+        db.splice(observationIndex, 1);
+        _saveObservationsDb(db);
+
+        debugLog('Finalized observation DELETED', { observationId, requestingUserEmail });
+        return { success: true };
+    } catch (error) {
+        console.error(`Error deleting finalized observation ${observationId}:`, error);
+        return { success: false, error: 'An unexpected error occurred during deletion.' };
+    }
+}
+
+/**
  * Updates the status of an observation (e.g., to "Finalized").
  * @param {string} observationId The ID of the observation to update.
  * @param {string} newStatus The new status to set.
