@@ -96,7 +96,7 @@
         }
     </style>
 </head>
-<%
+<?
 function escapeHtml(str) {
     if (str == null) return '';
     return String(str)
@@ -106,7 +106,7 @@ function escapeHtml(str) {
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
 }
-%>
+?>
 <body>
     <div class="container">
         <div class="header">
