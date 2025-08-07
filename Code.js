@@ -434,7 +434,6 @@ function exportObservationToPdf(observationId) {
             }
         });
 
-        // Save and close the document to finalize changes.
         doc.saveAndClose();
 
         // Get the document ID after saving and closing.
