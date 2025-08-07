@@ -53,45 +53,35 @@ function _getObservationsDb() {
  * @param {Array<Object>} db The array of all observation objects to save.
  * @private
  */
-function _saveObservationsDb(db) {
+/**
+ * Appends a new observation record directly to the Google Sheet.
+ * @param {Object} observation The observation object to append.
+ * @private
+ */
+function _appendObservationToSheet(observation) {
   try {
     const spreadsheet = openSpreadsheet();
     const sheet = getSheetByName(spreadsheet, OBSERVATION_SHEET_NAME);
     if (!sheet) {
-        throw new Error(`Sheet "${OBSERVATION_SHEET_NAME}" not found.`);
+      throw new Error(`Sheet "${OBSERVATION_SHEET_NAME}" not found.`);
     }
 
-    const headers = [
-      "observationId", "observerEmail", "observedEmail", "observedName",
-      "observedRole", "observedYear", "status", "createdAt",
-      "lastModifiedAt", "finalizedAt", "observationData", "evidenceLinks"
-    ];
-
-    // Clear old data but keep headers
-    if (sheet.getLastRow() > 1) {
-      sheet.getRange(2, 1, sheet.getLastRow() - 1, headers.length).clearContent();
-    }
-
-    if (db.length === 0) {
-      debugLog("No observations to save. Sheet cleared.");
-      return;
-    }
-
-    const data = db.map(obs => {
-      return headers.map(header => {
-        let value = obs[header];
-        if ((header === 'observationData' || header === 'evidenceLinks') && typeof value === 'object') {
-          return JSON.stringify(value, null, 2); // Pretty print JSON
-        }
-        return value;
-      });
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const rowData = headers.map(header => {
+      let value = observation[header];
+      if ((header === 'observationData' || header === 'evidenceLinks') && typeof value === 'object') {
+        return JSON.stringify(value, null, 2);
+      }
+      return value;
     });
 
-    sheet.getRange(2, 1, data.length, headers.length).setValues(data);
-    debugLog(`Saved ${db.length} observations to the sheet.`);
+    sheet.appendRow(rowData);
+    SpreadsheetApp.flush(); // Ensure the data is written immediately
+    debugLog(`Appended new observation ${observation.observationId} to the sheet.`);
 
   } catch (error) {
-    console.error('Error saving observations DB to Sheet:', error);
+    console.error('Error appending observation to Sheet:', error);
+    throw error; // Re-throw to be handled by the calling function
   }
 }
 
@@ -158,7 +148,6 @@ function createNewObservation(observerEmail, observedEmail) {
       return null;
     }
 
-    const db = _getObservationsDb();
     const observationId = generateUniqueId('obs');
 
     const newObservation = {
@@ -177,10 +166,9 @@ function createNewObservation(observerEmail, observedEmail) {
       evidenceLinks: {} // e.g., { "1a:": [{url: "...", name: "...", uploadedAt: "..."}, ...] }
     };
 
-    db.push(newObservation);
-    _saveObservationsDb(db);
+    _appendObservationToSheet(newObservation);
 
-    debugLog('New observation draft created', newObservation);
+    debugLog('New observation draft created and saved', newObservation);
     return newObservation;
 
   } catch (error) {
@@ -196,24 +184,77 @@ function createNewObservation(observerEmail, observedEmail) {
  * @param {string} proficiency The selected proficiency level (e.g., "proficient").
  * @returns {Object} A response object with success status.
  */
+/**
+ * Finds the row number for a given observation ID in the sheet.
+ * @param {GoogleAppsScript.Spreadsheet.Sheet} sheet The observation data sheet.
+ * @param {string} observationId The ID of the observation to find.
+ * @returns {number} The 1-based row number, or -1 if not found.
+ * @private
+ */
+function _findObservationRow(sheet, observationId) {
+  const idColumn = 1; // Assuming observationId is in column A
+  const ids = sheet.getRange(2, idColumn, sheet.getLastRow() - 1, 1).getValues();
+  for (let i = 0; i < ids.length; i++) {
+    if (ids[i][0] === observationId) {
+      return i + 2; // +2 because data starts at row 2 and i is 0-indexed
+    }
+  }
+  return -1;
+}
+
+/**
+ * Saves a proficiency level selection for a specific component in an observation.
+ * @param {string} observationId The ID of the observation to update.
+ * @param {string} componentId The rubric component ID (e.g., "1a:").
+ * @param {string} proficiency The selected proficiency level (e.g., "proficient").
+ * @returns {Object} A response object with success status.
+ */
 function saveProficiencySelection(observationId, componentId, proficiency) {
   if (!observationId || !componentId || !proficiency) {
     return { success: false, error: 'Observation ID, component ID, and proficiency level are required.' };
   }
 
   try {
-    const db = _getObservationsDb();
-    const observationIndex = db.findIndex(obs => obs.observationId === observationId);
+    const spreadsheet = openSpreadsheet();
+    const sheet = getSheetByName(spreadsheet, OBSERVATION_SHEET_NAME);
+    if (!sheet) {
+      throw new Error(`Sheet "${OBSERVATION_SHEET_NAME}" not found.`);
+    }
 
-    if (observationIndex === -1) {
+    const row = _findObservationRow(sheet, observationId);
+    if (row === -1) {
       return { success: false, error: 'Observation not found.' };
     }
 
-    // Update the observation data
-    db[observationIndex].observationData[componentId] = proficiency;
-    db[observationIndex].lastModifiedAt = new Date().toISOString();
+    // Get the current observation data from the sheet
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const observationDataCol = headers.indexOf('observationData') + 1;
+    const lastModifiedCol = headers.indexOf('lastModifiedAt') + 1;
 
-    _saveObservationsDb(db);
+    if (observationDataCol === 0) {
+        return { success: false, error: 'observationData column not found in the sheet.' };
+    }
+
+    const observationDataCell = sheet.getRange(row, observationDataCol);
+    const currentDataString = observationDataCell.getValue();
+    let currentData = {};
+    try {
+        if(currentDataString){
+            currentData = JSON.parse(currentDataString);
+        }
+    } catch(e){
+        console.warn(`Could not parse observationData for ${observationId}. Starting fresh. Data: ${currentDataString}`);
+    }
+
+    // Update the data
+    currentData[componentId] = proficiency;
+
+    // Write the updated data back to the sheet
+    observationDataCell.setValue(JSON.stringify(currentData, null, 2));
+    if(lastModifiedCol > 0){
+        sheet.getRange(row, lastModifiedCol).setValue(new Date().toISOString());
+    }
+    SpreadsheetApp.flush(); // Ensure the data is written immediately
 
     debugLog('Proficiency selection saved', { observationId, componentId, proficiency });
     return { success: true };
