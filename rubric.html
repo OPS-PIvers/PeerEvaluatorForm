@@ -2057,7 +2057,8 @@
                     if (currentlySelected) {
                         currentlySelected.classList.add('selected');
                     }
-                    alert('Server error: ' + error.message);
+                    // Show a user-friendly error message
+                    showNotification('A server error occurred. Please try again later.', 'error');
                 })
                 .saveProficiencySelection(observationId, componentId, rating);
         }
