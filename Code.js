@@ -311,6 +311,218 @@ function finalizeObservation(observationId) {
     }
 }
 
+/**
+ * Deletes a finalized observation. This is a permanent action.
+ * @param {string} observationId The ID of the observation to delete.
+ * @returns {Object} A response object indicating success or failure.
+ */
+function deleteFinalizedObservation(observationId) {
+    try {
+        const userContext = createUserContext();
+        if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
+            return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
+        }
+        return deleteFinalizedObservationRecord(observationId, userContext.email);
+    } catch (error) {
+        console.error('Error in deleteFinalizedObservation wrapper:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Loads a finalized observation for read-only viewing.
+ * @param {string} observationId The ID of the observation to load.
+ * @returns {Object} A response object with the observation and rubric data.
+ */
+function loadFinalizedObservationForViewing(observationId) {
+    const result = loadObservationForEditing(observationId);
+    if (result.success && result.rubricData && result.rubricData.userContext) {
+        result.rubricData.userContext.isEvaluator = false;
+    }
+    return result;
+}
+
+/**
+ * Exports an observation to a styled PDF file in Google Drive.
+ * @param {string} observationId The ID of the observation to export.
+ * @returns {Object} A response object with success status and PDF URL.
+ */
+function exportObservationToPdf(observationId) {
+    try {
+        const userContext = createUserContext();
+        if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
+            return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
+        }
+
+        const observation = getObservationById(observationId);
+        if (!observation) {
+            return { success: false, error: 'Observation not found.' };
+        }
+
+        if (observation.observerEmail !== userContext.email) {
+            return { success: false, error: 'Permission denied. You did not create this observation.' };
+        }
+
+        const assignedSubdomains = getAssignedSubdomainsForRoleYear(observation.observedRole, observation.observedYear);
+        const rubricData = getAllDomainsData(observation.observedRole, observation.observedYear, 'full', assignedSubdomains);
+
+        if (rubricData.isError) {
+            return { success: false, error: `Failed to load rubric data: ${rubricData.errorMessage}` };
+        }
+
+        const docName = `Observation for ${observation.observedName} - ${new Date(observation.finalizedAt || Date.now()).toISOString().slice(0, 10)}`;
+        const doc = DocumentApp.create(docName);
+        const body = doc.getBody();
+
+        const styles = {
+            HEADING1: {
+                [DocumentApp.Attribute.FONT_FAMILY]: 'Arial',
+                [DocumentApp.Attribute.FONT_SIZE]: 18,
+                [DocumentApp.Attribute.BOLD]: true,
+                [DocumentApp.Attribute.HORIZONTAL_ALIGNMENT]: DocumentApp.HorizontalAlignment.CENTER,
+                [DocumentApp.Attribute.SPACING_AFTER]: 20
+            },
+            HEADING2: {
+                [DocumentApp.Attribute.FONT_FAMILY]: 'Arial',
+                [DocumentApp.Attribute.FONT_SIZE]: 14,
+                [DocumentApp.Attribute.BOLD]: true,
+                [DocumentApp.Attribute.FOREGROUND_COLOR]: '#4a5568',
+                [DocumentApp.Attribute.SPACING_BEFORE]: 20,
+                [DocumentApp.Attribute.SPACING_AFTER]: 10
+            },
+            HEADING3: {
+                [DocumentApp.Attribute.FONT_FAMILY]: 'Arial',
+                [DocumentApp.Attribute.FONT_SIZE]: 12,
+                [DocumentApp.Attribute.BOLD]: true,
+                [DocumentApp.Attribute.ITALIC]: true,
+                [DocumentApp.Attribute.FOREGROUND_COLOR]: '#2d3748',
+                [DocumentApp.Attribute.SPACING_BEFORE]: 15,
+                [DocumentApp.Attribute.SPACING_AFTER]: 5
+            },
+            PROFICIENCY: {
+                [DocumentApp.Attribute.FONT_FAMILY]: 'Arial',
+                [DocumentApp.Attribute.FONT_SIZE]: 11,
+                [DocumentApp.Attribute.BOLD]: true,
+                [DocumentApp.Attribute.FOREGROUND_COLOR]: '#3182ce'
+            },
+            DESCRIPTION: {
+                [DocumentApp.Attribute.FONT_FAMILY]: 'Arial',
+                [DocumentApp.Attribute.FONT_SIZE]: 10,
+                [DocumentApp.Attribute.SPACING_AFTER]: 10
+            },
+            EVIDENCE_HEADING: {
+                [DocumentApp.Attribute.FONT_FAMILY]: 'Arial',
+                [DocumentApp.Attribute.FONT_SIZE]: 11,
+                [DocumentApp.Attribute.BOLD]: true,
+                [DocumentApp.Attribute.SPACING_BEFORE]: 10
+            },
+            EVIDENCE_ITEM: {
+                [DocumentApp.Attribute.FONT_FAMILY]: 'Arial',
+                [DocumentApp.Attribute.FONT_SIZE]: 10
+            },
+            TABLE: {
+                [DocumentApp.Attribute.BORDER_WIDTH]: 1,
+                [DocumentApp.Attribute.BORDER_COLOR]: '#e2e8f0'
+            },
+            TABLE_HEADER_CELL: {
+                [DocumentApp.Attribute.BACKGROUND_COLOR]: '#e2e8f0',
+                [DocumentApp.Attribute.BOLD]: true,
+                [DocumentApp.Attribute.FONT_SIZE]: 10,
+                [DocumentApp.Attribute.FOREGROUND_COLOR]: '#4a5568'
+            },
+            TABLE_CELL: {
+                [DocumentApp.Attribute.FONT_SIZE]: 10,
+                [DocumentApp.Attribute.PADDING_TOP]: 5,
+                [DocumentApp.Attribute.PADDING_BOTTOM]: 5,
+                [DocumentApp.Attribute.PADDING_LEFT]: 5,
+                [DocumentApp.Attribute.PADDING_RIGHT]: 5
+            },
+            CENTERED_INFO: {
+                [DocumentApp.Attribute.HORIZONTAL_ALIGNMENT]: DocumentApp.HorizontalAlignment.CENTER
+            }
+        };
+
+        body.setAttributes({ [DocumentApp.Attribute.FONT_FAMILY]: 'Arial', [DocumentApp.Attribute.FONT_SIZE]: 11 });
+
+        const heading1 = body.appendParagraph('Observation Report');
+        heading1.setAttributes(styles.HEADING1);
+
+        const observedNamePara = body.appendParagraph(`${observation.observedName}`);
+        observedNamePara.setAttributes(styles.HEADING1);
+        observedNamePara.setBold(true);
+
+        body.appendParagraph(`Role: ${observation.observedRole} | Year: ${observation.observedYear || 'N/A'}`).setAttributes(styles.CENTERED_INFO);
+        body.appendParagraph(`Observer: ${observation.observerEmail}`).setAttributes(styles.CENTERED_INFO);
+        const finalizedDate = observation.finalizedAt ? new Date(observation.finalizedAt).toLocaleString() : 'N/A';
+        body.appendParagraph(`Finalized on: ${finalizedDate}`).setAttributes(styles.CENTERED_INFO);
+        body.appendHorizontalRule();
+
+        rubricData.domains.forEach(domain => {
+            if (domain.components.some(c => observation.observationData[c.componentId])) {
+                const domainPara = body.appendParagraph(domain.name);
+                domainPara.setAttributes(styles.HEADING2);
+
+                domain.components.forEach(component => {
+                    const proficiency = observation.observationData[component.componentId];
+                    if (proficiency) {
+                        const componentPara = body.appendParagraph(component.title);
+                        componentPara.setAttributes(styles.HEADING3);
+
+                        const proficiencyPara = body.appendParagraph(`Selected Proficiency: ${proficiency.charAt(0).toUpperCase() + proficiency.slice(1)}`);
+                        proficiencyPara.setAttributes(styles.PROFICIENCY);
+
+                        const description = component[proficiency];
+                        if (description) {
+                            body.appendParagraph(description).setAttributes(styles.DESCRIPTION);
+                        }
+                        const evidence = observation.evidenceLinks[component.componentId];
+                        if (evidence && evidence.length > 0) {
+                            body.appendParagraph("Evidence:").setAttributes(styles.EVIDENCE_HEADING);
+                            evidence.forEach(item => {
+                                const li = body.appendListItem('');
+                                li.setGlyphType(DocumentApp.GlyphType.SQUARE_BULLET);
+                                li.setText(`${item.name}: `);
+                                const link = li.appendText(item.url);
+                                link.setLinkUrl(item.url);
+                                link.setAttributes(styles.EVIDENCE_ITEM);
+                            });
+                        }
+                        body.appendParagraph("");
+                    }
+                });
+            }
+        });
+
+        doc.saveAndClose();
+
+        // Get the document ID after saving and closing.
+        const docId = doc.getId();
+        // Find or create the folder structure in Google Drive.
+        const rootFolderIterator = DriveApp.getFoldersByName(DRIVE_FOLDER_INFO.ROOT_FOLDER_NAME);
+        let rootFolder = rootFolderIterator.hasNext() ? rootFolderIterator.next() : DriveApp.createFolder(DRIVE_FOLDER_INFO.ROOT_FOLDER_NAME);
+        const userFolderName = `${observation.observedName} (${observation.observedEmail})`;
+        let userFolderIterator = rootFolder.getFoldersByName(userFolderName);
+        let userFolder = userFolderIterator.hasNext() ? userFolderIterator.next() : rootFolder.createFolder(userFolderName);
+        const obsFolderName = `Observation - ${observation.observationId}`;
+        let obsFolderIterator = userFolder.getFoldersByName(obsFolderName);
+        let obsFolder = obsFolderIterator.hasNext() ? obsFolderIterator.next() : userFolder.createFolder(obsFolderName);
+
+        // Create the PDF from the document.
+        const docFile = DriveApp.getFileById(docId);
+        const pdfBlob = docFile.getAs('application/pdf');
+        const pdfFile = obsFolder.createFile(pdfBlob).setName(docName + ".pdf");
+
+        // Move the temporary Google Doc to trash (rather than permanently deleting) to allow for recovery and audit purposes.
+        DriveApp.getFileById(docId).setTrashed(true);
+
+        return { success: true, pdfUrl: pdfFile.getUrl() };
+
+    } catch (error) {
+        console.error(`Error exporting PDF for observation ${observationId}:`, error);
+        return { success: false, error: 'An unexpected error occurred during PDF export: ' + error.message };
+    }
+}
+
 
 /**
  * =================================================================

@@ -39,6 +39,27 @@
     <meta name="turbo-cache-control" content="no-cache">
 
     <style>
+.toast-notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background-color: #dc3545;
+    color: white;
+    padding: 15px 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    z-index: 10000;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-20px);
+    transition: all 0.3s ease-in-out;
+}
+
+.toast-notification.show {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
 :root {
     --color-white: white;
     --color-text-default: #333;
@@ -214,6 +235,27 @@
             border-bottom: 1px solid #cbd5e0;
             color: #4a5568;
             font-size: 0.9rem;
+        }
+
+        .level-content.rating-cell {
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+        }
+
+        .level-content.rating-cell:hover {
+            background-color: #f0f4f8;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+        }
+
+        .level-content.rating-cell.selected {
+            background-color: var(--color-blue-light-bg);
+            border-color: var(--color-blue-base);
+            color: var(--color-blue-text-dark);
+            font-weight: 600;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+            transform: translateY(-2px);
+            border-left: 3px solid var(--color-blue-base);
         }
         
         .level-content {
@@ -832,6 +874,7 @@
     </style>
 </head>
 <body>
+    <div id="toastNotification" class="toast-notification"></div>
     <!-- Debug Information (only visible in debug mode) -->
     <? if (data.userContext && data.userContext.debugMode) { ?>
     <div class="debug-info">
@@ -1006,16 +1049,16 @@
                                 <span class="assigned-badge">📋 Assigned</span>
                                 <? } ?>
                             </div>
-                            <div class="level-content">
+                            <div class="level-content rating-cell" data-component-id="<?= component.componentId ?>" data-rating="developing">
                                 <?= component.developing ?>
                             </div>
-                            <div class="level-content">
+                            <div class="level-content rating-cell" data-component-id="<?= component.componentId ?>" data-rating="basic">
                                 <?= component.basic ?>
                             </div>
-                            <div class="level-content">
+                            <div class="level-content rating-cell" data-component-id="<?= component.componentId ?>" data-rating="proficient">
                                 <?= component.proficient ?>
                             </div>
-                            <div class="level-content">
+                            <div class="level-content rating-cell" data-component-id="<?= component.componentId ?>" data-rating="distinguished">
                                 <?= component.distinguished ?>
                             </div>
                         </div>
@@ -1988,6 +2031,68 @@
         console.log('User assigned subdomains:', userAssignedSubdomains);
         <? } ?>
 
+        function showToast(message) {
+            const toast = document.getElementById('toastNotification');
+            toast.textContent = message;
+            toast.classList.add('show');
+            setTimeout(function() {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        function handleRatingCellClick(cell) {
+            // Ensure this only runs in evaluator mode
+            if (!data.userContext || !data.userContext.isEvaluator) {
+                console.log('Not in evaluator mode. Ignoring click.');
+                return;
+            }
+
+            const componentId = cell.dataset.componentId;
+            const rating = cell.dataset.rating;
+            const observationId = data.observationId; // Retrieve from current observation context
+
+            if (!componentId || !rating || !observationId) {
+                console.error('Missing data for rating selection:', { componentId, rating, observationId });
+                return;
+            }
+
+            const parentRow = cell.parentNode;
+            const currentlySelected = parentRow.querySelector('.selected');
+
+            // --- Instant UI Update ---
+            if (currentlySelected) {
+                currentlySelected.classList.remove('selected');
+            }
+            cell.classList.add('selected');
+
+            // --- Background Save ---
+            google.script.run
+                .withSuccessHandler(function(response) {
+                    if (response.success) {
+                        console.log('Saved:', { componentId, rating });
+                        // Optionally show a small success indicator
+                    } else {
+                        console.error('Failed to save rating:', response.error);
+                        // --- Revert UI on Failure ---
+                        cell.classList.remove('selected');
+                        if (currentlySelected) {
+                            currentlySelected.classList.add('selected');
+                        }
+                        showToast('Error saving selection: ' + response.error);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    console.error('Server error saving rating:', error);
+                    // --- Revert UI on Failure ---
+                    cell.classList.remove('selected');
+                    if (currentlySelected) {
+                        currentlySelected.classList.add('selected');
+                    }
+                    showToast('Server error: ' + error.message);
+                })
+                .saveProficiencySelection(observationId, componentId, rating);
+        }
+
         <? if (data.userContext && data.userContext.isEvaluator) { ?>
           // This script will run only if the user is an evaluator
           // It will add the necessary controls for editing proficiency levels and uploading media
@@ -2057,6 +2162,15 @@
             linksContainer.appendChild(linkItem);
           }
         <? } ?>
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const ratingCells = document.querySelectorAll('.rating-cell');
+            ratingCells.forEach(function(cell) {
+                cell.addEventListener('click', function() {
+                    handleRatingCellClick(cell);
+                });
+            });
+        });
     </script>
 </body>
 </html>
