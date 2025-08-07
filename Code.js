@@ -370,7 +370,7 @@ function exportObservationToPdf(observationId) {
             return { success: false, error: `Failed to load rubric data: ${rubricData.errorMessage}` };
         }
 
-        const docName = `Observation for ${observation.observedName} - ${new Date(observation.finalizedAt || Date.now()).toLocaleDateString()}`;
+        const docName = `Observation for ${observation.observedName} - ${new Date(observation.finalizedAt || Date.now()).toISOString().slice(0, 10)}`;
         const doc = DocumentApp.create(docName);
         const body = doc.getBody();
 
