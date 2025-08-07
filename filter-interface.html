@@ -326,12 +326,14 @@
             if (typeof unsafe !== 'string') {
                 return '';
             }
-            return unsafe
-                .replace(/&/g, "&amp;")
-                .replace(/</g, "&lt;")
-                .replace(/>/g, "&gt;")
-                .replace(/"/g, "&quot;")
-                .replace(/'/g, "&#039;");
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return unsafe.replace(/[&<>"']/g, m => map[m]);
         }
 
         function showLoading(message = 'Loading...') { document.getElementById('loading').innerHTML = `<div class="loading-spinner"></div>${message}`; document.getElementById('loading').style.display = 'block'; hideError(); }
