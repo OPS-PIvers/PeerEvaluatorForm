@@ -113,6 +113,7 @@ function createNewObservation(observerEmail, observedEmail) {
       createdAt: new Date().toISOString(),
       lastModifiedAt: new Date().toISOString(),
       finalizedAt: null,
+      pdfUrl: null, // To store the link to the generated PDF
       observationData: {}, // e.g., { "1a:": "proficient", "1b:": "basic" }
       evidenceLinks: {} // e.g., { "1a:": [{url: "...", name: "...", uploadedAt: "..."}, ...] }
     };
@@ -361,6 +362,7 @@ function updateObservationStatus(observationId, newStatus, requestingUserEmail) 
             observation.finalizedAt = new Date().toISOString();
         }
 
+        db[observationIndex] = observation;
         _saveObservationsDb(db);
         debugLog('Observation status updated', { observationId, newStatus });
         return { success: true, observation: observation };
