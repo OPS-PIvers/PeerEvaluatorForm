@@ -2018,7 +2018,7 @@
 
             const componentId = cell.dataset.componentId;
             const rating = cell.dataset.rating;
-            const observationId = '...'; // This needs to be retrieved from the current observation context
+            const observationId = data.observationId; // Retrieve from current observation context
 
             if (!componentId || !rating || !observationId) {
                 console.error('Missing data for rating selection:', { componentId, rating, observationId });
