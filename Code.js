@@ -185,6 +185,7 @@ function getStaffListForDropdown(role, year) {
  */
 function getObservationOptions(observedEmail) {
     try {
+        setupObservationSheet(); // Ensure the sheet is ready
         const userContext = createUserContext();
         if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
             return { success: false, error: 'Permission denied.' };
@@ -204,6 +205,7 @@ function getObservationOptions(observedEmail) {
  */
 function createNewObservationForPeerEvaluator(observedEmail) {
   try {
+    setupObservationSheet(); // Ensure the sheet is ready
     const userContext = createUserContext();
     if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
       return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
@@ -248,6 +250,7 @@ function createNewObservationForPeerEvaluator(observedEmail) {
  */
 function loadObservationForEditing(observationId) {
     try {
+        setupObservationSheet(); // Ensure the sheet is ready
         const userContext = createUserContext();
         if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
             return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
@@ -282,6 +285,7 @@ function loadObservationForEditing(observationId) {
  */
 function deleteObservation(observationId) {
     try {
+        setupObservationSheet(); // Ensure the sheet is ready
         const userContext = createUserContext();
         if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
             return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
@@ -300,6 +304,7 @@ function deleteObservation(observationId) {
  */
 function finalizeObservation(observationId) {
     try {
+        setupObservationSheet(); // Ensure the sheet is ready
         const userContext = createUserContext();
         if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
             return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
@@ -318,6 +323,7 @@ function finalizeObservation(observationId) {
  */
 function deleteFinalizedObservation(observationId) {
     try {
+        setupObservationSheet(); // Ensure the sheet is ready
         const userContext = createUserContext();
         if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
             return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
@@ -335,6 +341,7 @@ function deleteFinalizedObservation(observationId) {
  * @returns {Object} A response object with the observation and rubric data.
  */
 function loadFinalizedObservationForViewing(observationId) {
+    setupObservationSheet(); // Ensure the sheet is ready
     const result = loadObservationForEditing(observationId);
     if (result.success && result.rubricData && result.rubricData.userContext) {
         result.rubricData.userContext.isEvaluator = false;
@@ -349,6 +356,7 @@ function loadFinalizedObservationForViewing(observationId) {
  */
 function exportObservationToPdf(observationId) {
     try {
+        setupObservationSheet(); // Ensure the sheet is ready
         const userContext = createUserContext();
         if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
             return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };

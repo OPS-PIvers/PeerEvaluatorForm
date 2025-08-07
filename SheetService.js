@@ -921,6 +921,38 @@ function clearAllSheetCache() {
  * Tests connectivity to all critical sheets
  * @return {Object} Test results for all sheets
  */
+/**
+ * Ensures the Observation_Data sheet exists and has the correct headers.
+ * This function is idempotent and can be called safely multiple times.
+ */
+function setupObservationSheet() {
+  try {
+    const spreadsheet = openSpreadsheet();
+    const sheetName = "Observation_Data";
+    let sheet = getSheetByName(spreadsheet, sheetName);
+
+    if (!sheet) {
+      sheet = spreadsheet.insertSheet(sheetName);
+      debugLog(`Created sheet: ${sheetName}`);
+    }
+
+    // Check if headers are already present
+    if (sheet.getLastRow() === 0) {
+      const headers = [
+        "observationId", "observerEmail", "observedEmail", "observedName",
+        "observedRole", "observedYear", "status", "createdAt",
+        "lastModifiedAt", "finalizedAt", "observationData", "evidenceLinks"
+      ];
+      sheet.appendRow(headers);
+      debugLog(`Headers written to ${sheetName}`);
+    }
+  } catch (error) {
+    console.error('Error setting up observation sheet:', formatErrorMessage(error, 'setupObservationSheet'));
+    // Throwing the error might be better to halt execution if the sheet is critical
+    throw new Error(`Could not initialize the Observation_Data sheet: ${error.message}`);
+  }
+}
+
 function testSheetConnectivity() {
   const results = {
     spreadsheet: { accessible: false, error: null },
