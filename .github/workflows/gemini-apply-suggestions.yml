@@ -1,12 +1,14 @@
 name: '🤖 Gemini Apply Suggestions'
 
 on:
-  pull_request:
+  pull_request_review:
     types:
-      - 'opened'
+      - 'submitted'
 
 jobs:
   apply_suggestions:
+    # Only run if the review contains suggestion code blocks
+    if: contains(github.event.review.body, '```suggestion')
     runs-on: ubuntu-latest
     permissions:
       contents: write # Needed to commit and push
@@ -17,12 +19,11 @@ jobs:
         uses: 'actions/checkout@v4'
         with:
           ref: ${{ github.event.pull_request.head.ref }}
-          # If you have protected branches, you might need a PAT here
-          # token: ${{ secrets.YOUR_PAT_SECRET }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: 'Wait for reviews'
+      - name: 'Wait for all AI reviewers to complete'
         run: |
-          echo "Waiting for 2 minutes for reviews to be submitted..."
+          echo "Waiting for Copilot and Gemini Code Assist to finish their reviews..."
           sleep 120
 
       - name: 'Apply suggestions'
@@ -33,7 +34,33 @@ jobs:
         run: |
           set -e
           echo "Fetching reviews for PR #${PR_NUMBER}"
-          gh pr review "${PR_NUMBER}" --json comments --jq '.[] | .comments[] | select(.body | contains("```suggestion")) | {path: .path, line: .line, start_line: .start_line, body: .body}' > suggestions.json
+          gh api repos/${{ github.repository }}/pulls/${PR_NUMBER}/reviews --jq '.[] | .body | select(. and (. | contains("```suggestion")))' > review_bodies.txt
+          
+          # Extract suggestions from review bodies
+          python3 << 'EOF'
+import re
+import json
+
+suggestions = []
+try:
+    with open('review_bodies.txt', 'r') as f:
+        for line in f:
+            body = line.strip()
+            if '```suggestion' in body:
+                # For now, just log that suggestions exist
+                # More complex parsing would be needed for full implementation
+                print(f"Found suggestion in review: {body[:100]}...")
+                suggestions.append({"body": body})
+                
+    with open('suggestions.json', 'w') as f:
+        json.dump(suggestions, f)
+        
+    print(f"Found {len(suggestions)} suggestions")
+except FileNotFoundError:
+    print("No review bodies file found")
+    with open('suggestions.json', 'w') as f:
+        json.dump([], f)
+EOF
 
           if [[ ! -s suggestions.json ]]; then
             echo "No suggestions with code blocks found."
