@@ -1,0 +1,128 @@
+name: '🤖 Gemini Apply Suggestions'
+
+on:
+  pull_request:
+    types:
+      - 'opened'
+
+jobs:
+  apply_suggestions:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Needed to commit and push
+      pull-requests: read # Needed to read PR data
+
+    steps:
+      - name: 'Checkout PR code'
+        uses: 'actions/checkout@v4'
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          # If you have protected branches, you might need a PAT here
+          # token: ${{ secrets.YOUR_PAT_SECRET }}
+
+      - name: 'Wait for reviews'
+        run: |
+          echo "Waiting for 2 minutes for reviews to be submitted..."
+          sleep 120
+
+      - name: 'Apply suggestions'
+        id: apply_suggestions
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -e
+          echo "Fetching reviews for PR #${PR_NUMBER}"
+          gh pr review "${PR_NUMBER}" --json comments --jq '.[] | .comments[] | select(.body | contains("```suggestion")) | {path: .path, line: .line, start_line: .start_line, body: .body}' > suggestions.json
+
+          if [[ ! -s suggestions.json ]]; then
+            echo "No suggestions with code blocks found."
+            exit 0
+          fi
+
+          echo "Applying suggestions..."
+          cat << 'EOF' > apply_suggestions.py
+import json
+import os
+
+suggestions = []
+with open('suggestions.json') as f:
+    # The gh command outputs a stream of JSON objects, not a single array
+    for line in f:
+        try:
+            suggestions.append(json.loads(line))
+        except json.JSONDecodeError:
+            # Handle cases where a line is not valid JSON
+            pass
+
+for suggestion in suggestions:
+    path = suggestion.get('path')
+    line = suggestion.get('line')
+    start_line = suggestion.get('start_line')
+    body = suggestion.get('body')
+
+    if not all([path, line, body]):
+        print(f"Skipping suggestion due to missing data: {suggestion}")
+        continue
+
+    if not start_line:
+        start_line = line
+
+    # Extract suggestion from markdown block
+    suggestion_code = []
+    in_suggestion_block = False
+    for l in body.splitlines():
+        if l.strip() == '```suggestion':
+            in_suggestion_block = True
+        elif l.strip() == '```' and in_suggestion_block:
+            in_suggestion_block = False
+            break # Exit after the first suggestion block
+        elif in_suggestion_block:
+            suggestion_code.append(l)
+
+    if not suggestion_code:
+        print(f"Could not extract suggestion code from: {body}")
+        continue
+
+    try:
+        with open(path, 'r') as f:
+            lines = f.readlines()
+    except FileNotFoundError:
+        print(f"File not found: {path}. Skipping suggestion.")
+        continue
+
+    # Line numbers are 1-based, list indices are 0-based
+    start_index = start_line - 1
+    end_index = line
+
+    # Basic sanity check for line numbers
+    if start_index < 0 or end_index > len(lines):
+        print(f"Invalid line numbers for file {path}. Skipping suggestion.")
+        continue
+
+    new_lines = lines[:start_index]
+    new_lines.extend([l + '
+' for l in suggestion_code])
+    new_lines.extend(lines[end_index:])
+
+    with open(path, 'w') as f:
+        f.writelines(new_lines)
+
+    print(f"Applied suggestion to {path}")
+
+EOF
+          python apply_suggestions.py
+
+      - name: 'Commit changes'
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+
+          if [[ -n "$(git status --porcelain)" ]]; then
+            echo "Changes detected, committing..."
+            git add .
+            git commit -m "chore: Apply review suggestions"
+            git push
+          else
+            echo "No changes to commit."
+          fi
