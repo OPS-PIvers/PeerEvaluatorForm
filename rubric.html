@@ -1378,33 +1378,6 @@
             window.location.href = newUrl;
         }
 
-        window.initializeFiltersFromURL = function() {
-            const urlParams = new URLSearchParams(window.location.search);
-
-            // Restore Administrator filter
-            const probationaryFilter = document.getElementById('probationaryFilter');
-            if (probationaryFilter && urlParams.get('filterType')) {
-                probationaryFilter.value = urlParams.get('filterType');
-            }
-
-            // Restore role/year filters
-            const roleFilter = document.getElementById('roleFilter');
-            const yearFilter = document.getElementById('yearFilter');
-
-            if (roleFilter && urlParams.get('filterRole')) {
-                roleFilter.value = urlParams.get('filterRole');
-            }
-
-            if (yearFilter && urlParams.get('filterYear')) {
-                yearFilter.value = urlParams.get('filterYear');
-            }
-
-            // Update staff list if both role and year are set
-            if (roleFilter && yearFilter && roleFilter.value && yearFilter.value) {
-                updateAvailableStaff();
-            }
-        }
-
         // Enhanced cache busting and page management
 
         // Prevent browser caching of this page
@@ -2136,7 +2109,7 @@
             reader.onload = function(e) {
               const base64Data = e.target.result.split(',')[1];
               const componentId = component.getAttribute('data-component-id');
-              const observationId = '...'; // This needs to be retrieved from the current observation context
+              const observationId = data.observationId; // This needs to be retrieved from the current observation context
 
               google.script.run
                 .withSuccessHandler(function(result) {

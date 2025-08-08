@@ -191,6 +191,35 @@ function formatErrorMessage(error, context = '') {
 }
 
 /**
+ * Gets the 1-based index of a column in a sheet by its name.
+ * This is a common operation and is centralized here to ensure consistency.
+ * It assumes the first row of the sheet is the header row.
+ * @param {GoogleAppsScript.Spreadsheet.Sheet} sheet - The Google Sheet object.
+ * @param {string} columnName - The name of the column to find.
+ * @return {number} The 1-based column index, or -1 if the column is not found.
+ */
+function getColumnIndex(sheet, columnName) {
+  if (!sheet) {
+    console.error("getColumnIndex was called with a null or undefined sheet.");
+    return -1;
+  }
+  try {
+    const header = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const index = header.indexOf(columnName);
+
+    if (index === -1) {
+      console.warn(`Column "${columnName}" not found in sheet "${sheet.getName()}".`);
+      return -1;
+    }
+
+    return index + 1; // Convert 0-based index to 1-based index for sheet ranges
+  } catch (e) {
+    console.error(`Error in getColumnIndex for column "${columnName}" in sheet "${sheet.getName()}": ${e.toString()}`);
+    return -1;
+  }
+}
+
+/**
  * Generates a unique identifier for caching and tracking
  * @param {string} prefix - Optional prefix for the ID
  * @return {string} Unique identifier
