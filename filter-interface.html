@@ -517,7 +517,7 @@
                     if (res.success) {
                         if (res.pdfError) {
                             // Finalization succeeded but PDF generation failed
-                            showToast('Observation finalized successfully, but PDF generation failed. You can retry PDF generation from the observation list.');
+                            showToast('Observation finalized successfully, but PDF generation failed. You can retry PDF generation from the observation list.', false);
                         } else {
                             showToast('Observation finalized and PDF generated successfully!', true);
                         }
