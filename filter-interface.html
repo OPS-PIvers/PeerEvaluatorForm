@@ -868,6 +868,96 @@
                 components.forEach(comp => { comp.style.display = ''; });
             }
         }
+
+        // Observation management functions
+        function getObservationOptions(observedEmail) {
+            return ObservationService.getObservationsForUser(observedEmail);
+        }
+
+        function loadRubricData(filters) {
+            if (filters.myOwnView) {
+                const userContext = UserService.createUserContext();
+                return {
+                    success: true,
+                    rubricData: getAllDomainsData(userContext.role, userContext.year, userContext.viewMode, userContext.assignedSubdomains),
+                    observation: null
+                };
+            } else {
+                const userContext = UserService.createFilteredUserContext(filters.staff, filters.role);
+                return {
+                    success: true,
+                    rubricData: getAllDomainsData(userContext.role, userContext.year, userContext.viewMode, userContext.assignedSubdomains),
+                    observation: null
+                };
+            }
+        }
+
+        function createNewObservationForPeerEvaluator(observedEmail) {
+            const userContext = UserService.createUserContext();
+            const observation = ObservationService.createNewObservation(userContext.email, observedEmail);
+            return {
+                success: true,
+                rubricData: getAllDomainsData(observation.observedRole, observation.observedYear, 'full', null),
+                observation: observation
+            };
+        }
+
+        function loadObservationForEditing(obsId) {
+            const observation = ObservationService.getObservationById(obsId);
+            return {
+                success: true,
+                rubricData: getAllDomainsData(observation.observedRole, observation.observedYear, 'full', null),
+                observation: observation
+            };
+        }
+
+        function deleteObservation(obsId) {
+            const userContext = UserService.createUserContext();
+            return ObservationService.deleteObservationRecord(obsId, userContext.email);
+        }
+
+        function loadFinalizedObservationForViewing(obsId) {
+            const observation = ObservationService.getObservationById(obsId);
+            return {
+                success: true,
+                rubricData: getAllDomainsData(observation.observedRole, observation.observedYear, 'full', null),
+                observation: observation
+            };
+        }
+
+        function deleteFinalizedObservation(obsId) {
+            const userContext = UserService.createUserContext();
+            return ObservationService.deleteFinalizedObservationRecord(obsId, userContext.email);
+        }
+
+        function getObservationPdfUrl(obsId) {
+            const observation = ObservationService.getObservationById(obsId);
+            return { success: true, pdfUrl: observation.pdfUrl };
+        }
+
+        function regenerateObservationPdf(obsId) {
+            // TODO: Implement PDF regeneration functionality
+            console.log('regenerateObservationPdf called with obsId:', obsId);
+            return { success: false, error: 'Not yet implemented' };
+        }
+
+        function updateObservationMetadata(obsId, metadata) {
+            // TODO: Implement observation metadata update functionality
+            console.log('updateObservationMetadata called with obsId:', obsId, 'metadata:', metadata);
+            return { success: false, error: 'Not yet implemented' };
+        }
+
+        function saveProficiencySelection(obsId, componentId, proficiency) {
+            // TODO: Implement proficiency selection saving functionality
+            console.log('saveProficiencySelection called with obsId:', obsId, 'componentId:', componentId, 'proficiency:', proficiency);
+            return { success: false, error: 'Not yet implemented' };
+        }
+
+        function uploadMediaEvidence(obsId, componentId, base64Data, fileName, mimeType) {
+            // TODO: Implement media evidence upload functionality
+            console.log('uploadMediaEvidence called with obsId:', obsId, 'componentId:', componentId, 'fileName:', fileName);
+            return { success: false, error: 'Not yet implemented' };
+        }
         
         document.addEventListener('DOMContentLoaded', () => showView('quickActionsView'));
     </script>
