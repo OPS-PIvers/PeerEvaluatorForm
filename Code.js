@@ -266,7 +266,7 @@ function include(filename) {
 function createFilterSelectionInterface(userContext, requestId) {
   const template = HtmlService.createTemplateFromFile('filter-interface');
   template.userContext = userContext;
-  template.availableRoles = UserService.getAvailableRoles(); // Assuming this function exists
+  template.availableRoles = UserService.getAvailableRoles();
   return template.evaluate()
       .setTitle('Select Rubric View')
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
@@ -311,7 +311,7 @@ function getAllDomainsData(role, year, viewMode, assignedSubdomains) {
         proficient: row[3] || '',
         distinguished: row[4] || '',
         bestPractices: [], // Placeholder
-        isAssigned: isComponentAssigned(componentIdMatch[0], assignedSubdomains)
+        isAssigned: UserService.isComponentAssigned(componentIdMatch[0], assignedSubdomains)
       });
     }
   });
@@ -403,7 +403,7 @@ function forceCleanAllCaches() {
  */
 function doGet(e) {
   const startTime = Date.now();
-  const requestId = generateUniqueId('request');
+  const requestId = Utils.generateUniqueId('request');
   
   try {
     // Clean up expired sessions periodically (10% chance)
@@ -417,18 +417,18 @@ function doGet(e) {
     const forceRefresh = params.refresh === 'true' || params.nocache === 'true';
     const debugMode = params.debug === 'true';
 
-    debugLog('Web app request received', { requestId, forceRefresh, debugMode });
+    Utils.debugLog('Web app request received', { requestId, forceRefresh, debugMode });
 
     if (forceRefresh) {
       forceCleanAllCaches();
     }
 
-    const userContext = createUserContext();
+    const userContext = UserService.createUserContext();
 
     // If the user has special access and no specific staff member is being targeted,
     // show the filter interface instead of a rubric.
     if (userContext.hasSpecialAccess && !params.filterStaff) {
-        debugLog('Special access user detected - showing filter interface', { role: userContext.role, requestId });
+        Utils.debugLog('Special access user detected - showing filter interface', { role: userContext.role, requestId });
         return createFilterSelectionInterface(userContext, requestId);
     }
     
@@ -463,7 +463,7 @@ function doGet(e) {
     return htmlOutput;
     
   } catch (error) {
-    console.error('Fatal error in doGet:', formatErrorMessage(error, 'doGet'));
+    console.error('Fatal error in doGet:', Utils.formatErrorMessage(error, 'doGet'));
     return createEnhancedErrorPage(error, requestId, null, e.userAgent);
   }
 }
