@@ -237,6 +237,28 @@ const SYSTEM_INFO = {
 };
 
 /**
+ * UI and Log message strings for consistency
+ */
+const UI_STRINGS = {
+  MENU_START: 'Start',
+  MENU_FILTER_OBSERVATIONS: 'Filter Observations',
+  HTML_TEMPLATE_RUBRIC: 'rubric',
+  HTML_TEMPLATE_FILTER: 'filter-interface',
+  HTML_TEMPLATE_ERROR: 'error-page',
+  PAGE_TITLE_RUBRIC: 'Peer Evaluator Form',
+  PAGE_TITLE_FILTER: 'Filter Observations',
+  PAGE_TITLE_SELECT_VIEW: 'Select Rubric View',
+  PAGE_TITLE_ERROR: 'Error',
+  ERROR_ACCESS_DENIED: 'Access Denied',
+  SUCCESS_OBSERVATION_FINALIZED: 'Observation finalized successfully.',
+  LOG_ERROR_MISSING_COLUMNS: 'One or more required columns are missing in the Observations sheet.',
+  LOG_INFO_SPECIAL_ACCESS_USER: 'Special access user detected - showing filter interface',
+  LOG_ERROR_FATAL_DOGET: 'Fatal error in doGet:',
+  LOG_CONTEXT_DOGET: 'doGet',
+  REQUEST_ID_PREFIX: 'request'
+};
+
+/**
  * Contact settings
  */
 const CONTACT_SETTINGS = {

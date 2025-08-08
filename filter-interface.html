@@ -868,104 +868,10 @@
                 components.forEach(comp => { comp.style.display = ''; });
             }
         }
-
-        // Observation management functions
-        function getObservationOptions(observedEmail) {
-            return ObservationService.getObservationsForUser(observedEmail);
-        }
-
-        function loadRubricData(filters) {
-            if (filters.myOwnView) {
-                const userContext = UserService.createUserContext();
-                return {
-                    success: true,
-                    rubricData: getAllDomainsData(userContext.role, userContext.year, userContext.viewMode, userContext.assignedSubdomains),
-                    observation: null
-                };
-            } else {
-                const userContext = UserService.createFilteredUserContext(filters.staff, filters.role);
-                return {
-                    success: true,
-                    rubricData: getAllDomainsData(userContext.role, userContext.year, userContext.viewMode, userContext.assignedSubdomains),
-                    observation: null
-                };
-            }
-        }
-
-        function createNewObservationForPeerEvaluator(observedEmail) {
-            const userContext = UserService.createUserContext();
-            const observation = ObservationService.createNewObservation(userContext.email, observedEmail);
-            return {
-                success: true,
-                rubricData: getAllDomainsData(observation.observedRole, observation.observedYear, 'full', null),
-                observation: observation
-            };
-        }
-
-        function loadObservationForEditing(obsId) {
-            const observation = ObservationService.getObservationById(obsId);
-            return {
-                success: true,
-                rubricData: getAllDomainsData(observation.observedRole, observation.observedYear, 'full', null),
-                observation: observation
-            };
-        }
-
-        function deleteObservation(obsId) {
-            const userContext = UserService.createUserContext();
-            return ObservationService.deleteObservationRecord(obsId, userContext.email);
-        }
-
-        function loadFinalizedObservationForViewing(obsId) {
-            const observation = ObservationService.getObservationById(obsId);
-            return {
-                success: true,
-                rubricData: getAllDomainsData(observation.observedRole, observation.observedYear, 'full', null),
-                observation: observation
-            };
-        }
-
-        function deleteFinalizedObservation(obsId) {
-            const userContext = UserService.createUserContext();
-            return ObservationService.deleteFinalizedObservationRecord(obsId, userContext.email);
-        }
-
-        function getObservationPdfUrl(obsId) {
-            const observation = ObservationService.getObservationById(obsId);
-            return { success: true, pdfUrl: observation.pdfUrl };
-        }
-
-        function regenerateObservationPdf(obsId) {
-            // TODO: Implement PDF regeneration functionality
-            console.log('regenerateObservationPdf called with obsId:', obsId);
-            return { success: false, error: 'Not yet implemented' };
-        }
-
-        function updateObservationMetadata(obsId, metadata) {
-            // TODO: Implement observation metadata update functionality
-            console.log('updateObservationMetadata called with obsId:', obsId, 'metadata:', metadata);
-            return { success: false, error: 'Not yet implemented' };
-        }
-
-        function saveProficiencySelection(obsId, componentId, proficiency) {
-            try {
-                return ObservationService.saveProficiencySelection(obsId, componentId, proficiency);
-            } catch (error) {
-                console.error('Error saving proficiency selection:', error);
-                return { success: false, error: error.message };
-            }
-        }
-
-        function uploadMediaEvidence(obsId, componentId, base64Data, fileName, mimeType) {
-            try {
-                return ObservationService.uploadMediaEvidence(obsId, componentId, base64Data, fileName, mimeType);
-            } catch (error) {
-                console.error('Error uploading media evidence:', error);
-                return { success: false, error: error.message };
-            }
-        }
         
-        document.addEventListener('DOMContentLoaded', () => showView('quickActionsView'));
+        document.addEventListener('DOMContentLoaded', () => {
+          showView('quickActionsView');
+        });
     </script>
 </body>
 </html>
