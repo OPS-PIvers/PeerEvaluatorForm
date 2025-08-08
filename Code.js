@@ -333,6 +333,13 @@ function finalizeObservation(observationId) {
                         sheet.getRange(row, pdfStatusCol).setValue('generated');
                     }
                     SpreadsheetApp.flush();
+
+                    // Manually clear the observation cache since we updated the sheet directly
+                    const cache = CacheService.getScriptCache();
+                    if (cache) {
+                        cache.remove('all_observations');
+                        debugLog('Cleared all_observations cache after PDF URL update.', { observationId });
+                    }
                 }
                 // Get the updated observation to return
                 const updatedObservation = getObservationById(observationId);
