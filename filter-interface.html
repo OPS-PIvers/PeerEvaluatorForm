@@ -697,7 +697,7 @@
             }
 
             html += `<div style="padding: 20px 20px 0 20px; display: flex; justify-content: space-between; align-items: center;">`;
-            if (rubricData.userContext.isEvaluator) {
+            if (data.userContext.isEvaluator) {
                 if (observation.status === 'Draft') {
                     html += `<button id="viewToggleBtn" class="view-toggle-button" onclick="toggleObservationView()">View Full Rubric</button><button class="filter-btn btn-finalize" onclick="reviewObservation()">Review and Finalize</button>`;
                 } else {
