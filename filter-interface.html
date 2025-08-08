@@ -205,6 +205,12 @@
         .btn-view:hover { background: #2563eb; border-color: #2563eb; }
         .btn-export { background: var(--color-green-base); border-color: var(--color-green-base); }
         .btn-export:hover { background: var(--color-green-dark); border-color: var(--color-green-dark); }
+
+        .observation-metadata-editor {
+            padding: 20px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #dee2e6;
+        }
         
         /* PDF Button States */
         .btn-pdf-failed { 
@@ -427,6 +433,7 @@
         let currentFilters = { role: null, year: null, staff: null };
         let currentObservationId = null;
         let observationViewMode = 'assigned';
+        let currentObservedUser = { email: null, name: null };
 
         function showView(viewId) { ['quickActionsView', 'customFiltersView', 'observationSelectorView', 'rubricContainer'].forEach(id => { document.getElementById(id).style.display = 'none'; }); document.getElementById(viewId).style.display = 'block'; }
         function showCustomFilters() { showView('customFiltersView'); }
@@ -460,6 +467,8 @@
         function clearFilters() { showView('quickActionsView'); hideError(); hideLoading(); document.getElementById('filterStatus').style.display = 'none'; }
 
         function displayObservationOptions(observedEmail, observedName) {
+            currentObservedUser.email = observedEmail;
+            currentObservedUser.name = observedName;
             showLoading(`Loading options for ${observedName}`);
             google.script.run.withSuccessHandler(result => {
                 hideLoading(); if (!result.success) return showError(result.error);
@@ -479,13 +488,13 @@
                         
                         if (pdfStatus === 'generated' && obs.pdfUrl) {
                             // PDF is available - show normal View PDF button
-                            pdfButton = `<button class="filter-btn btn-export" onclick="handleViewPdf('${obs.observationId}')">View PDF</button>`;
+                            pdfButton = `<button class="filter-btn btn-export" onclick="window.open('${obs.pdfUrl}', '_blank')">View PDF</button>`;
                         } else if (pdfStatus === 'failed') {
                             // PDF generation failed - show retry button
                             pdfButton = `<button class="filter-btn btn-pdf-failed" onclick="handleRetryPdf('${obs.observationId}')">PDF Failed - Retry</button>`;
                         } else {
-                            // PDF status unknown or missing - show disabled button
-                            pdfButton = `<button class="filter-btn btn-pdf-missing" onclick="handleRetryPdf('${obs.observationId}')">Generate PDF</button>`;
+                            // PDF is not available, show Generate PDF button
+                            pdfButton = `<button class="filter-btn btn-export" onclick="handleRetryPdf('${obs.observationId}')">Generate PDF</button>`;
                         }
                         
                         buttons = `<button class="filter-btn btn-view" onclick="handleViewObservation('${obs.observationId}')">View</button>
@@ -527,6 +536,11 @@
                     }
                 }).withFailureHandler(handleError).finalizeObservation(obsId);
             }
+        }
+
+        function reviewObservation() {
+            showLoading('Loading review...');
+            google.script.run.withSuccessHandler(handleRubricData).withFailureHandler(handleError).loadFinalizedObservationForViewing(currentObservationId);
         }
 
         function handleViewObservation(obsId) {
@@ -626,13 +640,29 @@
             }
         }
 
+        function goBackToObservations() {
+            if (currentObservedUser.email && currentObservedUser.name) {
+                displayObservationOptions(currentObservedUser.email, currentObservedUser.name);
+            } else {
+                showView('customFiltersView');
+            }
+        }
+
         function handleRubricData(result) {
             hideLoading();
             if (!result.success) return showError(result.error);
-            if (result.action === 'show_observation_selector') return displayObservationOptions(result.observedEmail, result.observedName);
+            if (result.action === 'show_observation_selector') {
+                currentObservedUser.email = result.observedEmail;
+                currentObservedUser.name = result.observedName;
+                return displayObservationOptions(result.observedEmail, result.observedName);
+            }
 
             const { observation, rubricData } = result;
             currentObservationId = observation ? observation.observationId : null;
+            if (observation) {
+                currentObservedUser.email = observation.observedEmail;
+                currentObservedUser.name = observation.observedName;
+            }
             observationViewMode = (rubricData.userContext && rubricData.userContext.viewMode) || 'assigned';
 
             window.pageLoadInfo = {
@@ -653,9 +683,28 @@
         function generateInteractiveRubricHtml(data, observation) {
             const isEvaluator = data.userContext && data.userContext.isEvaluator;
             let html = `<div style="background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">`;
+
+            if (isEvaluator) {
+                const today = new Date().toISOString().slice(0, 10);
+                const defaultObsName = `${observation.observedName.split(' ').pop()}, ${observation.observedName.split(' ')[0]}_${today}`;
+                html += `
+                <div class="observation-metadata-editor">
+                    <div class="filter-row">
+                        <input type="text" id="observationName" class="filter-select" value="${escapeHtml(observation.observationName || defaultObsName)}" onchange="saveObservationMetadata()">
+                        <input type="date" id="observationDate" class="filter-select" value="${escapeHtml(observation.observationDate || today)}" onchange="saveObservationMetadata()">
+                    </div>
+                </div>`;
+            }
+
             html += `<div style="padding: 20px 20px 0 20px; display: flex; justify-content: space-between; align-items: center;">`;
-            if (isEvaluator) { html += `<button id="viewToggleBtn" class="view-toggle-button" onclick="toggleObservationView()">View Full Rubric</button>`; }
-            html += `<button class="filter-btn btn-secondary" onclick="showView('observationSelectorView')">Back to Observations</button>`;
+            if (rubricData.userContext.isEvaluator) {
+                if (observation.status === 'Draft') {
+                    html += `<button id="viewToggleBtn" class="view-toggle-button" onclick="toggleObservationView()">View Full Rubric</button><button class="filter-btn btn-finalize" onclick="reviewObservation()">Review and Finalize</button>`;
+                } else {
+                    html += `<button class="filter-btn btn-finalize" onclick="handleFinalizeObservation('${observation.observationId}', '${observation.observedEmail}', '${observation.observedName}')">Finalize</button>`;
+                }
+            }
+            html += `<button class="filter-btn btn-secondary" onclick="goBackToObservations()">Back to Observations</button>`;
             html += `</div>`;
 
             data.domains.forEach((domain, domainIdx) => {
@@ -719,11 +768,32 @@
                     statusLabel = `<strong>Observation Draft</strong>`;
                 } else if (observation.status === 'Finalized') {
                     statusLabel = `<strong>Finalized Observation (Read-Only)</strong>`;
+                } else if (observation.status === 'Review') {
+                    statusLabel = `<strong>Reviewing Observation</strong>`;
                 }
                 text = `Observing: ${observation.observedName} &mdash; ${statusLabel}`;
             }
             statusText.innerHTML = text;
             status.style.display = 'block';
+        }
+
+        function saveObservationMetadata() {
+            const obsId = currentObservationId;
+            const newName = document.getElementById('observationName').value;
+            const newDate = document.getElementById('observationDate').value;
+
+            if (!obsId || !newName || !newDate) return;
+
+            google.script.run
+                .withSuccessHandler(res => {
+                    if (res.success) {
+                        showToast('Observation details saved.', true);
+                    } else {
+                        showError(res.error);
+                    }
+                })
+                .withFailureHandler(handleError)
+                .updateObservationMetadata(obsId, { observationName: newName, observationDate: newDate });
         }
 
         function selectProficiency(element, componentId, proficiency) {

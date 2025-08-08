@@ -444,6 +444,99 @@ function getObservationPdfUrl(observationId) {
     }
 }
 
+/**
+ * Updates the metadata for an observation, such as its name or date.
+ * @param {string} observationId The ID of the observation to update.
+ * @param {object} metadata The metadata to update (e.g., { observationName: 'New Name', observationDate: '2025-12-25' }).
+ * @returns {Object} A response object indicating success or failure.
+ */
+function updateObservationMetadata(observationId, metadata) {
+    try {
+        const userContext = createUserContext();
+        if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
+            return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
+        }
+
+        const observation = getObservationById(observationId);
+        if (!observation) {
+            return { success: false, error: 'Observation not found.' };
+        }
+
+        if (observation.observerEmail !== userContext.email) {
+            return { success: false, error: 'You do not have permission to edit this observation.' };
+        }
+
+        if (observation.status !== OBSERVATION_STATUS.DRAFT) {
+            return { success: false, error: 'You can only edit draft observations.' };
+        }
+
+        const spreadsheet = openSpreadsheet();
+        const sheet = getSheetByName(spreadsheet, OBSERVATION_SHEET_NAME);
+        if (!sheet) {
+            return { success: false, error: `Sheet '${OBSERVATION_SHEET_NAME}' not found.` };
+        }
+
+        const row = _findObservationRow(sheet, observationId);
+        if (row === -1) {
+            return { success: false, error: 'Observation row not found in the sheet.' };
+        }
+
+        const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+        
+        if (metadata.observationName) {
+            const nameCol = headers.indexOf('observationName') + 1;
+            if (nameCol > 0) {
+                sheet.getRange(row, nameCol).setValue(metadata.observationName);
+            }
+        }
+
+        if (metadata.observationDate) {
+            const dateCol = headers.indexOf('observationDate') + 1;
+            if (dateCol > 0) {
+                sheet.getRange(row, dateCol).setValue(metadata.observationDate);
+            }
+        }
+        
+        const lastModifiedCol = headers.indexOf('lastModifiedAt') + 1;
+        if (lastModifiedCol > 0) {
+            sheet.getRange(row, lastModifiedCol).setValue(new Date().toISOString());
+        }
+
+        SpreadsheetApp.flush();
+        
+        // Update the observation folder name if the observationName has changed
+        if (metadata.observationName && metadata.observationName !== observation.observationName) {
+            try {
+                const rootFolderIterator = DriveApp.getFoldersByName(DRIVE_FOLDER_INFO.ROOT_FOLDER_NAME);
+                if (rootFolderIterator.hasNext()) {
+                    const rootFolder = rootFolderIterator.next();
+                    const userFolderName = `${observation.observedName} (${observation.observedEmail}`;
+                    const userFolderIterator = rootFolder.getFoldersByName(userFolderName);
+                    if (userFolderIterator.hasNext()) {
+                        const userFolder = userFolderIterator.next();
+                        const oldFolderName = `Observation - ${observation.observationId}`;
+                        const obsFolderIterator = userFolder.getFoldersByName(oldFolderName);
+                        if (obsFolderIterator.hasNext()) {
+                            const obsFolder = obsFolderIterator.next();
+                            obsFolder.setName(metadata.observationName);
+                        }
+                    }
+                }
+            } catch (driveError) {
+                // Log the error, but don't fail the whole operation
+                console.error(`Failed to rename observation folder for ${observationId}:`, driveError);
+            }
+        }
+
+
+        return { success: true };
+
+    } catch (error) {
+        console.error(`Error updating metadata for observation ${observationId}:`, error);
+        return { success: false, error: 'An unexpected error occurred while saving the details.' };
+    }
+}
+
 
 /**
  * Generates and saves a PDF for an observation to Google Drive.

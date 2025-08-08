@@ -941,7 +941,8 @@ function setupObservationSheet() {
       const headers = [
         "observationId", "observerEmail", "observedEmail", "observedName",
         "observedRole", "observedYear", "status", "createdAt",
-        "lastModifiedAt", "finalizedAt", "observationData", "evidenceLinks"
+        "lastModifiedAt", "finalizedAt", "observationData", "evidenceLinks",
+        "observationName", "observationDate" // Added new fields
       ];
       sheet.appendRow(headers);
       debugLog(`Headers written to ${sheetName}`);
