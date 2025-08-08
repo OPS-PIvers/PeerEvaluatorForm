@@ -948,15 +948,21 @@
         }
 
         function saveProficiencySelection(obsId, componentId, proficiency) {
-            // TODO: Implement proficiency selection saving functionality
-            console.log('saveProficiencySelection called with obsId:', obsId, 'componentId:', componentId, 'proficiency:', proficiency);
-            return { success: false, error: 'Not yet implemented' };
+            try {
+                return ObservationService.saveProficiencySelection(obsId, componentId, proficiency);
+            } catch (error) {
+                console.error('Error saving proficiency selection:', error);
+                return { success: false, error: error.message };
+            }
         }
 
         function uploadMediaEvidence(obsId, componentId, base64Data, fileName, mimeType) {
-            // TODO: Implement media evidence upload functionality
-            console.log('uploadMediaEvidence called with obsId:', obsId, 'componentId:', componentId, 'fileName:', fileName);
-            return { success: false, error: 'Not yet implemented' };
+            try {
+                return ObservationService.uploadMediaEvidence(obsId, componentId, base64Data, fileName, mimeType);
+            } catch (error) {
+                console.error('Error uploading media evidence:', error);
+                return { success: false, error: error.message };
+            }
         }
         
         document.addEventListener('DOMContentLoaded', () => showView('quickActionsView'));
