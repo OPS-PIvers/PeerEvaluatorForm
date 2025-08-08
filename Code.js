@@ -148,7 +148,7 @@ function createFilterSelectionInterface(userContext, requestId) {
   template.userContext = userContext;
   template.availableRoles = UserService.getAvailableRoles();
   return template.evaluate()
-      .setTitle('Select Rubric View') // This could also be a constant
+      .setTitle(UI_STRINGS.PAGE_TITLE_SELECT_VIEW)
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
@@ -226,7 +226,7 @@ function createEnhancedErrorPage(error, requestId, userEmail, userAgent) {
     userEmail: userEmail,
     stack: error.stack
   };
-  return template.evaluate().setTitle('Error'); // Could be a constant
+  return template.evaluate().setTitle(UI_STRINGS.PAGE_TITLE_ERROR);
 }
 
 function cleanupExpiredSessions() {

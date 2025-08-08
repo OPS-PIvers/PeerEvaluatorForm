@@ -2022,10 +2022,17 @@
 
             const componentId = cell.dataset.componentId;
             const rating = cell.dataset.rating;
-            const observationId = data.observationId; // Retrieve from current observation context
+            
+            let observationId = undefined;
+            if (typeof data !== 'undefined' && data && data.observation && data.observation.observationId) {
+                observationId = data.observation.observationId;
+            } else if (typeof data !== 'undefined' && data && data.observationId) {
+                observationId = data.observationId;
+            }
 
             if (!componentId || !rating || !observationId) {
                 console.error('Missing data for rating selection:', { componentId, rating, observationId });
+                alert('Cannot save rating: Observation context not available.');
                 return;
             }
 
@@ -2109,7 +2116,18 @@
             reader.onload = function(e) {
               const base64Data = e.target.result.split(',')[1];
               const componentId = component.getAttribute('data-component-id');
-              const observationId = data.observationId; // This needs to be retrieved from the current observation context
+              
+              let observationId = undefined;
+              if (typeof data !== 'undefined' && data && data.observation && data.observation.observationId) {
+                observationId = data.observation.observationId;
+              } else if (typeof data !== 'undefined' && data && data.observationId) {
+                observationId = data.observationId;
+              }
+              
+              if (!observationId) {
+                alert('Cannot upload media: Observation context not available.');
+                return;
+              }
 
               google.script.run
                 .withSuccessHandler(function(result) {

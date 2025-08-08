@@ -247,6 +247,8 @@ const UI_STRINGS = {
   HTML_TEMPLATE_ERROR: 'error-page',
   PAGE_TITLE_RUBRIC: 'Peer Evaluator Form',
   PAGE_TITLE_FILTER: 'Filter Observations',
+  PAGE_TITLE_SELECT_VIEW: 'Select Rubric View',
+  PAGE_TITLE_ERROR: 'Error',
   ERROR_ACCESS_DENIED: 'Access Denied',
   SUCCESS_OBSERVATION_FINALIZED: 'Observation finalized successfully.',
   LOG_ERROR_MISSING_COLUMNS: 'One or more required columns are missing in the Observations sheet.',
