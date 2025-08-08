@@ -122,7 +122,15 @@ function getObservationsForUser(observedEmail, status = null) {
     // Sort by creation date, newest first
     userObservations.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
-    return userObservations;
+    // Ensure essential fields for the UI are present
+    return userObservations.map(obs => ({
+      observationId: obs.observationId,
+      observedName: obs.observedName,
+      createdAt: obs.createdAt,
+      status: obs.status,
+      pdfUrl: obs.pdfUrl || null,
+      pdfStatus: obs.pdfStatus || null
+    }));
   } catch (error) {
     console.error(`Error in getObservationsForUser for ${observedEmail}:`, error);
     return [];
