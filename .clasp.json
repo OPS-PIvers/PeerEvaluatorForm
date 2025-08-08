@@ -11,6 +11,17 @@
   "jsonExtensions": [
     ".json"
   ],
-  "filePushOrder": [],
+  "filePushOrder": [
+    "Constants.js",
+    "Utils.js",
+    "CacheManager.js",
+    "SessionManager.js",
+    "SheetService.js",
+    "ValidationService.js",
+    "UserService.js",
+    "ObservationService.js",
+    "Code.js",
+    "Tests.js"
+  ],
   "skipSubdirectories": false
 }

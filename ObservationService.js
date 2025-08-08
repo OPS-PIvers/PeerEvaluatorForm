@@ -633,6 +633,60 @@ function updateObservationStatus(observationId, newStatus, requestingUserEmail) 
     }
 }
 
+/**
+ * Updates the PDF URL for a given observation in the sheet.
+ * This function is called after a PDF has been generated and is used by the `finalizeObservation` flow.
+ * @param {string} observationId The ID of the observation to update.
+ * @param {string} pdfUrl The new URL of the generated PDF.
+ * @returns {{success: boolean, error?: string}} A response object.
+ */
+function updateObservationPdfUrl(observationId, pdfUrl) {
+  if (!observationId || !pdfUrl) {
+    return { success: false, error: 'Observation ID and PDF URL are required.' };
+  }
+
+  try {
+    const spreadsheet = openSpreadsheet();
+    const sheet = getSheetByName(spreadsheet, OBSERVATION_SHEET_NAME);
+    if (!sheet) {
+      throw new Error(`Sheet "${OBSERVATION_SHEET_NAME}" not found.`);
+    }
+
+    const row = _findObservationRow(sheet, observationId);
+    if (row === -1) {
+      // Log this as a warning instead of returning an error that might break the UI flow.
+      // The calling function might not handle the error gracefully.
+      console.warn(`Observation with ID "${observationId}" not found in sheet. Cannot update PDF URL.`);
+      return { success: false, error: 'Observation not found.' };
+    }
+
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const pdfUrlCol = headers.indexOf('pdfUrl') + 1;
+    const lastModifiedCol = headers.indexOf('lastModifiedAt') + 1;
+
+    if (pdfUrlCol === 0) {
+      // This is a configuration error, so throwing an error is appropriate.
+      throw new Error('The "pdfUrl" column was not found in the Observations sheet.');
+    }
+
+    // Update the PDF URL and timestamp
+    sheet.getRange(row, pdfUrlCol).setValue(pdfUrl);
+    if (lastModifiedCol > 0) {
+      sheet.getRange(row, lastModifiedCol).setValue(new Date().toISOString());
+    }
+
+    SpreadsheetApp.flush();
+
+    debugLog('Observation PDF URL updated', { observationId, pdfUrl });
+    return { success: true };
+
+  } catch (error) {
+    console.error(`Error updating PDF URL for observation ${observationId}:`, error);
+    // Return a structured error response
+    return { success: false, error: `An unexpected error occurred while updating the PDF URL: ${error.message}` };
+  }
+}
+
 
 /**
  * A test function to clear all observations from the properties service.
