@@ -517,9 +517,9 @@
                     if (res.success) {
                         if (res.pdfError) {
                             // Finalization succeeded but PDF generation failed
-                            showSuccess('Observation finalized successfully, but PDF generation failed. You can retry PDF generation from the observation list.');
+                            showToast('Observation finalized successfully, but PDF generation failed. You can retry PDF generation from the observation list.', false);
                         } else {
-                            showSuccess('Observation finalized and PDF generated successfully!');
+                            showToast('Observation finalized and PDF generated successfully!', true);
                         }
                         displayObservationOptions(email, name);
                     } else {
@@ -565,7 +565,7 @@
                 google.script.run.withSuccessHandler(res => {
                     hideLoading();
                     if (res.success) {
-                        showSuccess('PDF successfully regenerated!');
+                        showToast('PDF successfully regenerated!', true);
                         // Refresh the current view to show updated button state
                         const currentView = document.querySelector('.main-view:not(.hidden)');
                         if (currentView && currentView.id === 'observationSelectorView') {
