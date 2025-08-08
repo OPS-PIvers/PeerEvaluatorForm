@@ -256,3 +256,214 @@ function processCompletedObservations() {
 function include(filename) {
   return HtmlService.createHtmlOutputFromFile(filename).getContent();
 }
+
+/**
+ * Creates a filter selection interface for special access users
+ * @param {Object} userContext - The user context object
+ * @param {string} requestId - The request ID for tracking
+ * @returns {HtmlOutput} The HTML output for the filter interface
+ */
+function createFilterSelectionInterface(userContext, requestId) {
+  const template = HtmlService.createTemplateFromFile('filter-interface');
+  template.userContext = userContext;
+  template.availableRoles = UserService.getAvailableRoles(); // Assuming this function exists
+  return template.evaluate()
+      .setTitle('Select Rubric View')
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+/**
+ * Gets all domains data for a specific role, year, and view mode
+ * @param {string} role - The user role
+ * @param {number} year - The user year
+ * @param {string} viewMode - The view mode (full or assigned)
+ * @param {Array} assignedSubdomains - Array of assigned subdomains
+ * @returns {Object} The rubric data with domains
+ */
+function getAllDomainsData(role, year, viewMode, assignedSubdomains) {
+  const roleSheetData = SheetService.getRoleSheetData(role);
+  if (!roleSheetData || roleSheetData.validation.isErrorData) {
+    return { title: 'Error', subtitle: 'Could not load rubric data.', domains: [] };
+  }
+
+  const domains = [];
+  let currentDomain = null;
+
+  roleSheetData.data.forEach((row, index) => {
+    const componentTitle = row[0] ? row[0].toString().trim() : '';
+    const componentIdMatch = componentTitle.match(VALIDATION_PATTERNS.COMPONENT_ID);
+
+    if (componentIdMatch) {
+      if (!currentDomain) {
+        currentDomain = { name: `Domain ${componentIdMatch[0][0]}`, components: [] };
+        domains.push(currentDomain);
+      }
+      if (currentDomain.name[7] !== componentIdMatch[0][0]) {
+        currentDomain = { name: `Domain ${componentIdMatch[0][0]}`, components: [] };
+        domains.push(currentDomain);
+      }
+
+      currentDomain.components.push({
+        componentId: componentIdMatch[0],
+        title: componentTitle,
+        developing: row[1] || '',
+        basic: row[2] || '',
+        proficient: row[3] || '',
+        distinguished: row[4] || '',
+        bestPractices: [], // Placeholder
+        isAssigned: isComponentAssigned(componentIdMatch[0], assignedSubdomains)
+      });
+    }
+  });
+
+  return {
+    title: roleSheetData.title,
+    subtitle: roleSheetData.subtitle,
+    domains: domains
+  };
+}
+
+/**
+ * Wrapper function for Utils.generateResponseMetadata
+ */
+function generateResponseMetadata(userContext, requestId, debugMode) {
+  return Utils.generateResponseMetadata(userContext, requestId, debugMode);
+}
+
+/**
+ * Generates a page title based on the user's role
+ * @param {string} role - The user's role
+ * @returns {string} The title for the HTML page
+ */
+function getPageTitle(role) {
+  return `Danielson Framework - ${role}`;
+}
+
+/**
+ * Wrapper function for Utils.addCacheBustingHeaders
+ */
+function addCacheBustingHeaders(htmlOutput, responseMetadata) {
+  return Utils.addCacheBustingHeaders(htmlOutput, responseMetadata);
+}
+
+/**
+ * Wrapper function for Utils.logPerformanceMetrics
+ */
+function logPerformanceMetrics(operation, executionTime, metrics) {
+  return Utils.logPerformanceMetrics(operation, executionTime, metrics);
+}
+
+/**
+ * Wrapper function for Utils.formatErrorMessage
+ */
+function formatErrorMessage(error, context) {
+  return Utils.formatErrorMessage(error, context);
+}
+
+/**
+ * Creates an enhanced error page with debugging information
+ * @param {Error} error - The error object
+ * @param {string} requestId - The unique ID for the request
+ * @param {string} userEmail - The user's email
+ * @param {string} userAgent - The user agent string
+ * @returns {HtmlOutput} The HTML output for the error page
+ */
+function createEnhancedErrorPage(error, requestId, userEmail, userAgent) {
+  const template = HtmlService.createTemplateFromFile('error-page');
+  template.error = {
+    message: error.message,
+    requestId: requestId,
+    timestamp: new Date().toISOString(),
+    version: SYSTEM_INFO.VERSION,
+    userEmail: userEmail,
+    stack: error.stack
+  };
+  return template.evaluate().setTitle('Error');
+}
+
+/**
+ * Wrapper function for SessionManager.cleanupExpiredSessions
+ */
+function cleanupExpiredSessions() {
+  return SessionManager.cleanupExpiredSessions();
+}
+
+/**
+ * Wrapper function for CacheManager.forceCleanAllCaches
+ */
+function forceCleanAllCaches() {
+  return CacheManager.forceCleanAllCaches();
+}
+
+/**
+ * Main entry point for the Google Apps Script web application
+ * Handles HTTP GET requests and returns appropriate HTML content
+ * @param {Object} e - The event object containing request parameters
+ * @returns {HtmlOutput} The HTML output to be displayed
+ */
+function doGet(e) {
+  const startTime = Date.now();
+  const requestId = generateUniqueId('request');
+  
+  try {
+    // Clean up expired sessions periodically (10% chance)
+    if (Math.random() < 0.1) {
+      cleanupExpiredSessions();
+    }
+
+    // Parse URL parameters for cache control
+    const params = e.parameter || {};
+
+    const forceRefresh = params.refresh === 'true' || params.nocache === 'true';
+    const debugMode = params.debug === 'true';
+
+    debugLog('Web app request received', { requestId, forceRefresh, debugMode });
+
+    if (forceRefresh) {
+      forceCleanAllCaches();
+    }
+
+    const userContext = createUserContext();
+
+    // If the user has special access and no specific staff member is being targeted,
+    // show the filter interface instead of a rubric.
+    if (userContext.hasSpecialAccess && !params.filterStaff) {
+        debugLog('Special access user detected - showing filter interface', { role: userContext.role, requestId });
+        return createFilterSelectionInterface(userContext, requestId);
+    }
+    
+    // For users who land here directly (not through the filter UI) or for non-special roles
+    const rubricData = getAllDomainsData(
+      userContext.role, 
+      userContext.year, 
+      userContext.viewMode, 
+      userContext.assignedSubdomains
+    );
+    
+    // Attach the full user context to the data payload for the template
+    rubricData.userContext = userContext;
+
+    // Generate response metadata for headers
+    const responseMetadata = generateResponseMetadata(userContext, requestId, debugMode);
+    
+    // Create and configure the HTML template
+    const htmlTemplate = HtmlService.createTemplateFromFile('rubric.html'); // This is now a fallback view
+    htmlTemplate.data = rubricData;
+    
+    // Generate the HTML output
+    const htmlOutput = htmlTemplate.evaluate()
+      .setTitle(getPageTitle(userContext.role))
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+      
+    addCacheBustingHeaders(htmlOutput, responseMetadata);
+
+    const executionTime = Date.now() - startTime;
+    logPerformanceMetrics('doGet', executionTime, { role: userContext.role, requestId });
+    
+    return htmlOutput;
+    
+  } catch (error) {
+    console.error('Fatal error in doGet:', formatErrorMessage(error, 'doGet'));
+    return createEnhancedErrorPage(error, requestId, null, e.userAgent);
+  }
+}
