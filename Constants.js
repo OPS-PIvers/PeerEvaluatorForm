@@ -10,7 +10,14 @@ const SHEET_NAMES = {
   STAFF: 'Staff',
   SETTINGS: 'Settings',
   TEACHER: 'Teacher',
-  OBSERVATIONS: 'Observations' // Future use for dedicated sheet
+  OBSERVATIONS: 'Observations',
+  OBSERVATION_DATA: 'Observation_Data' // Added for consistency
+};
+
+const COLUMN_NAMES = {
+    observationId: 'observationId',
+    pdfUrl: 'pdfUrl',
+    status: 'status'
 };
 
 /**
