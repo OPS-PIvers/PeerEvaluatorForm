@@ -749,7 +749,17 @@ function _addComponentSection(body, component, proficiency, observation) {
                 ...(cell.getAttributes() || {}),
                 [DocumentApp.Attribute.BORDER_WIDTH]: 2,
                 [DocumentApp.Attribute.BORDER_COLOR]: '#3b82f6'
-            });
+            // Safely copy existing attributes to a plain object before merging
+            var attrs = {};
+            var existingAttrs = cell.getAttributes();
+            if (existingAttrs) {
+                Object.keys(existingAttrs).forEach(function(key) {
+                    attrs[key] = existingAttrs[key];
+                });
+            }
+            attrs[DocumentApp.Attribute.BORDER_WIDTH] = 2;
+            attrs[DocumentApp.Attribute.BORDER_COLOR] = '#3b82f6';
+            cell.setAttributes(attrs);
         } else {
             cell.getChild(0).asText().setForegroundColor('#4a5568');
         }
