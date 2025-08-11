@@ -52,6 +52,9 @@ function testIsValidEmailFunction() {
   assert(isValidEmail("test@domain withspace.com") === false, "Test Case 22 Failed: test@domain withspace.com (space in domain)");
   assert(isValidEmail("test@domain.c") === false, "Test Case 23 Failed: test@domain.c (TLD too short)");
   assert(isValidEmail("test@sub-.example.com") === false, "Test Case 24 Failed: test@sub-.example.com (subdomain ends with hyphen)");
+  assert(isValidEmail("test..name@example.com") === false, "Test Case 25 Failed: test..name@example.com (consecutive dots in local part)");
+  assert(isValidEmail(".test@example.com") === false, "Test Case 26 Failed: .test@example.com (leading dot in local part)");
+  assert(isValidEmail("test.@example.com") === false, "Test Case 27 Failed: test.@example.com (trailing dot in local part)");
 
   console.log("isValidEmail tests completed.");
 }
