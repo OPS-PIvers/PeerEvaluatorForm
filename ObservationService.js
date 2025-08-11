@@ -740,7 +740,6 @@ function sanitizeHtml(html) {
     // This is a very basic sanitizer. For a real-world application,
     // a more robust library would be recommended if available.
     // It allows simple formatting tags.
-    const allowedTags = /<\/?(p|strong|em|u|ol|ul|li|br|h1|h2)>/g;
     return html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
                .replace(/>/g, '&gt;').replace(/</g, '&lt;')
                .replace(/&lt;(\/?(p|strong|em|u|ol|ul|li|br|h1|h2))&gt;/g, '<$1>');

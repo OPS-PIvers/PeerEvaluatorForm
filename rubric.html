@@ -2153,6 +2153,50 @@
         }
 
 
+        function handleMediaUpload(componentId) {
+            const fileInput = document.getElementById(`media-upload-${componentId}`);
+            const file = fileInput.files[0];
+            if (!file) {
+                showToast('Please select a file first.');
+                return;
+            }
+
+            if (!currentObservationId) {
+                showToast('Error: No active observation found.');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const base64Data = e.target.result.split(',')[1];
+                showToast('Uploading file...');
+
+                google.script.run
+                    .withSuccessHandler(function(result) {
+                        if (result.success) {
+                            showToast('File uploaded successfully!');
+                            fileInput.value = '';
+                            
+                            // Update the media links container
+                            const container = document.querySelector(`[data-component-id="${componentId}"] ul`);
+                            if (container) {
+                                const linkItem = document.createElement('li');
+                                linkItem.innerHTML = `<a href="${result.fileUrl}" target="_blank">${result.fileName}</a>`;
+                                container.appendChild(linkItem);
+                            }
+                        } else {
+                            showToast('Upload failed: ' + (result.error || 'Unknown error'));
+                        }
+                    })
+                    .withFailureHandler(function(error) {
+                        console.error('Upload error:', error);
+                        showToast('Upload failed. Please check your connection.');
+                    })
+                    .uploadMediaEvidence(currentObservationId, componentId, base64Data, file.name, file.type);
+            };
+            reader.readAsDataURL(file);
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
             const ratingCells = document.querySelectorAll('.rating-cell');
             ratingCells.forEach(function(cell) {
