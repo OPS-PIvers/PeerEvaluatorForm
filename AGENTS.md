@@ -129,12 +129,9 @@ This section outlines the technical configuration of the Google Apps Script proj
     -   `https://www.googleapis.com/auth/script.webapp.deploy`
     -   `https://www.googleapis.com/auth/spreadsheets`
     -   `https://www.googleapis.com/auth/userinfo.email`
-    -   `https://www.googleapis.com/auth/script.external_request`
-    -   `https://www.googleapis.com/auth/drive`
-    -   `https://www.googleapis.com/auth/script.container.ui`
     -   `https://www.googleapis.com/auth/script.scriptapp`
-    -   `https://www.googleapis.com/auth/script.send_mail`
-    -   `https://www.googleapis.com/auth/script.storage`
+    -   `https://www.googleapis.com/auth/drive`
+    -   `https://www.googleapis.com/auth/documents`
 
 ## 7. Development Workflow & Coding Conventions
 
