@@ -38,17 +38,24 @@ The project follows a modular, service-oriented architecture.
 
 ```
 /workspaces/PeerEvaluatorForm/
+├─── .github/
+│    ├─── copilot-instructions.md # Instructions for GitHub Copilot.
+│    └─── workflows/
+│         └─── clasp-deploy.yml   # GitHub Action for auto-deployment.
 ├─── .clasp.json              # Google Apps Script CLI configuration.
 ├─── .gitignore               # Standard git ignore file.
 ├─── appsscript.json          # GAS manifest: defines scopes, dependencies, and web app settings.
 ├─── AGENTS.md                # This file.
 ├─── CacheManager.js          # Manages advanced, versioned caching.
+├─── CLAUDE.md                # Instructional context for the Claude AI model.
 ├─── Code.js                  # Main server-side entry point (doGet) and orchestrator.
 ├─── Constants.js             # Global constants (sheet names, roles, cache settings, etc.).
 ├─── error-page.html          # HTML template for displaying fatal errors.
 ├─── filter-interface.html    # HTML/JS for the filter view shown to special access roles.
+├─── finalized-observation-email.html # HTML template for the email sent when an observation is finalized.
 ├─── GEMINI.md                # Instructional context for the Gemini AI model.
 ├─── ObservationService.js    # Backend logic for managing observation records.
+├─── pdf-rubric.html          # Detailed HTML template for generating a printable PDF Observation Report.
 ├─── rubric.html              # HTML/JS template for rendering the main evaluation rubric.
 ├─── SessionManager.js        # Handles user sessions and state change detection.
 ├─── SheetService.js          # Data access layer for all Google Sheets operations.
@@ -110,10 +117,21 @@ The project follows a modular, service-oriented architecture.
 
 ## 6. Deployment & Environment Setup
 
--   **Deployment:** The project is deployed as a Google Apps Script web app.
--   **Execution:** The web app is set to "Execute as: User accessing the web app". This is critical for security, as it ensures that API calls respect the permissions of the currently logged-in user.
--   **Access:** The web app is configured for "DOMAIN" access, meaning only users within the same Google Workspace domain can access it.
+This section outlines the technical configuration of the Google Apps Script project, based on the `appsscript.json` manifest file.
+
+-   **Deployment Model:** The project is deployed as a Google Apps Script web app.
+-   **Execution (`executeAs`):** The web app is configured to run as **`USER_ACCESSING`**. This means that when the script accesses Google services (such as Sheets or Drive), it does so using the permissions of the user currently accessing the web app. This is critical for security, as it ensures that API calls respect the permissions of the currently logged-in user.
+-   **Access (`access`):** The web app is configured for **`DOMAIN`** access, meaning only users within the same Google Workspace domain can access it.
+-   **Runtime:** The project uses the modern **`V8`** runtime.
+-   **Timezone:** The script's timezone is set to **`America/Chicago`**.
 -   **Script Properties:** A crucial setup step is to set the `SHEET_ID` in the Script Properties. This tells the script which Google Sheet to use as its database.
+-   **OAuth Scopes:** The script requires the following permissions to function correctly. These scopes are requested when a user first authorizes the application:
+    -   `https://www.googleapis.com/auth/script.webapp.deploy`
+    -   `https://www.googleapis.com/auth/spreadsheets`
+    -   `https://www.googleapis.com/auth/userinfo.email`
+    -   `https://www.googleapis.com/auth/script.scriptapp`
+    -   `https://www.googleapis.com/auth/drive`
+    -   `https://www.googleapis.com/auth/documents`
 
 ## 7. Development Workflow & Coding Conventions
 
