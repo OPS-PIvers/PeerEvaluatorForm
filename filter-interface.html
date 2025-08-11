@@ -530,7 +530,10 @@
                         } else {
                             showToast('Observation finalized and PDF generated successfully!', true);
                         }
-                        displayObservationOptions(email, name);
+                        // Add a small delay to ensure spreadsheet changes are committed before refreshing
+                        setTimeout(() => {
+                            displayObservationOptions(email, name);
+                        }, 500);
                     } else {
                         showError(res.error);
                     }

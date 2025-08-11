@@ -140,10 +140,9 @@ body {
 
 .level-content.selected {
     background-color: var(--color-blue-light-bg);
-    border-color: var(--color-blue-base);
+    border: 2px solid var(--color-blue-base);
     color: var(--color-blue-text-dark);
     font-weight: 600;
-    border-left: 3px solid var(--color-blue-base);
 }
 
 .row-label {
@@ -166,6 +165,41 @@ body {
 .media-link-item a {
     color: #3182ce;
     text-decoration: none;
+}
+
+/* Look-fors (Best Practices) */
+.look-fors-section {
+    border-top: 1px solid #e2e8f0;
+}
+
+.look-fors-header {
+    background: linear-gradient(135deg, #3182ce, #2b77cb);
+    color: white;
+    padding: 10px 20px;
+    font-weight: 600;
+    font-size: 0.85rem;
+}
+
+.look-fors-grid {
+    padding: 12px 20px;
+    background: #f8fafc;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+}
+
+.look-for-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 8px 12px;
+    background: white;
+    border-radius: 4px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+    border-left: 3px solid var(--color-blue-base);
+    font-size: 0.85rem;
+    line-height: 1.4;
+    color: #4a5568;
 }
 </style>
 </head>
@@ -236,6 +270,21 @@ body {
                                 </li>
                             <? } ?>
                             </ul>
+                        </div>
+                        <? } ?>
+
+                        <? if (component.bestPractices && component.bestPractices.length > 0) { ?>
+                        <div class="look-fors-section">
+                            <div class="look-fors-header">
+                                <span>Best Practices aligned with 5D+ and PELSB Standards</span>
+                            </div>
+                            <div class="look-fors-grid">
+                                <? for (var k = 0; k < component.bestPractices.length; k++) { ?>
+                                    <div class="look-for-item">
+                                        • <?= escapeHtml(component.bestPractices[k]) ?>
+                                    </div>
+                                <? } ?>
+                            </div>
                         </div>
                         <? } ?>
                     </div>
