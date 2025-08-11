@@ -123,7 +123,7 @@ This section outlines the technical configuration of the Google Apps Script proj
 -   **Execution (`executeAs`):** The web app is configured to run as **`USER_ACCESSING`**. This is critical for security, as it ensures that API calls respect the permissions of the currently logged-in user.
 -   **Access (`access`):** The web app is configured for **`DOMAIN`** access, meaning only users within the same Google Workspace domain can access it.
 -   **Runtime:** The project uses the modern **`V8`** runtime.
--   **Timezone:** The script's timezone is set to **`America/New_York`**.
+-   **Timezone:** The script's timezone is set to **`America/Chicago`**.
 -   **Script Properties:** A crucial setup step is to set the `SHEET_ID` in the Script Properties. This tells the script which Google Sheet to use as its database.
 -   **OAuth Scopes:** The script requires the following permissions to function correctly. These scopes are requested when a user first authorizes the application:
     -   `https://www.googleapis.com/auth/script.webapp.deploy`
