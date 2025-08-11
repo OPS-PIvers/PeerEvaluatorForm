@@ -287,7 +287,13 @@ function logPerformanceMetrics(operation, executionTime, additionalMetrics = {})
  */
 function isValidEmail(email) {
   if (!email || typeof email !== 'string') return false;
-  return VALIDATION_PATTERNS.EMAIL.test(email.trim());
+  const trimmedEmail = email.trim();
+  if (trimmedEmail.includes('..')) return false;
+  if (trimmedEmail.split('@').length < 2) return false;
+  const domainPart = trimmedEmail.split('@')[1];
+  if (domainPart.startsWith('-') || domainPart.endsWith('-')) return false;
+  if (domainPart.startsWith('.')) return false;
+  return VALIDATION_PATTERNS.EMAIL.test(trimmedEmail);
 }
 
 /**
