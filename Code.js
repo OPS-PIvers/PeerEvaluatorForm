@@ -572,23 +572,14 @@ function _generateAndSavePdf(observationId, userContext) {
 
         const docName = `Observation for ${observation.observedName} - ${new Date(observation.finalizedAt || Date.now()).toISOString().slice(0, 10)}`;
 
-        // Check if PDF template exists
+        // Generate PDF using DocumentApp for proper styling
+        let pdfBlob;
         try {
-            const template = HtmlService.createTemplateFromFile('pdf-rubric.html');
-            template.data = {
-                observation: observation,
-                rubricData: rubricData
-            };
-            const htmlContent = template.evaluate().getContent();
-            debugLog('Successfully generated HTML content for PDF', { observationId, contentLength: htmlContent.length });
-
-            // Generate PDF blob
-            const pdfBlob = Utilities.newBlob(htmlContent, 'text/html', docName + '.html').getAs('application/pdf');
-            debugLog('Successfully generated PDF blob', { observationId, blobSize: pdfBlob.getBytes().length });
-
-        } catch (templateError) {
-            debugLog('PDF generation failed: Template error', { observationId, error: templateError.message });
-            return { success: false, error: `Failed to generate PDF template: ${templateError.message}` };
+            pdfBlob = _createStyledPdfDocument(observation, rubricData, docName);
+            debugLog('Successfully generated styled PDF document', { observationId, blobSize: pdfBlob.getBytes().length });
+        } catch (documentError) {
+            debugLog('PDF generation failed: Document creation error', { observationId, error: documentError.message });
+            return { success: false, error: `Failed to generate styled PDF: ${documentError.message}` };
         }
 
         // Create folder structure
@@ -607,15 +598,7 @@ function _generateAndSavePdf(observationId, userContext) {
             let obsFolder = obsFolderIterator.hasNext() ? obsFolderIterator.next() : userFolder.createFolder(obsFolderName);
             debugLog('Retrieved/created observation folder', { observationId, obsFolderId: obsFolder.getId() });
 
-            // Recreate the blob for file creation (needed after the try/catch block)
-            const template = HtmlService.createTemplateFromFile('pdf-rubric.html');
-            template.data = {
-                observation: observation,
-                rubricData: rubricData
-            };
-            const htmlContent = template.evaluate().getContent();
-            const pdfBlob = Utilities.newBlob(htmlContent, 'text/html', docName + '.html').getAs('application/pdf');
-            
+            // Use the already created styled PDF blob
             const pdfFile = obsFolder.createFile(pdfBlob).setName(docName + ".pdf");
             debugLog('Successfully created PDF file', { observationId, fileId: pdfFile.getId(), pdfUrl: pdfFile.getUrl() });
 
@@ -631,6 +614,206 @@ function _generateAndSavePdf(observationId, userContext) {
         debugLog('PDF generation failed: Unexpected error', { observationId, error: error.message, stack: error.stack });
         return { success: false, error: 'An unexpected error occurred during PDF generation: ' + error.message };
     }
+}
+
+/**
+ * Creates a styled PDF document using DocumentApp for proper color and formatting preservation.
+ * @param {Object} observation The observation data
+ * @param {Object} rubricData The rubric structure and content
+ * @param {string} docName The document name
+ * @returns {Blob} PDF blob for the styled document
+ */
+function _createStyledPdfDocument(observation, rubricData, docName) {
+    // Create a new Google Document
+    const doc = DocumentApp.create(docName);
+    const body = doc.getBody();
+    
+    // Clear any default content
+    body.clear();
+    
+    // Add document header
+    _addDocumentHeader(body, observation);
+    
+    // Add rubric content
+    _addRubricContent(body, observation, rubricData);
+    
+    // Save and close the document
+    doc.saveAndClose();
+    
+    // Convert to PDF
+    const docFile = DriveApp.getFileById(doc.getId());
+    const pdfBlob = docFile.getBlob().getAs('application/pdf');
+    
+    // Clean up - delete the temporary Google Doc
+    DriveApp.getFileById(doc.getId()).setTrashed(true);
+    
+    return pdfBlob;
+}
+
+/**
+ * Adds the document header with observation details.
+ * @param {Body} body The document body
+ * @param {Object} observation The observation data
+ */
+function _addDocumentHeader(body, observation) {
+    // Title
+    const title = body.appendParagraph(`Observation Report for ${observation.observedName}`);
+    title.setHeading(DocumentApp.ParagraphHeading.HEADING1);
+    title.getChild(0).asText().setFontSize(18).setBold(true).setForegroundColor('#2d3748');
+    
+    // Observation details
+    const details = body.appendParagraph(
+        `Role: ${observation.observedRole} | Year: ${observation.observedYear || 'N/A'}\n` +
+        `Observer: ${observation.observerEmail}\n` +
+        `Finalized on: ${observation.finalizedAt ? new Date(observation.finalizedAt).toLocaleString() : 'N/A'}`
+    );
+    details.getChild(0).asText().setFontSize(11).setForegroundColor('#4a5568');
+    
+    // Add some spacing
+    body.appendParagraph('').setSpacingAfter(10);
+}
+
+/**
+ * Adds the rubric content with proper styling.
+ * @param {Body} body The document body
+ * @param {Object} observation The observation data
+ * @param {Object} rubricData The rubric structure and content
+ */
+function _addRubricContent(body, observation, rubricData) {
+    rubricData.domains.forEach(domain => {
+        const domainHasContent = domain.components.some(c => observation.observationData[c.componentId]);
+        
+        if (domainHasContent) {
+            // Domain header with dark blue background
+            const domainHeader = body.appendParagraph(domain.name);
+            domainHeader.setHeading(DocumentApp.ParagraphHeading.HEADING2);
+            domainHeader.getChild(0).asText()
+                .setFontSize(14)
+                .setBold(true)
+                .setForegroundColor('#ffffff')
+                .setBackgroundColor('#5a82b8');
+            domainHeader.setSpacingBefore(15).setSpacingAfter(5);
+            
+            // Add components for this domain
+            domain.components.forEach(component => {
+                const proficiency = observation.observationData[component.componentId];
+                if (proficiency) {
+                    _addComponentSection(body, component, proficiency, observation);
+                }
+            });
+        }
+    });
+}
+
+/**
+ * Adds a component section with proficiency levels and styling.
+ * @param {Body} body The document body
+ * @param {Object} component The component data
+ * @param {string} proficiency The selected proficiency level
+ * @param {Object} observation The observation data
+ */
+function _addComponentSection(body, component, proficiency, observation) {
+    // Component title with dark gray background
+    const componentTitle = body.appendParagraph(component.title);
+    componentTitle.getChild(0).asText()
+        .setFontSize(12)
+        .setBold(true)
+        .setForegroundColor('#ffffff')
+        .setBackgroundColor('#64748b');
+    componentTitle.setSpacingBefore(10).setSpacingAfter(5);
+    
+    // Create table for proficiency levels
+    const table = body.appendTable();
+    table.setBorderWidth(1).setBorderColor('#e2e8f0');
+    
+    // Header row
+    const headerRow = table.appendTableRow();
+    ['Developing', 'Basic', 'Proficient', 'Distinguished'].forEach(level => {
+        const cell = headerRow.appendTableCell(level);
+        cell.getChild(0).asText().setFontSize(10).setBold(true).setForegroundColor('#4a5568');
+        cell.setBackgroundColor('#e2e8f0');
+        cell.setPaddingTop(8).setPaddingBottom(8).setPaddingLeft(12).setPaddingRight(12);
+    });
+    
+    // Content row
+    const contentRow = table.appendTableRow();
+    ['developing', 'basic', 'proficient', 'distinguished'].forEach(level => {
+        const cell = contentRow.appendTableCell(component[level] || '');
+        const isSelected = proficiency === level;
+        
+        if (isSelected) {
+            // Selected cell styling with blue background
+            cell.setBackgroundColor('#dbeafe');
+            cell.getChild(0).asText().setForegroundColor('#1e40af').setBold(true);
+            cell.setBorderWidth(2).setBorderColor('#3b82f6');
+        } else {
+            cell.getChild(0).asText().setForegroundColor('#4a5568');
+        }
+        
+        cell.getChild(0).asText().setFontSize(9);
+        cell.setPaddingTop(12).setPaddingBottom(12).setPaddingLeft(12).setPaddingRight(12);
+    });
+    
+    // Add best practices if available
+    if (component.bestPractices && component.bestPractices.length > 0) {
+        _addBestPracticesSection(body, component.bestPractices);
+    }
+    
+    // Add evidence if available
+    const evidence = observation.evidenceLinks[component.componentId];
+    if (evidence && evidence.length > 0) {
+        _addEvidenceSection(body, evidence);
+    }
+    
+    // Add spacing after component
+    body.appendParagraph('').setSpacingAfter(8);
+}
+
+/**
+ * Adds a best practices section with royal blue styling.
+ * @param {Body} body The document body
+ * @param {Array} bestPractices Array of best practice strings
+ */
+function _addBestPracticesSection(body, bestPractices) {
+    // Best practices header with royal blue background
+    const practicesHeader = body.appendParagraph('Best Practices aligned with 5D+ and PELSB Standards');
+    practicesHeader.getChild(0).asText()
+        .setFontSize(10)
+        .setBold(true)
+        .setForegroundColor('#ffffff')
+        .setBackgroundColor('#3182ce');
+    practicesHeader.setSpacingBefore(5).setSpacingAfter(3);
+    
+    // Add each practice as a bullet point
+    bestPractices.forEach(practice => {
+        const practiceItem = body.appendParagraph(`• ${practice}`);
+        practiceItem.getChild(0).asText().setFontSize(9).setForegroundColor('#4a5568');
+        practiceItem.setIndentFirstLine(20).setSpacingAfter(2);
+        practiceItem.setBackgroundColor('#f8fafc');
+    });
+}
+
+/**
+ * Adds an evidence section.
+ * @param {Body} body The document body
+ * @param {Array} evidence Array of evidence objects
+ */
+function _addEvidenceSection(body, evidence) {
+    const evidenceHeader = body.appendParagraph('Evidence:');
+    evidenceHeader.getChild(0).asText().setFontSize(10).setBold(true).setForegroundColor('#4a5568');
+    evidenceHeader.setSpacingBefore(5).setSpacingAfter(2);
+    evidenceHeader.setBackgroundColor('#f8fafc');
+    
+    evidence.forEach(item => {
+        const evidenceItem = body.appendParagraph(`• ${item.name}`);
+        evidenceItem.getChild(0).asText().setFontSize(9).setForegroundColor('#3182ce');
+        evidenceItem.setIndentFirstLine(20).setSpacingAfter(2);
+        // Note: DocumentApp doesn't support hyperlinks in the same way as HTML
+        // The URL information is preserved in the text but won't be clickable
+        if (item.url) {
+            evidenceItem.appendText(` (${item.url})`);
+        }
+    });
 }
 
 /**
