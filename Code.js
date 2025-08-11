@@ -745,12 +745,16 @@ function _addComponentSection(body, component, proficiency, observation) {
             // Selected cell styling with blue background
             cell.setBackgroundColor('#dbeafe');
             cell.getChild(0).asText().setForegroundColor('#1e40af').setBold(true);
-            // Safely merge existing attributes with new border attributes
-            cell.setAttributes({
-              ...(cell.getAttributes() || {}),
-              [DocumentApp.Attribute.BORDER_WIDTH]: 2,
-              [DocumentApp.Attribute.BORDER_COLOR]: '#3b82f6',
-            });
+            // Safely copy existing attributes to a plain object before merging
+            const attributes = cell.getAttributes() || {};
+            const newAttributes = { ...attributes };
+
+            // Add/overwrite the new attributes
+            newAttributes[DocumentApp.Attribute.BORDER_WIDTH] = 2;
+            newAttributes[DocumentApp.Attribute.BORDER_COLOR] = '#3b82f6';
+
+            // Apply the merged attributes
+            cell.setAttributes(newAttributes);
         } else {
             cell.getChild(0).asText().setForegroundColor('#4a5568');
         }
