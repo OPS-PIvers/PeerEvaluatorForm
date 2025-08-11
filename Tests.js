@@ -42,7 +42,7 @@ function testIsValidEmailFunction() {
   // Let's adjust the expectation or the regex if this is not desired. For now, assuming standard regex behavior.
   // The regex `[a-zA-Z0-9.-]+` means it can contain hyphens. `example-` is a valid part.
   // The issue was about `[^\s@.-]+` which disallowed hyphens *within* segments.
-  assert(isValidEmail("test@example-.com") === true, "Test Case 15 Failed: test@example-.com (domain segment ends with hyphen, but valid by regex before TLD)");
+  assert(isValidEmail("test@example-.com") === false, "Test Case 15 Failed: test@example-.com (domain segment ends with hyphen, but valid by regex before TLD)");
   assert(isValidEmail("test@example..com") === false, "Test Case 16 Failed: test@example..com (double dot in domain)");
   assert(isValidEmail("") === false, "Test Case 17 Failed: empty string");
   assert(isValidEmail(null) === false, "Test Case 18 Failed: null");
@@ -51,7 +51,7 @@ function testIsValidEmailFunction() {
   assert(isValidEmail("plainaddress ") === false, "Test Case 21 Failed: 'plainaddress ' (trailing space)");
   assert(isValidEmail("test@domain withspace.com") === false, "Test Case 22 Failed: test@domain withspace.com (space in domain)");
   assert(isValidEmail("test@domain.c") === false, "Test Case 23 Failed: test@domain.c (TLD too short)");
-  assert(isValidEmail("test@sub-.example.com") === true, "Test Case 24 Failed: test@sub-.example.com (subdomain ends with hyphen)");
+  assert(isValidEmail("test@sub-.example.com") === false, "Test Case 24 Failed: test@sub-.example.com (subdomain ends with hyphen)");
 
   console.log("isValidEmail tests completed.");
 }

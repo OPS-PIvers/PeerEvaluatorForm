@@ -25,6 +25,11 @@
   ],
   "files": [
     {
+      "name": "Code",
+      "source": "Code.js",
+      "type": "server_js"
+    },
+    {
       "name": "Constants",
       "source": "Constants.js",
       "type": "server_js"
@@ -62,11 +67,6 @@
     {
       "name": "ObservationService",
       "source": "ObservationService.js",
-      "type": "server_js"
-    },
-    {
-      "name": "Code",
-      "source": "Code.js",
       "type": "server_js"
     },
     {
