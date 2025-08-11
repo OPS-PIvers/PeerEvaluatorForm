@@ -273,20 +273,35 @@ body {
                         </div>
                         <? } ?>
 
-                        <? if (component.bestPractices && component.bestPractices.length > 0) { ?>
+                        <?
+                        if (component.bestPractices && component.bestPractices.length > 0 && data.observation.checkedLookFors) {
+                            var key = "Best Practices aligned with 5D+ and PELSB Standards: Subdomain [" + component.componentId.replace(':', '') + "]";
+                            var checkedLookFors = data.observation.checkedLookFors[key] || [];
+
+                            if (checkedLookFors.length > 0) {
+                        ?>
                         <div class="look-fors-section">
                             <div class="look-fors-header">
                                 <span>Best Practices aligned with 5D+ and PELSB Standards</span>
                             </div>
                             <div class="look-fors-grid">
-                                <? for (var k = 0; k < component.bestPractices.length; k++) { ?>
+                                <? for (var k = 0; k < component.bestPractices.length; k++) {
+                                    var practice = component.bestPractices[k];
+                                    if (checkedLookFors.includes(practice)) {
+                                ?>
                                     <div class="look-for-item">
-                                        • <?= escapeHtml(component.bestPractices[k]) ?>
+                                        • <?= escapeHtml(practice) ?>
                                     </div>
-                                <? } ?>
+                                <?
+                                    }
+                                }
+                                ?>
                             </div>
                         </div>
-                        <? } ?>
+                        <?
+                            }
+                        }
+                        ?>
                     </div>
                     <? } ?>
                 <? } ?>

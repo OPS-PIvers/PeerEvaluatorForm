@@ -1073,8 +1073,14 @@
                                 <div class="look-fors-grid">
                                     <? for (var j = 0; j < component.bestPractices.length; j++) { ?>
                                         <div class="look-for-item">
-                                            <input type="checkbox" id="practice-<?= domainIdx ?>-<?= i ?>-<?= j ?>" name="practice-<?= domainIdx ?>-<?= i ?>-<?= j ?>">
-                                            <label for="practice-<?= domainIdx ?>-<?= i ?>-<?= j ?>"><?= component.bestPractices[j] ?></label>
+                                            <?
+                                                var practiceText = component.bestPractices[j];
+                                                var lookForKey = "Best Practices aligned with 5D+ and PELSB Standards: Subdomain [" + component.componentId.replace(':', '') + "]";
+                                                var checkedLookForsForComponent = (data.observation && data.observation.checkedLookFors && data.observation.checkedLookFors[lookForKey]) || [];
+                                                var isChecked = checkedLookForsForComponent.includes(practiceText);
+                                            ?>
+                                            <input type="checkbox" id="practice-<?= domainIdx ?>-<?= i ?>-<?= j ?>" name="practice-<?= domainIdx ?>-<?= i ?>-<?= j ?>" onchange="handleLookForChange(this, '<?= component.componentId ?>')" <?= isChecked ? 'checked' : '' ?>>
+                                            <label for="practice-<?= domainIdx ?>-<?= i ?>-<?= j ?>"><?= practiceText ?></label>
                                         </div>
                                     <? } ?>
                                 </div>
@@ -2011,6 +2017,40 @@
             setTimeout(function() {
                 toast.classList.remove('show');
             }, 3000);
+        }
+
+        function handleLookForChange(checkbox, componentId) {
+            const lookForText = checkbox.nextElementSibling.textContent;
+            const isChecked = checkbox.checked;
+
+            let observationId = undefined;
+            if (typeof data !== 'undefined' && data && data.observation && data.observation.observationId) {
+                observationId = data.observation.observationId;
+            } else if (typeof data !== 'undefined' && data && data.observationId) {
+                observationId = data.observationId;
+            }
+
+            if (!observationId) {
+                console.error('Cannot save look-for selection: Observation context not available.');
+                checkbox.checked = !isChecked; // Revert
+                showToast('Error: Could not find observation ID. Cannot save.');
+                return;
+            }
+
+            // Construct the key as requested by the user, removing the colon from componentId
+            const key = "Best Practices aligned with 5D+ and PELSB Standards: Subdomain [" + componentId.replace(':', '') + "]";
+
+            google.script.run
+                .withSuccessHandler(() => {
+                    console.log(`Saved look-for: ${key} -> ${lookForText}`);
+                })
+                .withFailureHandler(error => {
+                    console.error('Save failed:', error);
+                    // Revert the checkbox state on failure
+                    checkbox.checked = !isChecked;
+                    showToast('Failed to save look-for selection. Please check your connection.');
+                })
+                .saveLookForSelection(observationId, key, lookForText, isChecked);
         }
 
         function handleRatingCellClick(cell) {

@@ -19,7 +19,7 @@ The project follows a modular, service-oriented architecture.
         -   `Staff` sheet: Manages user identity, roles, and evaluation years.
         -   `Settings` sheet: Configures which rubric subdomains are assigned to which roles for specific years.
         -   **Role-specific sheets** (e.g., `Teacher`, `Nurse`): Contain the actual rubric content for each role.
-    -   **Data Storage for Observations:** `PropertiesService` is used as a key-value store (like a simple NoSQL database) to save observation records as JSON strings.
+    -   **Data Storage for Observations:** The `Observation_Data` sheet in the project's Google Sheet is used as the database to store observation records. Each row in the sheet represents a single observation.
     -   **File Storage:** Google Drive is used to store evidence files and generated PDF reports in a structured folder system.
 -   **Frontend Logic (HTML Service - `.html` files):**
     -   The UI is built with standard HTML, CSS, and JavaScript.
@@ -90,9 +90,10 @@ The project follows a modular, service-oriented architecture.
 -   `getRoleSheetData(roleName)`: Reads the entire content of a specific role's rubric sheet (e.g., `Teacher`).
 
 ### `ObservationService.js`
--   `_getObservationsDb()`: Retrieves the entire observation "database" from `PropertiesService`.
--   `_saveObservationsDb(db)`: Saves the observation "database" back to `PropertiesService`.
+-   `_getObservationsDb()`: Retrieves all observation records from the `Observation_Data` sheet.
+-   `_appendObservationToSheet(observation)`: Appends a new observation record to the `Observation_Data` sheet.
 -   `createNewObservation(...)`: Creates a new observation record.
+-   `saveLookForSelection(...)`: Saves the state of a "look-for" checkbox.
 -   `getObservationById(observationId)`: Retrieves a single observation.
 -   `updateObservationStatus(...)`: Changes an observation's status (e.g., to "Finalized").
 -   `uploadMediaEvidence(...)`: Handles file uploads to Google Drive.
@@ -112,7 +113,7 @@ The project follows a modular, service-oriented architecture.
 ## 5. Data Structures
 
 -   **User Context Object:** The object returned by `createUserContext()` is central to the application. It contains everything the server and client need to know about the current user's session.
--   **Observation Object:** The structure used to store observation data in `PropertiesService`. Includes observer/observed info, status, timestamps, and the actual observation data (`observationData` and `evidenceLinks`).
+-   **Observation Object:** The structure used for an observation record, which is stored as a row in the `Observation_Data` sheet. It includes observer/observed info, status, timestamps, and the actual observation data (`observationData`, `evidenceLinks`, and `checkedLookFors`).
 -   **Rubric Data Object:** The object returned by `getAllDomainsData()` and passed to the HTML templates. It contains the title, subtitle, and an array of `domains`, which in turn contain an array of `components`.
 
 ## 6. Deployment & Environment Setup
