@@ -290,7 +290,9 @@ function isValidEmail(email) {
   const trimmedEmail = email.trim();
   if (trimmedEmail.includes('..')) return false;
   if (trimmedEmail.split('@').length < 2) return false;
-  const domainPart = trimmedEmail.split('@')[1];
+  const emailParts = trimmedEmail.split('@');
+  if (emailParts.length < 2) return false;
+  const domainPart = emailParts[1];
   if (domainPart.startsWith('-') || domainPart.endsWith('-')) return false;
   if (domainPart.startsWith('.')) return false;
   return VALIDATION_PATTERNS.EMAIL.test(trimmedEmail);
