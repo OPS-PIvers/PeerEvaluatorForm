@@ -120,8 +120,8 @@ The project follows a modular, service-oriented architecture.
 This section outlines the technical configuration of the Google Apps Script project, based on the `appsscript.json` manifest file.
 
 -   **Deployment Model:** The project is deployed as a Google Apps Script web app.
--   **Execution (`executeAs`):** The web app is configured to run as the **`USER_DEPLOYING`**. This means the script executes with the permissions of the account that deployed it, not the user who is currently accessing the app. This is a critical security and execution context to be aware of.
--   **Access (`access`):** The web app is accessible to **`ANYONE_ANONYMOUS`**. This setting makes the web app public, though the underlying Google Sheet and Drive files may still be protected by their own sharing settings.
+-   **Execution (`executeAs`):** The web app is configured to run as **`USER_ACCESSING`**. This is critical for security, as it ensures that API calls respect the permissions of the currently logged-in user.
+-   **Access (`access`):** The web app is configured for **`DOMAIN`** access, meaning only users within the same Google Workspace domain can access it.
 -   **Runtime:** The project uses the modern **`V8`** runtime.
 -   **Timezone:** The script's timezone is set to **`America/New_York`**.
 -   **Script Properties:** A crucial setup step is to set the `SHEET_ID` in the Script Properties. This tells the script which Google Sheet to use as its database.
