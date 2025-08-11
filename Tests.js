@@ -243,6 +243,10 @@ const MockSpreadsheetApp = {
       assert.isTrue(isValidEmail('test@example.com'), 'Valid email should be true.');
       assert.isFalse(isValidEmail('test.example.com'), 'Invalid email should be false.');
       assert.isFalse(isValidEmail(null), 'Null email should be false.');
+      // Additional test cases for improved validation
+      assert.isFalse(isValidEmail('test..name@example.com'), 'Consecutive dots in local part should be false.');
+      assert.isFalse(isValidEmail('.test@example.com'), 'Leading dot in local part should be false.');
+      assert.isFalse(isValidEmail('test.@example.com'), 'Trailing dot in local part should be false.');
     });
 
     this.add("escapeHtml should escape HTML entities", function() {

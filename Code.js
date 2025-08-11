@@ -333,6 +333,13 @@ function finalizeObservation(observationId) {
                         sheet.getRange(row, pdfStatusCol).setValue('generated');
                     }
                     SpreadsheetApp.flush();
+
+                    // Manually clear the observation cache since we updated the sheet directly
+                    const cache = CacheService.getScriptCache();
+                    if (cache) {
+                        cache.remove('all_observations');
+                        debugLog('Cleared all_observations cache after PDF URL update.', { observationId });
+                    }
                 }
                 // Get the updated observation to return
                 const updatedObservation = getObservationById(observationId);
@@ -746,16 +753,15 @@ function _addComponentSection(body, component, proficiency, observation) {
             cell.setBackgroundColor('#dbeafe');
             cell.getChild(0).asText().setForegroundColor('#1e40af').setBold(true);
             // Safely copy existing attributes to a plain object before merging
-            const attrs = {};
-            const existingAttrs = cell.getAttributes();
-            if (existingAttrs) {
-                Object.keys(existingAttrs).forEach(function(key) {
-                    attrs[key] = existingAttrs[key];
-                });
-            }
-            attrs[DocumentApp.Attribute.BORDER_WIDTH] = 2;
-            attrs[DocumentApp.Attribute.BORDER_COLOR] = '#3b82f6';
-            cell.setAttributes(attrs);
+            const attributes = cell.getAttributes() || {};
+            const newAttributes = { ...attributes };
+
+            // Add/overwrite the new attributes
+            newAttributes[DocumentApp.Attribute.BORDER_WIDTH] = 2;
+            newAttributes[DocumentApp.Attribute.BORDER_COLOR] = '#3b82f6';
+
+            // Apply the merged attributes
+            cell.setAttributes(newAttributes);
         } else {
             cell.getChild(0).asText().setForegroundColor('#4a5568');
         }
