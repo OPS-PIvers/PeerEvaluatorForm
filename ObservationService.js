@@ -1,7 +1,7 @@
 /**
  * ObservationService.js
  * Manages observation data for the Peer Evaluator role.
- * This uses PropertiesService as a simple database.
+ * This service manages observation records, which are stored as rows in the "Observation_Data" Google Sheet.
  */
 
 const OBSERVATION_SHEET_NAME = "Observation_Data";
@@ -45,6 +45,79 @@ function _getObservationsDb() {
   } catch (error) {
     console.error('Error getting observations DB from Sheet:', error);
     return []; // Return empty DB on error
+  }
+}
+
+/**
+ * Saves a look-for selection for a specific component in an observation.
+ * @param {string} observationId The ID of the observation to update.
+ * @param {string} key The key for the look-for category, formatted as "Best Practices...[componentId]".
+ * @param {string} lookForText The text content of the look-for.
+ * @param {boolean} isChecked The state of the checkbox.
+ * @returns {Object} A response object with success status.
+ */
+function saveLookForSelection(observationId, key, lookForText, isChecked) {
+  if (!observationId || !key || !lookForText) {
+    return { success: false, error: 'Observation ID, key, and look-for text are required.' };
+  }
+
+  try {
+    const spreadsheet = openSpreadsheet();
+    const sheet = getSheetByName(spreadsheet, OBSERVATION_SHEET_NAME);
+    if (!sheet) {
+      throw new Error(`Sheet "${OBSERVATION_SHEET_NAME}" not found.`);
+    }
+
+    const row = _findObservationRow(sheet, observationId);
+    if (row === -1) {
+      return { success: false, error: 'Observation not found.' };
+    }
+
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const lookForsCol = headers.indexOf('checkedLookFors') + 1;
+    const lastModifiedCol = headers.indexOf('lastModifiedAt') + 1;
+
+    if (lookForsCol === 0) {
+        return { success: false, error: 'checkedLookFors column not found in the sheet.' };
+    }
+
+    const lookForsCell = sheet.getRange(row, lookForsCol);
+    const currentLookForsString = lookForsCell.getValue();
+    let currentLookFors = {};
+    try {
+        if(currentLookForsString){
+            currentLookFors = JSON.parse(currentLookForsString);
+        }
+    } catch(e){
+        console.warn(`Could not parse checkedLookFors for ${observationId}. Starting fresh. Data: ${currentLookForsString}`);
+    }
+
+    if (!currentLookFors[key]) {
+        currentLookFors[key] = [];
+    }
+
+    if (isChecked) {
+        if (!currentLookFors[key].includes(lookForText)) {
+            currentLookFors[key].push(lookForText);
+        }
+    } else {
+        const index = currentLookFors[key].indexOf(lookForText);
+        if (index > -1) {
+            currentLookFors[key].splice(index, 1);
+        }
+    }
+
+    lookForsCell.setValue(JSON.stringify(currentLookFors, null, 2));
+    if(lastModifiedCol > 0){
+        sheet.getRange(row, lastModifiedCol).setValue(new Date().toISOString());
+    }
+    SpreadsheetApp.flush();
+
+    debugLog('Look-for selection saved', { observationId, key, lookForText, isChecked });
+    return { success: true };
+  } catch (error) {
+    console.error(`Error saving look-for for observation ${observationId}:`, error);
+    return { success: false, error: 'An unexpected error occurred.' };
   }
 }
 
@@ -174,7 +247,8 @@ function createNewObservation(observerEmail, observedEmail) {
       observationName: null,
       observationDate: null,
       observationData: {}, // e.g., { "1a:": "proficient", "1b:": "basic" }
-      evidenceLinks: {} // e.g., { "1a:": [{url: "...", name: "...", uploadedAt: "..."}, ...] }
+      evidenceLinks: {}, // e.g., { "1a:": [{url: "...", name: "...", uploadedAt: "..."}, ...] }
+      checkedLookFors: {} // e.g., { "Best Practices aligned with 5D+ and PELSB Standards: Subdomain [1a:]": ["Look-for text 1", "Look-for text 2"] }
     };
 
     _appendObservationToSheet(newObservation);
