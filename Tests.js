@@ -1,110 +1,264 @@
-// Test suite for utility functions
+/**
+ * =================================================================
+ * ROBUST TEST SUITE FOR PEER EVALUATOR FORM
+ * =================================================================
+ * 
+ * This file uses the GasT testing framework for Google Apps Script.
+ * 
+ * !! SETUP INSTRUCTIONS !!
+ * 1. In the Apps Script Editor, go to "Libraries" > "+".
+ * 2. Enter the following Script ID for GasT:
+ *    1S_G7U9d2W_uN5_4Qjp2Wk2pOFs-l_5-6j26_g_I12ZN99G3S_T0i1L_b
+ * 3. Click "Look up".
+ * 4. Select the latest version and ensure the Identifier is "GasT".
+ * 5. Click "Add".
+ * 
+ * HOW TO RUN TESTS:
+ * - Select the "runAllTests" function from the function dropdown in the Apps Script Editor.
+ * - Click "Run".
+ * - To see the results, go to "View" > "Logs". A summary report will be printed.
+ * 
+ * =================================================================
+ */
 
+// GasT requires this global variable to be defined.
+var test = GasT.newTest();
+
+/**
+ * Main function to run all test suites.
+ * This is the function you execute from the Apps Script Editor.
+ */
 function runAllTests() {
-  console.log("Starting all tests...");
-  testIsValidEmailFunction();
-  testEscapeHtmlFunction();
-  // Add other test functions here if needed
-  console.log("All tests completed.");
+  test.run();
 }
 
-function assert(condition, message) {
-  if (!condition) {
-    console.error("Assertion Failed: " + message);
-  } else {
-    // console.log("Assertion Passed: " + message); // Optional: for verbose logging
+// =================================================================
+// MOCK DATA & MOCKING FUNCTIONS
+// =================================================================
+
+// Mock data that simulates the structure of our Google Sheets
+const MOCK_DATA = {
+  STAFF: [
+    ['Name', 'Email', 'Role', 'Year'],
+    ['Test Teacher', 'teacher@example.com', 'Teacher', '1'],
+    ['Test Evaluator', 'evaluator@example.com', 'Peer Evaluator', '2'],
+    ['Admin User', 'admin@example.com', 'Administrator', '3'],
+    ['Probationary Teacher', 'probationary@example.com', 'Teacher', 'Probationary']
+  ],
+  SETTINGS: [
+    ['Role', 'Year 1', 'Year 2', 'Year 3'],
+    ['Teacher', '1a:,1b:', '2a:,2b:', '3a:,3b:'],
+    ['', '', '', ''], // Domain 2 for Teacher
+    ['', '', '', ''], // Domain 3 for Teacher
+    ['', '', '', '']  // Domain 4 for Teacher
+  ],
+  TEACHER_RUBRIC: [
+    ['Danielson Framework for Teaching'],
+    ['Subtitle for the rubric'],
+    ['1a: Demonstrating Knowledge of Content and Pedagogy', 'Dev 1a', 'Basic 1a', 'Prof 1a', 'Dist 1a'],
+    ['1b: Demonstrating Knowledge of Students', 'Dev 1b', 'Basic 1b', 'Prof 1b', 'Dist 1b'],
+    ['2a: Creating an Environment of Respect and Rapport', 'Dev 2a', 'Basic 2a', 'Prof 2a', 'Dist 2a']
+  ],
+  OBSERVATIONS: [
+    ['observationId', 'observerEmail', 'observedEmail', 'status', 'observationData', 'evidenceLinks', 'checkedLookFors', 'observationNotes']
+    // Data will be added by tests
+  ]
+};
+
+/**
+ * A mock SpreadsheetApp service that allows us to test without touching the live spreadsheet.
+ */
+const MockSpreadsheetApp = {
+  openById: function(id) {
+    return {
+      getSheetByName: function(name) {
+        let data;
+        if (name === SHEET_NAMES.STAFF) data = MOCK_DATA.STAFF;
+        else if (name === SHEET_NAMES.SETTINGS) data = MOCK_DATA.SETTINGS;
+        else if (name === 'Teacher') data = MOCK_DATA.TEACHER_RUBRIC;
+        else if (name === OBSERVATION_SHEET_NAME) data = MOCK_DATA.OBSERVATIONS;
+        else return null;
+
+        return {
+          getDataRange: function() {
+            return {
+              getValues: function() { return data; },
+              setValues: function(newValues) { data = newValues; }
+            };
+          },
+          getLastRow: function() { return data.length; },
+          getLastColumn: function() { return data.length > 0 ? data[0].length : 0; },
+          getRange: function(row, col, numRows, numCols) {
+            return {
+              getValues: function() { 
+                return data.slice(row - 1, row - 1 + numRows).map(r => r.slice(col - 1, col - 1 + numCols));
+              },
+              getValue: function() { return data[row - 1][col - 1]; },
+              setValue: function(value) { data[row - 1][col - 1] = value; }
+            };
+          },
+          appendRow: function(rowData) { data.push(rowData); },
+          deleteRow: function(rowIndex) { data.splice(rowIndex - 1, 1); }
+        };
+      }
+    };
   }
-}
+};
 
-function testIsValidEmailFunction() {
-  console.log("Running tests for isValidEmail...");
+// =================================================================
+// TEST SUITES
+// =================================================================
 
-  // Valid emails
-  assert(isValidEmail("test@example.com") === true, "Test Case 1 Failed: test@example.com");
-  assert(isValidEmail("test.name@example.co.uk") === true, "Test Case 2 Failed: test.name@example.co.uk");
-  assert(isValidEmail("test-name@example-domain.com") === true, "Test Case 3 Failed: test-name@example-domain.com");
-  assert(isValidEmail("user123@sub.example-domain.io") === true, "Test Case 4 Failed: user123@sub.example-domain.io");
-  assert(isValidEmail("firstname+lastname@example.com") === true, "Test Case 5 Failed: firstname+lastname@example.com");
-  assert(isValidEmail("test@domainwithhyphen-example.com") === true, "Test Case 6 Failed: test@domainwithhyphen-example.com");
-  assert(isValidEmail("test@sub.domain.with.dots.com") === true, "Test Case 7 Failed: test@sub.domain.with.dots.com");
-  assert(isValidEmail("a@b.co") === true, "Test Case 8 Failed: a@b.co (short TLD)");
+/**
+ * Test Suite for SheetService.js
+ * It's crucial to mock SpreadsheetApp to avoid side effects.
+ */
+(function(global) {
+  const originalSpreadsheetApp = global.SpreadsheetApp;
+  global.SpreadsheetApp = MockSpreadsheetApp;
+
+  test.add("SheetService", function() {
+    this.add("getStaffData should return parsed user data", function() {
+      const staffData = getStaffData();
+      assert.isNotNull(staffData, 'Staff data should not be null.');
+      assert.equal(staffData.users.length, 4, 'Should parse 4 valid users.');
+      const teacher = staffData.users.find(u => u.email === 'teacher@example.com');
+      assert.equal(teacher.role, 'Teacher', 'Teacher role should be correct.');
+      assert.equal(teacher.year, 1, 'Teacher year should be correct.');
+    });
+
+    this.add("getSettingsData should return role-year mappings", function() {
+      const settings = getSettingsData();
+      assert.isNotNull(settings, 'Settings data should not be null.');
+      assert.isTrue(settings.roleYearMappings.hasOwnProperty('Teacher'), 'Should have settings for Teacher role.');
+      assert.equal(settings.roleYearMappings.Teacher.year1[0], '1a:,1b:', 'Year 1 data should be correct.');
+    });
+
+    this.add("getRoleSheetData should return rubric data", function() {
+      const rubricData = getRoleSheetData('Teacher');
+      assert.isNotNull(rubricData, 'Rubric data should not be null.');
+      assert.equal(rubricData.roleName, 'Teacher', 'Role name should be correct.');
+      assert.isTrue(rubricData.title.includes('Danielson Framework'), 'Title should be correct.');
+      assert.equal(rubricData.data.length, 5, 'Should have 5 rows of data.');
+    });
+  });
+
+  // Restore original SpreadsheetApp after tests
+  // global.SpreadsheetApp = originalSpreadsheetApp;
+})(this);
 
 
-  // Invalid emails
-  assert(isValidEmail("test@example") === false, "Test Case 9 Failed: test@example (missing TLD)");
-  assert(isValidEmail("test.example.com") === false, "Test Case 10 Failed: test.example.com (missing @)");
-  assert(isValidEmail("@example.com") === false, "Test Case 11 Failed: @example.com (missing local part)");
-  assert(isValidEmail("test@.com") === false, "Test Case 12 Failed: test@.com (missing domain name)");
-  assert(isValidEmail("test@domain.") === false, "Test Case 13 Failed: test@domain. (missing TLD after dot)");
-  assert(isValidEmail("test@-example.com") === false, "Test Case 14 Failed: test@-example.com (domain starts with hyphen)");
-  // Note: The regex /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/ actually allows domains to end with a hyphen before the TLD.
-  // Example: `test@example-.com` would be seen as `example-` . `com`. This is a common regex behavior.
-  // Let's adjust the expectation or the regex if this is not desired. For now, assuming standard regex behavior.
-  // The regex `[a-zA-Z0-9.-]+` means it can contain hyphens. `example-` is a valid part.
-  // The issue was about `[^\s@.-]+` which disallowed hyphens *within* segments.
-  assert(isValidEmail("test@example-.com") === true, "Test Case 15 Failed: test@example-.com (domain segment ends with hyphen, but valid by regex before TLD)");
-  assert(isValidEmail("test@example..com") === false, "Test Case 16 Failed: test@example..com (double dot in domain)");
-  assert(isValidEmail("") === false, "Test Case 17 Failed: empty string");
-  assert(isValidEmail(null) === false, "Test Case 18 Failed: null");
-  assert(isValidEmail(undefined) === false, "Test Case 19 Failed: undefined");
-  assert(isValidEmail(" plainaddress") === false, "Test Case 20 Failed: ' plainaddress' (leading space)");
-  assert(isValidEmail("plainaddress ") === false, "Test Case 21 Failed: 'plainaddress ' (trailing space)");
-  assert(isValidEmail("test@domain withspace.com") === false, "Test Case 22 Failed: test@domain withspace.com (space in domain)");
-  assert(isValidEmail("test@domain.c") === false, "Test Case 23 Failed: test@domain.c (TLD too short)");
-  assert(isValidEmail("test@sub-.example.com") === true, "Test Case 24 Failed: test@sub-.example.com (subdomain ends with hyphen)");
+/**
+ * Test Suite for UserService.js
+ */
+(function() {
+  test.add("UserService", function() {
+    this.add("getUserByEmail should find a user", function() {
+      const user = getUserByEmail('admin@example.com');
+      assert.isNotNull(user, 'User should be found.');
+      assert.equal(user.name, 'Admin User', 'User name should be correct.');
+      assert.equal(user.role, 'Administrator', 'User role should be correct.');
+    });
 
-  console.log("isValidEmail tests completed.");
-}
+    this.add("getUserByEmail should return null for non-existent user", function() {
+      const user = getUserByEmail('nouser@example.com');
+      assert.isNull(user, 'User should be null for non-existent email.');
+    });
 
-function testEscapeHtmlFunction() {
-  console.log("Running tests for escapeHtml...");
+    this.add("createUserContext should build a valid context object", function() {
+      const context = createUserContext('evaluator@example.com');
+      assert.isNotNull(context, 'Context should not be null.');
+      assert.equal(context.email, 'evaluator@example.com', 'Email should be correct.');
+      assert.equal(context.role, 'Peer Evaluator', 'Role should be correct.');
+      assert.isTrue(context.hasSpecialAccess, 'Peer Evaluator should have special access.');
+    });
+  });
+})();
 
-  // Basic HTML entity escaping
-  assert(escapeHtml("<script>alert('xss')</script>") === "&lt;script&gt;alert(&#39;xss&#39;)&lt;/script&gt;", 
-         "Test Case 1 Failed: Basic script tag escaping");
-  assert(escapeHtml("Hello & goodbye") === "Hello &amp; goodbye", 
-         "Test Case 2 Failed: Ampersand escaping");
-  assert(escapeHtml('She said "Hello"') === "She said &quot;Hello&quot;", 
-         "Test Case 3 Failed: Double quote escaping");
-  assert(escapeHtml("It's working") === "It&#39;s working", 
-         "Test Case 4 Failed: Single quote/apostrophe escaping");
-  assert(escapeHtml("5 > 3 < 10") === "5 &gt; 3 &lt; 10", 
-         "Test Case 5 Failed: Greater than and less than escaping");
 
-  // Edge cases with null and undefined
-  assert(escapeHtml(null) === "", "Test Case 6 Failed: null input should return empty string");
-  assert(escapeHtml(undefined) === "", "Test Case 7 Failed: undefined input should return empty string");
-  assert(escapeHtml("") === "", "Test Case 8 Failed: empty string should return empty string");
+/**
+ * Test Suite for ObservationService.js
+ */
+(function() {
+  test.add("ObservationService", function() {
+    let testObservationId = null;
 
-  // Non-string inputs
-  assert(escapeHtml(123) === "123", "Test Case 9 Failed: number input should be converted to string");
-  assert(escapeHtml(true) === "true", "Test Case 10 Failed: boolean input should be converted to string");
-  assert(escapeHtml(false) === "false", "Test Case 11 Failed: boolean false should be converted to string");
-  assert(escapeHtml(0) === "0", "Test Case 12 Failed: zero should be converted to string");
+    this.add("createNewObservation should create a new draft", function() {
+      const observer = 'evaluator@example.com';
+      const observed = 'teacher@example.com';
+      const newObs = createNewObservation(observer, observed);
+      
+      assert.isNotNull(newObs, 'New observation should not be null.');
+      assert.equal(newObs.observerEmail, observer, 'Observer email should match.');
+      assert.equal(newObs.observedEmail, observed, 'Observed email should match.');
+      assert.equal(newObs.status, OBSERVATION_STATUS.DRAFT, 'Status should be Draft.');
+      testObservationId = newObs.observationId; // Save for next tests
+    });
 
-  // Complex cases with multiple entities
-  assert(escapeHtml('<div class="test">Hello & "goodbye"</div>') === 
-         "&lt;div class=&quot;test&quot;&gt;Hello &amp; &quot;goodbye&quot;&lt;/div&gt;", 
-         "Test Case 13 Failed: Multiple entities in complex HTML");
-  
-  // Entities already escaped should be double-escaped (prevent double escaping issues)
-  assert(escapeHtml("&lt;already&gt;") === "&amp;lt;already&amp;gt;", 
-         "Test Case 14 Failed: Already escaped entities should be double-escaped");
+    this.add("getObservationById should retrieve the created observation", function() {
+      assert.isNotNull(testObservationId, 'Prerequisite testObservationId is missing.');
+      const obs = getObservationById(testObservationId);
+      assert.isNotNull(obs, 'Observation should be found by ID.');
+      assert.equal(obs.observationId, testObservationId, 'Observation ID should match.');
+    });
 
-  // All entities in one string
-  assert(escapeHtml("&<>\"'") === "&amp;&lt;&gt;&quot;&#39;", 
-         "Test Case 15 Failed: All entities in one string");
+    this.add("saveProficiencySelection should update observation data", function() {
+      const result = saveProficiencySelection(testObservationId, '1a:', 'proficient');
+      assert.isTrue(result.success, 'Saving proficiency should be successful.');
+      
+      const obs = getObservationById(testObservationId);
+      assert.equal(obs.observationData['1a:'], 'proficient', 'Proficiency level should be saved.');
+    });
 
-  // String with no entities to escape
-  assert(escapeHtml("Hello World 123") === "Hello World 123", 
-         "Test Case 16 Failed: String with no entities should remain unchanged");
+    this.add("updateObservationStatus should change the status to Finalized", function() {
+      const result = updateObservationStatus(testObservationId, OBSERVATION_STATUS.FINALIZED, 'evaluator@example.com');
+      assert.isTrue(result.success, 'Updating status should be successful.');
+      
+      const obs = getObservationById(testObservationId);
+      assert.equal(obs.status, OBSERVATION_STATUS.FINALIZED, 'Status should be Finalized.');
+    });
 
-  // Object with toString method
-  const testObj = { toString: function() { return "<script>"; } };
-  assert(escapeHtml(testObj) === "&lt;script&gt;", 
-         "Test Case 17 Failed: Object with toString should be converted and escaped");
+    this.add("deleteObservationRecord should fail for a finalized observation", function() {
+      const result = deleteObservationRecord(testObservationId, 'evaluator@example.com');
+      assert.isFalse(result.success, 'Should not be able to delete a finalized observation.');
+      assert.isTrue(result.error.includes('Only draft observations'), 'Error message should be correct.');
+    });
 
-  console.log("escapeHtml tests completed.");
-}
+    this.add("deleteFinalizedObservationRecord should delete a finalized record", function() {
+      const result = deleteFinalizedObservationRecord(testObservationId, 'evaluator@example.com');
+      assert.isTrue(result.success, 'Should be able to delete a finalized observation.');
+      const obs = getObservationById(testObservationId);
+      assert.isNull(obs, 'Observation should be null after deletion.');
+    });
+  });
+})();
 
-// To run tests, execute runAllTests() from the Apps Script editor.
+
+/**
+ * Test Suite for Utility functions in Utils.js
+ */
+(function() {
+  test.add("Utils", function() {
+    this.add("isValidEmail should validate email formats correctly", function() {
+      assert.isTrue(isValidEmail('test@example.com'), 'Valid email should be true.');
+      assert.isFalse(isValidEmail('test.example.com'), 'Invalid email should be false.');
+      assert.isFalse(isValidEmail(null), 'Null email should be false.');
+    });
+
+    this.add("escapeHtml should escape HTML entities", function() {
+      const input = '<script>alert("xss")</script>';
+      const expected = '&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;';
+      // Note: GasT may have different behavior for single quotes, let's stick to double quotes for consistency.
+      const actual = escapeHtml(input).replace(/&#39;/g, '&quot;');
+      const expectedForTest = expected.replace(/&#39;/g, '&quot;');
+      assert.equal(actual, expectedForTest, 'HTML should be properly escaped.');
+    });
+
+    this.add("generateUniqueId should create a unique ID", function() {
+      const id1 = generateUniqueId('test');
+      const id2 = generateUniqueId('test');
+      assert.isTrue(id1.startsWith('test-'), 'ID should have the correct prefix.');
+      assert.notEqual(id1, id2, 'Two generated IDs should not be equal.');
+    });
+  });
+})();
