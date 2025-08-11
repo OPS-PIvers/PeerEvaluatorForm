@@ -100,7 +100,7 @@ const DEFAULT_ROLE_CONFIG = {
  * Validation patterns for data integrity
  */
 const VALIDATION_PATTERNS = {
-  EMAIL: /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
+  EMAIL: /^[a-zA-Z0-9]+(?:[._%+-][a-zA-Z0-9]+)*@(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/,
   COMPONENT_ID: /^[1-4][a-fA-F]:/, // Matches patterns like "1a:", "2b:", etc.
   SUBDOMAIN_PATTERN: /^[1-4][a-fA-F]:/,
   SUBDOMAIN_LIST: /^[1-4][a-fA-F](,\s*[1-4][a-fA-F])*$/ // Matches "1a, 1c, 1f"
