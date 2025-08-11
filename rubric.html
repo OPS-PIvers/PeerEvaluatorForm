@@ -15,6 +15,10 @@
     <meta name="generator" content="Google Apps Script">
     <meta name="robots" content="noindex, nofollow">
 
+    <!-- In <head> -->
+    <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+    <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+
     <!-- Response Metadata (from server) -->
     <? if (data.userContext && data.userContext.responseMetadata) { ?>
         <meta name="x-request-id" content="<?= data.userContext.responseMetadata.requestId ?>">
@@ -1063,24 +1067,40 @@
                             </div>
                         </div>
                         
-                        <? if (component.bestPractices && component.bestPractices.length > 0) { ?>
-                        <div class="look-fors-section">
-                            <div class="look-fors-header" onclick="toggleLookFors('domain-<?= domainIdx ?>-component-<?= i ?>')">
-                                <span>Best Practices aligned with 5D+ and PELSB Standards</span>
-                                <span class="chevron" id="chevron-<?= domainIdx ?>-<?= i ?>">▼</span>
-                            </div>
-                            <div class="look-fors-content" id="lookForsContent-<?= domainIdx ?>-<?= i ?>">
-                                <div class="look-fors-grid">
-                                    <? for (var j = 0; j < component.bestPractices.length; j++) { ?>
-                                        <div class="look-for-item">
-                                            <input type="checkbox" id="practice-<?= domainIdx ?>-<?= i ?>-<?= j ?>" name="practice-<?= domainIdx ?>-<?= i ?>-<?= j ?>">
-                                            <label for="practice-<?= domainIdx ?>-<?= i ?>-<?= j ?>"><?= component.bestPractices[j] ?></label>
-                                        </div>
-                                    <? } ?>
+                        <div class="evidence-section">
+                            <button class="evidence-toggle-btn" onclick="toggleEvidenceSection('evidence-<?= component.componentId ?>')">
+                                <span>📝</span> Notes & Evidence
+                            </button>
+                            <div class="evidence-content" id="evidence-<?= component.componentId ?>">
+                                <div class="notes-container">
+                                    <h4>Observation Notes</h4>
+                                    <div id="notes-editor-<?= component.componentId ?>"></div>
+                                </div>
+
+                                <? if (component.bestPractices && component.bestPractices.length > 0) { ?>
+                                <div class="look-fors-container">
+                                    <h4>Best Practices (Look-fors)</h4>
+                                    <div class="look-fors-grid">
+                                        <? for (var j = 0; j < component.bestPractices.length; j++) { ?>
+                                            <div class="look-for-item">
+                                                <input type="checkbox" id="practice-<?= component.componentId ?>-<?= j ?>" onchange="handleLookForChange(this, '<?= component.componentId ?>')">
+                                                <label for="practice-<?= component.componentId ?>-<?= j ?>"><?= component.bestPractices[j] ?></label>
+                                            </div>
+                                        <? } ?>
+                                    </div>
+                                </div>
+                                <? } ?>
+
+                                <div class="media-upload-container">
+                                    <h4>Upload Evidence</h4>
+                                    <input type="file" class="media-upload-input" id="media-upload-<?= component.componentId ?>">
+                                    <button class="media-upload-button" onclick="handleMediaUpload('<?= component.componentId ?>')">Upload</button>
+                                    <div class="media-links-container" data-component-id="<?= component.componentId ?>">
+                                        <ul><!-- Links will be populated here --></ul>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                        <? } ?>
                     </div>
                     <? } ?>
                 <? } ?>
@@ -2013,6 +2033,65 @@
             }, 3000);
         }
 
+        let observationNotes = (data && data.observation && data.observation.observationNotes) ? data.observation.observationNotes : {};
+        let currentObservationId = (data && data.observation && data.observation.observationId) ? data.observation.observationId : null;
+
+        // Store Quill instances
+        const quillInstances = {};
+
+        function toggleEvidenceSection(contentId) {
+            const content = document.getElementById(contentId);
+            content.classList.toggle('expanded');
+
+            const componentId = contentId.replace('evidence-', '');
+
+            // Initialize Quill on first expansion
+            if (content.classList.contains('expanded') && !quillInstances[componentId]) {
+                const editor = new Quill('#notes-editor-' + componentId, {
+                    theme: 'snow',
+                    modules: {
+                        toolbar: [
+                            [{ 'header': [1, 2, false] }],
+                            ['bold', 'italic', 'underline'],
+                            [{'list': 'ordered'}, {'list': 'bullet'}],
+                            ['clean']
+                        ]
+                    }
+                });
+
+                // Load existing notes
+                if (observationNotes[componentId]) {
+                    editor.root.innerHTML = observationNotes[componentId];
+                }
+
+                // Add a debounce function to save notes automatically after user stops typing
+                let timeout;
+                editor.on('text-change', () => {
+                    clearTimeout(timeout);
+                    timeout = setTimeout(() => {
+                        saveNotes(componentId, editor.root.innerHTML);
+                    }, 1500); // Save 1.5 seconds after typing stops
+                });
+
+                quillInstances[componentId] = editor;
+            }
+        }
+
+        function saveNotes(componentId, content) {
+            if (!currentObservationId) return;
+
+            // Update local data
+            observationNotes[componentId] = content;
+
+            google.script.run
+                .withSuccessHandler(() => console.log(`Notes saved for ${componentId}`))
+                .withFailureHandler(error => {
+                    console.error('Failed to save notes:', error);
+                    showToast('Error saving notes. Please check your connection.');
+                })
+                .saveObservationNotes(currentObservationId, componentId, content);
+        }
+
         function handleRatingCellClick(cell) {
             // Ensure this only runs in evaluator mode
             if (!data.userContext || !data.userContext.isEvaluator) {
@@ -2073,86 +2152,6 @@
                 .saveProficiencySelection(observationId, componentId, rating);
         }
 
-        <? if (data.userContext && data.userContext.isEvaluator) { ?>
-          // This script will run only if the user is an evaluator
-          // It will add the necessary controls for editing proficiency levels and uploading media
-          console.log('Evaluator mode enabled');
-
-          // Add a file input to each component for media uploads
-          const components = document.querySelectorAll('.component-section');
-          components.forEach(function(component) {
-            const uploadContainer = document.createElement('div');
-            uploadContainer.className = 'media-upload-container';
-
-            const fileInput = document.createElement('input');
-            fileInput.type = 'file';
-            fileInput.className = 'media-upload-input';
-            fileInput.accept = 'image/*,video/*,application/pdf';
-
-            const uploadButton = document.createElement('button');
-            uploadButton.className = 'media-upload-button';
-            uploadButton.textContent = 'Upload';
-            uploadButton.onclick = function() {
-              uploadMedia(component, fileInput);
-            };
-
-            uploadContainer.appendChild(fileInput);
-            uploadContainer.appendChild(uploadButton);
-            component.appendChild(uploadContainer);
-
-            const linksContainer = document.createElement('div');
-            linksContainer.className = 'media-links-container';
-            component.appendChild(linksContainer);
-          });
-
-          function uploadMedia(component, fileInput) {
-            const file = fileInput.files[0];
-            if (!file) {
-              alert('Please select a file to upload.');
-              return;
-            }
-
-            const reader = new FileReader();
-            reader.onload = function(e) {
-              const base64Data = e.target.result.split(',')[1];
-              const componentId = component.getAttribute('data-component-id');
-              
-              let observationId = undefined;
-              if (typeof data !== 'undefined' && data && data.observation && data.observation.observationId) {
-                observationId = data.observation.observationId;
-              } else if (typeof data !== 'undefined' && data && data.observationId) {
-                observationId = data.observationId;
-              }
-              
-              if (!observationId) {
-                alert('Cannot upload media: Observation context not available.');
-                return;
-              }
-
-              google.script.run
-                .withSuccessHandler(function(result) {
-                  if (result.success) {
-                    addMediaLink(component, result.fileLink);
-                  } else {
-                    alert('Upload failed: ' + result.error);
-                  }
-                })
-                .withFailureHandler(function(error) {
-                  alert('Upload failed: ' + error.message);
-                })
-                .uploadMediaEvidence(observationId, componentId, base64Data, file.name, file.type);
-            };
-            reader.readAsDataURL(file);
-          }
-
-          function addMediaLink(component, link) {
-            const linksContainer = component.querySelector('.media-links-container');
-            const linkItem = document.createElement('div');
-            linkItem.className = 'media-link-item';
-            linkItem.innerHTML = `<a href="${link}" target="_blank">${link}</a>`;
-            linksContainer.appendChild(linkItem);
-          }
-        <? } ?>
 
         document.addEventListener('DOMContentLoaded', function() {
             const ratingCells = document.querySelectorAll('.rating-cell');

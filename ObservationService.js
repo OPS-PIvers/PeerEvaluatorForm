@@ -174,7 +174,8 @@ function createNewObservation(observerEmail, observedEmail) {
       observationName: null,
       observationDate: null,
       observationData: {}, // e.g., { "1a:": "proficient", "1b:": "basic" }
-      evidenceLinks: {} // e.g., { "1a:": [{url: "...", name: "...", uploadedAt: "..."}, ...] }
+      evidenceLinks: {}, // e.g., { "1a:": [{url: "...", name: "...", uploadedAt: "..."}, ...] }
+      observationNotes: {}
     };
 
     _appendObservationToSheet(newObservation);
@@ -687,6 +688,63 @@ function updateObservationPdfUrl(observationId, pdfUrl) {
   }
 }
 
+
+function saveObservationNotes(observationId, componentId, notesContent) {
+  if (!observationId || !componentId) {
+    return { success: false, error: 'Observation ID and component ID are required.' };
+  }
+
+  try {
+    const spreadsheet = openSpreadsheet();
+    const sheet = getSheetByName(spreadsheet, OBSERVATION_SHEET_NAME);
+    if (!sheet) throw new Error(`Sheet "${OBSERVATION_SHEET_NAME}" not found.`);
+
+    const row = _findObservationRow(sheet, observationId);
+    if (row === -1) return { success: false, error: 'Observation not found.' };
+
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const notesCol = headers.indexOf('observationNotes') + 1;
+    const lastModifiedCol = headers.indexOf('lastModifiedAt') + 1;
+
+    if (notesCol === 0) {
+        return { success: false, error: 'observationNotes column not found.' };
+    }
+
+    const notesCell = sheet.getRange(row, notesCol);
+    const currentNotesString = notesCell.getValue();
+    let currentNotes = {};
+    try {
+        if(currentNotesString) currentNotes = JSON.parse(currentNotesString);
+    } catch(e){
+        console.warn(`Could not parse observationNotes for ${observationId}.`);
+    }
+
+    // Sanitize HTML content before saving
+    currentNotes[componentId] = sanitizeHtml(notesContent);
+
+    notesCell.setValue(JSON.stringify(currentNotes, null, 2));
+    if(lastModifiedCol > 0){
+        sheet.getRange(row, lastModifiedCol).setValue(new Date().toISOString());
+    }
+    SpreadsheetApp.flush();
+
+    return { success: true };
+  } catch (error) {
+    console.error(`Error saving notes for observation ${observationId}:`, error);
+    return { success: false, error: 'An unexpected error occurred.' };
+  }
+}
+
+// Add a simple HTML sanitizer to prevent script injection
+function sanitizeHtml(html) {
+    // This is a very basic sanitizer. For a real-world application,
+    // a more robust library would be recommended if available.
+    // It allows simple formatting tags.
+    const allowedTags = /<\/?(p|strong|em|u|ol|ul|li|br|h1|h2)>/g;
+    return html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+               .replace(/>/g, '&gt;').replace(/</g, '&lt;')
+               .replace(/&lt;(\/?(p|strong|em|u|ol|ul|li|br|h1|h2))&gt;/g, '<$1>');
+}
 
 /**
  * A test function to clear all observations from the properties service.

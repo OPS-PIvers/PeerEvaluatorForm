@@ -706,6 +706,59 @@ function _addRubricContent(body, observation, rubricData) {
 }
 
 /**
+ * Adds an observation notes section.
+ * @param {Body} body The document body
+ * @param {string} notesHtml The HTML content of the notes
+ */
+function _addNotesSection(body, notesHtml) {
+    const notesHeader = body.appendParagraph('Observation Notes:');
+    notesHeader.getChild(0).asText().setFontSize(10).setBold(true).setForegroundColor('#4a5568');
+    notesHeader.setSpacingBefore(5).setSpacingAfter(2);
+    notesHeader.setBackgroundColor('#f8fafc');
+
+    // Basic HTML to DocumentApp parser
+    // This is a simplified parser. It handles p, strong, em, ul, ol, li.
+    // A more robust solution would require a proper HTML parsing library.
+    try {
+        // Replace <p> with newlines for spacing
+        notesHtml = notesHtml.replace(/<p>/g, '').replace(/<\/p>/g, '\n');
+
+        const listItems = notesHtml.match(/<li>(.*?)<\/li>/g) || [];
+        if (listItems.length > 0) {
+            listItems.forEach(item => {
+                const text = item.replace(/<\/?li>/g, '');
+                const listItem = body.appendListItem('• ' + stripHtml(text));
+                // Apply basic styling from tags like <strong>
+                styleTextFromHtml(listItem.getChild(0).asText(), text);
+            });
+        } else {
+            // Handle non-list content
+            const paragraph = body.appendParagraph(stripHtml(notesHtml));
+            styleTextFromHtml(paragraph.getChild(0).asText(), notesHtml);
+        }
+    } catch (e) {
+        // Fallback for parsing errors
+        body.appendParagraph(stripHtml(notesHtml));
+    }
+}
+
+function stripHtml(html) {
+    return html.replace(/<[^>]*>?/gm, '');
+}
+
+function styleTextFromHtml(textElement, html) {
+    if (html.includes('<strong>')) {
+        textElement.setBold(true);
+    }
+    if (html.includes('<em>')) {
+        textElement.setItalic(true);
+    }
+    if (html.includes('<u>')) {
+        textElement.setUnderline(true);
+    }
+}
+
+/**
  * Adds a component section with proficiency levels and styling.
  * @param {Body} body The document body
  * @param {Object} component The component data
@@ -775,6 +828,11 @@ function _addComponentSection(body, component, proficiency, observation) {
         _addEvidenceSection(body, evidence);
     }
     
+    const notes = observation.observationNotes ? observation.observationNotes[component.componentId] : null;
+    if (notes) {
+        _addNotesSection(body, notes);
+    }
+
     // Add spacing after component
     body.appendParagraph('').setSpacingAfter(8);
 }
