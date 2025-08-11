@@ -289,7 +289,7 @@ function isValidEmail(email) {
   if (!email || typeof email !== 'string') return false;
   const trimmedEmail = email.trim();
   if (trimmedEmail.includes('..')) return false;
-  if (trimmedEmail.split('@').length < 2) return false;
+  if (trimmedEmail.split('@').length !== 2) return false;
   const emailParts = trimmedEmail.split('@');
   if (emailParts.length < 2) return false;
   const domainPart = emailParts[1];
