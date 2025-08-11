@@ -745,7 +745,10 @@ function _addComponentSection(body, component, proficiency, observation) {
             // Selected cell styling with blue background
             cell.setBackgroundColor('#dbeafe');
             cell.getChild(0).asText().setForegroundColor('#1e40af').setBold(true);
-            cell.setBorderWidth(2).setBorderColor('#3b82f6');
+            const attributes = cell.getAttributes();
+            attributes[DocumentApp.Attribute.BORDER_WIDTH] = 2;
+            attributes[DocumentApp.Attribute.BORDER_COLOR] = '#3b82f6';
+            cell.setAttributes(attributes);
         } else {
             cell.getChild(0).asText().setForegroundColor('#4a5568');
         }
