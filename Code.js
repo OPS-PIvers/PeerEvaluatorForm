@@ -195,9 +195,25 @@ function getAllDomainsData(role, year, viewMode, assignedSubdomains) {
   };
 }
 
+// Wrapper Functions
+function generateResponseMetadata(userContext, requestId, debugMode) {
+  return Utils.generateResponseMetadata(userContext, requestId, debugMode);
+}
 
 function getPageTitle(role) {
   return `Danielson Framework - ${role}`; // Could be a constant
+}
+
+function addCacheBustingHeaders(htmlOutput, responseMetadata) {
+  return Utils.addCacheBustingHeaders(htmlOutput, responseMetadata);
+}
+
+function logPerformanceMetrics(operation, executionTime, metrics) {
+  return Utils.logPerformanceMetrics(operation, executionTime, metrics);
+}
+
+function formatErrorMessage(error, context) {
+  return Utils.formatErrorMessage(error, context);
 }
 
 function createEnhancedErrorPage(error, requestId, userEmail, userAgent) {
@@ -224,7 +240,7 @@ function forceCleanAllCaches() {
 // Main Web App Entry Point
 function doGet(e) {
   const startTime = Date.now();
-  const requestId = generateUniqueId(UI_STRINGS.REQUEST_ID_PREFIX);
+  const requestId = Utils.generateUniqueId(UI_STRINGS.REQUEST_ID_PREFIX);
   
   try {
     if (Math.random() < 0.1) {
@@ -235,7 +251,7 @@ function doGet(e) {
     const forceRefresh = params.refresh === 'true' || params.nocache === 'true';
     const debugMode = params.debug === 'true';
 
-    debugLog('Web app request received', { requestId, forceRefresh, debugMode });
+    Utils.debugLog('Web app request received', { requestId, forceRefresh, debugMode });
 
     if (forceRefresh) {
       forceCleanAllCaches();
@@ -244,7 +260,7 @@ function doGet(e) {
     const userContext = UserService.createUserContext();
 
     if (userContext.hasSpecialAccess && !params.filterStaff) {
-        debugLog(UI_STRINGS.LOG_INFO_SPECIAL_ACCESS_USER, { role: userContext.role, requestId });
+        Utils.debugLog(UI_STRINGS.LOG_INFO_SPECIAL_ACCESS_USER, { role: userContext.role, requestId });
         return createFilterSelectionInterface(userContext, requestId);
     }
     
@@ -274,7 +290,7 @@ function doGet(e) {
     return htmlOutput;
     
   } catch (error) {
-    console.error(UI_STRINGS.LOG_ERROR_FATAL_DOGET, formatErrorMessage(error, UI_STRINGS.LOG_CONTEXT_DOGET));
+    console.error(UI_STRINGS.LOG_ERROR_FATAL_DOGET, Utils.formatErrorMessage(error, UI_STRINGS.LOG_CONTEXT_DOGET));
     return createEnhancedErrorPage(error, requestId, null, e.userAgent);
   }
 }
