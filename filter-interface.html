@@ -913,28 +913,34 @@
                     });
                     html += `</div>`;
 
-                    // Look-fors section (directly below subdomain rows, separate from evidence)
+                    // Look-fors section (collapsible blue header, directly below subdomain rows)
                     if (comp.bestPractices && comp.bestPractices.length > 0) {
-                        html += `<div class="look-fors-container">`;
-                        html += `<h4>Best Practices (Look-fors)</h4>`;
+                        const lookForsId = `domain-${domainIdx}-component-${compIdx}`;
+                        html += `<div class="look-fors-section">`;
+                        html += `<div class="look-fors-header" onclick="toggleLookFors('${lookForsId}')">`;
+                        html += `<span>Best Practices aligned with 5D+ and PELSB Standards</span>`;
+                        html += `<span class="chevron" id="chevron-${lookForsId}">▶</span>`;
+                        html += `</div>`;
+                        html += `<div class="look-fors-content" id="lookForsContent-${lookForsId}">`;
                         html += `<div class="look-fors-grid">`;
                         comp.bestPractices.forEach((practice, practiceIdx) => {
-                            const practiceId = `practice-${componentId}-${practiceIdx}`;
+                            const practiceId = `practice-${domainIdx}-${compIdx}-${practiceIdx}`;
                             const sanitizedPractice = escapeHtml(practice);
                             const onchangeHandler = isEvaluator ? `onchange="handleLookForChange(this, '${componentId}')"` : '';
                             html += `<div class="look-for-item">`;
                             html += `<input type="checkbox" id="${practiceId}" ${onchangeHandler}><label for="${practiceId}">${sanitizedPractice}</label>`;
                             html += `</div>`;
                         });
-                        html += `</div></div>`;
+                        html += `</div></div></div>`;
                     }
 
                     // Notes & Evidence section (for evaluators only - contains notes editor and media upload)
                     if (isEvaluator) {
                         html += `<div class="evidence-section">`;
-                        html += `<button class="evidence-toggle-btn" onclick="toggleEvidenceSection('evidence-${componentId}')">`;
-                        html += `<span>📝</span> Notes & Evidence`;
-                        html += `</button>`;
+                        html += `<div class="evidence-toggle-btn" onclick="toggleEvidenceSection('evidence-${componentId}')">`;
+                        html += `<span>📝 Notes & Evidence</span>`;
+                        html += `<span class="chevron" id="evidence-chevron-${componentId}">▶</span>`;
+                        html += `</div>`;
                         html += `<div class="evidence-content" id="evidence-${componentId}">`;
                         
                         // Notes container
@@ -1097,12 +1103,19 @@
             const componentId = contentId.replace('evidence-', '');
             console.log('Component ID:', componentId);
 
+            // Toggle chevron rotation
+            const chevron = document.getElementById(`evidence-chevron-${componentId}`);
+            if (chevron) {
+                chevron.classList.toggle('expanded');
+                chevron.textContent = isExpanded ? '▼' : '▶';
+            }
+
             // Initialize Quill on first expansion if not already initialized
             if (isExpanded && !quillInstances[componentId]) {
                 console.log('Attempting to initialize Quill editor for:', componentId);
                 const escapedComponentId = CSS.escape(componentId);
-                const editorId = '#notes-editor-' + escapedComponentId;
-                const editorElement = document.querySelector(editorId);
+                const editorId = 'notes-editor-' + escapedComponentId;
+                const editorElement = document.getElementById(editorId);
                 
                 if (editorElement) {
                     console.log('Found editor element:', editorId);
@@ -1113,7 +1126,7 @@
                             return;
                         }
                         
-                        const editor = new Quill(editorId, {
+                        const editor = new Quill(editorElement, {
                             theme: 'snow',
                             modules: {
                                 toolbar: [
