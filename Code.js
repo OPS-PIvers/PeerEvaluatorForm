@@ -945,7 +945,16 @@ function _applyInlineFormatting(textElement, html) {
                 if (index > -1) {
                     styleSetter(index, index + styledText.length - 1, true);
                     // Replace the found text with placeholders to avoid matching it again in subsequent searches for the same styled text.
-                    cleanText = cleanText.substring(0, index) + ' '.repeat(styledText.length) + cleanText.substring(index + styledText.length);
+        let placeholderCounter = 0;
+        matches.forEach(match => {
+            const styledText = stripHtml(match[1]);
+            if (styledText) {
+                const index = cleanText.indexOf(styledText);
+                if (index > -1) {
+                    styleSetter(index, index + styledText.length - 1, true);
+                    // Use a unique placeholder string to avoid conflicts with actual text content.
+                    const placeholder = `__PLACEHOLDER_${tag.toUpperCase()}_${placeholderCounter++}__`;
+                    cleanText = cleanText.substring(0, index) + placeholder + cleanText.substring(index + styledText.length);
                 }
             }
         });
