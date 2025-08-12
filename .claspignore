@@ -1,0 +1,33 @@
+# Documentation files
+*.md
+
+# Git and GitHub files
+.git/
+.github/
+.gitignore
+
+# Node.js files (if any)
+node_modules/
+package*.json
+
+# VS Code settings
+.vscode/
+
+# Log files
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Backup files
+*.bak
+*.backup
+
+# clasp configuration (should not be pushed to GAS)
+.clasp.json
+.clasprc.json
