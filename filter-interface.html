@@ -954,8 +954,8 @@
                         evidence.forEach(item => { evidenceHtml += `<div class="evidence-item"><a href="${item.url}" target="_blank" rel="noopener noreferrer">${item.name}</a></div>`; });
                         html += `<div class="media-upload-container">`;
                         html += `<h4>Upload Evidence</h4>`;
-                        html += `<input type="file" class="media-upload-input" id="media-upload-${componentId}">`;
-                        html += `<button class="media-upload-button" onclick="handleMediaUpload('${componentId}')">Upload</button>`;
+                        html += `<input type="file" class="media-upload-input" id="media-upload-${componentId}" onchange="uploadSelectedFile('${componentId}')" style="display: none;">`;
+                        html += `<button class="media-upload-button" onclick="triggerFileUpload('${componentId}')">📎 Select & Upload File</button>`;
                         html += `<div class="media-links-container" data-component-id="${componentId}">`;
                         html += `<ul>${evidenceHtml}</ul>`;
                         html += `</div></div>`;
@@ -1195,7 +1195,18 @@
                 .saveObservationNotes(currentObservationId, componentId, content);
         }
 
-        function handleMediaUpload(componentId) {
+        function triggerFileUpload(componentId) {
+            const fileInput = document.getElementById(`media-upload-${componentId}`);
+            if (!fileInput) {
+                console.error('File input not found for component:', componentId);
+                return;
+            }
+            
+            // Trigger the file picker
+            fileInput.click();
+        }
+
+        function uploadSelectedFile(componentId) {
             const fileInput = document.getElementById(`media-upload-${componentId}`);
             if (!fileInput) {
                 console.error('File input not found for component:', componentId);
@@ -1204,8 +1215,7 @@
 
             const file = fileInput.files[0];
             if (!file) {
-                showToast('Please select a file to upload.');
-                return;
+                return; // No file selected, user probably cancelled
             }
 
             if (!currentObservationId) {
