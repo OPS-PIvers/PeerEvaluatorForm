@@ -402,64 +402,56 @@ function finalizeObservation(observationId) {
 
         // If finalization is successful, generate and save the PDF
         const pdfResult = _generateAndSavePdf(observationId, userContext);
-        if (pdfResult.success) {
-            // The PDF URL is now available, let's save it to the observation
-            // Update the observation with the PDF URL directly in the sheet
-            const spreadsheet = openSpreadsheet();
-            const sheet = getSheetByName(spreadsheet, "Observation_Data");
-            if (sheet) {
-                const row = findObservationRow(sheet, observationId);
-                if (row !== -1) {
-                    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-                    const pdfUrlCol = headers.indexOf('pdfUrl') + 1;
-                    const pdfStatusCol = headers.indexOf('pdfStatus') + 1;
-                    if (pdfUrlCol > 0) {
-                        sheet.getRange(row, pdfUrlCol).setValue(pdfResult.pdfUrl);
-                    }
-                    if (pdfStatusCol > 0) {
-                        sheet.getRange(row, pdfStatusCol).setValue('generated');
-                    }
-                    SpreadsheetApp.flush();
 
-                    // Manually clear the observation cache since we updated the sheet directly
-                    const cache = CacheService.getScriptCache();
-                    if (cache) {
-                        cache.remove('all_observations');
-                        debugLog('Cleared all_observations cache after PDF URL update.', { observationId });
-                    }
+        const spreadsheet = openSpreadsheet();
+        const sheet = getSheetByName(spreadsheet, "Observation_Data");
+
+        if (sheet) {
+            const row = findObservationRow(sheet, observationId);
+            if (row !== -1) {
+                const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+                const pdfUrlCol = headers.indexOf('pdfUrl') + 1;
+                const pdfStatusCol = headers.indexOf('pdfStatus') + 1;
+
+                const pdfStatus = pdfResult.success ? 'generated' : 'failed';
+
+                if (pdfResult.success) {
+                    if (pdfUrlCol > 0) sheet.getRange(row, pdfUrlCol).setValue(pdfResult.pdfUrl);
+                    debugLog('PDF successfully generated and saved for observation', { observationId, pdfUrl: pdfResult.pdfUrl });
+                } else {
+                    console.error('PDF generation failed after finalization:', pdfResult.error);
+                    debugLog('PDF generation failed for finalized observation', { observationId, error: pdfResult.error });
                 }
-                // Get the updated observation to return
-                const updatedObservation = getObservationById(observationId);
-                if (updatedObservation) {
-                    statusUpdateResult.observation = updatedObservation;
-                }
-            }
-            debugLog('PDF successfully generated and saved for observation', { observationId, pdfUrl: pdfResult.pdfUrl });
-        } else {
-            // PDF generation failed - mark the status and continue with finalization
-            console.error('PDF generation failed after finalization:', pdfResult.error);
-            debugLog('PDF generation failed for finalized observation', { observationId, error: pdfResult.error });
-            
-            // Update PDF status to indicate failure
-            const spreadsheet = openSpreadsheet();
-            const sheet = getSheetByName(spreadsheet, "Observation_Data");
-            if (sheet) {
-                const row = findObservationRow(sheet, observationId);
-                if (row !== -1) {
-                    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-                    const pdfStatusCol = headers.indexOf('pdfStatus') + 1;
-                    if (pdfStatusCol > 0) {
-                        sheet.getRange(row, pdfStatusCol).setValue('failed');
-                        SpreadsheetApp.flush();
-                    }
+                if (pdfStatusCol > 0) sheet.getRange(row, pdfStatusCol).setValue(pdfStatus);
+                SpreadsheetApp.flush();
+
+                // Manually clear the observation cache since we updated the sheet directly
+                const cache = CacheService.getScriptCache();
+                if (cache) {
+                    cache.remove('all_observations');
+                    debugLog('Cleared all_observations cache after PDF URL update.', { observationId });
                 }
             }
-            
-            // Add PDF error to the response so UI can show appropriate message
-            statusUpdateResult.pdfError = pdfResult.error;
         }
 
-        return statusUpdateResult;
+        // After all updates, get the fresh list of observations for the user
+        const finalizedObservation = getObservationById(observationId);
+        if (!finalizedObservation) {
+            return { success: false, error: 'Could not retrieve observation after finalization.' };
+        }
+
+        const allObservationsForUser = getObservationsForUser(finalizedObservation.observedEmail);
+
+        const finalResult = {
+            success: true,
+            observations: allObservationsForUser
+        };
+
+        if (!pdfResult.success) {
+            finalResult.pdfError = pdfResult.error;
+        }
+
+        return finalResult;
 
     } catch (error) {
         console.error('Error in finalizeObservation wrapper:', error);

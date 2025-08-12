@@ -651,78 +651,88 @@
         function loadSelectedView() { if (!currentFilters.staff) return; showLoading('Loading...'); google.script.run.withSuccessHandler(handleRubricData).withFailureHandler(handleError).loadRubricData(currentFilters); }
         function clearFilters() { showView('quickActionsView'); hideError(); hideLoading(); document.getElementById('filterStatus').style.display = 'none'; }
 
+        function renderObservationCards(result, observedEmail, observedName) {
+            hideLoading();
+            if (!result.success) return showError(result.error);
+            const container = document.getElementById('observationSelectorView');
+            let cardsHtml = `<div class="action-card" onclick="handleNewObservation('${observedEmail}')"><span class="action-icon">➕</span><div class="action-title">Start New Observation</div><div class="action-desc">Begin a new evaluation for this staff member.</div></div>`;
+            result.observations.forEach(obs => {
+                const date = new Date(obs.createdAt).toLocaleDateString();
+                let buttons = '';
+                if (obs.status === 'Draft') {
+                    buttons = `<button class="filter-btn btn-edit" onclick="handleEditObservation('${obs.observationId}')">Edit</button>
+                               <button class="filter-btn btn-finalize" onclick="handleFinalizeObservation('${obs.observationId}', '${observedEmail}', '${observedName}')">Finalize</button>
+                               <button class="filter-btn btn-delete" onclick="handleDeleteObservation('${obs.observationId}', '${observedEmail}', '${observedName}')">Delete</button>`;
+                } else if (obs.status === 'Finalized') {
+                    // Determine PDF button state based on pdfUrl and pdfStatus
+                    let pdfButton = '';
+                    const pdfStatus = obs.pdfStatus || (obs.pdfUrl ? 'generated' : 'unknown');
+
+                    if (pdfStatus === 'generated' && obs.pdfUrl) {
+                        // PDF is available - show normal View PDF button
+                        pdfButton = `<button class="filter-btn btn-export" onclick="window.open('${obs.pdfUrl}', '_blank')">View PDF</button>`;
+                    } else if (pdfStatus === 'failed') {
+                        // PDF generation failed - show retry button
+                        pdfButton = `<button class="filter-btn btn-pdf-failed" onclick="handleRetryPdf('${obs.observationId}')">PDF Failed - Retry</button>`;
+                    } else {
+                        // PDF is not available, show Generate PDF button
+                        pdfButton = `<button class="filter-btn btn-export" onclick="handleRetryPdf('${obs.observationId}')">Generate PDF</button>`;
+                    }
+
+                    buttons = `<button class="filter-btn btn-view" onclick="handleViewObservation('${obs.observationId}')">View</button>
+                               ${pdfButton}
+                               <button class="filter-btn btn-delete" onclick="handleDeleteFinalizedObservation('${obs.observationId}', '${observedEmail}', '${observedName}')">Delete</button>`;
+                }
+                cardsHtml += `
+                    <div class="observation-card">
+                        <div class="obs-card-content">
+                            <div class="obs-card-title">${obs.observedName} - ${obs.status}</div>
+                            <div class="obs-card-desc">Created on ${date}</div>
+                            <div class="status-badge ${obs.status === 'Draft' ? 'status-draft' : 'status-finalized'}">${obs.status}</div>
+                        </div>
+                        ${buttons ? `<div class="obs-card-actions">${buttons}</div>` : ''}
+                    </div>`;
+            });
+            container.innerHTML = `<h2 class="section-title"><span>📝</span> Observations for ${observedName}</h2><div class="actions-grid">${cardsHtml}</div><div style="margin-top: 20px;"><button class="filter-btn btn-secondary" onclick="showView('customFiltersView')">Back to Filters</button></div>`;
+            showView('observationSelectorView');
+        }
+
         function displayObservationOptions(observedEmail, observedName) {
             currentObservedUser.email = observedEmail;
             currentObservedUser.name = observedName;
             showLoading(`Loading options for ${observedName}`);
-            google.script.run.withSuccessHandler(result => {
-                hideLoading(); if (!result.success) return showError(result.error);
-                const container = document.getElementById('observationSelectorView');
-                let cardsHtml = `<div class="action-card" onclick="handleNewObservation('${observedEmail}')"><span class="action-icon">➕</span><div class="action-title">Start New Observation</div><div class="action-desc">Begin a new evaluation for this staff member.</div></div>`;
-                result.observations.forEach(obs => {
-                    const date = new Date(obs.createdAt).toLocaleDateString();
-                    let buttons = '';
-                    if (obs.status === 'Draft') {
-                        buttons = `<button class="filter-btn btn-edit" onclick="handleEditObservation('${obs.observationId}')">Edit</button>
-                                   <button class="filter-btn btn-finalize" onclick="handleFinalizeObservation('${obs.observationId}', '${observedEmail}', '${observedName}')">Finalize</button>
-                                   <button class="filter-btn btn-delete" onclick="handleDeleteObservation('${obs.observationId}', '${observedEmail}', '${observedName}')">Delete</button>`;
-                    } else if (obs.status === 'Finalized') {
-                        // Determine PDF button state based on pdfUrl and pdfStatus
-                        let pdfButton = '';
-                        const pdfStatus = obs.pdfStatus || (obs.pdfUrl ? 'generated' : 'unknown');
-                        
-                        if (pdfStatus === 'generated' && obs.pdfUrl) {
-                            // PDF is available - show normal View PDF button
-                            pdfButton = `<button class="filter-btn btn-export" onclick="window.open('${obs.pdfUrl}', '_blank')">View PDF</button>`;
-                        } else if (pdfStatus === 'failed') {
-                            // PDF generation failed - show retry button
-                            pdfButton = `<button class="filter-btn btn-pdf-failed" onclick="handleRetryPdf('${obs.observationId}')">PDF Failed - Retry</button>`;
-                        } else {
-                            // PDF is not available, show Generate PDF button
-                            pdfButton = `<button class="filter-btn btn-export" onclick="handleRetryPdf('${obs.observationId}')">Generate PDF</button>`;
-                        }
-                        
-                        buttons = `<button class="filter-btn btn-view" onclick="handleViewObservation('${obs.observationId}')">View</button>
-                                   ${pdfButton}
-                                   <button class="filter-btn btn-delete" onclick="handleDeleteFinalizedObservation('${obs.observationId}', '${observedEmail}', '${observedName}')">Delete</button>`;
-                    }
-                    cardsHtml += `
-                        <div class="observation-card">
-                            <div class="obs-card-content">
-                                <div class="obs-card-title">${obs.observedName} - ${obs.status}</div>
-                                <div class="obs-card-desc">Created on ${date}</div>
-                                <div class="status-badge ${obs.status === 'Draft' ? 'status-draft' : 'status-finalized'}">${obs.status}</div>
-                            </div>
-                            ${buttons ? `<div class="obs-card-actions">${buttons}</div>` : ''}
-                        </div>`;
-                });
-                container.innerHTML = `<h2 class="section-title"><span>📝</span> Observations for ${observedName}</h2><div class="actions-grid">${cardsHtml}</div><div style="margin-top: 20px;"><button class="filter-btn btn-secondary" onclick="showView('customFiltersView')">Back to Filters</button></div>`;
-                showView('observationSelectorView');
-            }).withFailureHandler(handleError).getObservationOptions(observedEmail);
+            google.script.run
+                .withSuccessHandler(result => {
+                    renderObservationCards(result, observedEmail, observedName);
+                })
+                .withFailureHandler(handleError)
+                .getObservationOptions(observedEmail);
         }
+
         function handleNewObservation(observedEmail) { showLoading('Creating new observation draft...'); google.script.run.withSuccessHandler(handleRubricData).withFailureHandler(handleError).createNewObservationForPeerEvaluator(observedEmail); }
         function handleEditObservation(obsId) { showLoading('Loading observation...'); google.script.run.withSuccessHandler(handleRubricData).withFailureHandler(handleError).loadObservationForEditing(obsId); }
         function handleDeleteObservation(obsId, email, name) { if (confirm('Are you sure you want to delete this draft? This cannot be undone.')) { showLoading('Deleting draft...'); google.script.run.withSuccessHandler(res => { if(res.success) { displayObservationOptions(email, name); } else { showError(res.error); } }).withFailureHandler(handleError).deleteObservation(obsId); } }
+
         function handleFinalizeObservation(obsId, email, name) {
             if (confirm('Are you sure you want to finalize this observation? You will not be able to edit it further.')) {
                 showLoading('Finalizing observation and generating PDF...');
-                google.script.run.withSuccessHandler(res => {
-                    hideLoading();
-                    if (res.success) {
-                        if (res.pdfError) {
-                            // Finalization succeeded but PDF generation failed
-                            showToast('Observation finalized successfully, but PDF generation failed. You can retry PDF generation from the observation list.', false);
+                google.script.run
+                    .withSuccessHandler(res => {
+                        hideLoading();
+                        if (res.success) {
+                            if (res.pdfError) {
+                                showToast('Observation finalized successfully, but PDF generation failed. You can retry PDF generation from the observation list.', false);
+                            } else {
+                                showToast('Observation finalized and PDF generated successfully!', true);
+                            }
+                            // Directly render the cards with the fresh data from the server.
+                            renderObservationCards(res, email, name);
                         } else {
-                            showToast('Observation finalized and PDF generated successfully!', true);
+                            showError(res.error);
                         }
-                        // Add a small delay to ensure spreadsheet changes are committed before refreshing
-                        setTimeout(() => {
-                            displayObservationOptions(email, name);
-                        }, 500);
-                    } else {
-                        showError(res.error);
-                    }
-                }).withFailureHandler(handleError).finalizeObservation(obsId);
+                    })
+                    .withFailureHandler(handleError)
+                    .finalizeObservation(obsId);
             }
         }
 
