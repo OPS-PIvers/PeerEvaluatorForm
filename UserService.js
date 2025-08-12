@@ -727,15 +727,26 @@ function createFilteredUserContext(targetEmail, requestingRole) {
     const context = createUserContext(targetEmail);
 
     // --- PERMISSION OVERRIDE LOGIC ---
-    // If the requesting user is a Peer Evaluator, force a full, editable view
+    // If the requesting user is a Peer Evaluator, enable editable observation mode
     if (requestingRole === SPECIAL_ROLES.PEER_EVALUATOR) {
-      context.viewMode = VIEW_MODES.FULL;
-      context.assignedSubdomains = null; // Ensure all subdomains are loaded
+      // Default to assigned view for better performance and UX - evaluators can toggle to full view if needed
+      if (targetUser && targetUser.year === PROBATIONARY_OBSERVATION_YEAR) {
+        context.viewMode = VIEW_MODES.FULL;
+        context.assignedSubdomains = null;
+      } else if (targetUser) {
+        context.viewMode = VIEW_MODES.ASSIGNED;
+        context.assignedSubdomains = getAssignedSubdomainsForRoleYear(targetUser.role, targetUser.year);
+      } else {
+        context.viewMode = VIEW_MODES.FULL; // Fallback
+        context.assignedSubdomains = null;
+      }
       context.isObservationMode = true; // Flag for the UI to enable editing
       context.isEvaluator = true; // Explicitly set evaluator status
-      debugLog('Peer Evaluator observation mode enabled.', {
+      debugLog('Peer Evaluator observation mode enabled with assigned view default.', {
         targetEmail: targetEmail,
-        requestingRole: requestingRole
+        requestingRole: requestingRole,
+        viewMode: context.viewMode,
+        hasAssignedSubdomains: context.assignedSubdomains ? context.assignedSubdomains.length : 0
       });
     } else {
       // Original logic for other special roles (e.g., Administrator just viewing)
