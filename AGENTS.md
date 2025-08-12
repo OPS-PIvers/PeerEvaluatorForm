@@ -143,3 +143,140 @@ This section outlines the technical configuration of the Google Apps Script proj
 -   **Error Handling:** Wrap potentially failing operations (especially API calls) in `try...catch` blocks. Use the `formatErrorMessage` utility for consistent error logging.
 -   **Validation:** Use the functions in `ValidationService.js` to validate data and system health.
 -   **Debugging:** Use the `debugLog()` utility for logging. The application supports a `?debug=true` URL parameter to enable more verbose logging and display a debug info panel on the UI.
+
+### 7.1 **MANDATORY: Existing Code Analysis Protocol**
+
+**🚨 CRITICAL REQUIREMENT: Before implementing ANY new functionality, you MUST perform comprehensive analysis of existing code to prevent duplicates and conflicts.**
+
+#### **Pre-Implementation Search Process**
+
+Always perform these searches before adding new features:
+
+```bash
+# 1. Function name variations
+grep -r "functionName\|function_name\|FunctionName" .
+
+# 2. CSS classes and IDs
+grep -r "\.class-name\|#element-id" .
+
+# 3. HTML elements and event handlers  
+grep -r "onclick.*function\|addEventListener\|onchange" .
+
+# 4. Related keywords and comments
+grep -ri "feature.*keyword\|todo.*feature\|fixme" .
+
+# 5. Toggle/interaction functions (common pattern)
+grep -r "toggle\|Toggle\|show\|hide\|expand" .
+```
+
+#### **Analysis Decision Framework**
+
+For each piece of existing code discovered:
+
+| **Code State** | **Required Action** | **Example** |
+|---------------|-------------------|-------------|
+| **✅ Complete & Working** | Extend/enhance existing code | Add new options to existing toggle function |
+| **🟡 Partial Implementation** | Complete OR replace entirely | Found incomplete `toggleSection()` → finish it |
+| **🔴 Broken/Incomplete** | Fix OR replace with working version | Buggy function → rewrite properly |
+| **🔄 Duplicate Functions** | Consolidate into single implementation | 2+ functions doing same thing → merge |
+| **❌ No Existing Code** | Safe to create new implementation | Confirmed no related functionality exists |
+
+#### **Mandatory Cleanup Requirements**
+
+When implementing new functionality, you **MUST**:
+
+1. **🔍 REMOVE** all duplicate functions
+2. **🧹 DELETE** unused CSS classes/styles
+3. **🗑️ ELIMINATE** commented-out code blocks
+4. **📝 UPDATE** related documentation and comments
+5. **🎯 ENSURE** consistent naming conventions
+6. **✅ VERIFY** no dead code remains
+
+#### **Code Integration Best Practices**
+
+**✅ CORRECT Approach:**
+```javascript
+// Single, comprehensive function handling all cases
+function toggleSection(sectionType, elementId, options = {}) {
+    // Centralized toggle logic for evidence, lookfors, etc.
+    const element = document.getElementById(elementId);
+    // ... complete implementation
+}
+```
+
+**❌ INCORRECT Approach:**
+```javascript  
+// Multiple functions for similar purposes (AVOID THIS)
+function toggleEvidence(id) { /* ... */ }
+function toggleLookFors(id) { /* ... */ }
+function toggleSection(id) { /* ... */ }  // Duplicate functionality!
+```
+
+#### **Real-World Case Study: Evidence Section Duplicate Function Issue**
+
+**What Went Wrong:**
+1. ❌ Failed to search for existing `toggleEvidenceSection()` function
+2. ❌ Added complete new implementation alongside partial existing one  
+3. ❌ Created conflicting, duplicate functionality
+4. ❌ Left incomplete CSS and HTML structures
+
+**What Should Have Happened:**
+1. ✅ **Search**: `grep -r "toggleEvidence\|evidence.*section" .`
+2. ✅ **Discovery**: Found existing incomplete function
+3. ✅ **Analysis**: Determined function was partial implementation
+4. ✅ **Decision**: Replace incomplete function entirely
+5. ✅ **Implementation**: Single, complete function with all features
+6. ✅ **Cleanup**: Remove old incomplete function
+7. ✅ **Verification**: Confirm no duplicates remain
+
+#### **Emergency Cleanup Protocol**
+
+If you discover conflicting/duplicate code during development:
+
+1. **🛑 STOP** current implementation immediately
+2. **📋 INVENTORY** all related functions, CSS, and HTML
+3. **🎯 CHOOSE** the most complete/correct implementation
+4. **🗑️ REMOVE** all duplicates and incomplete versions
+5. **🔧 CONSOLIDATE** functionality into single implementation  
+6. **🧪 TEST** thoroughly to ensure functionality works
+7. **📝 DOCUMENT** the cleanup process in commit messages
+
+#### **Quality Assurance Checklist**
+
+Before completing any feature implementation:
+
+- [ ] **Searched for existing functionality using multiple patterns**
+- [ ] **No duplicate functions exist in codebase**  
+- [ ] **No unused CSS classes or styles remain**
+- [ ] **No commented-out code blocks left behind**
+- [ ] **All related functionality is consolidated**
+- [ ] **Function names follow consistent conventions**
+- [ ] **Documentation reflects current implementation**
+- [ ] **All features tested and working correctly**
+- [ ] **No JavaScript console errors present**
+
+### 7.2 **Code Organization Standards**
+
+-   **Service Pattern**: Group related functionality into service modules (`UserService.js`, `SheetService.js`, etc.)
+-   **Single Responsibility**: Each function should have one clear purpose
+-   **DRY Principle**: Don't Repeat Yourself - consolidate similar functionality
+-   **Consistent Naming**: Use camelCase for functions, kebab-case for CSS classes
+-   **Error Boundaries**: Always include proper error handling and fallbacks
+
+### 7.3 **Performance Optimization**
+
+-   **Cache First**: Check cache before making expensive operations
+-   **Batch Operations**: Group similar API calls together when possible  
+-   **Minimize DOM Queries**: Store element references when accessed multiple times
+-   **Lazy Loading**: Initialize heavy components only when needed
+-   **Memory Management**: Clean up event listeners and references
+
+### 7.4 **Testing Requirements**
+
+-   **Unit Testing**: Test individual functions in isolation
+-   **Integration Testing**: Verify components work together correctly
+-   **User Role Testing**: Test functionality across different user roles
+-   **Cache Testing**: Verify caching system works correctly
+-   **Error Path Testing**: Test error handling and edge cases
+
+**Remember: Prevention of code duplication is infinitely better than cleanup after the fact. Always analyze before you implement.**
