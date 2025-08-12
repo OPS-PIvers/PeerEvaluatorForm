@@ -1090,7 +1090,12 @@ function _addEvidenceSection(body, evidence) {
         // If a URL exists, make the item name a clickable hyperlink.
         if (item.url) {
             // The link should cover the item name, which starts after "• ".
-            textElement.setLinkUrl(2, textElement.getText().length - 1, item.url);
+            // The link should cover the item name, regardless of bullet or prefix.
+            const text = textElement.getText();
+            const nameStart = text.indexOf(item.name);
+            if (nameStart !== -1) {
+                textElement.setLinkUrl(nameStart, nameStart + item.name.length - 1, item.url);
+            }
         }
     });
 }
