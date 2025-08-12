@@ -165,6 +165,39 @@ function loadRubricData(filterParams) {
 }
 
 /**
+ * Adds a look-fors section with royal blue styling for checked items.
+ * @param {Body} body The document body.
+ * @param {Object} component The component data.
+ * @param {Object} observation The observation data, containing checkedLookFors.
+ */
+function _addLookForsSection(body, component, observation) {
+    const lookFors = observation.checkedLookFors && observation.checkedLookFors[component.componentId]
+        ? observation.checkedLookFors[component.componentId]
+        : [];
+
+    if (lookFors.length === 0) {
+        return; // Don't add the section if there are no checked look-fors
+    }
+
+    // Look-fors header with royal blue background
+    const lookForsHeader = body.appendParagraph('Look-fors');
+    lookForsHeader.getChild(0).asText()
+        .setFontSize(10)
+        .setBold(true)
+        .setForegroundColor('#ffffff')
+        .setBackgroundColor('#3182ce');
+    lookForsHeader.setSpacingBefore(5).setSpacingAfter(3);
+
+    // Add each checked look-for as a bullet point with a light blue background
+    lookFors.forEach(lookFor => {
+        const lookForItem = body.appendParagraph(`• ${lookFor}`);
+        lookForItem.getChild(0).asText().setFontSize(9).setForegroundColor('#4a5568'); // Dark gray text
+        lookForItem.setIndentFirstLine(20).setSpacingAfter(2);
+        lookForItem.setBackgroundColor('#dbeafe'); // Light blue background
+    });
+}
+
+/**
  * Gets the list of staff members for the filter dropdowns.
  * @param {string} role The role to filter by.
  * @param {string} year The year to filter by.
@@ -813,6 +846,9 @@ function _addNotesSection(body, notesHtml) {
     // Improved HTML to DocumentApp parser
     // Parse HTML sequentially to handle mixed content properly
     try {
+        // Handle <br> tags by converting them to newlines.
+        notesHtml = notesHtml.replace(/<br\s*\/?>/gi, '\n');
+
         // Split HTML into blocks by tags that create separate elements
         const blockRegex = /<(\/?)(?:p|h1|h2|ul|ol|li)(?:\s[^>]*)?>|(<\/li>)/gi;
         let currentText = '';
@@ -895,38 +931,29 @@ function _addParagraphWithFormatting(body, text) {
 }
 
 function _applyInlineFormatting(textElement, html) {
-    // Apply formatting to specific ranges within text
-    const cleanText = stripHtml(html);
+    // Apply formatting to specific ranges within text. This version handles multiple occurrences of the same text with the same style.
+    let cleanText = stripHtml(html);
     
-    // Find bold text ranges
-    const boldMatches = [...html.matchAll(/<strong>(.*?)<\/strong>/gi)];
-    boldMatches.forEach(match => {
-        const boldText = stripHtml(match[1]);
-        const start = cleanText.indexOf(boldText);
-        if (start >= 0) {
-            textElement.setBold(start, start + boldText.length - 1, true);
-        }
-    });
-    
-    // Find italic text ranges
-    const italicMatches = [...html.matchAll(/<em>(.*?)<\/em>/gi)];
-    italicMatches.forEach(match => {
-        const italicText = stripHtml(match[1]);
-        const start = cleanText.indexOf(italicText);
-        if (start >= 0) {
-            textElement.setItalic(start, start + italicText.length - 1, true);
-        }
-    });
-    
-    // Find underlined text ranges
-    const underlineMatches = [...html.matchAll(/<u>(.*?)<\/u>/gi)];
-    underlineMatches.forEach(match => {
-        const underlineText = stripHtml(match[1]);
-        const start = cleanText.indexOf(underlineText);
-        if (start >= 0) {
-            textElement.setUnderline(start, start + underlineText.length - 1, true);
-        }
-    });
+    const applyStyle = (tag, styleSetter) => {
+        const regex = new RegExp(`<${tag}>(.*?)<\\/${tag}>`, 'gi');
+        const matches = [...html.matchAll(regex)];
+
+        matches.forEach(match => {
+            const styledText = stripHtml(match[1]);
+            if (styledText) {
+                const index = cleanText.indexOf(styledText);
+                if (index > -1) {
+                    styleSetter(index, index + styledText.length - 1, true);
+                    // Replace the found text with placeholders to avoid matching it again in subsequent searches for the same styled text.
+                    cleanText = cleanText.substring(0, index) + ' '.repeat(styledText.length) + cleanText.substring(index + styledText.length);
+                }
+            }
+        });
+    };
+
+    applyStyle('strong', (start, end, value) => textElement.setBold(start, end, value));
+    applyStyle('em', (start, end, value) => textElement.setItalic(start, end, value));
+    applyStyle('u', (start, end, value) => textElement.setUnderline(start, end, value));
 }
 
 function stripHtml(html) {
@@ -992,20 +1019,22 @@ function _addComponentSection(body, component, proficiency, observation) {
         cell.setPaddingTop(12).setPaddingBottom(12).setPaddingLeft(12).setPaddingRight(12);
     });
     
-    // Add best practices if available
-    if (component.bestPractices && component.bestPractices.length > 0) {
-        _addBestPracticesSection(body, component.bestPractices);
-    }
-    
-    // Add evidence if available
-    const evidence = observation.evidenceLinks[component.componentId];
-    if (evidence && evidence.length > 0) {
-        _addEvidenceSection(body, evidence);
-    }
-    
+    // Add Look-fors, Notes, and Evidence sections in the specified order.
+
+    // Add the new Look-fors section.
+    // This function checks internally if there are any look-fors to add.
+    _addLookForsSection(body, component, observation);
+
+    // Add notes if available.
     const notes = observation.observationNotes ? observation.observationNotes[component.componentId] : null;
     if (notes) {
         _addNotesSection(body, notes);
+    }
+
+    // Add evidence if available.
+    const evidence = observation.evidenceLinks[component.componentId];
+    if (evidence && evidence.length > 0) {
+        _addEvidenceSection(body, evidence);
     }
 
     // Add spacing after component
@@ -1048,13 +1077,20 @@ function _addEvidenceSection(body, evidence) {
     evidenceHeader.setBackgroundColor('#f8fafc');
     
     evidence.forEach(item => {
+        // Create the paragraph with the bullet point and item name.
         const evidenceItem = body.appendParagraph(`• ${item.name}`);
-        evidenceItem.getChild(0).asText().setFontSize(9).setForegroundColor('#3182ce');
+        const textElement = evidenceItem.getChild(0).asText();
+
+        // Style the text.
+        textElement.setFontSize(9).setForegroundColor('#3182ce');
+
+        // Apply paragraph styling.
         evidenceItem.setIndentFirstLine(20).setSpacingAfter(2);
-        // Note: DocumentApp doesn't support hyperlinks in the same way as HTML
-        // The URL information is preserved in the text but won't be clickable
+
+        // If a URL exists, make the item name a clickable hyperlink.
         if (item.url) {
-            evidenceItem.appendText(` (${item.url})`);
+            // The link should cover the item name, which starts after "• ".
+            textElement.setLinkUrl(2, textElement.getText().length - 1, item.url);
         }
     });
 }
