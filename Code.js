@@ -713,6 +713,141 @@ function _addRubricContent(body, observation, rubricData) {
 }
 
 /**
+ * Adds an observation notes section.
+ * @param {Body} body The document body
+ * @param {string} notesHtml The HTML content of the notes
+ */
+function _addNotesSection(body, notesHtml) {
+    const notesHeader = body.appendParagraph('Observation Notes:');
+    notesHeader.getChild(0).asText().setFontSize(10).setBold(true).setForegroundColor('#4a5568');
+    notesHeader.setSpacingBefore(5).setSpacingAfter(2);
+    notesHeader.setBackgroundColor('#f8fafc');
+
+    // Improved HTML to DocumentApp parser
+    // Parse HTML sequentially to handle mixed content properly
+    try {
+        // Split HTML into blocks by tags that create separate elements
+        const blockRegex = /<(\/?)(?:p|h1|h2|ul|ol|li)(?:\s[^>]*)?>|(<\/li>)/gi;
+        let currentText = '';
+        let lastIndex = 0;
+        let match;
+        let inList = false;
+        
+        while ((match = blockRegex.exec(notesHtml)) !== null) {
+            // Add any text before this tag
+            const textBefore = notesHtml.slice(lastIndex, match.index);
+            currentText += textBefore;
+            
+            const tag = match[1] ? match[0] : match[0]; // Get the full match
+            const tagName = tag.match(/<\/?(\w+)/)?.[1]?.toLowerCase();
+            const isClosing = tag.startsWith('</');
+            
+            if (tagName === 'p' && !isClosing) {
+                if (currentText.trim()) {
+                    _addParagraphWithFormatting(body, currentText.trim());
+                    currentText = '';
+                }
+            } else if (tagName === 'p' && isClosing) {
+                if (currentText.trim()) {
+                    _addParagraphWithFormatting(body, currentText.trim());
+                    currentText = '';
+                }
+            } else if ((tagName === 'h1' || tagName === 'h2') && !isClosing) {
+                if (currentText.trim()) {
+                    _addParagraphWithFormatting(body, currentText.trim());
+                    currentText = '';
+                }
+            } else if ((tagName === 'h1' || tagName === 'h2') && isClosing) {
+                if (currentText.trim()) {
+                    const headerPara = body.appendParagraph(stripHtml(currentText.trim()));
+                    const headerText = headerPara.getChild(0).asText();
+                    headerText.setBold(true).setFontSize(tagName === 'h1' ? 14 : 12);
+                    _applyInlineFormatting(headerText, currentText.trim());
+                    currentText = '';
+                }
+            } else if (tagName === 'ul' || tagName === 'ol') {
+                if (!isClosing) {
+                    inList = true;
+                    if (currentText.trim()) {
+                        _addParagraphWithFormatting(body, currentText.trim());
+                        currentText = '';
+                    }
+                } else {
+                    inList = false;
+                }
+            } else if (tagName === 'li' && !isClosing) {
+                // Li opening - continue collecting text
+            } else if (tagName === 'li' && isClosing) {
+                if (currentText.trim()) {
+                    const listItem = body.appendListItem(stripHtml(currentText.trim()));
+                    _applyInlineFormatting(listItem.getChild(0).asText(), currentText.trim());
+                    currentText = '';
+                }
+            }
+            
+            lastIndex = blockRegex.lastIndex;
+        }
+        
+        // Add any remaining text
+        const remainingText = notesHtml.slice(lastIndex);
+        currentText += remainingText;
+        if (currentText.trim()) {
+            _addParagraphWithFormatting(body, currentText.trim());
+        }
+        
+    } catch (e) {
+        // Fallback for parsing errors
+        body.appendParagraph(stripHtml(notesHtml));
+    }
+}
+
+function _addParagraphWithFormatting(body, text) {
+    if (!text.trim()) return;
+    const paragraph = body.appendParagraph(stripHtml(text));
+    _applyInlineFormatting(paragraph.getChild(0).asText(), text);
+}
+
+function _applyInlineFormatting(textElement, html) {
+    // Apply formatting to specific ranges within text
+    const cleanText = stripHtml(html);
+    
+    // Find bold text ranges
+    const boldMatches = [...html.matchAll(/<strong>(.*?)<\/strong>/gi)];
+    boldMatches.forEach(match => {
+        const boldText = stripHtml(match[1]);
+        const start = cleanText.indexOf(boldText);
+        if (start >= 0) {
+            textElement.setBold(start, start + boldText.length - 1, true);
+        }
+    });
+    
+    // Find italic text ranges
+    const italicMatches = [...html.matchAll(/<em>(.*?)<\/em>/gi)];
+    italicMatches.forEach(match => {
+        const italicText = stripHtml(match[1]);
+        const start = cleanText.indexOf(italicText);
+        if (start >= 0) {
+            textElement.setItalic(start, start + italicText.length - 1, true);
+        }
+    });
+    
+    // Find underlined text ranges
+    const underlineMatches = [...html.matchAll(/<u>(.*?)<\/u>/gi)];
+    underlineMatches.forEach(match => {
+        const underlineText = stripHtml(match[1]);
+        const start = cleanText.indexOf(underlineText);
+        if (start >= 0) {
+            textElement.setUnderline(start, start + underlineText.length - 1, true);
+        }
+    });
+}
+
+function stripHtml(html) {
+    return html.replace(/<[^>]*>?/gm, '');
+}
+
+
+/**
  * Adds a component section with proficiency levels and styling.
  * @param {Body} body The document body
  * @param {Object} component The component data
@@ -781,6 +916,11 @@ function _addComponentSection(body, component, proficiency, observation) {
         _addEvidenceSection(body, evidence);
     }
     
+    const notes = observation.observationNotes ? observation.observationNotes[component.componentId] : null;
+    if (notes) {
+        _addNotesSection(body, notes);
+    }
+
     // Add spacing after component
     body.appendParagraph('').setSpacingAfter(8);
 }

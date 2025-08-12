@@ -942,7 +942,7 @@ function setupObservationSheet() {
         "observationId", "observerEmail", "observedEmail", "observedName",
         "observedRole", "observedYear", "status", "createdAt",
         "lastModifiedAt", "finalizedAt", "observationData", "evidenceLinks",
-        "observationName", "observationDate", "checkedLookFors"
+        "observationName", "observationDate", "checkedLookFors", "observationNotes"
       ];
       sheet.appendRow(headers);
       debugLog(`Headers written to ${sheetName}`);
