@@ -1956,6 +1956,27 @@
                     }
                 }
             });
+
+            // Add click handlers for rating cells
+            const ratingCells = document.querySelectorAll('.rating-cell');
+            ratingCells.forEach(function(cell) {
+                cell.addEventListener('click', function() {
+                    handleRatingCellClick(cell);
+                });
+            });
+
+            // Auto-expand evidence sections for evaluators and initialize editors
+            if (data && data.userContext && data.userContext.isEvaluator) {
+                console.log('Peer Evaluator detected, auto-expanding all evidence sections.');
+                const evidenceSections = document.querySelectorAll('.evidence-content');
+                evidenceSections.forEach(section => {
+                    const contentId = section.id;
+                    // Check if the section is not already expanded to avoid re-initializing
+                    if (contentId && !section.classList.contains('expanded')) {
+                        toggleEvidenceSection(contentId);
+                    }
+                });
+            }
         });
         
         // Show/hide back to top button
@@ -2257,7 +2278,7 @@
             const lookForText = checkbox.nextElementSibling.textContent;
             const isChecked = checkbox.checked;
 
-            let observationId = (data && data.observation && data.observation.observationId) ? data.observation.observationId : null;
+            let observationId = (data?.observation?.observationId) || (data?.observationId) || null;
 
             if (!observationId) {
                 console.error('Cannot save look-for selection: Observation context not available.');
@@ -2394,27 +2415,6 @@
             reader.readAsDataURL(file);
         }
 
-        document.addEventListener('DOMContentLoaded', function() {
-            const ratingCells = document.querySelectorAll('.rating-cell');
-            ratingCells.forEach(function(cell) {
-                cell.addEventListener('click', function() {
-                    handleRatingCellClick(cell);
-                });
-            });
-
-            // Auto-expand evidence sections for evaluators and initialize editors
-            if (data && data.userContext && data.userContext.isEvaluator) {
-                console.log('Peer Evaluator detected, auto-expanding all evidence sections.');
-                const evidenceSections = document.querySelectorAll('.evidence-content');
-                evidenceSections.forEach(section => {
-                    const contentId = section.id;
-                    // Check if the section is not already expanded to avoid re-initializing
-                    if (contentId && !section.classList.contains('expanded')) {
-                        toggleEvidenceSection(contentId);
-                    }
-                });
-            }
-        });
     </script>
 </body>
 </html>
