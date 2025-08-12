@@ -922,9 +922,10 @@
                     
                     // Notes container (only for evaluators)
                     if (isEvaluator) {
+                        const escapedComponentId = CSS.escape(componentId);
                         html += `<div class="notes-container">`;
                         html += `<h4>Observation Notes</h4>`;
-                        html += `<div id="notes-editor-${componentId}"></div>`;
+                        html += `<div id="notes-editor-${escapedComponentId}"></div>`;
                         html += `</div>`;
                     }
                     
@@ -1100,7 +1101,8 @@
             // Initialize Quill on first expansion if not already initialized
             if (isExpanded && !quillInstances[componentId]) {
                 console.log('Attempting to initialize Quill editor for:', componentId);
-                const editorId = '#notes-editor-' + componentId;
+                const escapedComponentId = CSS.escape(componentId);
+                const editorId = '#notes-editor-' + escapedComponentId;
                 const editorElement = document.querySelector(editorId);
                 
                 if (editorElement) {
