@@ -364,6 +364,7 @@ function createUserContext(email = null) {
       context.role = 'Teacher';
       context.year = 1;
       context.isDefaultUser = true;
+      context.isEvaluator = false; // Default users are not evaluators
       context.permissions.canAccessRubric = true;
       context.permissions.canSeeAllDomains = true;
       
@@ -383,6 +384,7 @@ function createUserContext(email = null) {
       context.role = 'Teacher';
       context.year = 1;
       context.isDefaultUser = true;
+      context.isEvaluator = false; // Default fallback users are not evaluators
       context.hasStaffRecord = false;
       context.permissions.canAccessRubric = true;
       context.permissions.canSeeAllDomains = true;
@@ -415,6 +417,10 @@ function createUserContext(email = null) {
     if (roleToSpecialTypeMap[context.role]) {
       context.specialRoleType = roleToSpecialTypeMap[context.role];
     }
+
+    // Set isEvaluator flag for Peer Evaluators (CRITICAL FIX)
+    // This enables look-fors checkboxes and notes functionality in rubric.html
+    context.isEvaluator = (context.role === SPECIAL_ROLES.PEER_EVALUATOR);
 
     // Set assignedSubdomains and viewMode based on year
     if (context.year === PROBATIONARY_OBSERVATION_YEAR) {
@@ -512,6 +518,7 @@ function createUserContext(email = null) {
       year: 1,
       isAuthenticated: false,
       isDefaultUser: true,
+      isEvaluator: false, // Error fallback users are not evaluators
       hasStaffRecord: false,
       roleChangeDetected: false,
       stateChanges: [],

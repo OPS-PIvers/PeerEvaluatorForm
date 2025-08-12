@@ -38,31 +38,27 @@ The project follows a modular, service-oriented architecture.
 
 ```
 /workspaces/PeerEvaluatorForm/
-├─── .github/
-│    ├─── copilot-instructions.md # Instructions for GitHub Copilot.
-│    └─── workflows/
-│         └─── clasp-deploy.yml   # GitHub Action for auto-deployment.
-├─── .clasp.json              # Google Apps Script CLI configuration.
-├─── .gitignore               # Standard git ignore file.
-├─── appsscript.json          # GAS manifest: defines scopes, dependencies, and web app settings.
-├─── AGENTS.md                # This file.
-├─── CacheManager.js          # Manages advanced, versioned caching.
-├─── CLAUDE.md                # Instructional context for the Claude AI model.
-├─── Code.js                  # Main server-side entry point (doGet) and orchestrator.
-├─── Constants.js             # Global constants (sheet names, roles, cache settings, etc.).
-├─── error-page.html          # HTML template for displaying fatal errors.
-├─── filter-interface.html    # HTML/JS for the filter view shown to special access roles.
-├─── finalized-observation-email.html # HTML template for the email sent when an observation is finalized.
-├─── GEMINI.md                # Instructional context for the Gemini AI model.
-├─── ObservationService.js    # Backend logic for managing observation records.
-├─── pdf-rubric.html          # Detailed HTML template for generating a printable PDF Observation Report.
-├─── rubric.html              # HTML/JS template for rendering the main evaluation rubric.
-├─── SessionManager.js        # Handles user sessions and state change detection.
-├─── SheetService.js          # Data access layer for all Google Sheets operations.
-├─── Tests.js                 # Unit tests for utility functions.
-├─── UserService.js           # Manages user authentication, role retrieval, and context creation.
-├─── Utils.js                 # General utility and helper functions.
-└─── ValidationService.js     # Handles data validation and system health checks.
+├─── AGENTS.md                          # This file - Comprehensive AI agent guide.
+├─── CLAUDE.md                          # Instructional context for Claude AI.
+├─── CacheManager.js                    # Advanced versioned caching system.
+├─── Code.js                           # Main server-side entry point (doGet) and orchestrator.
+├─── Constants.js                      # Global constants (sheet names, roles, cache settings, etc.).
+├─── GEMINI.md                         # Instructional context for Gemini AI.
+├─── ObservationService.js             # Backend logic for managing observation records.
+├─── SessionManager.js                 # User sessions and state change detection.
+├─── SheetService.js                   # Data access layer for all Google Sheets operations.
+├─── UserService.js                    # User authentication, role retrieval, and context creation.
+├─── Utils.js                          # General utility and helper functions.
+├─── ValidationService.js              # Data validation and system health checks.
+├─── appsscript.json                   # GAS manifest: scopes, dependencies, and web app settings.
+├─── error-page.html                   # HTML template for displaying fatal errors.
+├─── filter-interface.html             # HTML/JS for filter view (special access roles).
+├─── finalized-observation-email.html  # HTML template for finalized observation emails.
+├─── lookfors-todo.md                  # Development notes for look-fors functionality.
+├─── observation-notes-todo.md         # Development notes for observation notes.
+├─── pdf-rubric.html                   # HTML template for generating PDF reports.
+├─── performance-todo.md               # Development notes for performance optimization.
+└─── rubric.html                       # Main HTML/JS template for evaluation rubric interface.
 ```
 
 ## 4. Function Index by File

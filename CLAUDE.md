@@ -14,10 +14,25 @@ This is a Google Apps Script (GAS) web application called "Peer Evaluator Form" 
 - **SessionManager.js**: Handles user sessions, role change detection, and state persistence
 - **SheetService.js**: Data access layer for Google Sheets operations
 - **UserService.js**: User authentication, validation, and context creation
-- **ObservationService.js**: Manages peer evaluation observations using PropertiesService as a database
+- **ObservationService.js**: Manages peer evaluation observations using Observation_Data sheet as database
 - **CacheManager.js**: Advanced caching system with versioning and dependency management
 - **ValidationService.js**: Data validation and error handling
 - **Utils.js**: Utility functions and constants
+- **Constants.js**: Global constants including sheet names, roles, cache settings, and validation patterns
+
+### HTML Templates
+
+- **rubric.html**: Main evaluation rubric interface with look-fors checkboxes and rich-text notes
+- **filter-interface.html**: Filter view for special access roles (Administrator, Peer Evaluator, Full Access)
+- **error-page.html**: Error display template with debugging information
+- **pdf-rubric.html**: Template for generating PDF observation reports
+- **finalized-observation-email.html**: Email template for finalized observations
+
+### Development Notes
+
+- **lookfors-todo.md**: Development notes for look-fors functionality
+- **observation-notes-todo.md**: Development notes for observation notes
+- **performance-todo.md**: Performance optimization notes
 
 ### Key Features
 

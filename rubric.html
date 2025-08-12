@@ -913,6 +913,13 @@
             max-height: 800px;
         }
 
+        /* Auto-expand evidence sections for Peer Evaluators */
+        <? if (data.userContext && data.userContext.isEvaluator) { ?>
+        .evidence-content {
+            max-height: 800px;
+        }
+        <? } ?>
+
         .notes-container {
             padding: 15px 20px;
             border-bottom: 1px solid #e2e8f0;
@@ -2161,7 +2168,21 @@
 
 
         function saveNotes(componentId, content) {
-            if (!currentObservationId) return;
+            if (!currentObservationId) {
+                console.error('Cannot save notes: No observation context available.', {
+                    componentId: componentId,
+                    hasData: typeof data !== 'undefined',
+                    hasObservation: data && data.observation,
+                    hasObservationId: data && data.observation && data.observation.observationId,
+                    currentObservationId: currentObservationId,
+                    userContext: data && data.userContext ? {
+                        isEvaluator: data.userContext.isEvaluator,
+                        role: data.userContext.role
+                    } : null
+                });
+                showToast('Error: No active observation found. Cannot save notes.');
+                return;
+            }
 
             // Update local data
             observationNotes[componentId] = content;
@@ -2258,9 +2279,19 @@
             }
 
             if (!observationId) {
-                console.error('Cannot save look-for selection: Observation context not available.');
+                console.error('Cannot save look-for selection: Observation context not available.', {
+                    hasData: typeof data !== 'undefined',
+                    hasObservation: data && data.observation,
+                    hasObservationId: data && data.observation && data.observation.observationId,
+                    hasTopLevelId: data && data.observationId,
+                    currentObservationId: currentObservationId,
+                    userContext: data && data.userContext ? {
+                        isEvaluator: data.userContext.isEvaluator,
+                        role: data.userContext.role
+                    } : null
+                });
                 checkbox.checked = !isChecked; // Revert
-                showToast('Error: Could not find observation ID. Cannot save.');
+                showToast('Error: No active observation found. Please ensure you are in observation editing mode.');
                 return;
             }
 
@@ -2350,7 +2381,18 @@
             }
 
             if (!currentObservationId) {
-                showToast('Error: No active observation found.');
+                console.error('Cannot save observation notes: No observation context available.', {
+                    hasData: typeof data !== 'undefined',
+                    hasObservation: data && data.observation,
+                    hasObservationId: data && data.observation && data.observation.observationId,
+                    currentObservationId: currentObservationId,
+                    componentId: componentId,
+                    userContext: data && data.userContext ? {
+                        isEvaluator: data.userContext.isEvaluator,
+                        role: data.userContext.role
+                    } : null
+                });
+                showToast('Error: No active observation found. Please ensure you are in observation editing mode.');
                 return;
             }
 
