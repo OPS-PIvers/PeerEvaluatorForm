@@ -9,8 +9,8 @@
     <meta http-equiv="Content-Security-Policy" content="frame-ancestors *;">
     
     <!-- Quill.js for rich text editing -->
-    <link href="https://cdn.quilljs.com/2.0.2/quill.snow.css" rel="stylesheet">
-    <script src="https://cdn.quilljs.com/2.0.2/quill.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.js"></script>
     <style>
 :root {
     --color-white: white;
@@ -1120,7 +1120,8 @@
                     try {
                         // Check if Quill is available
                         if (typeof Quill === 'undefined') {
-                            console.error('Quill library is not loaded');
+                            console.error('Quill library failed to load from CDN');
+                            showToast('Rich text editor unavailable. Please refresh the page.');
                             return;
                         }
                         
