@@ -295,6 +295,242 @@ function deleteObservation(observationId) {
 }
 
 /**
+ * Saves a look-for selection for an observation component.
+ * @param {string} observationId The ID of the observation to update.
+ * @param {string} key The key for the look-for category.
+ * @param {string} lookForText The text content of the look-for.
+ * @param {boolean} isChecked The state of the checkbox.
+ * @returns {Object} A response object with success status.
+ */
+function saveLookForSelection(observationId, key, lookForText, isChecked) {
+    try {
+        setupObservationSheet(); // Ensure the sheet is ready
+        const userContext = createUserContext();
+        if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
+            return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
+        }
+        // Call the service function by constructing it manually to avoid naming conflict
+        return (function() {
+            if (!observationId || !key || !lookForText) {
+                return { success: false, error: 'Observation ID, key, and look-for text are required.' };
+            }
+            
+            const lock = LockService.getScriptLock();
+            lock.waitLock(30000);
+            
+            try {
+                const spreadsheet = openSpreadsheet();
+                const sheet = getSheetByName(spreadsheet, OBSERVATION_SHEET_NAME);
+                if (!sheet) {
+                    throw new Error(`Sheet "${OBSERVATION_SHEET_NAME}" not found.`);
+                }
+                
+                const row = _findObservationRow(sheet, observationId);
+                if (row === -1) {
+                    return { success: false, error: 'Observation not found.' };
+                }
+                
+                const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+                const lookForsCol = headers.indexOf('checkedLookFors') + 1;
+                const lastModifiedCol = headers.indexOf('lastModifiedAt') + 1;
+                
+                if (lookForsCol === 0) {
+                    return { success: false, error: 'checkedLookFors column not found in the sheet.' };
+                }
+                
+                const lookForsCell = sheet.getRange(row, lookForsCol);
+                const currentLookForsString = lookForsCell.getValue();
+                let currentLookFors = {};
+                try {
+                    if (currentLookForsString) {
+                        currentLookFors = JSON.parse(currentLookForsString);
+                    }
+                } catch (e) {
+                    console.warn(`Could not parse checkedLookFors for ${observationId}. Starting fresh.`);
+                }
+                
+                if (!currentLookFors[key]) {
+                    currentLookFors[key] = [];
+                }
+                
+                if (isChecked) {
+                    if (!currentLookFors[key].includes(lookForText)) {
+                        currentLookFors[key].push(lookForText);
+                    }
+                } else {
+                    const index = currentLookFors[key].indexOf(lookForText);
+                    if (index > -1) {
+                        currentLookFors[key].splice(index, 1);
+                    }
+                }
+                
+                lookForsCell.setValue(JSON.stringify(currentLookFors));
+                if (lastModifiedCol > 0) {
+                    sheet.getRange(row, lastModifiedCol).setValue(new Date().toISOString());
+                }
+                SpreadsheetApp.flush();
+                
+                debugLog('Look-for selection saved', { observationId, key, lookForText, isChecked });
+                return { success: true };
+            } catch (error) {
+                console.error(`Error saving look-for for observation ${observationId}:`, error);
+                return { success: false, error: 'An unexpected error occurred.' };
+            } finally {
+                lock.releaseLock();
+            }
+        })();
+    } catch (error) {
+        console.error('Error in saveLookForSelection wrapper:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Saves a proficiency level selection for an observation component.
+ * @param {string} observationId The ID of the observation to update.
+ * @param {string} componentId The rubric component ID.
+ * @param {string} proficiency The selected proficiency level.
+ * @returns {Object} A response object with success status.
+ */
+function saveProficiencySelection(observationId, componentId, proficiency) {
+    try {
+        setupObservationSheet(); // Ensure the sheet is ready
+        const userContext = createUserContext();
+        if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
+            return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
+        }
+        // Call the service function by constructing it manually to avoid naming conflict
+        return (function() {
+            if (!observationId || !componentId || !proficiency) {
+                return { success: false, error: 'Observation ID, component ID, and proficiency level are required.' };
+            }
+            
+            try {
+                const spreadsheet = openSpreadsheet();
+                const sheet = getSheetByName(spreadsheet, OBSERVATION_SHEET_NAME);
+                if (!sheet) {
+                    throw new Error(`Sheet "${OBSERVATION_SHEET_NAME}" not found.`);
+                }
+                
+                const row = _findObservationRow(sheet, observationId);
+                if (row === -1) {
+                    return { success: false, error: 'Observation not found.' };
+                }
+                
+                const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+                const observationDataCol = headers.indexOf('observationData') + 1;
+                const lastModifiedCol = headers.indexOf('lastModifiedAt') + 1;
+                
+                if (observationDataCol === 0) {
+                    return { success: false, error: 'observationData column not found in the sheet.' };
+                }
+                
+                const observationDataCell = sheet.getRange(row, observationDataCol);
+                const currentDataString = observationDataCell.getValue();
+                let currentData = {};
+                try {
+                    if (currentDataString) {
+                        currentData = JSON.parse(currentDataString);
+                    }
+                } catch (e) {
+                    console.warn(`Could not parse observationData for ${observationId}. Starting fresh.`);
+                }
+                
+                currentData[componentId] = proficiency;
+                
+                observationDataCell.setValue(JSON.stringify(currentData, null, 2));
+                if (lastModifiedCol > 0) {
+                    sheet.getRange(row, lastModifiedCol).setValue(new Date().toISOString());
+                }
+                SpreadsheetApp.flush();
+                
+                debugLog('Proficiency selection saved', { observationId, componentId, proficiency });
+                return { success: true };
+            } catch (error) {
+                console.error(`Error saving proficiency for observation ${observationId}:`, error);
+                return { success: false, error: 'An unexpected error occurred.' };
+            }
+        })();
+    } catch (error) {
+        console.error('Error in saveProficiencySelection wrapper:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Saves observation notes for a specific component.
+ * @param {string} observationId The ID of the observation to update.
+ * @param {string} componentId The ID of the component.
+ * @param {string} notesContent The HTML content of the notes.
+ * @returns {Object} A response object with success status.
+ */
+function saveObservationNotes(observationId, componentId, notesContent) {
+    try {
+        setupObservationSheet(); // Ensure the sheet is ready
+        const userContext = createUserContext();
+        if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
+            return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
+        }
+        
+        // Call the service function by constructing it manually to avoid naming conflict
+        return (function() {
+            if (!observationId || !componentId) {
+                return { success: false, error: 'Observation ID and component ID are required.' };
+            }
+            
+            try {
+                const spreadsheet = openSpreadsheet();
+                const sheet = getSheetByName(spreadsheet, OBSERVATION_SHEET_NAME);
+                if (!sheet) throw new Error(`Sheet "${OBSERVATION_SHEET_NAME}" not found.`);
+                
+                const row = _findObservationRow(sheet, observationId);
+                if (row === -1) return { success: false, error: 'Observation not found.' };
+                
+                const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+                const notesCol = headers.indexOf('observationNotes') + 1;
+                const lastModifiedCol = headers.indexOf('lastModifiedAt') + 1;
+                
+                if (notesCol === 0) {
+                    return { success: false, error: 'observationNotes column not found.' };
+                }
+                
+                const notesCell = sheet.getRange(row, notesCol);
+                const currentNotesString = notesCell.getValue();
+                let currentNotes = {};
+                try {
+                    if (currentNotesString) currentNotes = JSON.parse(currentNotesString);
+                } catch (e) {
+                    console.warn(`Could not parse observationNotes for ${observationId}.`);
+                }
+                
+                // Sanitize HTML content before saving (basic sanitizer)
+                currentNotes[componentId] = (function(html) {
+                    if (!html) return html;
+                    return html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+                               .replace(/>/g, '&gt;').replace(/</g, '&lt;')
+                               .replace(/&lt;(\/?(p|strong|em|u|ol|ul|li|br|h1|h2))&gt;/g, '<$1>');
+                })(notesContent);
+                
+                notesCell.setValue(JSON.stringify(currentNotes, null, 2));
+                if (lastModifiedCol > 0) {
+                    sheet.getRange(row, lastModifiedCol).setValue(new Date().toISOString());
+                }
+                SpreadsheetApp.flush();
+                
+                debugLog('Observation notes saved', { observationId, componentId });
+                return { success: true };
+            } catch (error) {
+                console.error(`Error saving notes for observation ${observationId}:`, error);
+                return { success: false, error: 'An unexpected error occurred.' };
+            }
+        })();
+    } catch (error) {
+        console.error('Error in saveObservationNotes wrapper:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
  * Finalizes an observation draft.
  * @param {string} observationId The ID of the observation to finalize.
  * @returns {Object} A response object indicating success or failure.

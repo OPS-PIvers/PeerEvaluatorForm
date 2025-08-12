@@ -553,11 +553,36 @@ function deleteObservationRecord(observationId, requestingUserEmail) {
             return { success: false, error: 'Only draft observations can be deleted.' };
         }
 
+        // Move associated Drive folder to trash (if it exists)
+        try {
+            // Get additional data needed for folder operations
+            const observedNameCol = headers.indexOf('observedName');
+            const observedEmailCol = headers.indexOf('observedEmail');
+            
+            if (observedNameCol !== -1 && observedEmailCol !== -1) {
+                // Create observation object for folder operations
+                const observation = {
+                    observationId: observationId,
+                    observedName: rowData[observedNameCol],
+                    observedEmail: rowData[observedEmailCol]
+                };
+                
+                const obsFolder = _getObservationFolder(observation);
+                if (obsFolder) {
+                    obsFolder.setTrashed(true);
+                    debugLog('Draft observation Drive folder moved to trash', { observationId: observationId, folderId: obsFolder.getId() });
+                }
+            }
+        } catch (driveError) {
+            console.error(`Could not delete Drive folder for draft observation ${observationId}:`, driveError);
+            // Do not block deletion if Drive operation fails, just log it.
+        }
+
         // Delete the row from the sheet
         sheet.deleteRow(row);
         SpreadsheetApp.flush();
 
-        debugLog('Observation deleted', { observationId, requestingUserEmail });
+        debugLog('Draft observation deleted', { observationId, requestingUserEmail });
         return { success: true };
     } catch (error) {
         console.error(`Error deleting observation ${observationId}:`, error);
