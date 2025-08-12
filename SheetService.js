@@ -936,16 +936,34 @@ function setupObservationSheet() {
       debugLog(`Created sheet: ${sheetName}`);
     }
 
+    // Define the required headers
+    const requiredHeaders = [
+      "observationId", "observerEmail", "observedEmail", "observedName",
+      "observedRole", "observedYear", "status", "createdAt",
+      "lastModifiedAt", "finalizedAt", "observationData", "evidenceLinks",
+      "observationName", "observationDate", "checkedLookFors", "observationNotes"
+    ];
+
     // Check if headers are already present
     if (sheet.getLastRow() === 0) {
-      const headers = [
-        "observationId", "observerEmail", "observedEmail", "observedName",
-        "observedRole", "observedYear", "status", "createdAt",
-        "lastModifiedAt", "finalizedAt", "observationData", "evidenceLinks",
-        "observationName", "observationDate", "checkedLookFors", "observationNotes"
-      ];
-      sheet.appendRow(headers);
+      // New sheet - add all headers
+      sheet.appendRow(requiredHeaders);
       debugLog(`Headers written to ${sheetName}`);
+    } else {
+      // Existing sheet - check for missing columns and add them
+      const existingHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+      const missingHeaders = requiredHeaders.filter(header => !existingHeaders.includes(header));
+      
+      if (missingHeaders.length > 0) {
+        debugLog(`Adding missing columns to ${sheetName}: ${missingHeaders.join(', ')}`);
+        
+        // Add missing headers to the end
+        const startColumn = sheet.getLastColumn() + 1;
+        const headerRange = sheet.getRange(1, startColumn, 1, missingHeaders.length);
+        headerRange.setValues([missingHeaders]);
+        
+        debugLog(`Added ${missingHeaders.length} missing columns to ${sheetName}`);
+      }
     }
   } catch (error) {
     console.error('Error setting up observation sheet:', formatErrorMessage(error, 'setupObservationSheet'));
