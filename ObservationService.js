@@ -56,7 +56,7 @@ function _getObservationsDb() {
  * @param {boolean} isChecked The state of the checkbox.
  * @returns {Object} A response object with success status.
  */
-function saveLookForSelection(observationId, componentId, lookForText, isChecked) {
+function _saveLookForSelection(observationId, componentId, lookForText, isChecked) {
   if (!observationId || !componentId || !lookForText) {
     return { success: false, error: 'Observation ID, component ID, and look-for text are required.' };
   }
@@ -77,29 +77,31 @@ function saveLookForSelection(observationId, componentId, lookForText, isChecked
     }
 
     const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-    const lookForsCol = headers.indexOf('checkedLookFors') + 1;
+    const observationDataCol = headers.indexOf('observationData') + 1;
     const lastModifiedCol = headers.indexOf('lastModifiedAt') + 1;
 
-    if (lookForsCol === 0) {
-        return { success: false, error: 'checkedLookFors column not found in the sheet.' };
+    if (observationDataCol === 0) {
+        return { success: false, error: 'observationData column not found in the sheet.' };
     }
 
-    const lookForsCell = sheet.getRange(row, lookForsCol);
-    const currentLookForsString = lookForsCell.getValue();
-    let currentLookFors = {};
+    const observationDataCell = sheet.getRange(row, observationDataCol);
+    const currentDataString = observationDataCell.getValue();
+    let observationData = {};
     try {
-        if (currentLookForsString) {
-            currentLookFors = JSON.parse(currentLookForsString);
+        if (currentDataString) {
+            observationData = JSON.parse(currentDataString);
         }
     } catch (e) {
-        console.warn(`Could not parse checkedLookFors for ${observationId}. Starting fresh. Data: ${currentLookForsString}`);
+        console.warn(`Could not parse observationData for ${observationId}. Starting fresh. Data: ${currentDataString}`);
     }
 
-    if (!currentLookFors[componentId]) {
-        currentLookFors[componentId] = [];
+    if (!observationData[componentId]) {
+        observationData[componentId] = { lookfors: [], proficiency: '', notes: '' };
+    } else if (!observationData[componentId].lookfors) {
+        observationData[componentId].lookfors = [];
     }
 
-    const set = new Set(currentLookFors[componentId]);
+    const set = new Set(observationData[componentId].lookfors);
 
     if (isChecked) {
         set.add(lookForText);
@@ -107,10 +109,9 @@ function saveLookForSelection(observationId, componentId, lookForText, isChecked
         set.delete(lookForText);
     }
 
-    currentLookFors[componentId] = Array.from(set);
+    observationData[componentId].lookfors = Array.from(set);
 
-
-    lookForsCell.setValue(JSON.stringify(currentLookFors));
+    observationDataCell.setValue(JSON.stringify(observationData, null, 2));
     if (lastModifiedCol > 0) {
         sheet.getRange(row, lastModifiedCol).setValue(new Date().toISOString());
     }
@@ -300,7 +301,7 @@ function _findObservationRow(sheet, observationId) {
  * @param {string} proficiency The selected proficiency level (e.g., "proficient").
  * @returns {Object} A response object with success status.
  */
-function saveProficiencySelection(observationId, componentId, proficiency) {
+function _saveProficiencySelection(observationId, componentId, proficiency) {
   if (!observationId || !componentId || !proficiency) {
     return { success: false, error: 'Observation ID, component ID, and proficiency level are required.' };
   }
@@ -337,8 +338,18 @@ function saveProficiencySelection(observationId, componentId, proficiency) {
         console.warn(`Could not parse observationData for ${observationId}. Starting fresh. Data: ${currentDataString}`);
     }
 
-    // Update the data
-    currentData[componentId] = proficiency;
+    // Update the data using unified structure
+    if (!currentData[componentId]) {
+        currentData[componentId] = {};
+    }
+    
+    // Preserve existing lookfors and notes when updating proficiency
+    const existingData = currentData[componentId];
+    currentData[componentId] = {
+        proficiency: proficiency,
+        lookfors: existingData.lookfors || [],
+        notes: existingData.notes || ''
+    };
 
     // Write the updated data back to the sheet
     observationDataCell.setValue(JSON.stringify(currentData, null, 2));
@@ -793,7 +804,7 @@ function updateObservationPdfUrl(observationId, pdfUrl) {
 }
 
 
-function saveObservationNotes(observationId, componentId, notesContent) {
+function _saveObservationNotes(observationId, componentId, notesContent) {
   if (!observationId || !componentId) {
     return { success: false, error: 'Observation ID and component ID are required.' };
   }
@@ -807,26 +818,31 @@ function saveObservationNotes(observationId, componentId, notesContent) {
     if (row === -1) return { success: false, error: 'Observation not found.' };
 
     const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-    const notesCol = headers.indexOf('observationNotes') + 1;
+    const observationDataCol = headers.indexOf('observationData') + 1;
     const lastModifiedCol = headers.indexOf('lastModifiedAt') + 1;
 
-    if (notesCol === 0) {
-        return { success: false, error: 'observationNotes column not found.' };
+    if (observationDataCol === 0) {
+        return { success: false, error: 'observationData column not found.' };
     }
 
-    const notesCell = sheet.getRange(row, notesCol);
-    const currentNotesString = notesCell.getValue();
-    let currentNotes = {};
+    const observationDataCell = sheet.getRange(row, observationDataCol);
+    const currentDataString = observationDataCell.getValue();
+    let observationData = {};
     try {
-        if(currentNotesString) currentNotes = JSON.parse(currentNotesString);
+        if(currentDataString) observationData = JSON.parse(currentDataString);
     } catch(e){
-        console.warn(`Could not parse observationNotes for ${observationId}.`);
+        console.warn(`Could not parse observationData for ${observationId}.`);
     }
 
-    // Sanitize HTML content before saving
-    currentNotes[componentId] = sanitizeHtml(notesContent);
+    // Ensure the component exists in the data structure
+    if (!observationData[componentId]) {
+        observationData[componentId] = { lookfors: [], proficiency: '', notes: '' };
+    }
+    
+    // Sanitize HTML content before saving to unified structure
+    observationData[componentId].notes = sanitizeHtml(notesContent);
 
-    notesCell.setValue(JSON.stringify(currentNotes, null, 2));
+    observationDataCell.setValue(JSON.stringify(observationData, null, 2));
     if(lastModifiedCol > 0){
         sheet.getRange(row, lastModifiedCol).setValue(new Date().toISOString());
     }

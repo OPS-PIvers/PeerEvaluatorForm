@@ -1171,7 +1171,7 @@
                                             <div class="look-for-item">
                                                 <?
                                                     var practiceText = component.bestPractices[j];
-                                                    var checkedLookForsForComponent = (data.observation && data.observation.checkedLookFors && data.observation.checkedLookFors[component.componentId]) || [];
+                                                    var checkedLookForsForComponent = (data.observation && data.observation.observationData && data.observation.observationData[component.componentId] && data.observation.observationData[component.componentId].lookfors) || [];
                                                     var isChecked = checkedLookForsForComponent.includes(practiceText);
                                                 ?>
                                                 <input type="checkbox" id="practice-<?= component.componentId ?>-<?= j ?>" onchange="handleLookForChange(this, '<?= jsStringEscape(component.componentId) ?>')" <?= isChecked ? 'checked' : '' ?>>
@@ -2174,7 +2174,7 @@
             }, 3000);
         }
 
-        let observationNotes = (data && data.observation && data.observation.observationNotes) ? data.observation.observationNotes : {};
+        let observationNotes = (data && data.observation && data.observation.observationData) ? data.observation.observationData : {};
         let currentObservationId = (data && data.observation && data.observation.observationId) ? data.observation.observationId : null;
 
         // Store Quill instances
@@ -2239,9 +2239,9 @@
                             }
                         });
 
-                        // Load existing notes
-                        if (observationNotes[componentId]) {
-                            editor.root.innerHTML = observationNotes[componentId];
+                        // Load existing notes from unified structure
+                        if (observationNotes[componentId] && observationNotes[componentId].notes) {
+                            editor.root.innerHTML = observationNotes[componentId].notes;
                         }
 
                         // Add debounced auto-save
