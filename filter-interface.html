@@ -7,6 +7,10 @@
     
     <!-- Content Security Policy - Allow framing from any origin -->
     <meta http-equiv="Content-Security-Policy" content="frame-ancestors *;">
+    
+    <!-- Quill.js for rich text editing -->
+    <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+    <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
     <style>
 :root {
     --color-white: white;
@@ -392,6 +396,145 @@
             .level-header, .row-label, .level-content { border-right: none; padding: 15px; font-size: 0.9rem; }
             .toast-notification { top: 10px; right: 10px; left: 10px; right: 10px; max-width: none; }
         }
+
+        /* Evidence Section Styles */
+        .evidence-section {
+            border-top: 1px solid #e2e8f0;
+            margin-top: 10px;
+        }
+
+        .evidence-toggle-btn {
+            background: linear-gradient(135deg, #3182ce, #2b77cb);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            width: 100%;
+            text-align: left;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.85rem;
+            transition: background 0.3s ease;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .evidence-toggle-btn:hover {
+            background: linear-gradient(135deg, #2b77cb, #2c5aa0);
+        }
+
+        .evidence-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+            background: #f8fafc;
+        }
+
+        .evidence-content.expanded {
+            max-height: 800px;
+        }
+
+        .notes-container {
+            padding: 15px 20px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .notes-container h4 {
+            color: #4a5568;
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        .look-fors-container {
+            padding: 15px 20px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .look-fors-container h4 {
+            color: #4a5568;
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        .look-fors-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 8px;
+        }
+
+        .look-for-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            padding: 8px;
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 4px;
+        }
+
+        .look-for-item input[type="checkbox"] {
+            margin-top: 2px;
+            flex-shrink: 0;
+        }
+
+        .look-for-item label {
+            font-size: 0.85rem;
+            line-height: 1.4;
+            cursor: pointer;
+        }
+
+        .media-upload-container {
+            padding: 15px 20px;
+        }
+
+        .media-upload-container h4 {
+            color: #4a5568;
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        .media-upload-input {
+            margin-bottom: 10px;
+            padding: 8px;
+            border: 1px solid #e2e8f0;
+            border-radius: 4px;
+            width: 100%;
+        }
+
+        .media-upload-button {
+            background: #3182ce;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85rem;
+        }
+
+        .media-upload-button:hover {
+            background: #2b77cb;
+        }
+
+        .media-links-container {
+            margin-top: 10px;
+        }
+
+        .evidence-item {
+            margin-bottom: 5px;
+        }
+
+        .evidence-item a {
+            color: #3182ce;
+            text-decoration: none;
+            font-size: 0.85rem;
+        }
+
+        .evidence-item a:hover {
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
@@ -770,30 +913,51 @@
                     });
                     html += `</div>`;
 
-                    if (comp.bestPractices && comp.bestPractices.length > 0) {
-                        const lookForsId = `domain-${domainIdx}-component-${compIdx}`;
-                        html += `<div class="look-fors-section">`;
-                        html += `<div class="look-fors-header" onclick="toggleLookFors('${lookForsId}')">`;
-                        html += `<span>Best Practices aligned with 5D+ and PELSB Standards</span>`;
-                        html += `<span class="chevron" id="chevron-${lookForsId}">▼</span>`;
+                    // Unified Notes & Evidence section for all users, with editing only for evaluators
+                    html += `<div class="evidence-section">`;
+                    html += `<button class="evidence-toggle-btn" onclick="toggleEvidenceSection('evidence-${componentId}')">`;
+                    html += `<span>📝</span> Notes & Evidence`;
+                    html += `</button>`;
+                    html += `<div class="evidence-content" id="evidence-${componentId}">`;
+                    
+                    // Notes container (only for evaluators)
+                    if (isEvaluator) {
+                        html += `<div class="notes-container">`;
+                        html += `<h4>Observation Notes</h4>`;
+                        html += `<div id="notes-editor-${componentId}"></div>`;
                         html += `</div>`;
-                        html += `<div class="look-fors-content" id="lookForsContent-${lookForsId}">`;
-                        html += `<div class="look-fors-grid">`;
-                        comp.bestPractices.forEach((practice, practiceIdx) => {
-                            const practiceId = `practice-${domainIdx}-${compIdx}-${practiceIdx}`;
-                            const sanitizedPractice = escapeHtml(practice);
-                            html += `<div class="look-for-item">`;
-                            html += `<input type="checkbox" id="${practiceId}" name="${practiceId}"><label for="${practiceId}">${sanitizedPractice}</label>`;
-                            html += `</div>`;
-                        });
-                        html += `</div></div></div>`;
                     }
                     
+                    // Look-fors section (always shown if available)
+                    if (comp.bestPractices && comp.bestPractices.length > 0) {
+                        html += `<div class="look-fors-container">`;
+                        html += `<h4>Best Practices (Look-fors)</h4>`;
+                        html += `<div class="look-fors-grid">`;
+                        comp.bestPractices.forEach((practice, practiceIdx) => {
+                            const practiceId = `practice-${componentId}-${practiceIdx}`;
+                            const sanitizedPractice = escapeHtml(practice);
+                            const onchangeHandler = isEvaluator ? `onchange="handleLookForChange(this, '${componentId}')"` : '';
+                            html += `<div class="look-for-item">`;
+                            html += `<input type="checkbox" id="${practiceId}" ${onchangeHandler}><label for="${practiceId}">${sanitizedPractice}</label>`;
+                            html += `</div>`;
+                        });
+                        html += `</div></div>`;
+                    }
+                    
+                    // Media upload section (only for evaluators)
                     if (isEvaluator) {
                         let evidenceHtml = '';
                         evidence.forEach(item => { evidenceHtml += `<div class="evidence-item"><a href="${item.url}" target="_blank" rel="noopener noreferrer">${item.name}</a></div>`; });
-                        html += `<div class="media-upload-section"><div class="media-upload-title">📷 Upload Evidence for ${componentId}</div><div class="media-upload-area"><label class="media-upload-label" for="file-upload-${componentId}">Choose File</label><input class="media-upload-input" id="file-upload-${componentId}" type="file" onchange="uploadFile(this, '${componentId}')"><span class="upload-status" id="upload-status-${componentId}">No file selected.</span></div><div class="evidence-list" id="evidence-list-${componentId}">${evidenceHtml}</div></div>`;
+                        html += `<div class="media-upload-container">`;
+                        html += `<h4>Upload Evidence</h4>`;
+                        html += `<input type="file" class="media-upload-input" id="media-upload-${componentId}">`;
+                        html += `<button class="media-upload-button" onclick="handleMediaUpload('${componentId}')">Upload</button>`;
+                        html += `<div class="media-links-container" data-component-id="${componentId}">`;
+                        html += `<ul>${evidenceHtml}</ul>`;
+                        html += `</div></div>`;
                     }
+                    
+                    html += `</div></div>`;
                     html += `</div>`;
                 });
                 html += `</div>`;
@@ -913,6 +1077,132 @@
                 btn.textContent = 'View Assigned Areas Only';
                 components.forEach(comp => { comp.style.display = ''; });
             }
+        }
+        
+        // Initialize Quill instances and observation notes tracking
+        const quillInstances = {};
+        let observationNotes = {};
+        
+        function toggleEvidenceSection(contentId) {
+            console.log('toggleEvidenceSection called with:', contentId);
+            const content = document.getElementById(contentId);
+            if (!content) {
+                console.error('Evidence content element not found:', contentId);
+                return;
+            }
+            console.log('Found evidence content element:', content);
+
+            const isExpanded = content.classList.toggle('expanded');
+            console.log('Evidence section expanded state:', isExpanded);
+            const componentId = contentId.replace('evidence-', '');
+            console.log('Component ID:', componentId);
+
+            // Initialize Quill on first expansion if not already initialized
+            if (isExpanded && !quillInstances[componentId]) {
+                console.log('Attempting to initialize Quill editor for:', componentId);
+                const editorId = '#notes-editor-' + componentId;
+                const editorElement = document.querySelector(editorId);
+                
+                if (editorElement) {
+                    console.log('Found editor element:', editorId);
+                    try {
+                        // Check if Quill is available
+                        if (typeof Quill === 'undefined') {
+                            console.error('Quill library is not loaded');
+                            return;
+                        }
+                        
+                        const editor = new Quill(editorId, {
+                            theme: 'snow',
+                            modules: {
+                                toolbar: [
+                                    [{ 'header': [1, 2, false] }],
+                                    ['bold', 'italic', 'underline'],
+                                    [{'list': 'ordered'}, {'list': 'bullet'}],
+                                    ['clean']
+                                ]
+                            }
+                        });
+                        console.log('Quill editor created successfully');
+
+                        // Load existing notes 
+                        if (observationNotes[componentId]) {
+                            editor.root.innerHTML = observationNotes[componentId];
+                            console.log('Loaded existing notes for component:', componentId);
+                        }
+
+                        // Add debounced auto-save
+                        let timeout;
+                        editor.on('text-change', () => {
+                            clearTimeout(timeout);
+                            timeout = setTimeout(() => {
+                                saveNotes(componentId, editor.root.innerHTML);
+                            }, 1500); // Save 1.5 seconds after typing stops
+                        });
+
+                        quillInstances[componentId] = editor;
+                        console.log('Quill editor initialized for component:', componentId);
+                    } catch (error) {
+                        console.error('Error initializing Quill editor:', error);
+                    }
+                } else {
+                    console.error('Notes editor element not found:', editorId);
+                }
+            } else if (isExpanded) {
+                console.log('Quill instance already exists for component:', componentId);
+            }
+
+            // Store state in sessionStorage for persistence
+            try {
+                const storageKey = 'evidenceState_' + (window.pageLoadInfo?.cacheVersion || 'default');
+                const allStates = JSON.parse(sessionStorage.getItem(storageKey) || '{}');
+                allStates[componentId] = isExpanded;
+                sessionStorage.setItem(storageKey, JSON.stringify(allStates));
+            } catch (e) {
+                console.warn('Could not save evidence section state:', e);
+            }
+        }
+        
+        function saveNotes(componentId, content) {
+            if (!currentObservationId) {
+                console.error('Cannot save notes: No observation context available.');
+                showToast('Error: No active observation found. Cannot save notes.');
+                return;
+            }
+
+            // Update local data
+            observationNotes[componentId] = content;
+
+            google.script.run
+                .withSuccessHandler(() => console.log(`Notes saved for ${componentId}`))
+                .withFailureHandler(error => {
+                    console.error('Failed to save notes:', error);
+                    showToast('Error saving notes. Please check your connection.');
+                })
+                .saveObservationNotes(currentObservationId, componentId, content);
+        }
+        
+        function handleLookForChange(checkbox, componentId) {
+            const lookForText = checkbox.nextElementSibling.textContent;
+            const isChecked = checkbox.checked;
+
+            if (!currentObservationId) {
+                console.error('Cannot save look-for selection: Observation context not available.');
+                checkbox.checked = !isChecked; // Revert the checkbox state
+                showToast('Error: No active observation found. Cannot save selection.');
+                return;
+            }
+
+            google.script.run
+                .withSuccessHandler(() => {
+                    console.log(`Saved look-for: ${componentId} -> ${lookForText}`);
+                })
+                .withFailureHandler(error => {
+                    console.error('Save failed:', error);
+                    checkbox.checked = !isChecked; // Revert the checkbox state on failure
+                    showToast('Failed to save look-for selection. Please check your connection.');
+                })
+                .saveLookForSelection(currentObservationId, componentId, lookForText, isChecked);
         }
         
         document.addEventListener('DOMContentLoaded', () => {

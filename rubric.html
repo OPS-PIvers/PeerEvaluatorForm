@@ -18,9 +18,7 @@
     <meta name="generator" content="Google Apps Script">
     <meta name="robots" content="noindex, nofollow">
 
-    <!-- In <head> -->
-    <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
-    <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+    <!-- Read-only rubric - no Quill.js needed -->
 
     <!-- Response Metadata (from server) -->
     <? if (data.userContext && data.userContext.responseMetadata) { ?>
@@ -1161,10 +1159,12 @@
                                 <span>📝</span> Notes & Evidence
                             </button>
                             <div class="evidence-content" id="evidence-<?= component.componentId ?>">
+                                <? if (data.observation && data.observation.observationNotes && data.observation.observationNotes[component.componentId]) { ?>
                                 <div class="notes-container">
                                     <h4>Observation Notes</h4>
-                                    <div id="notes-editor-<?= component.componentId ?>"></div>
+                                    <div class="notes-display"><?= data.observation.observationNotes[component.componentId] ?></div>
                                 </div>
+                                <? } ?>
 
                                 <? if (component.bestPractices && component.bestPractices.length > 0) { ?>
                                 <div class="look-fors-container">
@@ -1177,7 +1177,7 @@
                                                     var checkedLookForsForComponent = (data.observation && data.observation.observationData && data.observation.observationData[component.componentId] && data.observation.observationData[component.componentId].lookfors) || [];
                                                     var isChecked = checkedLookForsForComponent.includes(practiceText);
                                                 ?>
-                                                <input type="checkbox" id="practice-<?= component.componentId ?>-<?= j ?>" onchange="handleLookForChange(this, '<?= jsStringEscape(component.componentId) ?>')" <?= isChecked ? 'checked' : '' ?>>
+                                                <input type="checkbox" id="practice-<?= component.componentId ?>-<?= j ?>" <?= isChecked ? 'checked' : '' ?> disabled>
                                                 <label for="practice-<?= component.componentId ?>-<?= j ?>"><?= practiceText ?></label>
                                             </div>
                                         <? } ?>
@@ -1951,33 +1951,7 @@
                 }
             });
 
-            // Add click handlers for rating cells
-            const ratingCells = document.querySelectorAll('.rating-cell');
-            ratingCells.forEach(function(cell) {
-                cell.addEventListener('click', function() {
-                    handleRatingCellClick(cell);
-                });
-            });
-
-            // Auto-expand evidence sections for evaluators and initialize editors
-            if (data && data.userContext && data.userContext.isEvaluator) {
-                console.log('Peer Evaluator detected, auto-expanding all evidence sections.');
-                const evidenceSections = document.querySelectorAll('.evidence-content');
-                console.log('Found evidence sections:', evidenceSections.length);
-                evidenceSections.forEach(section => {
-                    const contentId = section.id;
-                    console.log('Processing evidence section:', contentId);
-                    // Check if the section is not already expanded to avoid re-initializing
-                    if (contentId && !section.classList.contains('expanded')) {
-                        console.log('Expanding evidence section:', contentId);
-                        toggleEvidenceSection(contentId);
-                    } else {
-                        console.log('Evidence section already expanded or invalid:', contentId);
-                    }
-                });
-            } else {
-                console.log('Not a peer evaluator or missing user context');
-            }
+            // Read-only mode - rating cells display selections but are not clickable
         });
         
         // Show/hide back to top button
@@ -2175,261 +2149,16 @@
             }, 3000);
         }
 
-        let observationNotes = (data && data.observation && data.observation.observationData) ? data.observation.observationData : {};
-        let currentObservationId = (data && data.observation && data.observation.observationId) ? data.observation.observationId : null;
-
-        // Store Quill instances
-        const quillInstances = {};
+        // Read-only display mode - no editing functionality
 
 
-        function saveNotes(componentId, content) {
-            if (!currentObservationId) {
-                console.error('Cannot save notes: No observation context available.', {
-                    componentId: componentId,
-                    hasData: typeof data !== 'undefined',
-                    hasObservation: data && data.observation,
-                    hasObservationId: data && data.observation && data.observation.observationId,
-                    currentObservationId: currentObservationId,
-                    userContext: data && data.userContext ? {
-                        isEvaluator: data.userContext.isEvaluator,
-                        role: data.userContext.role
-                    } : null
-                });
-                showToast('Error: No active observation found. Cannot save notes.');
-                return;
-            }
 
-            // Update local data
-            observationNotes[componentId] = content;
-
-            google.script.run
-                .withSuccessHandler(() => console.log(`Notes saved for ${componentId}`))
-                .withFailureHandler(error => {
-                    console.error('Failed to save notes:', error);
-                    showToast('Error saving notes. Please check your connection.');
-                })
-                .saveObservationNotes(currentObservationId, componentId, content);
-        }
-
+        // Simple read-only toggle for evidence sections
         function toggleEvidenceSection(contentId) {
-            console.log('toggleEvidenceSection called with:', contentId);
             const content = document.getElementById(contentId);
-            if (!content) {
-                console.error('Evidence content element not found:', contentId);
-                return;
+            if (content) {
+                content.classList.toggle('expanded');
             }
-            console.log('Found evidence content element:', content);
-
-            const isExpanded = content.classList.toggle('expanded');
-            console.log('Evidence section expanded state:', isExpanded);
-            const componentId = contentId.replace('evidence-', '');
-            console.log('Component ID:', componentId);
-
-            // Initialize Quill on first expansion if not already initialized
-            if (isExpanded && !quillInstances[componentId]) {
-                console.log('Attempting to initialize Quill editor for:', componentId);
-                const editorId = '#notes-editor-' + componentId;
-                const editorElement = document.querySelector(editorId);
-                
-                if (editorElement) {
-                    console.log('Found editor element:', editorId);
-                    try {
-                        // Check if Quill is available
-                        if (typeof Quill === 'undefined') {
-                            console.error('Quill library is not loaded');
-                            return;
-                        }
-                        
-                        const editor = new Quill(editorId, {
-                            theme: 'snow',
-                            modules: {
-                                toolbar: [
-                                    [{ 'header': [1, 2, false] }],
-                                    ['bold', 'italic', 'underline'],
-                                    [{'list': 'ordered'}, {'list': 'bullet'}],
-                                    ['clean']
-                                ]
-                            }
-                        });
-                        console.log('Quill editor created successfully');
-
-                        // Load existing notes from unified structure
-                        if (observationNotes[componentId] && observationNotes[componentId].notes) {
-                            editor.root.innerHTML = observationNotes[componentId].notes;
-                            console.log('Loaded existing notes for component:', componentId);
-                        }
-
-                        // Add debounced auto-save
-                        let timeout;
-                        editor.on('text-change', () => {
-                            clearTimeout(timeout);
-                            timeout = setTimeout(() => {
-                                saveNotes(componentId, editor.root.innerHTML);
-                            }, 1500); // Save 1.5 seconds after typing stops
-                        });
-
-                        quillInstances[componentId] = editor;
-                        console.log('Quill editor initialized for component:', componentId);
-                    } catch (error) {
-                        console.error('Error initializing Quill editor:', error);
-                    }
-                } else {
-                    console.error('Notes editor element not found:', editorId);
-                }
-            } else if (isExpanded) {
-                console.log('Quill instance already exists for component:', componentId);
-            }
-
-            // Store state in sessionStorage for persistence
-            try {
-                const storageKey = 'evidenceState_' + (window.pageLoadInfo?.cacheVersion || 'default');
-                const allStates = JSON.parse(sessionStorage.getItem(storageKey) || '{}');
-                allStates[componentId] = isExpanded;
-                sessionStorage.setItem(storageKey, JSON.stringify(allStates));
-            } catch (e) {
-                console.warn('Could not save evidence section state:', e);
-            }
-        }
-
-        function handleLookForChange(checkbox, componentId) {
-            const lookForText = checkbox.nextElementSibling.textContent;
-            const isChecked = checkbox.checked;
-
-            let observationId = (data?.observation?.observationId) || (data?.observationId) || null;
-
-            if (!observationId) {
-                console.error('Cannot save look-for selection: Observation context not available.');
-                checkbox.checked = !isChecked; // Revert the checkbox state
-                showToast('Error: No active observation found. Cannot save selection.');
-                return;
-            }
-
-            google.script.run
-                .withSuccessHandler(() => {
-                    console.log(`Saved look-for: ${componentId} -> ${lookForText}`);
-                })
-                .withFailureHandler(error => {
-                    console.error('Save failed:', error);
-                    checkbox.checked = !isChecked; // Revert the checkbox state on failure
-                    showToast('Failed to save look-for selection. Please check your connection.');
-                })
-                .saveLookForSelection(observationId, componentId, lookForText, isChecked);
-        }
-
-        function handleRatingCellClick(cell) {
-            // Ensure this only runs in evaluator mode
-            if (!data.userContext || !data.userContext.isEvaluator) {
-                console.log('Not in evaluator mode. Ignoring click.');
-                return;
-            }
-
-            const componentId = cell.dataset.componentId;
-            const rating = cell.dataset.rating;
-            
-            let observationId = undefined;
-            if (typeof data !== 'undefined' && data && data.observation && data.observation.observationId) {
-                observationId = data.observation.observationId;
-            } else if (typeof data !== 'undefined' && data && data.observationId) {
-                observationId = data.observationId;
-            }
-
-            if (!componentId || !rating || !observationId) {
-                console.error('Missing data for rating selection:', { componentId, rating, observationId });
-                alert('Cannot save rating: Observation context not available.');
-                return;
-            }
-
-            const parentRow = cell.parentNode;
-            const currentlySelected = parentRow.querySelector('.selected');
-
-            // --- Instant UI Update ---
-            if (currentlySelected) {
-                currentlySelected.classList.remove('selected');
-            }
-            cell.classList.add('selected');
-
-            // --- Background Save ---
-            google.script.run
-                .withSuccessHandler(function(response) {
-                    if (response.success) {
-                        console.log('Saved:', { componentId, rating });
-                        // Optionally show a small success indicator
-                    } else {
-                        console.error('Failed to save rating:', response.error);
-                        // --- Revert UI on Failure ---
-                        cell.classList.remove('selected');
-                        if (currentlySelected) {
-                            currentlySelected.classList.add('selected');
-                        }
-                        showToast('Error saving selection: ' + response.error);
-                    }
-                })
-                .withFailureHandler(function(error) {
-                    console.error('Server error saving rating:', error);
-                    // --- Revert UI on Failure ---
-                    cell.classList.remove('selected');
-                    if (currentlySelected) {
-                        currentlySelected.classList.add('selected');
-                    }
-                    showToast('Server error: ' + error.message);
-                })
-                .saveProficiencySelection(observationId, componentId, rating);
-        }
-
-
-        function handleMediaUpload(componentId) {
-            const fileInput = document.getElementById(`media-upload-${componentId}`);
-            const file = fileInput.files[0];
-            if (!file) {
-                showToast('Please select a file first.');
-                return;
-            }
-
-            if (!currentObservationId) {
-                console.error('Cannot save observation notes: No observation context available.', {
-                    hasData: typeof data !== 'undefined',
-                    hasObservation: data && data.observation,
-                    hasObservationId: data && data.observation && data.observation.observationId,
-                    currentObservationId: currentObservationId,
-                    componentId: componentId,
-                    userContext: data && data.userContext ? {
-                        isEvaluator: data.userContext.isEvaluator,
-                        role: data.userContext.role
-                    } : null
-                });
-                showToast('Error: No active observation found. Please ensure you are in observation editing mode.');
-                return;
-            }
-
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const base64Data = e.target.result.split(',')[1];
-                showToast('Uploading file...');
-
-                google.script.run
-                    .withSuccessHandler(function(result) {
-                        if (result.success) {
-                            showToast('File uploaded successfully!');
-                            fileInput.value = '';
-                            
-                            // Update the media links container
-                            const container = document.querySelector(`[data-component-id="${componentId}"] ul`);
-                            if (container) {
-                                const linkItem = document.createElement('li');
-                                linkItem.innerHTML = `<a href="${result.fileUrl}" target="_blank">${result.fileName}</a>`;
-                                container.appendChild(linkItem);
-                            }
-                        } else {
-                            showToast('Upload failed: ' + (result.error || 'Unknown error'));
-                        }
-                    })
-                    .withFailureHandler(function(error) {
-                        console.error('Upload error:', error);
-                        showToast('Upload failed. Please check your connection.');
-                    })
-                    .uploadMediaEvidence(currentObservationId, componentId, base64Data, file.name, file.type);
-            };
-            reader.readAsDataURL(file);
         }
 
     </script>
