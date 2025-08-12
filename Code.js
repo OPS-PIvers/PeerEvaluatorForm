@@ -295,6 +295,23 @@ function deleteObservation(observationId) {
 }
 
 /**
+ * Helper function to find the row number for a given observation ID in the sheet.
+ * @param {GoogleAppsScript.Spreadsheet.Sheet} sheet The observation data sheet.
+ * @param {string} observationId The ID of the observation to find.
+ * @returns {number} The 1-based row number, or -1 if not found.
+ */
+function findObservationRow(sheet, observationId) {
+    const idColumn = 1; // Assuming observationId is in column A
+    const ids = sheet.getRange(2, idColumn, sheet.getLastRow() - 1, 1).getValues();
+    for (let i = 0; i < ids.length; i++) {
+        if (ids[i][0] === observationId) {
+            return i + 2; // +2 because data starts at row 2 and i is 0-indexed
+        }
+    }
+    return -1;
+}
+
+/**
  * Saves a look-for selection for an observation component.
  * @param {string} observationId The ID of the observation to update.
  * @param {string} key The key for the look-for category.
@@ -320,12 +337,12 @@ function saveLookForSelection(observationId, key, lookForText, isChecked) {
             
             try {
                 const spreadsheet = openSpreadsheet();
-                const sheet = getSheetByName(spreadsheet, OBSERVATION_SHEET_NAME);
+                const sheet = getSheetByName(spreadsheet, "Observation_Data");
                 if (!sheet) {
-                    throw new Error(`Sheet "${OBSERVATION_SHEET_NAME}" not found.`);
+                    throw new Error(`Sheet "Observation_Data" not found.`);
                 }
                 
-                const row = _findObservationRow(sheet, observationId);
+                const row = findObservationRow(sheet, observationId);
                 if (row === -1) {
                     return { success: false, error: 'Observation not found.' };
                 }
@@ -407,12 +424,12 @@ function saveProficiencySelection(observationId, componentId, proficiency) {
             
             try {
                 const spreadsheet = openSpreadsheet();
-                const sheet = getSheetByName(spreadsheet, OBSERVATION_SHEET_NAME);
+                const sheet = getSheetByName(spreadsheet, "Observation_Data");
                 if (!sheet) {
-                    throw new Error(`Sheet "${OBSERVATION_SHEET_NAME}" not found.`);
+                    throw new Error(`Sheet "Observation_Data" not found.`);
                 }
                 
-                const row = _findObservationRow(sheet, observationId);
+                const row = findObservationRow(sheet, observationId);
                 if (row === -1) {
                     return { success: false, error: 'Observation not found.' };
                 }
@@ -480,10 +497,10 @@ function saveObservationNotes(observationId, componentId, notesContent) {
             
             try {
                 const spreadsheet = openSpreadsheet();
-                const sheet = getSheetByName(spreadsheet, OBSERVATION_SHEET_NAME);
-                if (!sheet) throw new Error(`Sheet "${OBSERVATION_SHEET_NAME}" not found.`);
+                const sheet = getSheetByName(spreadsheet, "Observation_Data");
+                if (!sheet) throw new Error(`Sheet "Observation_Data" not found.`);
                 
-                const row = _findObservationRow(sheet, observationId);
+                const row = findObservationRow(sheet, observationId);
                 if (row === -1) return { success: false, error: 'Observation not found.' };
                 
                 const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
@@ -555,9 +572,9 @@ function finalizeObservation(observationId) {
             // The PDF URL is now available, let's save it to the observation
             // Update the observation with the PDF URL directly in the sheet
             const spreadsheet = openSpreadsheet();
-            const sheet = getSheetByName(spreadsheet, OBSERVATION_SHEET_NAME);
+            const sheet = getSheetByName(spreadsheet, "Observation_Data");
             if (sheet) {
-                const row = _findObservationRow(sheet, observationId);
+                const row = findObservationRow(sheet, observationId);
                 if (row !== -1) {
                     const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
                     const pdfUrlCol = headers.indexOf('pdfUrl') + 1;
@@ -591,9 +608,9 @@ function finalizeObservation(observationId) {
             
             // Update PDF status to indicate failure
             const spreadsheet = openSpreadsheet();
-            const sheet = getSheetByName(spreadsheet, OBSERVATION_SHEET_NAME);
+            const sheet = getSheetByName(spreadsheet, "Observation_Data");
             if (sheet) {
-                const row = _findObservationRow(sheet, observationId);
+                const row = findObservationRow(sheet, observationId);
                 if (row !== -1) {
                     const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
                     const pdfStatusCol = headers.indexOf('pdfStatus') + 1;
@@ -714,12 +731,12 @@ function updateObservationMetadata(observationId, metadata) {
         }
 
         const spreadsheet = openSpreadsheet();
-        const sheet = getSheetByName(spreadsheet, OBSERVATION_SHEET_NAME);
+        const sheet = getSheetByName(spreadsheet, "Observation_Data");
         if (!sheet) {
-            return { success: false, error: `Sheet '${OBSERVATION_SHEET_NAME}' not found.` };
+            return { success: false, error: `Sheet '${"Observation_Data"}' not found.` };
         }
 
-        const row = _findObservationRow(sheet, observationId);
+        const row = findObservationRow(sheet, observationId);
         if (row === -1) {
             return { success: false, error: 'Observation row not found in the sheet.' };
         }
@@ -1242,9 +1259,9 @@ function regenerateObservationPdf(observationId) {
         if (pdfResult.success) {
             // Update the observation with the new PDF URL and status
             const spreadsheet = openSpreadsheet();
-            const sheet = getSheetByName(spreadsheet, OBSERVATION_SHEET_NAME);
+            const sheet = getSheetByName(spreadsheet, "Observation_Data");
             if (sheet) {
-                const row = _findObservationRow(sheet, observationId);
+                const row = findObservationRow(sheet, observationId);
                 if (row !== -1) {
                     const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
                     const pdfUrlCol = headers.indexOf('pdfUrl') + 1;
@@ -1270,9 +1287,9 @@ function regenerateObservationPdf(observationId) {
         } else {
             // PDF regeneration failed - update status
             const spreadsheet = openSpreadsheet();
-            const sheet = getSheetByName(spreadsheet, OBSERVATION_SHEET_NAME);
+            const sheet = getSheetByName(spreadsheet, "Observation_Data");
             if (sheet) {
-                const row = _findObservationRow(sheet, observationId);
+                const row = findObservationRow(sheet, observationId);
                 if (row !== -1) {
                     const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
                     const pdfStatusCol = headers.indexOf('pdfStatus') + 1;
