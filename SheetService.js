@@ -921,10 +921,7 @@ function clearAllSheetCache() {
  * Tests connectivity to all critical sheets
  * @return {Object} Test results for all sheets
  */
-/**
- * Ensures the Observation_Data sheet exists and has the correct headers.
- * This function is idempotent and can be called safely multiple times.
- */
+
 function setupObservationSheet() {
   try {
     const spreadsheet = openSpreadsheet();

@@ -913,12 +913,6 @@
             max-height: 800px;
         }
 
-        /* Auto-expand evidence sections for Peer Evaluators */
-        <? if (data.userContext && data.userContext.isEvaluator) { ?>
-        .evidence-content {
-            max-height: 800px;
-        }
-        <? } ?>
 
         .notes-container {
             padding: 15px 20px;
@@ -1177,8 +1171,7 @@
                                             <div class="look-for-item">
                                                 <?
                                                     var practiceText = component.bestPractices[j];
-                                                    var lookForKey = "Best Practices aligned with 5D+ and PELSB Standards: Subdomain [" + component.componentId.replace(':', '') + "]";
-                                                    var checkedLookForsForComponent = (data.observation && data.observation.checkedLookFors && data.observation.checkedLookFors[lookForKey]) || [];
+                                                    var checkedLookForsForComponent = (data.observation && data.observation.checkedLookFors && data.observation.checkedLookFors[component.componentId]) || [];
                                                     var isChecked = checkedLookForsForComponent.includes(practiceText);
                                                 ?>
                                                 <input type="checkbox" id="practice-<?= component.componentId ?>-<?= j ?>" onchange="handleLookForChange(this, '<?= jsStringEscape(component.componentId) ?>')" <?= isChecked ? 'checked' : '' ?>>
@@ -2263,52 +2256,26 @@
         function handleLookForChange(checkbox, componentId) {
             const lookForText = checkbox.nextElementSibling.textContent;
             const isChecked = checkbox.checked;
-            
-            // Debug logging
-            console.log('Look-for checkbox clicked:', {
-                componentId: componentId,
-                lookForText: lookForText,
-                isChecked: isChecked
-            });
 
-            let observationId = undefined;
-            if (typeof data !== 'undefined' && data && data.observation && data.observation.observationId) {
-                observationId = data.observation.observationId;
-            } else if (typeof data !== 'undefined' && data && data.observationId) {
-                observationId = data.observationId;
-            }
+            let observationId = (data && data.observation && data.observation.observationId) ? data.observation.observationId : null;
 
             if (!observationId) {
-                console.error('Cannot save look-for selection: Observation context not available.', {
-                    hasData: typeof data !== 'undefined',
-                    hasObservation: data && data.observation,
-                    hasObservationId: data && data.observation && data.observation.observationId,
-                    hasTopLevelId: data && data.observationId,
-                    currentObservationId: currentObservationId,
-                    userContext: data && data.userContext ? {
-                        isEvaluator: data.userContext.isEvaluator,
-                        role: data.userContext.role
-                    } : null
-                });
-                checkbox.checked = !isChecked; // Revert
-                showToast('Error: No active observation found. Please ensure you are in observation editing mode.');
+                console.error('Cannot save look-for selection: Observation context not available.');
+                checkbox.checked = !isChecked; // Revert the checkbox state
+                showToast('Error: No active observation found. Cannot save selection.');
                 return;
             }
 
-            // Construct the key as requested by the user, removing the colon from componentId
-            const key = "Best Practices aligned with 5D+ and PELSB Standards: Subdomain [" + componentId.replace(':', '') + "]";
-
             google.script.run
                 .withSuccessHandler(() => {
-                    console.log(`Saved look-for: ${key} -> ${lookForText}`);
+                    console.log(`Saved look-for: ${componentId} -> ${lookForText}`);
                 })
                 .withFailureHandler(error => {
                     console.error('Save failed:', error);
-                    // Revert the checkbox state on failure
-                    checkbox.checked = !isChecked;
+                    checkbox.checked = !isChecked; // Revert the checkbox state on failure
                     showToast('Failed to save look-for selection. Please check your connection.');
                 })
-                .saveLookForSelection(observationId, key, lookForText, isChecked);
+                .saveLookForSelection(observationId, componentId, lookForText, isChecked);
         }
 
         function handleRatingCellClick(cell) {
@@ -2434,6 +2401,19 @@
                     handleRatingCellClick(cell);
                 });
             });
+
+            // Auto-expand evidence sections for evaluators and initialize editors
+            if (data && data.userContext && data.userContext.isEvaluator) {
+                console.log('Peer Evaluator detected, auto-expanding all evidence sections.');
+                const evidenceSections = document.querySelectorAll('.evidence-content');
+                evidenceSections.forEach(section => {
+                    const contentId = section.id;
+                    // Check if the section is not already expanded to avoid re-initializing
+                    if (contentId && !section.classList.contains('expanded')) {
+                        toggleEvidenceSection(contentId);
+                    }
+                });
+            }
         });
     </script>
 </body>
