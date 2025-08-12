@@ -149,6 +149,40 @@ function escapeHtml(unsafe) {
 }
 
 /**
+ * Escapes a string for safe embedding in JavaScript string literals
+ * @param {string|null|undefined} unsafe - String to escape
+ * @return {string} JavaScript-safe string
+ */
+function jsStringEscape(unsafe) {
+  // Handle null and undefined by returning empty string
+  if (unsafe == null) {
+    return '';
+  }
+  
+  // Convert to string if not already a string
+  const str = String(unsafe);
+  
+  // Define the character mapping for JavaScript string escaping
+  const escapeMap = {
+    '\\': '\\\\',
+    "'": "\\'",
+    '"': '\\"',
+    '\n': '\\n',
+    '\r': '\\r',
+    '\t': '\\t',
+    '\b': '\\b',
+    '\f': '\\f',
+    '\v': '\\v',
+    '\0': '\\0'
+  };
+  
+  // Replace special characters
+  return str.replace(/[\\\'"'""''‚„\n\r\t\b\f\v\0]/g, function(match) {
+    return escapeMap[match] || match;
+  });
+}
+
+/**
  * Sanitizes text content by trimming whitespace and handling null values
  * @param {string|null|undefined} text - Text to sanitize
  * @return {string} Sanitized text

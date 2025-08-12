@@ -61,6 +61,9 @@ function saveLookForSelection(observationId, key, lookForText, isChecked) {
     return { success: false, error: 'Observation ID, key, and look-for text are required.' };
   }
 
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000); // Wait up to 30 seconds for the lock.
+
   try {
     const spreadsheet = openSpreadsheet();
     const sheet = getSheetByName(spreadsheet, OBSERVATION_SHEET_NAME);
@@ -85,10 +88,10 @@ function saveLookForSelection(observationId, key, lookForText, isChecked) {
     const currentLookForsString = lookForsCell.getValue();
     let currentLookFors = {};
     try {
-        if(currentLookForsString){
+        if (currentLookForsString) {
             currentLookFors = JSON.parse(currentLookForsString);
         }
-    } catch(e){
+    } catch (e) {
         console.warn(`Could not parse checkedLookFors for ${observationId}. Starting fresh. Data: ${currentLookForsString}`);
     }
 
@@ -107,8 +110,8 @@ function saveLookForSelection(observationId, key, lookForText, isChecked) {
         }
     }
 
-    lookForsCell.setValue(JSON.stringify(currentLookFors, null, 2));
-    if(lastModifiedCol > 0){
+    lookForsCell.setValue(JSON.stringify(currentLookFors));
+    if (lastModifiedCol > 0) {
         sheet.getRange(row, lastModifiedCol).setValue(new Date().toISOString());
     }
     SpreadsheetApp.flush();
@@ -118,6 +121,8 @@ function saveLookForSelection(observationId, key, lookForText, isChecked) {
   } catch (error) {
     console.error(`Error saving look-for for observation ${observationId}:`, error);
     return { success: false, error: 'An unexpected error occurred.' };
+  } finally {
+    lock.releaseLock();
   }
 }
 

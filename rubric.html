@@ -1079,7 +1079,7 @@
                                                 var checkedLookForsForComponent = (data.observation && data.observation.checkedLookFors && data.observation.checkedLookFors[lookForKey]) || [];
                                                 var isChecked = checkedLookForsForComponent.includes(practiceText);
                                             ?>
-                                            <input type="checkbox" id="practice-<?= domainIdx ?>-<?= i ?>-<?= j ?>" name="practice-<?= domainIdx ?>-<?= i ?>-<?= j ?>" onchange="handleLookForChange(this, '<?= component.componentId ?>')" <?= isChecked ? 'checked' : '' ?>>
+                                            <input type="checkbox" id="practice-<?= domainIdx ?>-<?= i ?>-<?= j ?>" name="practice-<?= domainIdx ?>-<?= i ?>-<?= j ?>" onchange="handleLookForChange(this, '<?= jsStringEscape(component.componentId) ?>')" <?= isChecked ? 'checked' : '' ?>>
                                             <label for="practice-<?= domainIdx ?>-<?= i ?>-<?= j ?>"><?= practiceText ?></label>
                                         </div>
                                     <? } ?>
