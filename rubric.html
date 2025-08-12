@@ -8,6 +8,9 @@
     <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate, max-age=0">
     <meta http-equiv="pragma" content="no-cache">
     <meta http-equiv="expires" content="0">
+    
+    <!-- Content Security Policy - Allow framing from any origin -->
+    <meta http-equiv="Content-Security-Policy" content="frame-ancestors *;">
 
     <!-- App Metadata -->
     <meta name="application-name" content="Danielson Framework">
@@ -1181,15 +1184,6 @@
                                     </div>
                                 </div>
                                 <? } ?>
-
-                                <div class="media-upload-container">
-                                    <h4>Upload Evidence</h4>
-                                    <input type="file" class="media-upload-input" id="media-upload-<?= component.componentId ?>">
-                                    <button class="media-upload-button" onclick="handleMediaUpload('<?= component.componentId ?>')">Upload</button>
-                                    <div class="media-links-container" data-component-id="<?= component.componentId ?>">
-                                        <ul><!-- Links will be populated here --></ul>
-                                    </div>
-                                </div>
                             </div>
                         </div>
                     </div>
