@@ -9,8 +9,8 @@
     <meta http-equiv="Content-Security-Policy" content="frame-ancestors *;">
     
     <!-- Quill.js for rich text editing -->
-    <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
-    <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+    <link href="https://cdn.quilljs.com/2.0.2/quill.snow.css" rel="stylesheet">
+    <script src="https://cdn.quilljs.com/2.0.2/quill.js"></script>
     <style>
 :root {
     --color-white: white;
@@ -302,8 +302,7 @@
         .look-fors-section { border-top: 1px solid var(--color-gray-border-medium); }
         .look-fors-header { background: linear-gradient(135deg, #3182ce, #2b77cb); color: white; padding: 10px 20px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-weight: 600; transition: background 0.3s ease; font-size: 0.85rem; }
         .look-fors-header:hover { background: linear-gradient(135deg, #2b77cb, #2c5aa0); }
-        .chevron { transition: transform 0.3s ease; font-size: 1rem; }
-        .chevron.expanded { transform: rotate(180deg); }
+        .chevron { transition: all 0.3s ease; font-size: 1rem; }
         .look-fors-content { max-height: 0; overflow: hidden; transition: max-height 0.3s ease; background: var(--color-gray-bg-light); }
         .look-fors-content.expanded { max-height: 1000px; }
         .look-fors-grid { padding: 12px 20px; display: grid; grid-template-columns: 1fr; gap: 8px; }
@@ -795,7 +794,7 @@
 
             if (content && chevron) {
                 const isExpanded = content.classList.toggle('expanded');
-                chevron.classList.toggle('expanded');
+                chevron.textContent = isExpanded ? '▼' : '▶';
                 try {
                     if (!window.pageLoadInfo) return;
                     const storageKey = `lookForsState_${window.pageLoadInfo.cacheVersion}`;
@@ -820,7 +819,7 @@
                         const chevron = document.getElementById(`chevron-${componentId}`);
                         if (content && chevron) {
                             content.classList.add('expanded');
-                            chevron.classList.add('expanded');
+                            chevron.textContent = '▼';
                         }
                     }
                 }
@@ -1103,10 +1102,9 @@
             const componentId = contentId.replace('evidence-', '');
             console.log('Component ID:', componentId);
 
-            // Toggle chevron rotation
+            // Toggle chevron
             const chevron = document.getElementById(`evidence-chevron-${componentId}`);
             if (chevron) {
-                chevron.classList.toggle('expanded');
                 chevron.textContent = isExpanded ? '▼' : '▶';
             }
 
@@ -1194,6 +1192,68 @@
                     showToast('Error saving notes. Please check your connection.');
                 })
                 .saveObservationNotes(currentObservationId, componentId, content);
+        }
+
+        function handleMediaUpload(componentId) {
+            const fileInput = document.getElementById(`media-upload-${componentId}`);
+            if (!fileInput) {
+                console.error('File input not found for component:', componentId);
+                return;
+            }
+
+            const file = fileInput.files[0];
+            if (!file) {
+                showToast('Please select a file to upload.');
+                return;
+            }
+
+            if (!currentObservationId) {
+                showToast('No observation selected. Please save the observation first.');
+                return;
+            }
+
+            showToast('Uploading file...', false);
+
+            // Convert file to base64 for Google Apps Script
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const fileData = {
+                    name: file.name,
+                    mimeType: file.type,
+                    content: e.target.result.split(',')[1], // Remove data:mime;base64, prefix
+                    size: file.size
+                };
+
+                google.script.run
+                    .withSuccessHandler(function(result) {
+                        if (result.success) {
+                            showToast('File uploaded successfully!', true);
+                            updateMediaLinks(componentId, result.fileUrl, result.fileName);
+                            fileInput.value = ''; // Clear the input
+                        } else {
+                            showToast('Upload failed: ' + result.error);
+                        }
+                    })
+                    .withFailureHandler(function(error) {
+                        console.error('Upload error:', error);
+                        showToast('Upload failed. Please try again.');
+                    })
+                    .uploadObservationEvidence(currentObservationId, componentId, fileData);
+            };
+            reader.onerror = function() {
+                showToast('Error reading file. Please try again.');
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function updateMediaLinks(componentId, fileUrl, fileName) {
+            const linksContainer = document.querySelector(`[data-component-id="${componentId}"] ul`);
+            if (linksContainer) {
+                const listItem = document.createElement('li');
+                listItem.className = 'evidence-item';
+                listItem.innerHTML = `<a href="${fileUrl}" target="_blank">${fileName}</a>`;
+                linksContainer.appendChild(listItem);
+            }
         }
         
         function handleLookForChange(checkbox, componentId) {
