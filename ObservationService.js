@@ -51,7 +51,7 @@ function _getObservationsDb() {
 /**
  * Saves a look-for selection for a specific component in an observation.
  * @param {string} observationId The ID of the observation to update.
- * @param {string} key The key for the look-for category, formatted as "Best Practices...[componentId]".
+ * @param {string} componentId The ID of the component (e.g., "1a:").
  * @param {string} lookForText The text content of the look-for.
  * @param {boolean} isChecked The state of the checkbox.
  * @returns {Object} A response object with success status.
@@ -61,8 +61,9 @@ function _saveLookForSelection(observationId, componentId, lookForText, isChecke
     return { success: false, error: 'Observation ID, component ID, and look-for text are required.' };
   }
 
+  // Use a lock to prevent simultaneous edits from causing data corruption
   const lock = LockService.getScriptLock();
-  lock.waitLock(30000); // Wait up to 30 seconds for the lock.
+  lock.waitLock(30000); // Wait up to 30 seconds
 
   try {
     const spreadsheet = openSpreadsheet();
@@ -77,6 +78,7 @@ function _saveLookForSelection(observationId, componentId, lookForText, isChecke
     }
 
     const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    // CORRECTED: Target the 'observationData' column, not the non-existent 'checkedLookFors'
     const observationDataCol = headers.indexOf('observationData') + 1;
     const lastModifiedCol = headers.indexOf('lastModifiedAt') + 1;
 
@@ -95,12 +97,14 @@ function _saveLookForSelection(observationId, componentId, lookForText, isChecke
         console.warn(`Could not parse observationData for ${observationId}. Starting fresh. Data: ${currentDataString}`);
     }
 
+    // Ensure the data structure for the component exists
     if (!observationData[componentId]) {
         observationData[componentId] = { lookfors: [], proficiency: '', notes: '' };
     } else if (!observationData[componentId].lookfors) {
         observationData[componentId].lookfors = [];
     }
 
+    // Use a Set for efficient add/delete operations
     const set = new Set(observationData[componentId].lookfors);
 
     if (isChecked) {
@@ -111,11 +115,12 @@ function _saveLookForSelection(observationId, componentId, lookForText, isChecke
 
     observationData[componentId].lookfors = Array.from(set);
 
+    // Save the updated object back to the cell
     observationDataCell.setValue(JSON.stringify(observationData, null, 2));
     if (lastModifiedCol > 0) {
         sheet.getRange(row, lastModifiedCol).setValue(new Date().toISOString());
     }
-    SpreadsheetApp.flush();
+    SpreadsheetApp.flush(); // Ensure the change is saved immediately
 
     debugLog('Look-for selection saved', { observationId, componentId, lookForText, isChecked });
     return { success: true };
