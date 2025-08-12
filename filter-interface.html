@@ -913,23 +913,7 @@
                     });
                     html += `</div>`;
 
-                    // Unified Notes & Evidence section for all users, with editing only for evaluators
-                    html += `<div class="evidence-section">`;
-                    html += `<button class="evidence-toggle-btn" onclick="toggleEvidenceSection('evidence-${componentId}')">`;
-                    html += `<span>📝</span> Notes & Evidence`;
-                    html += `</button>`;
-                    html += `<div class="evidence-content" id="evidence-${componentId}">`;
-                    
-                    // Notes container (only for evaluators)
-                    if (isEvaluator) {
-                        const escapedComponentId = CSS.escape(componentId);
-                        html += `<div class="notes-container">`;
-                        html += `<h4>Observation Notes</h4>`;
-                        html += `<div id="notes-editor-${escapedComponentId}"></div>`;
-                        html += `</div>`;
-                    }
-                    
-                    // Look-fors section (always shown if available)
+                    // Look-fors section (directly below subdomain rows, separate from evidence)
                     if (comp.bestPractices && comp.bestPractices.length > 0) {
                         html += `<div class="look-fors-container">`;
                         html += `<h4>Best Practices (Look-fors)</h4>`;
@@ -944,9 +928,23 @@
                         });
                         html += `</div></div>`;
                     }
-                    
-                    // Media upload section (only for evaluators)
+
+                    // Notes & Evidence section (for evaluators only - contains notes editor and media upload)
                     if (isEvaluator) {
+                        html += `<div class="evidence-section">`;
+                        html += `<button class="evidence-toggle-btn" onclick="toggleEvidenceSection('evidence-${componentId}')">`;
+                        html += `<span>📝</span> Notes & Evidence`;
+                        html += `</button>`;
+                        html += `<div class="evidence-content" id="evidence-${componentId}">`;
+                        
+                        // Notes container
+                        const escapedComponentId = CSS.escape(componentId);
+                        html += `<div class="notes-container">`;
+                        html += `<h4>Observation Notes</h4>`;
+                        html += `<div id="notes-editor-${escapedComponentId}"></div>`;
+                        html += `</div>`;
+                        
+                        // Media upload section
                         let evidenceHtml = '';
                         evidence.forEach(item => { evidenceHtml += `<div class="evidence-item"><a href="${item.url}" target="_blank" rel="noopener noreferrer">${item.name}</a></div>`; });
                         html += `<div class="media-upload-container">`;
@@ -956,9 +954,10 @@
                         html += `<div class="media-links-container" data-component-id="${componentId}">`;
                         html += `<ul>${evidenceHtml}</ul>`;
                         html += `</div></div>`;
+                        
+                        // Close evidence-content and evidence-section
+                        html += `</div></div>`;
                     }
-                    
-                    html += `</div></div>`;
                     html += `</div>`;
                 });
                 html += `</div>`;
