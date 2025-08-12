@@ -1969,13 +1969,20 @@
             if (data && data.userContext && data.userContext.isEvaluator) {
                 console.log('Peer Evaluator detected, auto-expanding all evidence sections.');
                 const evidenceSections = document.querySelectorAll('.evidence-content');
+                console.log('Found evidence sections:', evidenceSections.length);
                 evidenceSections.forEach(section => {
                     const contentId = section.id;
+                    console.log('Processing evidence section:', contentId);
                     // Check if the section is not already expanded to avoid re-initializing
                     if (contentId && !section.classList.contains('expanded')) {
+                        console.log('Expanding evidence section:', contentId);
                         toggleEvidenceSection(contentId);
+                    } else {
+                        console.log('Evidence section already expanded or invalid:', contentId);
                     }
                 });
+            } else {
+                console.log('Not a peer evaluator or missing user context');
             }
         });
         
@@ -2211,22 +2218,34 @@
         }
 
         function toggleEvidenceSection(contentId) {
+            console.log('toggleEvidenceSection called with:', contentId);
             const content = document.getElementById(contentId);
             if (!content) {
                 console.error('Evidence content element not found:', contentId);
                 return;
             }
+            console.log('Found evidence content element:', content);
 
             const isExpanded = content.classList.toggle('expanded');
+            console.log('Evidence section expanded state:', isExpanded);
             const componentId = contentId.replace('evidence-', '');
+            console.log('Component ID:', componentId);
 
             // Initialize Quill on first expansion if not already initialized
             if (isExpanded && !quillInstances[componentId]) {
+                console.log('Attempting to initialize Quill editor for:', componentId);
                 const editorId = '#notes-editor-' + componentId;
                 const editorElement = document.querySelector(editorId);
                 
                 if (editorElement) {
+                    console.log('Found editor element:', editorId);
                     try {
+                        // Check if Quill is available
+                        if (typeof Quill === 'undefined') {
+                            console.error('Quill library is not loaded');
+                            return;
+                        }
+                        
                         const editor = new Quill(editorId, {
                             theme: 'snow',
                             modules: {
@@ -2238,10 +2257,12 @@
                                 ]
                             }
                         });
+                        console.log('Quill editor created successfully');
 
                         // Load existing notes from unified structure
                         if (observationNotes[componentId] && observationNotes[componentId].notes) {
                             editor.root.innerHTML = observationNotes[componentId].notes;
+                            console.log('Loaded existing notes for component:', componentId);
                         }
 
                         // Add debounced auto-save
@@ -2261,6 +2282,8 @@
                 } else {
                     console.error('Notes editor element not found:', editorId);
                 }
+            } else if (isExpanded) {
+                console.log('Quill instance already exists for component:', componentId);
             }
 
             // Store state in sessionStorage for persistence
