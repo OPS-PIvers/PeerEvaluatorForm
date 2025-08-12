@@ -56,9 +56,9 @@ function _getObservationsDb() {
  * @param {boolean} isChecked The state of the checkbox.
  * @returns {Object} A response object with success status.
  */
-function saveLookForSelection(observationId, key, lookForText, isChecked) {
-  if (!observationId || !key || !lookForText) {
-    return { success: false, error: 'Observation ID, key, and look-for text are required.' };
+function saveLookForSelection(observationId, componentId, lookForText, isChecked) {
+  if (!observationId || !componentId || !lookForText) {
+    return { success: false, error: 'Observation ID, component ID, and look-for text are required.' };
   }
 
   const lock = LockService.getScriptLock();
@@ -95,20 +95,20 @@ function saveLookForSelection(observationId, key, lookForText, isChecked) {
         console.warn(`Could not parse checkedLookFors for ${observationId}. Starting fresh. Data: ${currentLookForsString}`);
     }
 
-    if (!currentLookFors[key]) {
-        currentLookFors[key] = [];
+    if (!currentLookFors[componentId]) {
+        currentLookFors[componentId] = [];
     }
 
+    const set = new Set(currentLookFors[componentId]);
+
     if (isChecked) {
-        if (!currentLookFors[key].includes(lookForText)) {
-            currentLookFors[key].push(lookForText);
-        }
+        set.add(lookForText);
     } else {
-        const index = currentLookFors[key].indexOf(lookForText);
-        if (index > -1) {
-            currentLookFors[key].splice(index, 1);
-        }
+        set.delete(lookForText);
     }
+
+    currentLookFors[componentId] = Array.from(set);
+
 
     lookForsCell.setValue(JSON.stringify(currentLookFors));
     if (lastModifiedCol > 0) {
@@ -116,7 +116,7 @@ function saveLookForSelection(observationId, key, lookForText, isChecked) {
     }
     SpreadsheetApp.flush();
 
-    debugLog('Look-for selection saved', { observationId, key, lookForText, isChecked });
+    debugLog('Look-for selection saved', { observationId, componentId, lookForText, isChecked });
     return { success: true };
   } catch (error) {
     console.error(`Error saving look-for for observation ${observationId}:`, error);
@@ -253,7 +253,7 @@ function createNewObservation(observerEmail, observedEmail) {
       observationDate: null,
       observationData: {}, // e.g., { "1a:": "proficient", "1b:": "basic" }
       evidenceLinks: {}, // e.g., { "1a:": [{url: "...", name: "...", uploadedAt: "..."}, ...] }
-      checkedLookFors: {}, // e.g., { "Best Practices aligned with 5D+ and PELSB Standards: Subdomain [1a:]": ["Look-for text 1", "Look-for text 2"] }
+      checkedLookFors: {}, // e.g., { "1a:": ["Look-for text 1", "Look-for text 2"] }
       observationNotes: {}
     };
 

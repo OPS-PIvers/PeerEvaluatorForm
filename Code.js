@@ -52,6 +52,9 @@ function doGet(e) {
   const requestId = generateUniqueId('request');
   
   try {
+    // Ensure the Observation_Data sheet has the correct columns before any other operation.
+    setupObservationSheet();
+
     // Clean up expired sessions periodically (10% chance)
     if (Math.random() < 0.1) {
       cleanupExpiredSessions();
