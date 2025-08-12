@@ -413,15 +413,16 @@ function finalizeObservation(observationId) {
                 const pdfUrlCol = headers.indexOf('pdfUrl') + 1;
                 const pdfStatusCol = headers.indexOf('pdfStatus') + 1;
 
+                const pdfStatus = pdfResult.success ? 'generated' : 'failed';
+
                 if (pdfResult.success) {
                     if (pdfUrlCol > 0) sheet.getRange(row, pdfUrlCol).setValue(pdfResult.pdfUrl);
-                    if (pdfStatusCol > 0) sheet.getRange(row, pdfStatusCol).setValue('generated');
                     debugLog('PDF successfully generated and saved for observation', { observationId, pdfUrl: pdfResult.pdfUrl });
                 } else {
                     console.error('PDF generation failed after finalization:', pdfResult.error);
                     debugLog('PDF generation failed for finalized observation', { observationId, error: pdfResult.error });
-                    if (pdfStatusCol > 0) sheet.getRange(row, pdfStatusCol).setValue('failed');
                 }
+                if (pdfStatusCol > 0) sheet.getRange(row, pdfStatusCol).setValue(pdfStatus);
                 SpreadsheetApp.flush();
 
                 // Manually clear the observation cache since we updated the sheet directly
