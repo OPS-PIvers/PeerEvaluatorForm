@@ -171,9 +171,7 @@ function loadRubricData(filterParams) {
  * @param {Object} observation The observation data, containing checkedLookFors.
  */
 function _addLookForsSection(body, component, observation) {
-    const lookFors = observation.checkedLookFors && observation.checkedLookFors[component.componentId]
-        ? observation.checkedLookFors[component.componentId]
-        : [];
+    const lookFors = observation.checkedLookFors?.[component.componentId] ?? [];
 
     if (lookFors.length === 0) {
         return; // Don't add the section if there are no checked look-fors
@@ -184,16 +182,16 @@ function _addLookForsSection(body, component, observation) {
     lookForsHeader.getChild(0).asText()
         .setFontSize(10)
         .setBold(true)
-        .setForegroundColor('#ffffff')
-        .setBackgroundColor('#3182ce');
+        .setForegroundColor(COLORS.WHITE)
+        .setBackgroundColor(COLORS.ROYAL_BLUE);
     lookForsHeader.setSpacingBefore(5).setSpacingAfter(3);
 
-    // Add each checked look-for as a bullet point with a light blue background
+    // Add each checked look-for as a list item with a light blue background
     lookFors.forEach(lookFor => {
-        const lookForItem = body.appendParagraph(`• ${lookFor}`);
-        lookForItem.getChild(0).asText().setFontSize(9).setForegroundColor('#4a5568'); // Dark gray text
-        lookForItem.setIndentFirstLine(20).setSpacingAfter(2);
-        lookForItem.setBackgroundColor('#dbeafe'); // Light blue background
+        const listItem = body.appendListItem(lookFor);
+        listItem.getChild(0).asText().setFontSize(9).setForegroundColor(COLORS.DARK_GRAY);
+        listItem.setBackgroundColor(COLORS.LIGHT_BLUE_BG);
+        listItem.setSpacingAfter(2);
     });
 }
 
@@ -933,6 +931,7 @@ function _addParagraphWithFormatting(body, text) {
 function _applyInlineFormatting(textElement, html) {
     // Apply formatting to specific ranges within text. This version handles multiple occurrences of the same text with the same style.
     let cleanText = stripHtml(html);
+    let placeholderCounter = 0;
     
     const applyStyle = (tag, styleSetter) => {
         const regex = new RegExp(`<${tag}>(.*?)<\\/${tag}>`, 'gi');
@@ -944,8 +943,9 @@ function _applyInlineFormatting(textElement, html) {
                 const index = cleanText.indexOf(styledText);
                 if (index > -1) {
                     styleSetter(index, index + styledText.length - 1, true);
-                    // Replace the found text with placeholders to avoid matching it again in subsequent searches for the same styled text.
-                    cleanText = cleanText.substring(0, index) + ' '.repeat(styledText.length) + cleanText.substring(index + styledText.length);
+                    // Use a unique placeholder string to avoid conflicts with actual text content.
+                    const placeholder = `__PLACEHOLDER_${tag.toUpperCase()}_${placeholderCounter++}__`;
+                    cleanText = cleanText.substring(0, index) + placeholder + cleanText.substring(index + styledText.length);
                 }
             }
         });
@@ -974,8 +974,8 @@ function _addComponentSection(body, component, proficiency, observation) {
     componentTitle.getChild(0).asText()
         .setFontSize(12)
         .setBold(true)
-        .setForegroundColor('#ffffff')
-        .setBackgroundColor('#64748b');
+        .setForegroundColor(COLORS.WHITE)
+        .setBackgroundColor(COLORS.COMPONENT_HEADER_BG);
     componentTitle.setSpacingBefore(10).setSpacingAfter(5);
     
     // Create table for proficiency levels
@@ -1072,9 +1072,9 @@ function _addBestPracticesSection(body, bestPractices) {
  */
 function _addEvidenceSection(body, evidence) {
     const evidenceHeader = body.appendParagraph('Evidence:');
-    evidenceHeader.getChild(0).asText().setFontSize(10).setBold(true).setForegroundColor('#4a5568');
+    evidenceHeader.getChild(0).asText().setFontSize(10).setBold(true).setForegroundColor(COLORS.DARK_GRAY);
     evidenceHeader.setSpacingBefore(5).setSpacingAfter(2);
-    evidenceHeader.setBackgroundColor('#f8fafc');
+    evidenceHeader.setBackgroundColor(COLORS.EVIDENCE_HEADER_BG);
     
     evidence.forEach(item => {
         // Create the paragraph with the bullet point and item name.
@@ -1082,15 +1082,19 @@ function _addEvidenceSection(body, evidence) {
         const textElement = evidenceItem.getChild(0).asText();
 
         // Style the text.
-        textElement.setFontSize(9).setForegroundColor('#3182ce');
+        textElement.setFontSize(9).setForegroundColor(COLORS.ROYAL_BLUE);
 
         // Apply paragraph styling.
         evidenceItem.setIndentFirstLine(20).setSpacingAfter(2);
 
         // If a URL exists, make the item name a clickable hyperlink.
         if (item.url) {
-            // The link should cover the item name, which starts after "• ".
-            textElement.setLinkUrl(2, textElement.getText().length - 1, item.url);
+            // The link should cover the item name, regardless of bullet or prefix.
+            const text = textElement.getText();
+            const nameStart = text.indexOf(item.name);
+            if (nameStart !== -1) {
+                textElement.setLinkUrl(nameStart, nameStart + item.name.length - 1, item.url);
+            }
         }
     });
 }

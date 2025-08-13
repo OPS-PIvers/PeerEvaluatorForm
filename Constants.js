@@ -378,3 +378,15 @@ const OBSERVATION_STATUS = {
 const DRIVE_FOLDER_INFO = {
   ROOT_FOLDER_NAME: 'Danielson Rubric Observations'
 };
+
+/**
+ * Color constants for PDF styling
+ */
+const COLORS = {
+  WHITE: '#ffffff',
+  ROYAL_BLUE: '#3182ce', 
+  DARK_GRAY: '#4a5568',
+  LIGHT_BLUE_BG: '#dbeafe',
+  COMPONENT_HEADER_BG: '#64748b',
+  EVIDENCE_HEADER_BG: '#f8fafc'
+};
