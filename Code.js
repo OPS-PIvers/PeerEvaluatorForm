@@ -984,54 +984,59 @@ function _addRubricContent(body, observation, rubricData) {
 function _addObservationComponentRows(table, component, domainName, observation, proficiency, componentData) {
     // Calculate equal column widths (total 500px divided by 4 columns)
     const COLUMN_WIDTH = 125;
-    const TOTAL_WIDTH = 500;
 
     /**
-     * Creates a merged header row spanning all 4 columns.
-     * This version creates a single cell and sets its width to the total table width
-     * to avoid issues with the native .merge() method.
+     * Creates a row with 4 cells and merges them into a single spanning cell
+     * This ensures consistent table structure while achieving the merged appearance
      */
-    const createMergedHeaderRow = (text, backgroundColor, fontSize = 12) => {
+    const createMergedRow = (text, backgroundColor, fontSize = 12) => {
         const row = table.appendTableRow();
-        const cell = row.appendTableCell(text);
-
-        // Set the width to the total width of the 4 content columns
-        cell.setWidth(TOTAL_WIDTH);
-
-        // Apply styling to the single cell
+        const cells = [];
+        
+        // Create 4 cells
+        for (let i = 0; i < 4; i++) {
+            const cell = row.appendTableCell(i === 0 ? text : '');
+            cell.setWidth(COLUMN_WIDTH);
+            cells.push(cell);
+        }
+        
+        // Merge cells 1, 2, 3 into cell 0
+        const mergedCell = cells[0];
+        try {
+            for (let i = 1; i < 4; i++) {
+                mergedCell.merge(cells[i]);
+            }
+        } catch (error) {
+            console.warn(`Cell merging failed for row "${text}":`, error);
+        }
+        
+        // Apply styling to the merged cell
         const style = {
             [DocumentApp.Attribute.BACKGROUND_COLOR]: backgroundColor,
             [DocumentApp.Attribute.FOREGROUND_COLOR]: COLORS.WHITE,
             [DocumentApp.Attribute.BOLD]: true,
             [DocumentApp.Attribute.FONT_SIZE]: fontSize
         };
-        cell.setAttributes(style);
-        cell.setPaddingTop(8).setPaddingBottom(8).setPaddingLeft(12).setPaddingRight(12);
+        mergedCell.setAttributes(style);
+        mergedCell.setPaddingTop(8).setPaddingBottom(8).setPaddingLeft(12).setPaddingRight(12);
 
-        return cell;
+        return mergedCell;
     };
 
-    /**
-     * Sets consistent widths for cells in a row
-     */
-    const setRowColumnWidths = (row) => {
-        const numCells = row.getNumCells();
-        for (let i = 0; i < numCells; i++) {
-            row.getCell(i).setWidth(COLUMN_WIDTH);
-        }
-    };
+    // === STEP 1: Create all 8 rows with consistent 4-cell structure ===
+    
+    // Row 1: Domain header (will be merged)
+    const domainCell = createMergedRow(domainName, COLORS.DOMAIN_HEADER_BG);
 
-    // Row 1: Domain (merged across all columns)
-    createMergedHeaderRow(domainName, COLORS.DOMAIN_HEADER_BG);
+    // Row 2: Subdomain header (will be merged)
+    const subdomainCell = createMergedRow(component.title, COLORS.COMPONENT_HEADER_BG, 11);
 
-    // Row 2: Subdomain (merged across all columns)
-    createMergedHeaderRow(component.title, COLORS.COMPONENT_HEADER_BG, 11);
-
-    // Row 3: Proficiency Titles (4 equal columns)
+    // Row 3: Proficiency Titles (4 separate cells)
     const titlesRow = table.appendTableRow();
+    const titleCells = [];
     PROFICIENCY_LEVELS.TITLES.forEach(level => {
         const cell = titlesRow.appendTableCell(level);
-        cell.setWidth(COLUMN_WIDTH); // Set consistent width
+        cell.setWidth(COLUMN_WIDTH);
         cell.getChild(0).asParagraph().setAlignment(DocumentApp.HorizontalAlignment.CENTER);
         cell.setBackgroundColor(COLORS.PROFICIENCY_HEADER_BG);
         cell.setPaddingTop(8).setPaddingBottom(8).setPaddingLeft(6).setPaddingRight(6);
@@ -1041,13 +1046,15 @@ function _addObservationComponentRows(table, component, domainName, observation,
         style[DocumentApp.Attribute.FONT_SIZE] = 10;
         style[DocumentApp.Attribute.FOREGROUND_COLOR] = COLORS.PROFICIENCY_TEXT;
         cell.setAttributes(style);
+        titleCells.push(cell);
     });
 
-    // Row 4: Proficiency Descriptions (4 equal columns with selection highlighting)
+    // Row 4: Proficiency Descriptions (4 separate cells with selection highlighting)
     const descriptionsRow = table.appendTableRow();
+    const descriptionCells = [];
     PROFICIENCY_LEVELS.KEYS.forEach(key => {
         const cell = descriptionsRow.appendTableCell(component[key] || '');
-        cell.setWidth(COLUMN_WIDTH); // Set consistent width
+        cell.setWidth(COLUMN_WIDTH);
         cell.setPaddingTop(12).setPaddingBottom(12).setPaddingLeft(8).setPaddingRight(8);
         
         const style = {};
@@ -1062,25 +1069,23 @@ function _addObservationComponentRows(table, component, domainName, observation,
             style[DocumentApp.Attribute.FOREGROUND_COLOR] = COLORS.PROFICIENCY_TEXT;
         }
         cell.setAttributes(style);
+        descriptionCells.push(cell);
     });
 
-    // Row 5: Best Practices Header (merged across all columns)
-    createMergedHeaderRow('Best Practices aligned with 5D+ and PELSB Standards', COLORS.ROYAL_BLUE, 10);
+    // Row 5: Best Practices Header (will be merged)
+    const bestPracticesHeaderCell = createMergedRow('Best Practices aligned with 5D+ and PELSB Standards', COLORS.ROYAL_BLUE, 10);
 
-    // Row 6: Selected Look-fors (merged across all columns)
+    // Row 6: Look-fors Content (will be merged)
     const lookforsRow = table.appendTableRow();
     const lookforsCells = [];
     for (let i = 0; i < 4; i++) {
-        const cell = lookforsRow.appendTableCell(i === 0 ? '' : '');
+        const cell = lookforsRow.appendTableCell('');
         cell.setWidth(COLUMN_WIDTH);
         lookforsCells.push(cell);
     }
     
-    // Style and merge the look-fors cells
+    // Merge look-fors cells
     const lookforsCell = lookforsCells[0];
-    lookforsCell.setPaddingTop(8).setPaddingBottom(8).setPaddingLeft(20).setPaddingRight(12);
-    
-    // Merge all look-fors cells
     try {
         for (let i = 1; i < 4; i++) {
             lookforsCell.merge(lookforsCells[i]);
@@ -1089,13 +1094,14 @@ function _addObservationComponentRows(table, component, domainName, observation,
         console.warn('Look-fors cell merging failed:', error);
     }
     
+    // Style and populate look-fors cell
+    lookforsCell.setPaddingTop(8).setPaddingBottom(8).setPaddingLeft(20).setPaddingRight(12);
+    
     // Handle both new unified structure and old separate structure for look-fors
     let checkedLookFors = [];
     if (componentData && componentData.lookfors) {
-        // New unified structure
         checkedLookFors = componentData.lookfors;
     } else if (observation.checkedLookFors?.[component.componentId]) {
-        // Fallback to old structure
         checkedLookFors = observation.checkedLookFors[component.componentId];
     }
     
@@ -1107,23 +1113,20 @@ function _addObservationComponentRows(table, component, domainName, observation,
         lookforsCell.appendParagraph('No best practices selected.').setItalic(true);
     }
 
-    // Row 7: Notes & Evidence Header (merged across all columns)
-    createMergedHeaderRow('Notes & Evidence', COLORS.NOTES_EVIDENCE_HEADER_BG, 10);
+    // Row 7: Notes & Evidence Header (will be merged)
+    const notesHeaderCell = createMergedRow('Notes & Evidence', COLORS.NOTES_EVIDENCE_HEADER_BG, 10);
 
-    // Row 8: Notes and Media (merged across all columns)
-    const notesAndEvidenceRow = table.appendTableRow();
+    // Row 8: Notes and Evidence Content (will be merged)
+    const notesRow = table.appendTableRow();
     const notesCells = [];
     for (let i = 0; i < 4; i++) {
-        const cell = notesAndEvidenceRow.appendTableCell(i === 0 ? '' : '');
+        const cell = notesRow.appendTableCell('');
         cell.setWidth(COLUMN_WIDTH);
         notesCells.push(cell);
     }
     
-    // Style and merge the notes cells
+    // Merge notes cells
     const notesAndEvidenceCell = notesCells[0];
-    notesAndEvidenceCell.setPaddingTop(8).setPaddingBottom(8).setPaddingLeft(12).setPaddingRight(12);
-    
-    // Merge all notes cells
     try {
         for (let i = 1; i < 4; i++) {
             notesAndEvidenceCell.merge(notesCells[i]);
@@ -1131,20 +1134,20 @@ function _addObservationComponentRows(table, component, domainName, observation,
     } catch (error) {
         console.warn('Notes cell merging failed:', error);
     }
+    
+    // Style and populate notes cell
+    notesAndEvidenceCell.setPaddingTop(8).setPaddingBottom(8).setPaddingLeft(12).setPaddingRight(12);
 
     // Handle both new unified structure and old separate structure for notes and evidence
     let notes = null;
     let evidence = null;
     
     if (componentData && componentData.notes) {
-        // New unified structure for notes
         notes = componentData.notes;
     } else if (observation.observationNotes?.[component.componentId]) {
-        // Fallback to old structure for notes
         notes = observation.observationNotes[component.componentId];
     }
     
-    // Evidence can still be in separate structure or in componentData (future extension)
     if (componentData && componentData.evidence) {
         evidence = componentData.evidence;
     } else if (observation.evidenceLinks?.[component.componentId]) {
