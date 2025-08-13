@@ -402,7 +402,11 @@ function finalizeObservation(observationId) {
         const pdfResult = _generateAndSavePdf(observationId, userContext);
         const pdfStatus = pdfResult.success ? 'generated' : 'failed';
 
-        _updatePdfStatusInSheet(observationId, pdfStatus, pdfResult.pdfUrl);
+        const updateResult = _updatePdfStatusInSheet(observationId, pdfStatus, pdfResult.pdfUrl);
+        if (!updateResult.success) {
+            console.error(`Failed to update PDF status in sheet during finalization: ${updateResult.error}`);
+            debugLog('PDF status update failed during finalization', { observationId, error: updateResult.error });
+        }
 
         const result = {
             success: true,
@@ -572,7 +576,11 @@ function regenerateObservationPdf(observationId) {
         const pdfResult = _generateAndSavePdf(observationId, userContext);
         const pdfStatus = pdfResult.success ? 'generated' : 'failed';
 
-        _updatePdfStatusInSheet(observationId, pdfStatus, pdfResult.pdfUrl);
+        const updateResult = _updatePdfStatusInSheet(observationId, pdfStatus, pdfResult.pdfUrl);
+        if (!updateResult.success) {
+            console.error(`Failed to update PDF status in sheet during regeneration: ${updateResult.error}`);
+            debugLog('PDF status update failed during regeneration', { observationId, error: updateResult.error });
+        }
 
         if (pdfResult.success) {
             debugLog('PDF successfully regenerated', { observationId, pdfUrl: pdfResult.pdfUrl });
@@ -690,40 +698,73 @@ function updateObservationMetadata(observationId, metadata) {
  * @private
  */
 function _updatePdfStatusInSheet(observationId, pdfStatus, pdfUrl = null) {
-    const spreadsheet = openSpreadsheet();
-    const sheet = getSheetByName(spreadsheet, "Observation_Data");
-    if (!sheet) {
-        console.error(`Sheet '${"Observation_Data"}' not found. Cannot update PDF status.`);
-        return;
-    }
+    debugLog('Starting PDF status update in sheet', { observationId, pdfStatus, pdfUrl: pdfUrl ? 'provided' : 'null' });
+    
+    try {
+        const spreadsheet = openSpreadsheet();
+        const sheet = getSheetByName(spreadsheet, "Observation_Data");
+        if (!sheet) {
+            console.error(`Sheet '${"Observation_Data"}' not found. Cannot update PDF status.`);
+            return { success: false, error: 'Observation sheet not found' };
+        }
 
-    const row = findObservationRow(sheet, observationId);
-    if (row === -1) {
-        console.error(`Observation ${observationId} not found. Cannot update PDF status.`);
-        return;
-    }
+        const row = findObservationRow(sheet, observationId);
+        if (row === -1) {
+            console.error(`Observation ${observationId} not found. Cannot update PDF status.`);
+            return { success: false, error: 'Observation not found in sheet' };
+        }
 
-    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-    const pdfStatusCol = headers.indexOf('pdfStatus') + 1;
-    const pdfUrlCol = headers.indexOf('pdfUrl') + 1;
-    const lastModifiedCol = headers.indexOf('lastModifiedAt') + 1;
+        const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+        const pdfStatusCol = headers.indexOf('pdfStatus') + 1;
+        const pdfUrlCol = headers.indexOf('pdfUrl') + 1;
+        const lastModifiedCol = headers.indexOf('lastModifiedAt') + 1;
 
-    if (pdfStatusCol > 0) {
-        sheet.getRange(row, pdfStatusCol).setValue(pdfStatus);
-    }
-    if (pdfUrl && pdfUrlCol > 0) {
-        sheet.getRange(row, pdfUrlCol).setValue(pdfUrl);
-    }
-    if (lastModifiedCol > 0) {
-        sheet.getRange(row, lastModifiedCol).setValue(new Date().toISOString());
-    }
-    SpreadsheetApp.flush();
+        debugLog('PDF column positions found', { 
+            observationId, 
+            pdfStatusCol: pdfStatusCol > 0 ? pdfStatusCol : 'MISSING',
+            pdfUrlCol: pdfUrlCol > 0 ? pdfUrlCol : 'MISSING',
+            lastModifiedCol: lastModifiedCol > 0 ? lastModifiedCol : 'available'
+        });
 
-    // Manually clear the observation cache since we updated the sheet directly
-    const cache = CacheService.getScriptCache();
-    if (cache) {
-        cache.remove('all_observations');
-        debugLog('Cleared all_observations cache after PDF status update.', { observationId });
+        // Check if required columns exist
+        if (pdfStatusCol === 0) {
+            console.error('pdfStatus column not found in observation sheet');
+            return { success: false, error: 'pdfStatus column missing from sheet' };
+        }
+        if (pdfUrl && pdfUrlCol === 0) {
+            console.error('pdfUrl column not found in observation sheet');
+            return { success: false, error: 'pdfUrl column missing from sheet' };
+        }
+
+        // Update the columns
+        let updatesCount = 0;
+        if (pdfStatusCol > 0) {
+            sheet.getRange(row, pdfStatusCol).setValue(pdfStatus);
+            updatesCount++;
+        }
+        if (pdfUrl && pdfUrlCol > 0) {
+            sheet.getRange(row, pdfUrlCol).setValue(pdfUrl);
+            updatesCount++;
+        }
+        if (lastModifiedCol > 0) {
+            sheet.getRange(row, lastModifiedCol).setValue(new Date().toISOString());
+            updatesCount++;
+        }
+        
+        SpreadsheetApp.flush();
+        debugLog('PDF status update completed successfully', { observationId, updatesCount });
+
+        // Manually clear the observation cache since we updated the sheet directly
+        const cache = CacheService.getScriptCache();
+        if (cache) {
+            cache.remove('all_observations');
+            debugLog('Cleared all_observations cache after PDF status update.', { observationId });
+        }
+
+        return { success: true, updatesCount };
+    } catch (error) {
+        console.error(`Error updating PDF status for observation ${observationId}:`, error);
+        return { success: false, error: error.message };
     }
 }
 

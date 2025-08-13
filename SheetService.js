@@ -933,12 +933,12 @@ function setupObservationSheet() {
       debugLog(`Created sheet: ${sheetName}`);
     }
 
-    // Define the required headers with legacy columns removed
+    // Define the required headers with legacy columns removed and PDF columns added
     const requiredHeaders = [
       "observationId", "observerEmail", "observedEmail", "observedName",
       "observedRole", "observedYear", "status", "createdAt",
       "lastModifiedAt", "finalizedAt", "observationData", "evidenceLinks",
-      "observationName", "observationDate" // "checkedLookFors" and "observationNotes" removed
+      "observationName", "observationDate", "pdfUrl", "pdfStatus"
     ];
 
     // Check if headers are already present
