@@ -893,6 +893,81 @@
         function loadSelectedView() { if (!currentFilters.staff) return; showLoading('Loading...'); google.script.run.withSuccessHandler(handleRubricData).withFailureHandler(handleError).loadRubricData(currentFilters); }
         function clearFilters() { showView('quickActionsView'); hideError(); hideLoading(); document.getElementById('filterStatus').style.display = 'none'; }
 
+        let activePollers = {};
+
+        function startPdfPolling(observationId) {
+            if (activePollers[observationId]) {
+                console.log(`Polling already active for ${observationId}`);
+                return;
+            }
+
+            console.log(`Starting PDF polling for ${observationId}`);
+            const pollInterval = 5000; // 5 seconds
+            const pollTimeout = 60000; // 60 seconds
+
+            const intervalId = setInterval(() => {
+                google.script.run
+                    .withSuccessHandler(res => {
+                        if (res.success) {
+                            const pdfButton = document.getElementById(`pdf-button-${observationId}`);
+                            if (!pdfButton) {
+                                stopPdfPolling(observationId);
+                                return;
+                            }
+
+                            if (res.pdfUrl) {
+                                console.log(`PDF found for ${observationId}`);
+                                showToast('PDF is ready!', true);
+                                pdfButton.textContent = 'View PDF';
+                                pdfButton.className = 'filter-btn btn-export';
+                                pdfButton.disabled = false;
+                                pdfButton.onclick = () => window.open(res.pdfUrl, '_blank');
+                                stopPdfPolling(observationId);
+                            } else if (res.pdfStatus === 'failed') {
+                                console.log(`PDF generation failed for ${observationId}`);
+                                showToast('PDF generation failed. Please retry.', false);
+                                pdfButton.textContent = 'Retry PDF';
+                                pdfButton.className = 'filter-btn btn-export btn-pdf-failed';
+                                pdfButton.disabled = false;
+                                pdfButton.onclick = () => handleRetryPdf(observationId);
+                                stopPdfPolling(observationId);
+                            }
+                        } else {
+                             console.warn(`Polling check failed for ${observationId}: ${res.error}`);
+                        }
+                    })
+                    .withFailureHandler(err => {
+                        console.error(`Polling error for ${observationId}:`, err);
+                        // Don't stop polling on a single failure, maybe it's a network blip
+                    })
+                    .getObservationStatusAndPdfUrl(observationId);
+            }, pollInterval);
+
+            const timeoutId = setTimeout(() => {
+                console.log(`Polling timed out for ${observationId}`);
+                const pdfButton = document.getElementById(`pdf-button-${observationId}`);
+                if (pdfButton && pdfButton.disabled) { // Check if still in pending state
+                     showToast('PDF generation is taking longer than expected. Please check back later or retry.', false);
+                     pdfButton.textContent = 'Retry PDF';
+                     pdfButton.className = 'filter-btn btn-export btn-pdf-failed';
+                     pdfButton.disabled = false;
+                     pdfButton.onclick = () => handleRetryPdf(observationId);
+                }
+                stopPdfPolling(observationId);
+            }, pollTimeout);
+
+            activePollers[observationId] = { intervalId, timeoutId };
+        }
+
+        function stopPdfPolling(observationId) {
+            if (activePollers[observationId]) {
+                clearInterval(activePollers[observationId].intervalId);
+                clearTimeout(activePollers[observationId].timeoutId);
+                delete activePollers[observationId];
+                console.log(`Stopped polling for ${observationId}`);
+            }
+        }
+
         function renderObservationCards(result, observedEmail, observedName) {
             hideLoading();
             if (!result.success) return showError(result.error);
@@ -906,10 +981,21 @@
                                <button class="filter-btn btn-finalize" onclick="handleFinalizeObservation('${obs.observationId}', '${observedEmail}', '${observedName}')">Finalize</button>
                                <button class="filter-btn btn-delete" onclick="handleDeleteObservation('${obs.observationId}', '${observedEmail}', '${observedName}')">Delete</button>`;
                 } else if (obs.status === 'Finalized') {
-                    // Finalized observations always have PDF available
-                    buttons = `<button class="filter-btn btn-view" onclick="handleViewObservation('${obs.observationId}')">View</button>
-                               <button class="filter-btn btn-export" onclick="window.open('${obs.pdfUrl}', '_blank')">View PDF</button>
-                               <button class="filter-btn btn-delete" onclick="handleDeleteFinalizedObservation('${obs.observationId}', '${observedEmail}', '${observedName}')">Delete</button>`;
+                    let pdfButtonHtml = '';
+                    if (obs.pdfUrl) {
+                        pdfButtonHtml = `<button class="filter-btn btn-export" onclick="window.open('${escapeHtml(obs.pdfUrl)}', '_blank')">View PDF</button>`;
+                    } else if (obs.pdfStatus === 'failed') {
+                        pdfButtonHtml = `<button class="filter-btn btn-export btn-pdf-failed" id="pdf-button-${escapeHtml(obs.observationId)}" onclick="handleRetryPdf('${escapeHtml(obs.observationId)}')">Retry PDF</button>`;
+                    } else {
+                        // PDF is pending generation or status is unknown
+                        pdfButtonHtml = `<button class="filter-btn btn-export btn-pdf-missing" id="pdf-button-${escapeHtml(obs.observationId)}" disabled>Generating PDF...</button>`;
+                        // Automatically start polling if we render a card that's pending
+                        setTimeout(() => startPdfPolling(obs.observationId), 100);
+                    }
+
+                    buttons = `<button class="filter-btn btn-view" onclick="handleViewObservation('${escapeHtml(obs.observationId)}')">View</button>
+                               ${pdfButtonHtml}
+                               <button class="filter-btn btn-delete" onclick="handleDeleteFinalizedObservation('${escapeHtml(obs.observationId)}', '${escapeHtml(observedEmail)}', '${escapeHtml(observedName)}')">Delete</button>`;
                 }
                 cardsHtml += `
                     <div class="observation-card">
@@ -943,18 +1029,14 @@
 
         function handleFinalizeObservation(obsId, email, name) {
             if (confirm('Are you sure you want to finalize this observation? You will not be able to edit it further.')) {
-                showLoading('Finalizing observation and generating PDF...');
+                showLoading('Finalizing observation, please wait...');
                 google.script.run
                     .withSuccessHandler(res => {
                         hideLoading();
                         if (res.success) {
-                            if (res.pdfError) {
-                                showToast('Observation finalized successfully, but PDF generation failed. You can retry PDF generation from the observation list.', false);
-                            } else {
-                                showToast('Observation finalized and PDF generated successfully!', true);
-                            }
-                            // Directly render the cards with the fresh data from the server.
-                            renderObservationCards(res, email, name);
+                            showToast('Observation finalized. Generating PDF...', true);
+                            // Refresh the view to show the "Generating..." button
+                            displayObservationOptions(email, name);
                         } else {
                             showError(res.error);
                         }
@@ -1000,29 +1082,36 @@
         }
 
         function handleRetryPdf(obsId) {
-            if (confirm('This will regenerate the PDF for this observation. Continue?')) {
-                showLoading('Regenerating PDF...');
+            if (confirm('This will attempt to regenerate the PDF for this observation. Continue?')) {
+                showLoading('Requesting PDF regeneration...');
+                const pdfButton = document.getElementById(`pdf-button-${obsId}`);
+                if (pdfButton) {
+                    pdfButton.textContent = 'Generating PDF...';
+                    pdfButton.className = 'filter-btn btn-export btn-pdf-missing';
+                    pdfButton.disabled = true;
+                }
+
                 google.script.run.withSuccessHandler(res => {
                     hideLoading();
                     if (res.success) {
-                        showToast('PDF successfully regenerated!', true);
-                        // Refresh the current view to show updated button state
-                        const currentView = document.querySelector('.main-view:not(.hidden)');
-                        if (currentView && currentView.id === 'observationSelectorView') {
-                            // Refresh the observation list to show updated PDF status
-                            const activeButtons = document.querySelectorAll('.staff-selector-btn.active');
-                            if (activeButtons.length > 0) {
-                                const email = activeButtons[0].getAttribute('data-email');
-                                const name = activeButtons[0].getAttribute('data-name');
-                                if (email && name) {
-                                    displayObservationOptions(email, name);
-                                }
-                            }
-                        }
+                        showToast('PDF regeneration started successfully!', true);
+                        startPdfPolling(obsId);
                     } else {
-                        showError('PDF regeneration failed: ' + res.error);
+                         showError('PDF regeneration failed: ' + res.error);
+                         if (pdfButton) {
+                            pdfButton.textContent = 'Retry PDF';
+                            pdfButton.className = 'filter-btn btn-export btn-pdf-failed';
+                            pdfButton.disabled = false;
+                        }
                     }
-                }).withFailureHandler(handleError).regenerateObservationPdf(obsId);
+                }).withFailureHandler(error => {
+                    handleError(error);
+                    if (pdfButton) {
+                       pdfButton.textContent = 'Retry PDF';
+                       pdfButton.className = 'filter-btn btn-export btn-pdf-failed';
+                       pdfButton.disabled = false;
+                    }
+                }).regenerateObservationPdf(obsId);
             }
         }
 
