@@ -687,7 +687,21 @@ function _generateAndSavePdf(observationId, userContext) {
 
             // Use the already created styled PDF blob
             const pdfFile = obsFolder.createFile(pdfBlob).setName(docName + ".pdf");
-            debugLog('Successfully created PDF file', { observationId, fileId: pdfFile.getId(), pdfUrl: pdfFile.getUrl() });
+            
+            // Share PDF with specific users only for privacy protection
+            // Add the peer evaluator (observer) as editor so they can regenerate if needed
+            pdfFile.addEditor(observation.observerEmail);
+            
+            // Add the observed staff member as viewer so they can see their evaluation
+            pdfFile.addViewer(observation.observedEmail);
+            
+            debugLog('Successfully created PDF file with user-specific sharing', { 
+                observationId, 
+                fileId: pdfFile.getId(), 
+                pdfUrl: pdfFile.getUrl(),
+                sharedWithObserver: observation.observerEmail,
+                sharedWithObserved: observation.observedEmail
+            });
 
             return { success: true, pdfUrl: pdfFile.getUrl() };
 
