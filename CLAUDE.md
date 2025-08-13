@@ -25,7 +25,6 @@ This is a Google Apps Script (GAS) web application called "Peer Evaluator Form" 
 - **rubric.html**: Main evaluation rubric interface with look-fors checkboxes and rich-text notes
 - **filter-interface.html**: Filter view for special access roles (Administrator, Peer Evaluator, Full Access)
 - **error-page.html**: Error display template with debugging information
-- **pdf-rubric.html**: Template for generating PDF observation reports
 - **finalized-observation-email.html**: Email template for finalized observations
 
 ### Development Notes

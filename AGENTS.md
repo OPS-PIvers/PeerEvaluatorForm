@@ -56,7 +56,6 @@ The project follows a modular, service-oriented architecture.
 ├─── finalized-observation-email.html  # HTML template for finalized observation emails.
 ├─── lookfors-todo.md                  # Development notes for look-fors functionality.
 ├─── observation-notes-todo.md         # Development notes for observation notes.
-├─── pdf-rubric.html                   # HTML template for generating PDF reports.
 ├─── performance-todo.md               # Development notes for performance optimization.
 └─── rubric.html                       # Main HTML/JS template for evaluation rubric interface.
 ```

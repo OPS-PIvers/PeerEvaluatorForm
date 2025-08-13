@@ -164,46 +164,4 @@ const headers = [
 // ...
 ```
 
-## 3. Update PDF Generation
-
-Finally, update the PDF generation process to only include the checked look-fors.
-
-### 3.1. Modify `_generateAndSavePdf` in `Code.js`
-
-No changes are needed here. The `observation` object retrieved by `getObservationById` will now contain the `checkedLookFors` property, which will be automatically passed to the `pdf-rubric.html` template.
-
-### 3.2. Update `pdf-rubric.html`
-
-Modify the template to conditionally render the look-fors.
-
-**File:** `pdf-rubric.html`
-
-**Change:**
-
-```html
-<!-- Inside the component loop -->
-<? if (component.bestPractices && component.bestPractices.length > 0) { ?>
-<div class="look-fors-section">
-    <div class="look-fors-header">
-        <span>Best Practices aligned with 5D+ and PELSB Standards</span>
-    </div>
-    <div class="look-fors-grid">
-        <? 
-        var checkedLookFors = data.observation.checkedLookFors[component.componentId] || [];
-        for (var k = 0; k < component.bestPractices.length; k++) { 
-            var practice = component.bestPractices[k];
-            if (checkedLookFors.includes(practice)) {
-        ?>
-            <div class="look-for-item">
-                • <?= escapeHtml(practice) ?>
-            </div>
-        <? 
-            }
-        } 
-        ?>
-    </div>
-</div>
-<? } ?>
-```
-
-This plan provides a complete, end-to-end solution for capturing, storing, and displaying only the checked "look-for" items in the PDF report.
+This plan provides a complete, end-to-end solution for capturing and storing the checked "look-for" items. The PDF generation has been updated separately to use `DocumentApp` and will correctly handle this data.
