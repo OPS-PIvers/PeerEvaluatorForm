@@ -812,8 +812,6 @@ function _addRubricContent(body, observation, rubricData) {
  * @param {string} proficiency The selected proficiency level.
  */
 function _addObservationComponentRows(table, component, domainName, observation, proficiency) {
-    const FONT_COLOR_WHITE = '#FFFFFF';
-
     const addHeaderRow = (text, backgroundColor, fontSize = 12) => {
         const row = table.appendTableRow();
         const cell = row.appendTableCell(text);
@@ -821,7 +819,7 @@ function _addObservationComponentRows(table, component, domainName, observation,
         cell.setPaddingTop(8).setPaddingBottom(8).setPaddingLeft(12).setPaddingRight(12);
         const style = {};
         style[DocumentApp.Attribute.BACKGROUND_COLOR] = backgroundColor;
-        style[DocumentApp.Attribute.FOREGROUND_COLOR] = FONT_COLOR_WHITE;
+        style[DocumentApp.Attribute.FOREGROUND_COLOR] = COLORS.WHITE;
         style[DocumentApp.Attribute.BOLD] = true;
         style[DocumentApp.Attribute.FONT_SIZE] = fontSize;
         cell.setAttributes(style);
@@ -829,45 +827,43 @@ function _addObservationComponentRows(table, component, domainName, observation,
     };
 
     // Row 1: Domain
-    addHeaderRow(domainName, '#7c9ac5');
+    addHeaderRow(domainName, COLORS.DOMAIN_HEADER_BG);
 
     // Row 2: Subdomain
-    addHeaderRow(component.title, '#64748b', 11);
+    addHeaderRow(component.title, COLORS.COMPONENT_HEADER_BG, 11);
 
     // Row 3: Proficiency Titles
     const titlesRow = table.appendTableRow();
-    const levels = ['Developing', 'Basic', 'Proficient', 'Distinguished'];
-    levels.forEach(level => {
+    PROFICIENCY_LEVELS.TITLES.forEach(level => {
         const cell = titlesRow.appendTableCell(level);
         cell.getChild(0).asParagraph().setAlignment(DocumentApp.HorizontalAlignment.CENTER);
-        cell.setBackgroundColor('#e2e8f0');
+        cell.setBackgroundColor(COLORS.PROFICIENCY_HEADER_BG);
         const style = {};
         style[DocumentApp.Attribute.BOLD] = true;
         style[DocumentApp.Attribute.FONT_SIZE] = 10;
-        style[DocumentApp.Attribute.FOREGROUND_COLOR] = '#4a5568';
+        style[DocumentApp.Attribute.FOREGROUND_COLOR] = COLORS.PROFICIENCY_TEXT;
         cell.setAttributes(style);
     });
 
     // Row 4: Proficiency Descriptions
     const descriptionsRow = table.appendTableRow();
-    const proficiencyKeys = ['developing', 'basic', 'proficient', 'distinguished'];
-    proficiencyKeys.forEach(key => {
+    PROFICIENCY_LEVELS.KEYS.forEach(key => {
         const cell = descriptionsRow.appendTableCell(component[key] || '');
         cell.setPaddingTop(12).setPaddingBottom(12).setPaddingLeft(12).setPaddingRight(12);
         const style = {};
         style[DocumentApp.Attribute.FONT_SIZE] = 9;
         if (proficiency === key) {
-            style[DocumentApp.Attribute.BACKGROUND_COLOR] = '#dbeafe'; // light blue
-            style[DocumentApp.Attribute.FOREGROUND_COLOR] = '#1e40af';
+            style[DocumentApp.Attribute.BACKGROUND_COLOR] = COLORS.SELECTED_PROFICIENCY_BG;
+            style[DocumentApp.Attribute.FOREGROUND_COLOR] = COLORS.SELECTED_PROFICIENCY_TEXT;
             style[DocumentApp.Attribute.BOLD] = true;
         } else {
-            style[DocumentApp.Attribute.FOREGROUND_COLOR] = '#4a5568';
+            style[DocumentApp.Attribute.FOREGROUND_COLOR] = COLORS.PROFICIENCY_TEXT;
         }
         cell.setAttributes(style);
     });
 
     // Row 5: Best Practices Header
-    addHeaderRow('Best Practices aligned with 5D+ and PELSB Standards', '#3182ce', 10);
+    addHeaderRow('Best Practices aligned with 5D+ and PELSB Standards', COLORS.ROYAL_BLUE, 10);
 
     // Row 6: Selected Look-fors
     const lookforsRow = table.appendTableRow();
@@ -884,7 +880,7 @@ function _addObservationComponentRows(table, component, domainName, observation,
     }
 
     // Row 7: Notes & Evidence Header
-    addHeaderRow('Notes & Evidence', '#4a5568', 10);
+    addHeaderRow('Notes & Evidence', COLORS.NOTES_EVIDENCE_HEADER_BG, 10);
 
     // Row 8: Notes and Media
     const notesAndEvidenceRow = table.appendTableRow();
@@ -925,6 +921,7 @@ function _addNotesSection(container, notesHtml) {
         let currentText = '';
         let lastIndex = 0;
         let match;
+        let inList = false;
         
         while ((match = blockRegex.exec(notesHtml)) !== null) {
             const textBefore = notesHtml.slice(lastIndex, match.index);
@@ -944,6 +941,16 @@ function _addNotesSection(container, notesHtml) {
                     headerText.setBold(true).setFontSize(tagName === 'h1' ? 14 : 12);
                     _applyInlineFormatting(headerText, currentText.trim());
                     currentText = '';
+                }
+            } else if (tagName === 'ul' || tagName === 'ol') {
+                if (!isClosing) {
+                    inList = true;
+                    if (currentText.trim()) {
+                        _addParagraphWithFormatting(container, currentText.trim());
+                        currentText = '';
+                    }
+                } else {
+                    inList = false;
                 }
             } else if (tagName === 'li' && isClosing) {
                 if (currentText.trim()) {
