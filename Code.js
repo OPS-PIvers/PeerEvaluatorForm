@@ -1027,19 +1027,16 @@ function _addBestPracticesSection(body, bestPractices) {
 }
 
 /**
- * Adds an evidence section.
- * @param {Body} body The document body
+ * Adds an evidence section to a container element (Body or TableCell).
+ * @param {DocumentApp.ContainerElement} container The container to add the evidence to.
  * @param {Array} evidence Array of evidence objects
  */
-function _addEvidenceSection(body, evidence) {
-    const evidenceHeader = body.appendParagraph('Evidence:');
-    evidenceHeader.getChild(0).asText().setFontSize(10).setBold(true).setForegroundColor(COLORS.DARK_GRAY);
-    evidenceHeader.setSpacingBefore(5).setSpacingAfter(2);
-    evidenceHeader.setBackgroundColor(COLORS.EVIDENCE_HEADER_BG);
+function _addEvidenceSection(container, evidence) {
+    container.appendParagraph('Evidence:').setBold(true);
     
     evidence.forEach(item => {
         // Create the paragraph with the bullet point and item name.
-        const evidenceItem = body.appendParagraph(`• ${item.name}`);
+        const evidenceItem = container.appendParagraph(`• ${item.name}`);
         const textElement = evidenceItem.getChild(0).asText();
 
         // Style the text.
@@ -1050,10 +1047,6 @@ function _addEvidenceSection(body, evidence) {
 
         // If a URL exists, make the item name a clickable hyperlink.
         if (item.url) {
-<<<<<<< HEAD
-=======
-            // The link should cover the item name, which starts after "• ".
->>>>>>> 39575adf5d1ae6ac84e22bf4e6ac8a40910df789
             // The link should cover the item name, regardless of bullet or prefix.
             const text = textElement.getText();
             const nameStart = text.indexOf(item.name);
