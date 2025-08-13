@@ -1323,21 +1323,19 @@
         }
 
         function updateFilterStatus(rubricData, observation) {
-            const status = document.getElementById('filterStatus'); const statusText = document.getElementById('filterStatusText');
+            const status = document.getElementById('filterStatus');
+            
+            if (observation) {
+                // Hide status div completely when viewing observations - main heading provides context
+                status.style.display = 'none';
+                return;
+            }
+            
+            // Keep existing logic for other contexts (role viewing, etc.)
+            const statusText = document.getElementById('filterStatusText');
             let text = 'Viewing Your Own Rubric';
             if (rubricData?.userContext?.filterInfo) {
                 text = `Viewing as: ${rubricData.userContext.filterInfo.viewingAs} (${rubricData.userContext.filterInfo.viewingRole}, Year ${rubricData.userContext.filterInfo.viewingYear})`;
-            }
-            if (observation) {
-                let statusLabel = `<strong>Observation ${observation.status}</strong>`;
-                if (observation.status === 'Draft') {
-                    statusLabel = `<strong>Observation Draft</strong>`;
-                } else if (observation.status === 'Finalized') {
-                    statusLabel = `<strong>Finalized Observation (Read-Only)</strong>`;
-                } else if (observation.status === 'Review') {
-                    statusLabel = `<strong>Reviewing Observation</strong>`;
-                }
-                text = `Observing: ${observation.observedName} &mdash; ${statusLabel}`;
             }
             statusText.innerHTML = text;
             status.style.display = 'block';

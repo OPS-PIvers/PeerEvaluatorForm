@@ -1179,22 +1179,32 @@ function _addObservationComponentRowsWithMergeTracking(table, component, domainN
         const row = table.appendTableRow();
         const cells = [];
         
-        // Create 4 cells
+        // Create 4 cells - start with empty cells to avoid extra paragraphs
         for (let i = 0; i < 4; i++) {
-            const cell = row.appendTableCell(i === 0 ? text : '');
+            const cell = row.appendTableCell('');
             cell.setWidth(COLUMN_WIDTH);
             cells.push(cell);
         }
         
-        // Style the first cell (which will become the merged cell)
+        // Work with the first cell's default paragraph
         const primaryCell = cells[0];
+        const defaultParagraph = primaryCell.getChild(0).asParagraph();
+        
+        // Set text and styling on the default paragraph
+        defaultParagraph.setText(text);
+        defaultParagraph.setSpacingBefore(0).setSpacingAfter(0).setLineSpacing(1);
+        
+        // Apply text styling to the paragraph content
+        const textElement = defaultParagraph.getChild(0).asText();
         const style = {
             [DocumentApp.Attribute.BACKGROUND_COLOR]: backgroundColor,
             [DocumentApp.Attribute.FOREGROUND_COLOR]: COLORS.WHITE,
             [DocumentApp.Attribute.BOLD]: true,
             [DocumentApp.Attribute.FONT_SIZE]: fontSize
         };
-        primaryCell.setAttributes(style);
+        textElement.setAttributes(style);
+        
+        // Set cell padding
         primaryCell.setPaddingTop(8).setPaddingBottom(8).setPaddingLeft(12).setPaddingRight(12);
 
         // Track merge operation for this row
@@ -1219,26 +1229,40 @@ function _addObservationComponentRowsWithMergeTracking(table, component, domainN
     // Row 3: Proficiency Titles (4 separate cells - no merge)
     const titlesRow = table.appendTableRow();
     PROFICIENCY_LEVELS.TITLES.forEach(level => {
-        const cell = titlesRow.appendTableCell(level);
+        const cell = titlesRow.appendTableCell('');
         cell.setWidth(COLUMN_WIDTH);
-        cell.getChild(0).asParagraph().setAlignment(DocumentApp.HorizontalAlignment.CENTER);
         cell.setBackgroundColor(COLORS.PROFICIENCY_HEADER_BG);
         cell.setPaddingTop(8).setPaddingBottom(8).setPaddingLeft(6).setPaddingRight(6);
         
+        // Work with the default paragraph
+        const paragraph = cell.getChild(0).asParagraph();
+        paragraph.setText(level);
+        paragraph.setAlignment(DocumentApp.HorizontalAlignment.CENTER);
+        paragraph.setSpacingBefore(0).setSpacingAfter(0).setLineSpacing(1);
+        
+        // Apply text styling
+        const textElement = paragraph.getChild(0).asText();
         const style = {};
         style[DocumentApp.Attribute.BOLD] = true;
         style[DocumentApp.Attribute.FONT_SIZE] = 10;
         style[DocumentApp.Attribute.FOREGROUND_COLOR] = COLORS.PROFICIENCY_TEXT;
-        cell.setAttributes(style);
+        textElement.setAttributes(style);
     });
 
     // Row 4: Proficiency Descriptions (4 separate cells - no merge)
     const descriptionsRow = table.appendTableRow();
     PROFICIENCY_LEVELS.KEYS.forEach(key => {
-        const cell = descriptionsRow.appendTableCell(component[key] || '');
+        const cell = descriptionsRow.appendTableCell('');
         cell.setWidth(COLUMN_WIDTH);
         cell.setPaddingTop(12).setPaddingBottom(12).setPaddingLeft(8).setPaddingRight(8);
         
+        // Work with the default paragraph
+        const paragraph = cell.getChild(0).asParagraph();
+        paragraph.setText(component[key] || '');
+        paragraph.setSpacingBefore(0).setSpacingAfter(0).setLineSpacing(1);
+        
+        // Apply styling to text
+        const textElement = paragraph.getChild(0).asText();
         const style = {};
         style[DocumentApp.Attribute.FONT_SIZE] = 9;
         
@@ -1250,7 +1274,7 @@ function _addObservationComponentRowsWithMergeTracking(table, component, domainN
         } else {
             style[DocumentApp.Attribute.FOREGROUND_COLOR] = COLORS.PROFICIENCY_TEXT;
         }
-        cell.setAttributes(style);
+        textElement.setAttributes(style);
     });
 
     // Row 5: Best Practices Header (to be merged)
@@ -1287,12 +1311,24 @@ function _addObservationComponentRowsWithMergeTracking(table, component, domainN
         checkedLookFors = observation.checkedLookFors[component.componentId];
     }
     
+    // Remove the default empty paragraph and add content properly
+    const defaultParagraph = lookforsCell.getChild(0).asParagraph();
+    
     if (checkedLookFors.length > 0) {
-        checkedLookFors.forEach(lookfor => {
-            lookforsCell.appendListItem(lookfor).setGlyphType(DocumentApp.GlyphType.BULLET);
+        // Use the default paragraph for the first item, then add additional items
+        defaultParagraph.setText(`• ${checkedLookFors[0]}`);
+        defaultParagraph.setSpacingBefore(0).setSpacingAfter(0).setLineSpacing(1);
+        
+        // Add remaining items as new list items with minimal spacing
+        checkedLookFors.slice(1).forEach(lookfor => {
+            const listItem = lookforsCell.appendListItem(lookfor);
+            listItem.setGlyphType(DocumentApp.GlyphType.BULLET);
+            listItem.setSpacingBefore(0).setSpacingAfter(0).setLineSpacing(1);
         });
     } else {
-        lookforsCell.appendParagraph('No best practices selected.').setItalic(true);
+        defaultParagraph.setText('No best practices selected.');
+        defaultParagraph.setItalic(true);
+        defaultParagraph.setSpacingBefore(0).setSpacingAfter(0).setLineSpacing(1);
     }
 
     // Row 7: Notes & Evidence Header (to be merged)
@@ -1337,19 +1373,37 @@ function _addObservationComponentRowsWithMergeTracking(table, component, domainN
         evidence = observation.evidenceLinks[component.componentId];
     }
 
-    let contentAdded = false;
+    // Use the default paragraph for the first content, then append additional content
+    const defaultParagraph = notesAndEvidenceCell.getChild(0).asParagraph();
+    defaultParagraph.setSpacingBefore(0).setSpacingAfter(0).setLineSpacing(1);
+    
+    let hasContent = false;
+    
     if (notes) {
-        _addNotesSection(notesAndEvidenceCell, notes);
-        contentAdded = true;
+        // Use the default paragraph for notes header, then add content
+        defaultParagraph.setText('Observation Notes:');
+        defaultParagraph.setBold(true);
+        _addNotesSectionContent(notesAndEvidenceCell, notes);
+        hasContent = true;
     }
+    
     if (evidence && evidence.length > 0) {
-        if(notes) notesAndEvidenceCell.appendParagraph('').setSpacingBefore(10);
+        if (notes) {
+            // Add spacing between notes and evidence
+            const spacerPara = notesAndEvidenceCell.appendParagraph('');
+            spacerPara.setSpacingBefore(0).setSpacingAfter(0).setSpacingBefore(10);
+        } else {
+            // Use default paragraph for evidence header
+            defaultParagraph.setText('Evidence:');
+            defaultParagraph.setBold(true);
+        }
         _addEvidenceSection(notesAndEvidenceCell, evidence);
-        contentAdded = true;
+        hasContent = true;
     }
 
-    if (!contentAdded) {
-        notesAndEvidenceCell.appendParagraph('No notes or evidence provided.').setItalic(true);
+    if (!hasContent) {
+        defaultParagraph.setText('No notes or evidence provided.');
+        defaultParagraph.setItalic(true);
     }
 }
 
@@ -1360,6 +1414,15 @@ function _addObservationComponentRowsWithMergeTracking(table, component, domainN
  */
 function _addNotesSection(container, notesHtml) {
     container.appendParagraph('Observation Notes:').setBold(true);
+    _addNotesSectionContent(container, notesHtml);
+}
+
+/**
+ * Adds observation notes content to a container without the header.
+ * @param {DocumentApp.ContainerElement} container The container to add the notes to.
+ * @param {string} notesHtml The HTML content of the notes.
+ */
+function _addNotesSectionContent(container, notesHtml) {
 
     try {
         notesHtml = notesHtml.replace(/<br\s*\/?>/gi, '\n');
@@ -1422,6 +1485,7 @@ function _addNotesSection(container, notesHtml) {
 function _addParagraphWithFormatting(container, text) {
     if (!text.trim()) return;
     const paragraph = container.appendParagraph(stripHtml(text));
+    paragraph.setSpacingBefore(0).setSpacingAfter(0).setLineSpacing(1);
     _applyInlineFormatting(paragraph.getChild(0).asText(), text);
 }
 
@@ -1485,7 +1549,9 @@ function _addBestPracticesSection(body, bestPractices) {
  * @param {Array} evidence Array of evidence objects
  */
 function _addEvidenceSection(container, evidence) {
-    container.appendParagraph('Evidence:').setBold(true);
+    const evidenceHeader = container.appendParagraph('Evidence:');
+    evidenceHeader.setBold(true);
+    evidenceHeader.setSpacingBefore(0).setSpacingAfter(0).setLineSpacing(1);
     
     evidence.forEach(item => {
         // Create the paragraph with the bullet point and item name.
@@ -1495,8 +1561,9 @@ function _addEvidenceSection(container, evidence) {
         // Style the text.
         textElement.setFontSize(9).setForegroundColor(COLORS.ROYAL_BLUE);
 
-        // Apply paragraph styling.
-        evidenceItem.setIndentFirstLine(20).setSpacingAfter(2);
+        // Apply paragraph styling with consistent spacing
+        evidenceItem.setIndentFirstLine(20);
+        evidenceItem.setSpacingBefore(0).setSpacingAfter(0).setLineSpacing(1);
 
         // If a URL exists, make the item name a clickable hyperlink.
         if (item.url) {
