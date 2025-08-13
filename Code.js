@@ -165,6 +165,37 @@ function loadRubricData(filterParams) {
 }
 
 /**
+ * Adds a look-fors section with royal blue styling for checked items.
+ * @param {Body} body The document body.
+ * @param {Object} component The component data.
+ * @param {Object} observation The observation data, containing checkedLookFors.
+ */
+function _addLookForsSection(body, component, observation) {
+    const lookFors = observation.checkedLookFors?.[component.componentId] ?? [];
+
+    if (lookFors.length === 0) {
+        return; // Don't add the section if there are no checked look-fors
+    }
+
+    // Look-fors header with royal blue background
+    const lookForsHeader = body.appendParagraph('Look-fors');
+    lookForsHeader.getChild(0).asText()
+        .setFontSize(10)
+        .setBold(true)
+        .setForegroundColor(COLORS.WHITE)
+        .setBackgroundColor(COLORS.ROYAL_BLUE);
+    lookForsHeader.setSpacingBefore(5).setSpacingAfter(3);
+
+    // Add each checked look-for as a list item with a light blue background
+    lookFors.forEach(lookFor => {
+        const listItem = body.appendListItem(lookFor);
+        listItem.getChild(0).asText().setFontSize(9).setForegroundColor(COLORS.DARK_GRAY);
+        listItem.setBackgroundColor(COLORS.LIGHT_BLUE_BG);
+        listItem.setSpacingAfter(2);
+    });
+}
+
+/**
  * Gets the list of staff members for the filter dropdowns.
  * @param {string} role The role to filter by.
  * @param {string} year The year to filter by.
@@ -805,6 +836,9 @@ function _addNotesSection(body, notesHtml) {
     // Improved HTML to DocumentApp parser
     // Parse HTML sequentially to handle mixed content properly
     try {
+        // Handle <br> tags by converting them to newlines.
+        notesHtml = notesHtml.replace(/<br\s*\/?>/gi, '\n');
+
         // Split HTML into blocks by tags that create separate elements
         const blockRegex = /<(\/?)(?:p|h1|h2|ul|ol|li)(?:\s[^>]*)?>|(<\/li>)/gi;
         let currentText = '';
@@ -887,38 +921,31 @@ function _addParagraphWithFormatting(body, text) {
 }
 
 function _applyInlineFormatting(textElement, html) {
-    // Apply formatting to specific ranges within text
-    const cleanText = stripHtml(html);
+    // Apply formatting to specific ranges within text. This version handles multiple occurrences of the same text with the same style.
+    let cleanText = stripHtml(html);
+    let placeholderCounter = 0;
     
-    // Find bold text ranges
-    const boldMatches = [...html.matchAll(/<strong>(.*?)<\/strong>/gi)];
-    boldMatches.forEach(match => {
-        const boldText = stripHtml(match[1]);
-        const start = cleanText.indexOf(boldText);
-        if (start >= 0) {
-            textElement.setBold(start, start + boldText.length - 1, true);
-        }
-    });
-    
-    // Find italic text ranges
-    const italicMatches = [...html.matchAll(/<em>(.*?)<\/em>/gi)];
-    italicMatches.forEach(match => {
-        const italicText = stripHtml(match[1]);
-        const start = cleanText.indexOf(italicText);
-        if (start >= 0) {
-            textElement.setItalic(start, start + italicText.length - 1, true);
-        }
-    });
-    
-    // Find underlined text ranges
-    const underlineMatches = [...html.matchAll(/<u>(.*?)<\/u>/gi)];
-    underlineMatches.forEach(match => {
-        const underlineText = stripHtml(match[1]);
-        const start = cleanText.indexOf(underlineText);
-        if (start >= 0) {
-            textElement.setUnderline(start, start + underlineText.length - 1, true);
-        }
-    });
+    const applyStyle = (tag, styleSetter) => {
+        const regex = new RegExp(`<${tag}>(.*?)<\\/${tag}>`, 'gi');
+        const matches = [...html.matchAll(regex)];
+
+        matches.forEach(match => {
+            const styledText = stripHtml(match[1]);
+            if (styledText) {
+                const index = cleanText.indexOf(styledText);
+                if (index > -1) {
+                    styleSetter(index, index + styledText.length - 1, true);
+                    // Use a unique placeholder string to avoid conflicts with actual text content.
+                    const placeholder = `__PLACEHOLDER_${tag.toUpperCase()}_${placeholderCounter++}__`;
+                    cleanText = cleanText.substring(0, index) + placeholder + cleanText.substring(index + styledText.length);
+                }
+            }
+        });
+    };
+
+    applyStyle('strong', (start, end, value) => textElement.setBold(start, end, value));
+    applyStyle('em', (start, end, value) => textElement.setItalic(start, end, value));
+    applyStyle('u', (start, end, value) => textElement.setUnderline(start, end, value));
 }
 
 function stripHtml(html) {
@@ -939,8 +966,8 @@ function _addComponentSection(body, component, proficiency, observation) {
     componentTitle.getChild(0).asText()
         .setFontSize(12)
         .setBold(true)
-        .setForegroundColor('#ffffff')
-        .setBackgroundColor('#64748b');
+        .setForegroundColor(COLORS.WHITE)
+        .setBackgroundColor(COLORS.COMPONENT_HEADER_BG);
     componentTitle.setSpacingBefore(10).setSpacingAfter(5);
     
     // Create table for proficiency levels
@@ -984,20 +1011,22 @@ function _addComponentSection(body, component, proficiency, observation) {
         cell.setPaddingTop(12).setPaddingBottom(12).setPaddingLeft(12).setPaddingRight(12);
     });
     
-    // Add best practices if available
-    if (component.bestPractices && component.bestPractices.length > 0) {
-        _addBestPracticesSection(body, component.bestPractices);
-    }
-    
-    // Add evidence if available
-    const evidence = observation.evidenceLinks[component.componentId];
-    if (evidence && evidence.length > 0) {
-        _addEvidenceSection(body, evidence);
-    }
-    
+    // Add Look-fors, Notes, and Evidence sections in the specified order.
+
+    // Add the new Look-fors section.
+    // This function checks internally if there are any look-fors to add.
+    _addLookForsSection(body, component, observation);
+
+    // Add notes if available.
     const notes = observation.observationNotes ? observation.observationNotes[component.componentId] : null;
     if (notes) {
         _addNotesSection(body, notes);
+    }
+
+    // Add evidence if available.
+    const evidence = observation.evidenceLinks[component.componentId];
+    if (evidence && evidence.length > 0) {
+        _addEvidenceSection(body, evidence);
     }
 
     // Add spacing after component
@@ -1035,18 +1064,33 @@ function _addBestPracticesSection(body, bestPractices) {
  */
 function _addEvidenceSection(body, evidence) {
     const evidenceHeader = body.appendParagraph('Evidence:');
-    evidenceHeader.getChild(0).asText().setFontSize(10).setBold(true).setForegroundColor('#4a5568');
+    evidenceHeader.getChild(0).asText().setFontSize(10).setBold(true).setForegroundColor(COLORS.DARK_GRAY);
     evidenceHeader.setSpacingBefore(5).setSpacingAfter(2);
-    evidenceHeader.setBackgroundColor('#f8fafc');
+    evidenceHeader.setBackgroundColor(COLORS.EVIDENCE_HEADER_BG);
     
     evidence.forEach(item => {
+        // Create the paragraph with the bullet point and item name.
         const evidenceItem = body.appendParagraph(`• ${item.name}`);
-        evidenceItem.getChild(0).asText().setFontSize(9).setForegroundColor('#3182ce');
+        const textElement = evidenceItem.getChild(0).asText();
+
+        // Style the text.
+        textElement.setFontSize(9).setForegroundColor(COLORS.ROYAL_BLUE);
+
+        // Apply paragraph styling.
         evidenceItem.setIndentFirstLine(20).setSpacingAfter(2);
-        // Note: DocumentApp doesn't support hyperlinks in the same way as HTML
-        // The URL information is preserved in the text but won't be clickable
+
+        // If a URL exists, make the item name a clickable hyperlink.
         if (item.url) {
-            evidenceItem.appendText(` (${item.url})`);
+<<<<<<< HEAD
+=======
+            // The link should cover the item name, which starts after "• ".
+>>>>>>> 39575adf5d1ae6ac84e22bf4e6ac8a40910df789
+            // The link should cover the item name, regardless of bullet or prefix.
+            const text = textElement.getText();
+            const nameStart = text.indexOf(item.name);
+            if (nameStart !== -1) {
+                textElement.setLinkUrl(nameStart, nameStart + item.name.length - 1, item.url);
+            }
         }
     });
 }
