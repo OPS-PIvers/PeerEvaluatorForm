@@ -771,12 +771,26 @@ function _addRubricContent(body, observation, rubricData) {
     rubricData.domains.forEach(domain => {
         if (domain.components) {
             domain.components.forEach(component => {
-                const proficiency = observation.observationData[component.componentId];
+                // Handle both new unified structure and old separate structure for backward compatibility
+                let proficiency = null;
+                let componentData = null;
+                
+                // Try new unified structure first
+                if (observation.observationData && observation.observationData[component.componentId]) {
+                    componentData = observation.observationData[component.componentId];
+                    proficiency = componentData.proficiency;
+                }
+                // Fallback to old structure if new structure doesn't have proficiency
+                else if (typeof observation.observationData?.[component.componentId] === 'string') {
+                    proficiency = observation.observationData[component.componentId];
+                }
+                
                 if (proficiency) {
                     observedComponents.push({
                         component: component,
                         domainName: domain.name,
                         proficiency: proficiency,
+                        componentData: componentData // Pass the full component data for use in rendering
                     });
                 }
             });
@@ -791,7 +805,7 @@ function _addRubricContent(body, observation, rubricData) {
     table.setBorderWidth(0);
 
     observedComponents.forEach((item, index) => {
-        _addObservationComponentRows(table, item.component, item.domainName, observation, item.proficiency);
+        _addObservationComponentRows(table, item.component, item.domainName, observation, item.proficiency, item.componentData);
         if (index < observedComponents.length - 1) {
             const spacerRow = table.appendTableRow();
             const spacerCell = spacerRow.appendTableCell('');
@@ -810,8 +824,9 @@ function _addRubricContent(body, observation, rubricData) {
  * @param {string} domainName The name of the parent domain.
  * @param {Object} observation The observation data.
  * @param {string} proficiency The selected proficiency level.
+ * @param {Object} componentData The component-specific data from the unified structure (may be null for old structure).
  */
-function _addObservationComponentRows(table, component, domainName, observation, proficiency) {
+function _addObservationComponentRows(table, component, domainName, observation, proficiency, componentData) {
     const addHeaderRow = (text, backgroundColor, fontSize = 12) => {
         const row = table.appendTableRow();
         const cell = row.appendTableCell(text);
@@ -870,7 +885,17 @@ function _addObservationComponentRows(table, component, domainName, observation,
     const lookforsCell = lookforsRow.appendTableCell('');
     lookforsCell.setWidth(500);
     lookforsCell.setPaddingTop(8).setPaddingBottom(8).setPaddingLeft(20).setPaddingRight(12);
-    const checkedLookFors = observation.checkedLookFors?.[component.componentId] ?? [];
+    
+    // Handle both new unified structure and old separate structure for look-fors
+    let checkedLookFors = [];
+    if (componentData && componentData.lookfors) {
+        // New unified structure
+        checkedLookFors = componentData.lookfors;
+    } else if (observation.checkedLookFors?.[component.componentId]) {
+        // Fallback to old structure
+        checkedLookFors = observation.checkedLookFors[component.componentId];
+    }
+    
     if (checkedLookFors.length > 0) {
         checkedLookFors.forEach(lookfor => {
             lookforsCell.appendListItem(lookfor).setGlyphType(DocumentApp.GlyphType.BULLET);
@@ -888,8 +913,24 @@ function _addObservationComponentRows(table, component, domainName, observation,
     notesAndEvidenceCell.setWidth(500);
     notesAndEvidenceCell.setPaddingTop(8).setPaddingBottom(8).setPaddingLeft(12).setPaddingRight(12);
 
-    const notes = observation.observationNotes?.[component.componentId];
-    const evidence = observation.evidenceLinks?.[component.componentId];
+    // Handle both new unified structure and old separate structure for notes and evidence
+    let notes = null;
+    let evidence = null;
+    
+    if (componentData && componentData.notes) {
+        // New unified structure for notes
+        notes = componentData.notes;
+    } else if (observation.observationNotes?.[component.componentId]) {
+        // Fallback to old structure for notes
+        notes = observation.observationNotes[component.componentId];
+    }
+    
+    // Evidence can still be in separate structure or in componentData (future extension)
+    if (componentData && componentData.evidence) {
+        evidence = componentData.evidence;
+    } else if (observation.evidenceLinks?.[component.componentId]) {
+        evidence = observation.evidenceLinks[component.componentId];
+    }
 
     let contentAdded = false;
     if (notes) {
