@@ -695,15 +695,21 @@ function _generateAndSavePdf(observationId, userContext) {
             // Add the observed staff member as viewer so they can see their evaluation
             pdfFile.addViewer(observation.observedEmail);
             
+            // Get file ID and construct direct view URL for better compatibility
+            const fileId = pdfFile.getId();
+            const originalUrl = pdfFile.getUrl();
+            const directViewUrl = `https://drive.google.com/file/d/${fileId}/view`;
+            
             debugLog('Successfully created PDF file with user-specific sharing', { 
                 observationId, 
-                fileId: pdfFile.getId(), 
-                pdfUrl: pdfFile.getUrl(),
+                fileId: fileId,
+                originalUrl: originalUrl,
+                directViewUrl: directViewUrl,
                 sharedWithObserver: observation.observerEmail,
                 sharedWithObserved: observation.observedEmail
             });
 
-            return { success: true, pdfUrl: pdfFile.getUrl() };
+            return { success: true, pdfUrl: directViewUrl };
 
         } catch (driveError) {
             debugLog('PDF generation failed: Drive error', { observationId, error: driveError.message });
