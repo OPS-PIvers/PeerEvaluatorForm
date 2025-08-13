@@ -394,53 +394,20 @@ function finalizeObservation(observationId) {
             return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
         }
 
-        // First, update the status to Finalized
         const statusUpdateResult = updateObservationStatus(observationId, OBSERVATION_STATUS.FINALIZED, userContext.email);
-
         if (!statusUpdateResult.success) {
-            return statusUpdateResult; // Return the error if finalization fails
+            return statusUpdateResult;
         }
 
-        // If finalization is successful, generate and save the PDF
         const pdfResult = _generateAndSavePdf(observationId, userContext);
+        const pdfStatus = pdfResult.success ? 'generated' : 'failed';
 
-        const spreadsheet = openSpreadsheet();
-        const sheet = getSheetByName(spreadsheet, "Observation_Data");
+        _updatePdfStatusInSheet(observationId, pdfStatus, pdfResult.pdfUrl);
 
-        if (sheet) {
-            const row = findObservationRow(sheet, observationId);
-            if (row !== -1) {
-                const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-                const pdfUrlCol = headers.indexOf('pdfUrl') + 1;
-                const pdfStatusCol = headers.indexOf('pdfStatus') + 1;
-
-                const pdfStatus = pdfResult.success ? 'generated' : 'failed';
-
-                if (pdfResult.success) {
-                    if (pdfUrlCol > 0) sheet.getRange(row, pdfUrlCol).setValue(pdfResult.pdfUrl);
-                    debugLog('PDF successfully generated and saved for observation', { observationId, pdfUrl: pdfResult.pdfUrl });
-                } else {
-                    console.error('PDF generation failed after finalization:', pdfResult.error);
-                    debugLog('PDF generation failed for finalized observation', { observationId, error: pdfResult.error });
-                }
-                if (pdfStatusCol > 0) sheet.getRange(row, pdfStatusCol).setValue(pdfStatus);
-                SpreadsheetApp.flush();
-
-                // Manually clear the observation cache since we updated the sheet directly
-                const cache = CacheService.getScriptCache();
-                if (cache) {
-                    cache.remove('all_observations');
-                    debugLog('Cleared all_observations cache after PDF URL update.', { observationId });
-                }
-            }
-        }
-
-        // After all updates, the client will be responsible for refreshing the observation list.
-        // Return a simple success object, plus any error related to the PDF generation.
         const result = {
             success: true,
             observationId: observationId,
-            pdfStatus: pdfResult.success ? 'generated' : 'failed'
+            pdfStatus: pdfStatus,
         };
 
         if (!pdfResult.success) {
@@ -583,7 +550,7 @@ function getObservationStatusAndPdfUrl(observationId) {
  */
 function regenerateObservationPdf(observationId) {
     try {
-        setupObservationSheet(); // Ensure the sheet is ready
+        setupObservationSheet();
         const userContext = createUserContext();
         if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
             return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
@@ -593,68 +560,27 @@ function regenerateObservationPdf(observationId) {
         if (!observation) {
             return { success: false, error: 'Observation not found.' };
         }
-
         if (observation.observerEmail !== userContext.email) {
             return { success: false, error: 'Permission denied. You did not create this observation.' };
         }
-
         if (observation.status !== OBSERVATION_STATUS.FINALIZED) {
             return { success: false, error: 'PDF can only be regenerated for finalized observations.' };
         }
 
         debugLog('Starting PDF regeneration', { observationId, requestedBy: userContext.email });
 
-        // Generate the PDF
         const pdfResult = _generateAndSavePdf(observationId, userContext);
+        const pdfStatus = pdfResult.success ? 'generated' : 'failed';
+
+        _updatePdfStatusInSheet(observationId, pdfStatus, pdfResult.pdfUrl);
 
         if (pdfResult.success) {
-            // Update the observation with the new PDF URL and status
-            const spreadsheet = openSpreadsheet();
-            const sheet = getSheetByName(spreadsheet, "Observation_Data");
-            if (sheet) {
-                const row = findObservationRow(sheet, observationId);
-                if (row !== -1) {
-                    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-                    const pdfUrlCol = headers.indexOf('pdfUrl') + 1;
-                    const pdfStatusCol = headers.indexOf('pdfStatus') + 1;
-                    const lastModifiedCol = headers.indexOf('lastModifiedAt') + 1;
-
-                    if (pdfUrlCol > 0) {
-                        sheet.getRange(row, pdfUrlCol).setValue(pdfResult.pdfUrl);
-                    }
-                    if (pdfStatusCol > 0) {
-                        sheet.getRange(row, pdfStatusCol).setValue('generated');
-                    }
-                    if (lastModifiedCol > 0) {
-                        sheet.getRange(row, lastModifiedCol).setValue(new Date().toISOString());
-                    }
-                    SpreadsheetApp.flush();
-                }
-            }
-
             debugLog('PDF successfully regenerated', { observationId, pdfUrl: pdfResult.pdfUrl });
             return { success: true, pdfUrl: pdfResult.pdfUrl };
-
         } else {
-            // PDF regeneration failed - update status
-            const spreadsheet = openSpreadsheet();
-            const sheet = getSheetByName(spreadsheet, "Observation_Data");
-            if (sheet) {
-                const row = findObservationRow(sheet, observationId);
-                if (row !== -1) {
-                    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-                    const pdfStatusCol = headers.indexOf('pdfStatus') + 1;
-                    if (pdfStatusCol > 0) {
-                        sheet.getRange(row, pdfStatusCol).setValue('failed');
-                        SpreadsheetApp.flush();
-                    }
-                }
-            }
-
             debugLog('PDF regeneration failed', { observationId, error: pdfResult.error });
             return { success: false, error: pdfResult.error };
         }
-
     } catch (error) {
         console.error(`Error regenerating PDF for observation ${observationId}:`, error);
         return { success: false, error: 'An unexpected error occurred while regenerating the PDF.' };
@@ -763,6 +689,44 @@ function updateObservationMetadata(observationId, metadata) {
  * @returns {Object} A response object with success status and PDF URL.
  * @private
  */
+function _updatePdfStatusInSheet(observationId, pdfStatus, pdfUrl = null) {
+    const spreadsheet = openSpreadsheet();
+    const sheet = getSheetByName(spreadsheet, "Observation_Data");
+    if (!sheet) {
+        console.error(`Sheet '${"Observation_Data"}' not found. Cannot update PDF status.`);
+        return;
+    }
+
+    const row = findObservationRow(sheet, observationId);
+    if (row === -1) {
+        console.error(`Observation ${observationId} not found. Cannot update PDF status.`);
+        return;
+    }
+
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const pdfStatusCol = headers.indexOf('pdfStatus') + 1;
+    const pdfUrlCol = headers.indexOf('pdfUrl') + 1;
+    const lastModifiedCol = headers.indexOf('lastModifiedAt') + 1;
+
+    if (pdfStatusCol > 0) {
+        sheet.getRange(row, pdfStatusCol).setValue(pdfStatus);
+    }
+    if (pdfUrl && pdfUrlCol > 0) {
+        sheet.getRange(row, pdfUrlCol).setValue(pdfUrl);
+    }
+    if (lastModifiedCol > 0) {
+        sheet.getRange(row, lastModifiedCol).setValue(new Date().toISOString());
+    }
+    SpreadsheetApp.flush();
+
+    // Manually clear the observation cache since we updated the sheet directly
+    const cache = CacheService.getScriptCache();
+    if (cache) {
+        cache.remove('all_observations');
+        debugLog('Cleared all_observations cache after PDF status update.', { observationId });
+    }
+}
+
 function _generateAndSavePdf(observationId, userContext) {
     debugLog('Starting PDF generation', { observationId });
     

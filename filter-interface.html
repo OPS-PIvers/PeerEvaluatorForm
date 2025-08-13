@@ -895,6 +895,32 @@
 
         let activePollers = {};
 
+        function _setPdfButtonState(observationId, state, pdfUrl = null) {
+            const pdfButton = document.getElementById(`pdf-button-${observationId}`);
+            if (!pdfButton) return;
+
+            switch (state) {
+                case 'generating':
+                    pdfButton.textContent = 'Generating PDF...';
+                    pdfButton.className = 'filter-btn btn-export btn-pdf-missing';
+                    pdfButton.disabled = true;
+                    pdfButton.onclick = null;
+                    break;
+                case 'ready':
+                    pdfButton.textContent = 'View PDF';
+                    pdfButton.className = 'filter-btn btn-export';
+                    pdfButton.disabled = false;
+                    pdfButton.onclick = () => window.open(pdfUrl, '_blank');
+                    break;
+                case 'failed':
+                    pdfButton.textContent = 'Retry PDF';
+                    pdfButton.className = 'filter-btn btn-export btn-pdf-failed';
+                    pdfButton.disabled = false;
+                    pdfButton.onclick = () => handleRetryPdf(observationId);
+                    break;
+            }
+        }
+
         function startPdfPolling(observationId) {
             if (activePollers[observationId]) {
                 console.log(`Polling already active for ${observationId}`);
@@ -909,27 +935,15 @@
                 google.script.run
                     .withSuccessHandler(res => {
                         if (res.success) {
-                            const pdfButton = document.getElementById(`pdf-button-${observationId}`);
-                            if (!pdfButton) {
-                                stopPdfPolling(observationId);
-                                return;
-                            }
-
                             if (res.pdfUrl) {
                                 console.log(`PDF found for ${observationId}`);
                                 showToast('PDF is ready!', true);
-                                pdfButton.textContent = 'View PDF';
-                                pdfButton.className = 'filter-btn btn-export';
-                                pdfButton.disabled = false;
-                                pdfButton.onclick = () => window.open(res.pdfUrl, '_blank');
+                                _setPdfButtonState(observationId, 'ready', res.pdfUrl);
                                 stopPdfPolling(observationId);
                             } else if (res.pdfStatus === 'failed') {
                                 console.log(`PDF generation failed for ${observationId}`);
                                 showToast('PDF generation failed. Please retry.', false);
-                                pdfButton.textContent = 'Retry PDF';
-                                pdfButton.className = 'filter-btn btn-export btn-pdf-failed';
-                                pdfButton.disabled = false;
-                                pdfButton.onclick = () => handleRetryPdf(observationId);
+                                _setPdfButtonState(observationId, 'failed');
                                 stopPdfPolling(observationId);
                             }
                         } else {
@@ -938,7 +952,6 @@
                     })
                     .withFailureHandler(err => {
                         console.error(`Polling error for ${observationId}:`, err);
-                        // Don't stop polling on a single failure, maybe it's a network blip
                     })
                     .getObservationStatusAndPdfUrl(observationId);
             }, pollInterval);
@@ -946,12 +959,9 @@
             const timeoutId = setTimeout(() => {
                 console.log(`Polling timed out for ${observationId}`);
                 const pdfButton = document.getElementById(`pdf-button-${observationId}`);
-                if (pdfButton && pdfButton.disabled) { // Check if still in pending state
+                if (pdfButton && pdfButton.disabled) {
                      showToast('PDF generation is taking longer than expected. Please check back later or retry.', false);
-                     pdfButton.textContent = 'Retry PDF';
-                     pdfButton.className = 'filter-btn btn-export btn-pdf-failed';
-                     pdfButton.disabled = false;
-                     pdfButton.onclick = () => handleRetryPdf(observationId);
+                    _setPdfButtonState(observationId, 'failed');
                 }
                 stopPdfPolling(observationId);
             }, pollTimeout);
@@ -1084,12 +1094,7 @@
         function handleRetryPdf(obsId) {
             if (confirm('This will attempt to regenerate the PDF for this observation. Continue?')) {
                 showLoading('Requesting PDF regeneration...');
-                const pdfButton = document.getElementById(`pdf-button-${obsId}`);
-                if (pdfButton) {
-                    pdfButton.textContent = 'Generating PDF...';
-                    pdfButton.className = 'filter-btn btn-export btn-pdf-missing';
-                    pdfButton.disabled = true;
-                }
+                _setPdfButtonState(obsId, 'generating');
 
                 google.script.run.withSuccessHandler(res => {
                     hideLoading();
@@ -1098,19 +1103,11 @@
                         startPdfPolling(obsId);
                     } else {
                          showError('PDF regeneration failed: ' + res.error);
-                         if (pdfButton) {
-                            pdfButton.textContent = 'Retry PDF';
-                            pdfButton.className = 'filter-btn btn-export btn-pdf-failed';
-                            pdfButton.disabled = false;
-                        }
+                         _setPdfButtonState(obsId, 'failed');
                     }
                 }).withFailureHandler(error => {
                     handleError(error);
-                    if (pdfButton) {
-                       pdfButton.textContent = 'Retry PDF';
-                       pdfButton.className = 'filter-btn btn-export btn-pdf-failed';
-                       pdfButton.disabled = false;
-                    }
+                    _setPdfButtonState(obsId, 'failed');
                 }).regenerateObservationPdf(obsId);
             }
         }
