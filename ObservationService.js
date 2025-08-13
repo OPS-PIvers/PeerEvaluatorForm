@@ -587,7 +587,7 @@ function _deleteRecordAndFolder(observationId, requestingUserEmail, allowedStatu
             const obsFolder = _getObservationFolder(observationForFolder);
             if (obsFolder) {
                 obsFolder.setTrashed(true);
-                debugLog(`Observation Drive folder for ${observationId} moved to trash.`);
+                debugLog('Observation Drive folder moved to trash', { observationId: observationId, folderId: obsFolder.getId() });
             }
         } catch (driveError) {
             console.error(`Could not delete Drive folder for observation ${observationId}. Deletion of sheet record will continue. Error:`, driveError);
