@@ -762,7 +762,7 @@
                         <button class="nav-btn nav-btn-save" id="saveDraftBtn" onclick="saveDraftQuickly()">
                             💾 Save Draft
                         </button>
-                        <button class="nav-btn nav-btn-finalize" id="finalizeBtn" onclick="reviewObservation()">
+                        <button class="nav-btn nav-btn-finalize" id="finalizeBtn" onclick="handleFinalizeFromNav()">
                             ✅ Finalize & Submit
                         </button>
                     </div>
@@ -1066,9 +1066,28 @@
             }
         }
 
-        function reviewObservation() {
-            showLoading('Loading review...');
-            google.script.run.withSuccessHandler(handleRubricData).withFailureHandler(handleError).loadFinalizedObservationForViewing(currentObservationId);
+        function handleFinalizeFromNav() {
+            if (!currentObservationId || !currentObservedUser.email || !currentObservedUser.name) {
+                showError('Unable to finalize: Missing observation context.');
+                return;
+            }
+            
+            if (confirm('Are you sure you want to finalize this observation? You will not be able to edit it further.')) {
+                showLoading('Finalizing observation, please wait...');
+                google.script.run
+                    .withSuccessHandler(res => {
+                        hideLoading();
+                        if (res.success) {
+                            showToast('Observation finalized. Generating PDF...', true);
+                            // Navigate back to observation list
+                            displayObservationOptions(currentObservedUser.email, currentObservedUser.name);
+                        } else {
+                            showError(res.error);
+                        }
+                    })
+                    .withFailureHandler(handleError)
+                    .finalizeObservation(currentObservationId);
+            }
         }
 
         function handleViewObservation(obsId) {
@@ -1682,7 +1701,7 @@
                 if (finalizeBtn) {
                     if (observation.status === 'Draft') {
                         finalizeBtn.textContent = '✅ Finalize & Submit';
-                        finalizeBtn.onclick = reviewObservation;
+                        finalizeBtn.onclick = handleFinalizeFromNav;
                     } else {
                         finalizeBtn.style.display = 'none';
                     }
