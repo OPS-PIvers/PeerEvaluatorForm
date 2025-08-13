@@ -54,7 +54,6 @@ The project follows a modular, service-oriented architecture.
 ├─── error-page.html                   # HTML template for displaying fatal errors.
 ├─── filter-interface.html             # HTML/JS for filter view (special access roles).
 ├─── finalized-observation-email.html  # HTML template for finalized observation emails.
-├─── lookfors-todo.md                  # Development notes for look-fors functionality.
 ├─── observation-notes-todo.md         # Development notes for observation notes.
 ├─── performance-todo.md               # Development notes for performance optimization.
 └─── rubric.html                       # Main HTML/JS template for evaluation rubric interface.

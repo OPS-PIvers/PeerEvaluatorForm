@@ -29,7 +29,6 @@ This is a Google Apps Script (GAS) web application called "Peer Evaluator Form" 
 
 ### Development Notes
 
-- **lookfors-todo.md**: Development notes for look-fors functionality
 - **observation-notes-todo.md**: Development notes for observation notes
 - **performance-todo.md**: Performance optimization notes
 
