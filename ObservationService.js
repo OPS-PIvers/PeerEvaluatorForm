@@ -447,7 +447,11 @@ function deleteObservationRecord(observationId, requestingUserEmail) {
 
         const row = _findObservationRow(sheet, observationId);
         if (row === -1) {
-            return { success: false, error: 'Observation not found.' };
+            // If the row is not found, it might have been deleted already.
+            // We can't reliably find and delete the corresponding folder without
+            // the `observedName` and `observedEmail` from the sheet row.
+            // Returning success as the primary goal (deleting the sheet record) is complete.
+            return { success: true, message: 'Observation record not found; assumed already deleted.' };
         }
 
         // Get the observation data to check permissions
