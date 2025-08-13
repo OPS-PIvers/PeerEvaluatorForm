@@ -958,11 +958,12 @@ function _addObservationComponentRows(table, component, domainName, observation,
         cell.setWidth(TOTAL_WIDTH);
 
         // Apply styling to the single cell
-        const style = {};
-        style[DocumentApp.Attribute.BACKGROUND_COLOR] = backgroundColor;
-        style[DocumentApp.Attribute.FOREGROUND_COLOR] = COLORS.WHITE;
-        style[DocumentApp.Attribute.BOLD] = true;
-        style[DocumentApp.Attribute.FONT_SIZE] = fontSize;
+        const style = {
+            [DocumentApp.Attribute.BACKGROUND_COLOR]: backgroundColor,
+            [DocumentApp.Attribute.FOREGROUND_COLOR]: COLORS.WHITE,
+            [DocumentApp.Attribute.BOLD]: true,
+            [DocumentApp.Attribute.FONT_SIZE]: fontSize
+        };
         cell.setAttributes(style);
         cell.setPaddingTop(8).setPaddingBottom(8).setPaddingLeft(12).setPaddingRight(12);
 
