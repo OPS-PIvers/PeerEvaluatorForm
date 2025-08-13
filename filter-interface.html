@@ -664,23 +664,9 @@
                                <button class="filter-btn btn-finalize" onclick="handleFinalizeObservation('${obs.observationId}', '${observedEmail}', '${observedName}')">Finalize</button>
                                <button class="filter-btn btn-delete" onclick="handleDeleteObservation('${obs.observationId}', '${observedEmail}', '${observedName}')">Delete</button>`;
                 } else if (obs.status === 'Finalized') {
-                    // Determine PDF button state based on pdfUrl and pdfStatus
-                    let pdfButton = '';
-                    const pdfStatus = obs.pdfStatus || (obs.pdfUrl ? 'generated' : 'unknown');
-
-                    if (pdfStatus === 'generated' && obs.pdfUrl) {
-                        // PDF is available - show normal View PDF button
-                        pdfButton = `<button class="filter-btn btn-export" onclick="window.open('${obs.pdfUrl}', '_blank')">View PDF</button>`;
-                    } else if (pdfStatus === 'failed') {
-                        // PDF generation failed - show retry button
-                        pdfButton = `<button class="filter-btn btn-pdf-failed" onclick="handleRetryPdf('${obs.observationId}')">PDF Failed - Retry</button>`;
-                    } else {
-                        // PDF is not available, show Generate PDF button
-                        pdfButton = `<button class="filter-btn btn-export" onclick="handleRetryPdf('${obs.observationId}')">Generate PDF</button>`;
-                    }
-
+                    // Finalized observations always have PDF available
                     buttons = `<button class="filter-btn btn-view" onclick="handleViewObservation('${obs.observationId}')">View</button>
-                               ${pdfButton}
+                               <button class="filter-btn btn-export" onclick="window.open('${obs.pdfUrl}', '_blank')">View PDF</button>
                                <button class="filter-btn btn-delete" onclick="handleDeleteFinalizedObservation('${obs.observationId}', '${observedEmail}', '${observedName}')">Delete</button>`;
                 }
                 cardsHtml += `

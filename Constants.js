@@ -380,6 +380,14 @@ const DRIVE_FOLDER_INFO = {
 };
 
 /**
+ * Proficiency level constants
+ */
+const PROFICIENCY_LEVELS = {
+  TITLES: ['Developing', 'Basic', 'Proficient', 'Distinguished'],
+  KEYS: ['developing', 'basic', 'proficient', 'distinguished']
+};
+
+/**
  * Color constants for PDF styling
  */
 const COLORS = {
@@ -388,5 +396,11 @@ const COLORS = {
   DARK_GRAY: '#4a5568',
   LIGHT_BLUE_BG: '#dbeafe',
   COMPONENT_HEADER_BG: '#64748b',
-  EVIDENCE_HEADER_BG: '#f8fafc'
+  EVIDENCE_HEADER_BG: '#f8fafc',
+  DOMAIN_HEADER_BG: '#7c9ac5',
+  PROFICIENCY_HEADER_BG: '#e2e8f0',
+  PROFICIENCY_TEXT: '#4a5568',
+  SELECTED_PROFICIENCY_BG: '#dbeafe',
+  SELECTED_PROFICIENCY_TEXT: '#1e40af',
+  NOTES_EVIDENCE_HEADER_BG: '#4a5568'
 };

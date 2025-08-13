@@ -164,36 +164,6 @@ function loadRubricData(filterParams) {
     }
 }
 
-/**
- * Adds a look-fors section with royal blue styling for checked items.
- * @param {Body} body The document body.
- * @param {Object} component The component data.
- * @param {Object} observation The observation data, containing checkedLookFors.
- */
-function _addLookForsSection(body, component, observation) {
-    const lookFors = observation.checkedLookFors?.[component.componentId] ?? [];
-
-    if (lookFors.length === 0) {
-        return; // Don't add the section if there are no checked look-fors
-    }
-
-    // Look-fors header with royal blue background
-    const lookForsHeader = body.appendParagraph('Look-fors');
-    lookForsHeader.getChild(0).asText()
-        .setFontSize(10)
-        .setBold(true)
-        .setForegroundColor(COLORS.WHITE)
-        .setBackgroundColor(COLORS.ROYAL_BLUE);
-    lookForsHeader.setSpacingBefore(5).setSpacingAfter(3);
-
-    // Add each checked look-for as a list item with a light blue background
-    lookFors.forEach(lookFor => {
-        const listItem = body.appendListItem(lookFor);
-        listItem.getChild(0).asText().setFontSize(9).setForegroundColor(COLORS.DARK_GRAY);
-        listItem.setBackgroundColor(COLORS.LIGHT_BLUE_BG);
-        listItem.setSpacingAfter(2);
-    });
-}
 
 /**
  * Gets the list of staff members for the filter dropdowns.
@@ -791,55 +761,162 @@ function _addDocumentHeader(body, observation) {
 }
 
 /**
- * Adds the rubric content with proper styling.
- * @param {Body} body The document body
- * @param {Object} observation The observation data
- * @param {Object} rubricData The rubric structure and content
+ * Adds the rubric content by creating a single table for all observed components.
+ * @param {DocumentApp.Body} body The document body.
+ * @param {Object} observation The observation data.
+ * @param {Object} rubricData The rubric structure and content.
  */
 function _addRubricContent(body, observation, rubricData) {
+    const observedComponents = [];
     rubricData.domains.forEach(domain => {
-        const domainHasContent = domain.components.some(c => observation.observationData[c.componentId]);
-        
-        if (domainHasContent) {
-            // Domain header with dark blue background
-            const domainHeader = body.appendParagraph(domain.name);
-            domainHeader.setHeading(DocumentApp.ParagraphHeading.HEADING2);
-            domainHeader.getChild(0).asText()
-                .setFontSize(14)
-                .setBold(true)
-                .setForegroundColor('#ffffff')
-                .setBackgroundColor('#5a82b8');
-            domainHeader.setSpacingBefore(15).setSpacingAfter(5);
-            
-            // Add components for this domain
+        if (domain.components) {
             domain.components.forEach(component => {
                 const proficiency = observation.observationData[component.componentId];
                 if (proficiency) {
-                    _addComponentSection(body, component, proficiency, observation);
+                    observedComponents.push({
+                        component: component,
+                        domainName: domain.name,
+                        proficiency: proficiency,
+                    });
                 }
             });
+        }
+    });
+
+    if (observedComponents.length === 0) {
+        return;
+    }
+
+    const table = body.appendTable();
+    table.setBorderWidth(0);
+
+    observedComponents.forEach((item, index) => {
+        _addObservationComponentRows(table, item.component, item.domainName, observation, item.proficiency);
+        if (index < observedComponents.length - 1) {
+            const spacerRow = table.appendTableRow();
+            const spacerCell = spacerRow.appendTableCell('');
+            const style = {};
+            style[DocumentApp.Attribute.BORDER_WIDTH] = 0;
+            spacerCell.setAttributes(style);
+            spacerCell.setPaddingTop(12);
         }
     });
 }
 
 /**
- * Adds an observation notes section.
- * @param {Body} body The document body
- * @param {string} notesHtml The HTML content of the notes
+ * Adds a set of rows to the main report table for a single observed component.
+ * @param {DocumentApp.Table} table The main report table.
+ * @param {Object} component The component data.
+ * @param {string} domainName The name of the parent domain.
+ * @param {Object} observation The observation data.
+ * @param {string} proficiency The selected proficiency level.
  */
-function _addNotesSection(body, notesHtml) {
-    const notesHeader = body.appendParagraph('Observation Notes:');
-    notesHeader.getChild(0).asText().setFontSize(10).setBold(true).setForegroundColor('#4a5568');
-    notesHeader.setSpacingBefore(5).setSpacingAfter(2);
-    notesHeader.setBackgroundColor('#f8fafc');
+function _addObservationComponentRows(table, component, domainName, observation, proficiency) {
+    const addHeaderRow = (text, backgroundColor, fontSize = 12) => {
+        const row = table.appendTableRow();
+        const cell = row.appendTableCell(text);
+        cell.setWidth(500);
+        cell.setPaddingTop(8).setPaddingBottom(8).setPaddingLeft(12).setPaddingRight(12);
+        const style = {};
+        style[DocumentApp.Attribute.BACKGROUND_COLOR] = backgroundColor;
+        style[DocumentApp.Attribute.FOREGROUND_COLOR] = COLORS.WHITE;
+        style[DocumentApp.Attribute.BOLD] = true;
+        style[DocumentApp.Attribute.FONT_SIZE] = fontSize;
+        cell.setAttributes(style);
+        return cell;
+    };
 
-    // Improved HTML to DocumentApp parser
-    // Parse HTML sequentially to handle mixed content properly
+    // Row 1: Domain
+    addHeaderRow(domainName, COLORS.DOMAIN_HEADER_BG);
+
+    // Row 2: Subdomain
+    addHeaderRow(component.title, COLORS.COMPONENT_HEADER_BG, 11);
+
+    // Row 3: Proficiency Titles
+    const titlesRow = table.appendTableRow();
+    PROFICIENCY_LEVELS.TITLES.forEach(level => {
+        const cell = titlesRow.appendTableCell(level);
+        cell.getChild(0).asParagraph().setAlignment(DocumentApp.HorizontalAlignment.CENTER);
+        cell.setBackgroundColor(COLORS.PROFICIENCY_HEADER_BG);
+        const style = {};
+        style[DocumentApp.Attribute.BOLD] = true;
+        style[DocumentApp.Attribute.FONT_SIZE] = 10;
+        style[DocumentApp.Attribute.FOREGROUND_COLOR] = COLORS.PROFICIENCY_TEXT;
+        cell.setAttributes(style);
+    });
+
+    // Row 4: Proficiency Descriptions
+    const descriptionsRow = table.appendTableRow();
+    PROFICIENCY_LEVELS.KEYS.forEach(key => {
+        const cell = descriptionsRow.appendTableCell(component[key] || '');
+        cell.setPaddingTop(12).setPaddingBottom(12).setPaddingLeft(12).setPaddingRight(12);
+        const style = {};
+        style[DocumentApp.Attribute.FONT_SIZE] = 9;
+        if (proficiency === key) {
+            style[DocumentApp.Attribute.BACKGROUND_COLOR] = COLORS.SELECTED_PROFICIENCY_BG;
+            style[DocumentApp.Attribute.FOREGROUND_COLOR] = COLORS.SELECTED_PROFICIENCY_TEXT;
+            style[DocumentApp.Attribute.BOLD] = true;
+        } else {
+            style[DocumentApp.Attribute.FOREGROUND_COLOR] = COLORS.PROFICIENCY_TEXT;
+        }
+        cell.setAttributes(style);
+    });
+
+    // Row 5: Best Practices Header
+    addHeaderRow('Best Practices aligned with 5D+ and PELSB Standards', COLORS.ROYAL_BLUE, 10);
+
+    // Row 6: Selected Look-fors
+    const lookforsRow = table.appendTableRow();
+    const lookforsCell = lookforsRow.appendTableCell('');
+    lookforsCell.setWidth(500);
+    lookforsCell.setPaddingTop(8).setPaddingBottom(8).setPaddingLeft(20).setPaddingRight(12);
+    const checkedLookFors = observation.checkedLookFors?.[component.componentId] ?? [];
+    if (checkedLookFors.length > 0) {
+        checkedLookFors.forEach(lookfor => {
+            lookforsCell.appendListItem(lookfor).setGlyphType(DocumentApp.GlyphType.BULLET);
+        });
+    } else {
+        lookforsCell.appendParagraph('No best practices selected.').setItalic(true);
+    }
+
+    // Row 7: Notes & Evidence Header
+    addHeaderRow('Notes & Evidence', COLORS.NOTES_EVIDENCE_HEADER_BG, 10);
+
+    // Row 8: Notes and Media
+    const notesAndEvidenceRow = table.appendTableRow();
+    const notesAndEvidenceCell = notesAndEvidenceRow.appendTableCell('');
+    notesAndEvidenceCell.setWidth(500);
+    notesAndEvidenceCell.setPaddingTop(8).setPaddingBottom(8).setPaddingLeft(12).setPaddingRight(12);
+
+    const notes = observation.observationNotes?.[component.componentId];
+    const evidence = observation.evidenceLinks?.[component.componentId];
+
+    let contentAdded = false;
+    if (notes) {
+        _addNotesSection(notesAndEvidenceCell, notes);
+        contentAdded = true;
+    }
+    if (evidence && evidence.length > 0) {
+        if(notes) notesAndEvidenceCell.appendParagraph('').setSpacingBefore(10);
+        _addEvidenceSection(notesAndEvidenceCell, evidence);
+        contentAdded = true;
+    }
+
+    if (!contentAdded) {
+        notesAndEvidenceCell.appendParagraph('No notes or evidence provided.').setItalic(true);
+    }
+}
+
+/**
+ * Adds an observation notes section to a container element (Body or TableCell).
+ * @param {DocumentApp.ContainerElement} container The container to add the notes to.
+ * @param {string} notesHtml The HTML content of the notes.
+ */
+function _addNotesSection(container, notesHtml) {
+    container.appendParagraph('Observation Notes:').setBold(true);
+
     try {
-        // Handle <br> tags by converting them to newlines.
         notesHtml = notesHtml.replace(/<br\s*\/?>/gi, '\n');
-
-        // Split HTML into blocks by tags that create separate elements
         const blockRegex = /<(\/?)(?:p|h1|h2|ul|ol|li)(?:\s[^>]*)?>|(<\/li>)/gi;
         let currentText = '';
         let lastIndex = 0;
@@ -847,32 +924,19 @@ function _addNotesSection(body, notesHtml) {
         let inList = false;
         
         while ((match = blockRegex.exec(notesHtml)) !== null) {
-            // Add any text before this tag
             const textBefore = notesHtml.slice(lastIndex, match.index);
             currentText += textBefore;
             
-            const tag = match[1] ? match[0] : match[0]; // Get the full match
+            const tag = match[0];
             const tagName = tag.match(/<\/?(\w+)/)?.[1]?.toLowerCase();
             const isClosing = tag.startsWith('</');
             
-            if (tagName === 'p' && !isClosing) {
-                if (currentText.trim()) {
-                    _addParagraphWithFormatting(body, currentText.trim());
-                    currentText = '';
-                }
-            } else if (tagName === 'p' && isClosing) {
-                if (currentText.trim()) {
-                    _addParagraphWithFormatting(body, currentText.trim());
-                    currentText = '';
-                }
-            } else if ((tagName === 'h1' || tagName === 'h2') && !isClosing) {
-                if (currentText.trim()) {
-                    _addParagraphWithFormatting(body, currentText.trim());
-                    currentText = '';
-                }
+            if (tagName === 'p' && isClosing) {
+                if (currentText.trim()) _addParagraphWithFormatting(container, currentText.trim());
+                currentText = '';
             } else if ((tagName === 'h1' || tagName === 'h2') && isClosing) {
-                if (currentText.trim()) {
-                    const headerPara = body.appendParagraph(stripHtml(currentText.trim()));
+                 if (currentText.trim()) {
+                    const headerPara = container.appendParagraph(stripHtml(currentText.trim()));
                     const headerText = headerPara.getChild(0).asText();
                     headerText.setBold(true).setFontSize(tagName === 'h1' ? 14 : 12);
                     _applyInlineFormatting(headerText, currentText.trim());
@@ -882,46 +946,40 @@ function _addNotesSection(body, notesHtml) {
                 if (!isClosing) {
                     inList = true;
                     if (currentText.trim()) {
-                        _addParagraphWithFormatting(body, currentText.trim());
+                        _addParagraphWithFormatting(container, currentText.trim());
                         currentText = '';
                     }
                 } else {
                     inList = false;
                 }
-            } else if (tagName === 'li' && !isClosing) {
-                // Li opening - continue collecting text
             } else if (tagName === 'li' && isClosing) {
                 if (currentText.trim()) {
-                    const listItem = body.appendListItem(stripHtml(currentText.trim()));
+                    const listItem = container.appendListItem(stripHtml(currentText.trim()));
                     _applyInlineFormatting(listItem.getChild(0).asText(), currentText.trim());
                     currentText = '';
                 }
             }
-            
             lastIndex = blockRegex.lastIndex;
         }
         
-        // Add any remaining text
         const remainingText = notesHtml.slice(lastIndex);
         currentText += remainingText;
         if (currentText.trim()) {
-            _addParagraphWithFormatting(body, currentText.trim());
+            _addParagraphWithFormatting(container, currentText.trim());
         }
         
     } catch (e) {
-        // Fallback for parsing errors
-        body.appendParagraph(stripHtml(notesHtml));
+        container.appendParagraph(stripHtml(notesHtml));
     }
 }
 
-function _addParagraphWithFormatting(body, text) {
+function _addParagraphWithFormatting(container, text) {
     if (!text.trim()) return;
-    const paragraph = body.appendParagraph(stripHtml(text));
+    const paragraph = container.appendParagraph(stripHtml(text));
     _applyInlineFormatting(paragraph.getChild(0).asText(), text);
 }
 
 function _applyInlineFormatting(textElement, html) {
-    // Apply formatting to specific ranges within text. This version handles multiple occurrences of the same text with the same style.
     let cleanText = stripHtml(html);
     let placeholderCounter = 0;
     
@@ -932,12 +990,13 @@ function _applyInlineFormatting(textElement, html) {
         matches.forEach(match => {
             const styledText = stripHtml(match[1]);
             if (styledText) {
-                const index = cleanText.indexOf(styledText);
-                if (index > -1) {
-                    styleSetter(index, index + styledText.length - 1, true);
-                    // Use a unique placeholder string to avoid conflicts with actual text content.
-                    const placeholder = `__PLACEHOLDER_${tag.toUpperCase()}_${placeholderCounter++}__`;
-                    cleanText = cleanText.substring(0, index) + placeholder + cleanText.substring(index + styledText.length);
+                let searchIndex = 0;
+                let foundIndex;
+                while((foundIndex = cleanText.indexOf(styledText, searchIndex)) > -1) {
+                    styleSetter(foundIndex, foundIndex + styledText.length - 1, true);
+                    const placeholder = `__PLACEHOLDER_${placeholderCounter++}__`.padEnd(styledText.length, '_');
+                    cleanText = cleanText.substring(0, foundIndex) + placeholder + cleanText.substring(foundIndex + styledText.length);
+                    break;
                 }
             }
         });
@@ -949,88 +1008,7 @@ function _applyInlineFormatting(textElement, html) {
 }
 
 function stripHtml(html) {
-    return html.replace(/<[^>]*>?/gm, '');
-}
-
-
-/**
- * Adds a component section with proficiency levels and styling.
- * @param {Body} body The document body
- * @param {Object} component The component data
- * @param {string} proficiency The selected proficiency level
- * @param {Object} observation The observation data
- */
-function _addComponentSection(body, component, proficiency, observation) {
-    // Component title with dark gray background
-    const componentTitle = body.appendParagraph(component.title);
-    componentTitle.getChild(0).asText()
-        .setFontSize(12)
-        .setBold(true)
-        .setForegroundColor(COLORS.WHITE)
-        .setBackgroundColor(COLORS.COMPONENT_HEADER_BG);
-    componentTitle.setSpacingBefore(10).setSpacingAfter(5);
-    
-    // Create table for proficiency levels
-    const table = body.appendTable();
-    table.setBorderWidth(1).setBorderColor('#e2e8f0');
-    
-    // Header row
-    const headerRow = table.appendTableRow();
-    ['Developing', 'Basic', 'Proficient', 'Distinguished'].forEach(level => {
-        const cell = headerRow.appendTableCell(level);
-        cell.getChild(0).asText().setFontSize(10).setBold(true).setForegroundColor('#4a5568');
-        cell.setBackgroundColor('#e2e8f0');
-        cell.setPaddingTop(8).setPaddingBottom(8).setPaddingLeft(12).setPaddingRight(12);
-    });
-    
-    // Content row
-    const contentRow = table.appendTableRow();
-    ['developing', 'basic', 'proficient', 'distinguished'].forEach(level => {
-        const cell = contentRow.appendTableCell(component[level] || '');
-        const isSelected = proficiency === level;
-        
-        if (isSelected) {
-            // Selected cell styling with blue background
-            cell.setBackgroundColor('#dbeafe');
-            cell.getChild(0).asText().setForegroundColor('#1e40af').setBold(true);
-            // Safely copy existing attributes to a plain object before merging
-            const attributes = cell.getAttributes() || {};
-            const newAttributes = { ...attributes };
-
-            // Add/overwrite the new attributes
-            newAttributes[DocumentApp.Attribute.BORDER_WIDTH] = 2;
-            newAttributes[DocumentApp.Attribute.BORDER_COLOR] = '#3b82f6';
-
-            // Apply the merged attributes
-            cell.setAttributes(newAttributes);
-        } else {
-            cell.getChild(0).asText().setForegroundColor('#4a5568');
-        }
-        
-        cell.getChild(0).asText().setFontSize(9);
-        cell.setPaddingTop(12).setPaddingBottom(12).setPaddingLeft(12).setPaddingRight(12);
-    });
-    
-    // Add Look-fors, Notes, and Evidence sections in the specified order.
-
-    // Add the new Look-fors section.
-    // This function checks internally if there are any look-fors to add.
-    _addLookForsSection(body, component, observation);
-
-    // Add notes if available.
-    const notes = observation.observationNotes ? observation.observationNotes[component.componentId] : null;
-    if (notes) {
-        _addNotesSection(body, notes);
-    }
-
-    // Add evidence if available.
-    const evidence = observation.evidenceLinks[component.componentId];
-    if (evidence && evidence.length > 0) {
-        _addEvidenceSection(body, evidence);
-    }
-
-    // Add spacing after component
-    body.appendParagraph('').setSpacingAfter(8);
+    return html ? html.replace(/<[^>]*>?/gm, '') : '';
 }
 
 /**
@@ -1039,7 +1017,6 @@ function _addComponentSection(body, component, proficiency, observation) {
  * @param {Array} bestPractices Array of best practice strings
  */
 function _addBestPracticesSection(body, bestPractices) {
-    // Best practices header with royal blue background
     const practicesHeader = body.appendParagraph('Best Practices aligned with 5D+ and PELSB Standards');
     practicesHeader.getChild(0).asText()
         .setFontSize(10)
@@ -1048,7 +1025,6 @@ function _addBestPracticesSection(body, bestPractices) {
         .setBackgroundColor('#3182ce');
     practicesHeader.setSpacingBefore(5).setSpacingAfter(3);
     
-    // Add each practice as a bullet point
     bestPractices.forEach(practice => {
         const practiceItem = body.appendParagraph(`• ${practice}`);
         practiceItem.getChild(0).asText().setFontSize(9).setForegroundColor('#4a5568');
@@ -1058,19 +1034,16 @@ function _addBestPracticesSection(body, bestPractices) {
 }
 
 /**
- * Adds an evidence section.
- * @param {Body} body The document body
+ * Adds an evidence section to a container element (Body or TableCell).
+ * @param {DocumentApp.ContainerElement} container The container to add the evidence to.
  * @param {Array} evidence Array of evidence objects
  */
-function _addEvidenceSection(body, evidence) {
-    const evidenceHeader = body.appendParagraph('Evidence:');
-    evidenceHeader.getChild(0).asText().setFontSize(10).setBold(true).setForegroundColor(COLORS.DARK_GRAY);
-    evidenceHeader.setSpacingBefore(5).setSpacingAfter(2);
-    evidenceHeader.setBackgroundColor(COLORS.EVIDENCE_HEADER_BG);
+function _addEvidenceSection(container, evidence) {
+    container.appendParagraph('Evidence:').setBold(true);
     
     evidence.forEach(item => {
         // Create the paragraph with the bullet point and item name.
-        const evidenceItem = body.appendParagraph(`• ${item.name}`);
+        const evidenceItem = container.appendParagraph(`• ${item.name}`);
         const textElement = evidenceItem.getChild(0).asText();
 
         // Style the text.
@@ -1081,10 +1054,6 @@ function _addEvidenceSection(body, evidence) {
 
         // If a URL exists, make the item name a clickable hyperlink.
         if (item.url) {
-<<<<<<< HEAD
-=======
-            // The link should cover the item name, which starts after "• ".
->>>>>>> 39575adf5d1ae6ac84e22bf4e6ac8a40910df789
             // The link should cover the item name, regardless of bullet or prefix.
             const text = textElement.getText();
             const nameStart = text.indexOf(item.name);
