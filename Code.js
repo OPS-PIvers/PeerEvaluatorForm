@@ -946,45 +946,27 @@ function _addObservationComponentRows(table, component, domainName, observation,
     const TOTAL_WIDTH = 500;
 
     /**
-     * Creates a merged header row spanning all 4 columns
+     * Creates a merged header row spanning all 4 columns.
+     * This version creates a single cell and sets its width to the total table width
+     * to avoid issues with the native .merge() method.
      */
     const createMergedHeaderRow = (text, backgroundColor, fontSize = 12) => {
         const row = table.appendTableRow();
-        
-        // Create 4 cells with equal widths
-        const cells = [];
-        for (let i = 0; i < 4; i++) {
-            const cell = row.appendTableCell(i === 0 ? text : '');
-            cell.setWidth(COLUMN_WIDTH);
-            cells.push(cell);
-        }
-        
-        // Apply styling to the first cell (which contains the text)
+        const cell = row.appendTableCell(text);
+
+        // Set the width to the total width of the 4 content columns
+        cell.setWidth(TOTAL_WIDTH);
+
+        // Apply styling to the single cell
         const style = {};
         style[DocumentApp.Attribute.BACKGROUND_COLOR] = backgroundColor;
         style[DocumentApp.Attribute.FOREGROUND_COLOR] = COLORS.WHITE;
         style[DocumentApp.Attribute.BOLD] = true;
         style[DocumentApp.Attribute.FONT_SIZE] = fontSize;
-        cells[0].setAttributes(style);
-        cells[0].setPaddingTop(8).setPaddingBottom(8).setPaddingLeft(12).setPaddingRight(12);
-        
-        // Apply background color to other cells for visual consistency
-        for (let i = 1; i < 4; i++) {
-            cells[i].setBackgroundColor(backgroundColor);
-            cells[i].setPaddingTop(8).setPaddingBottom(8);
-        }
-        
-        // Merge all 4 cells into one spanning cell
-        try {
-            for (let i = 1; i < 4; i++) {
-                cells[0].merge(cells[i]);
-            }
-        } catch (error) {
-            console.warn('Cell merging failed, continuing with single cell approach:', error);
-            // If merging fails, at least the content is in the first cell with proper styling
-        }
-        
-        return cells[0];
+        cell.setAttributes(style);
+        cell.setPaddingTop(8).setPaddingBottom(8).setPaddingLeft(12).setPaddingRight(12);
+
+        return cell;
     };
 
     /**
