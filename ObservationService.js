@@ -525,12 +525,14 @@ function uploadMediaEvidence(observationId, componentId, base64Data, fileName, m
 }
 
 /**
- * Deletes an observation record.
+ * Deletes an observation record and its associated Google Drive folder.
+ * This is a private helper function to consolidate deletion logic for both Draft and Finalized observations.
  * @param {string} observationId The ID of the observation to delete.
  * @param {string} requestingUserEmail The email of the user requesting deletion.
+ * @param {string} allowedStatus The status the observation must have to be deleted (e.g., "Draft" or "Finalized").
  * @returns {Object} A response object with success status.
  */
-function deleteObservationRecord(observationId, requestingUserEmail) {
+function _deleteRecordAndFolder(observationId, requestingUserEmail, allowedStatus) {
     if (!observationId || !requestingUserEmail) {
         return { success: false, error: 'Observation ID and requesting user email are required.' };
     }
@@ -543,67 +545,77 @@ function deleteObservationRecord(observationId, requestingUserEmail) {
 
         const row = _findObservationRow(sheet, observationId);
         if (row === -1) {
-            return { success: false, error: 'Observation not found.' };
+            debugLog(`Observation ${observationId} already deleted from sheet or never existed.`, { observationId, requestingUserEmail });
+            // Attempt to delete folder anyway, in case of orphaned folder.
+            const observation = getObservationById(observationId); //This will be null, need a better way.
+            if(observation){
+               _deleteObservationFolder(observation.observationId);
+            }
+            return { success: true };
         }
 
-        // Get the observation data to check permissions
         const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
         const rowData = sheet.getRange(row, 1, 1, sheet.getLastColumn()).getValues()[0];
+
         const observerEmailCol = headers.indexOf('observerEmail');
         const statusCol = headers.indexOf('status');
-        
-        if (observerEmailCol === -1 || statusCol === -1) {
-            return { success: false, error: 'Required columns not found in the sheet.' };
+        const observedNameCol = headers.indexOf('observedName');
+        const observedEmailCol = headers.indexOf('observedEmail');
+
+        if ([observerEmailCol, statusCol, observedNameCol, observedEmailCol].includes(-1)) {
+            return { success: false, error: 'Required data columns (observer, status, name, email) not found in the sheet.' };
         }
 
         const observerEmail = rowData[observerEmailCol];
         const status = rowData[statusCol];
 
-        // Permission check: only the observer who created it can delete.
         if (observerEmail !== requestingUserEmail) {
             return { success: false, error: 'Permission denied. You did not create this observation.' };
         }
 
-        // Only drafts can be deleted.
-        if (status !== OBSERVATION_STATUS.DRAFT) {
-            return { success: false, error: 'Only draft observations can be deleted.' };
+        if (status !== allowedStatus) {
+            return { success: false, error: `Action denied. Only ${allowedStatus} observations can be deleted with this function, but this observation has status "${status}".` };
         }
 
-        // Move associated Drive folder to trash (if it exists)
+        // First, attempt to delete the associated Drive folder.
         try {
-            // Get additional data needed for folder operations
-            const observedNameCol = headers.indexOf('observedName');
-            const observedEmailCol = headers.indexOf('observedEmail');
-            
-            if (observedNameCol !== -1 && observedEmailCol !== -1) {
-                // Create observation object for folder operations
-                const observation = {
-                    observationId: observationId,
-                    observedName: rowData[observedNameCol],
-                    observedEmail: rowData[observedEmailCol]
-                };
-                
-                const obsFolder = _getObservationFolder(observation);
-                if (obsFolder) {
-                    obsFolder.setTrashed(true);
-                    debugLog('Draft observation Drive folder moved to trash', { observationId: observationId, folderId: obsFolder.getId() });
-                }
+            const observationForFolder = {
+                observationId: observationId,
+                observedName: rowData[observedNameCol],
+                observedEmail: rowData[observedEmailCol]
+            };
+            const obsFolder = _getObservationFolder(observationForFolder);
+            if (obsFolder) {
+                obsFolder.setTrashed(true);
+                debugLog(`Observation Drive folder for ${observationId} moved to trash.`);
             }
         } catch (driveError) {
-            console.error(`Could not delete Drive folder for draft observation ${observationId}:`, driveError);
-            // Do not block deletion if Drive operation fails, just log it.
+            console.error(`Could not delete Drive folder for observation ${observationId}. Deletion of sheet record will continue. Error:`, driveError);
+            // Log the error, but do not block the sheet record deletion.
         }
 
-        // Delete the row from the sheet
+        // Finally, delete the row from the sheet.
         sheet.deleteRow(row);
         SpreadsheetApp.flush();
 
-        debugLog('Draft observation deleted', { observationId, requestingUserEmail });
+        debugLog(`${allowedStatus} observation DELETED successfully`, { observationId, requestingUserEmail });
         return { success: true };
+
     } catch (error) {
-        console.error(`Error deleting observation ${observationId}:`, error);
-        return { success: false, error: 'An unexpected error occurred during deletion.' };
+        console.error(`Error deleting ${allowedStatus} observation ${observationId}:`, error);
+        return { success: false, error: `An unexpected error occurred during the deletion of the ${allowedStatus} observation.` };
     }
+}
+
+
+/**
+ * Deletes a DRAFT observation record and its associated Google Drive folder.
+ * @param {string} observationId The ID of the observation to delete.
+ * @param {string} requestingUserEmail The email of the user requesting deletion.
+ * @returns {Object} A response object with success status.
+ */
+function deleteObservationRecord(observationId, requestingUserEmail) {
+    return _deleteRecordAndFolder(observationId, requestingUserEmail, OBSERVATION_STATUS.DRAFT);
 }
 
 /**
@@ -613,75 +625,7 @@ function deleteObservationRecord(observationId, requestingUserEmail) {
  * @returns {Object} A response object with success status.
  */
 function deleteFinalizedObservationRecord(observationId, requestingUserEmail) {
-    if (!observationId || !requestingUserEmail) {
-        return { success: false, error: 'Observation ID and requesting user email are required.' };
-    }
-    try {
-        const spreadsheet = openSpreadsheet();
-        const sheet = getSheetByName(spreadsheet, OBSERVATION_SHEET_NAME);
-        if (!sheet) {
-            throw new Error(`Sheet "${OBSERVATION_SHEET_NAME}" not found.`);
-        }
-
-        const row = _findObservationRow(sheet, observationId);
-        if (row === -1) {
-            return { success: false, error: 'Observation not found.' };
-        }
-
-        // Get the observation data to check permissions and get folder info
-        const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-        const rowData = sheet.getRange(row, 1, 1, sheet.getLastColumn()).getValues()[0];
-        const observerEmailCol = headers.indexOf('observerEmail');
-        const statusCol = headers.indexOf('status');
-        const observedNameCol = headers.indexOf('observedName');
-        const observedEmailCol = headers.indexOf('observedEmail');
-        
-        if (observerEmailCol === -1 || statusCol === -1) {
-            return { success: false, error: 'Required columns not found in the sheet.' };
-        }
-
-        const observerEmail = rowData[observerEmailCol];
-        const status = rowData[statusCol];
-
-        // Permission check: only the observer who created it can delete.
-        if (observerEmail !== requestingUserEmail) {
-            return { success: false, error: 'Permission denied. You did not create this observation.' };
-        }
-
-        // Only FINALIZED observations can be deleted by this function.
-        if (status !== OBSERVATION_STATUS.FINALIZED) {
-            return { success: false, error: 'This function can only delete finalized observations.' };
-        }
-
-        // Move associated Drive folder to trash
-        try {
-            // Create observation object for folder operations
-            const observation = {
-                observationId: observationId,
-                observedName: rowData[observedNameCol],
-                observedEmail: rowData[observedEmailCol]
-            };
-            
-            const obsFolder = _getObservationFolder(observation);
-            if (obsFolder) {
-                obsFolder.setTrashed(true);
-                debugLog('Observation Drive folder moved to trash', { observationId: observationId, folderId: obsFolder.getId() });
-            }
-        } catch (driveError) {
-            console.error(`Could not delete Drive folder for observation ${observationId}:`, driveError);
-            // Do not block deletion if Drive operation fails, just log it.
-        }
-
-        // Delete the row from the sheet
-        sheet.deleteRow(row);
-        SpreadsheetApp.flush();
-
-        debugLog('Finalized observation DELETED', { observationId, requestingUserEmail });
-        return { success: true };
-    } catch (error) {
-        console.error(`Error deleting finalized observation ${observationId}:`, error);
-        return { success: false, error: 'An unexpected error occurred during deletion.' };
-    }
+    return _deleteRecordAndFolder(observationId, requestingUserEmail, OBSERVATION_STATUS.FINALIZED);
 }
 
 /**
