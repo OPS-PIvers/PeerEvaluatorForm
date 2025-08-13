@@ -81,6 +81,9 @@
             color: var(--color-white);
             padding: 40px 30px;
             text-align: center;
+            position: sticky;
+            top: 0;
+            z-index: 101;
         }
 
         .header h1 {
@@ -856,10 +859,14 @@
             }); 
             document.getElementById(viewId).style.display = 'block'; 
             
-            // Show/hide sticky nav based on view
+            const header = document.querySelector('.header');
+
+            // Show/hide sticky nav and header based on view
             if (viewId === 'rubricContainer') {
+                if (header) header.style.display = 'none';
                 // Nav will be shown by handleRubricData
             } else {
+                if (header) header.style.display = 'block';
                 hideStickyNav();
             }
         }
