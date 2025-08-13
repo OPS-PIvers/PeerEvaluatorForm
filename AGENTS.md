@@ -32,7 +32,7 @@ The project follows a modular, service-oriented architecture.
     -   **Dynamic Rubric Rendering:** The rubric is generated based on the user's role and assigned subdomains for their specific evaluation year.
     -   **Advanced Caching:** A sophisticated, versioned caching system (`CacheManager.js`) using `CacheService` to minimize Google Sheets API calls and improve performance.
     -   **Automatic Change Detection:** An `onEdit` trigger automatically clears relevant caches when user roles or rubric content are modified in the Google Sheet, ensuring data consistency.
-    -   **PDF Generation:** Converts finalized observations into styled PDF documents and saves them to Google Drive.
+    -   **PDF Generation:** Converts finalized observations into styled PDF documents using Google's DocumentApp API and saves them to Google Drive.
 
 ## 3. File Tree and Descriptions
 
@@ -56,7 +56,6 @@ The project follows a modular, service-oriented architecture.
 ├─── finalized-observation-email.html  # HTML template for finalized observation emails.
 ├─── lookfors-todo.md                  # Development notes for look-fors functionality.
 ├─── observation-notes-todo.md         # Development notes for observation notes.
-├─── pdf-rubric.html                   # HTML template for generating PDF reports.
 ├─── performance-todo.md               # Development notes for performance optimization.
 └─── rubric.html                       # Main HTML/JS template for evaluation rubric interface.
 ```
@@ -72,7 +71,7 @@ The project follows a modular, service-oriented architecture.
 -   `loadObservationForEditing(observationId)`: Loads an existing draft for editing.
 -   `finalizeObservation(observationId)`: Marks an observation as "Finalized".
 -   `deleteObservation(observationId)`: Deletes a "Draft" observation.
--   `exportObservationToPdf(observationId)`: Generates and saves a PDF report.
+-   `exportObservationToPdf(observationId)`: Generates and saves a PDF report using DocumentApp API.
 -   `onEditTrigger(e)`: The function executed by the `onEdit` trigger. Detects changes in the `Staff` sheet or rubric sheets and clears caches accordingly.
 
 ### `UserService.js`

@@ -52,7 +52,7 @@ Key Files (16 tracked by clasp):
 ├── ValidationService.js     # Data validation and error handling
 ├── rubric.html (2,176 lines) # Main UI interface
 ├── filter-interface.html    # Special access role filtering interface
-└── Other HTML templates     # Error pages, PDF templates, email templates
+└── Other HTML templates     # Error pages, email templates
 
 Configuration:
 ├── .clasp.json             # Clasp project configuration
@@ -109,7 +109,7 @@ cat appsscript.json | jq . > /dev/null && echo "✓ appsscript.json valid" || ec
 ### Key Features to Test When Changed
 1. **Multi-Role System**: Users get different views based on Staff sheet role
 2. **Peer Observations**: Peer Evaluators can create/edit observations of other staff
-3. **PDF Export**: Observations export to styled PDFs in Google Drive
+3. **PDF Export**: Observations export to styled PDFs using DocumentApp API
 4. **Caching**: Automatic cache invalidation when sheets change
 5. **Role Detection**: System detects role changes and clears caches
 

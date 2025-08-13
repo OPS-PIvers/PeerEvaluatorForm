@@ -1180,9 +1180,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
 ## 12. Cleanup Tasks
 
-- Remove unused `pdf-rubric.html` file
-- Update documentation references to reflect DocumentApp-based PDF generation
-- Clean up any unused template references in codebase
+- [x] Remove unused `pdf-rubric.html` file
+- [x] Update documentation references to reflect DocumentApp-based PDF generation
+- [x] Clean up any unused template references in codebase
 
 ## Technical Notes
 

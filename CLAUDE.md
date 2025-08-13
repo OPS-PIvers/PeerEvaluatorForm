@@ -25,7 +25,6 @@ This is a Google Apps Script (GAS) web application called "Peer Evaluator Form" 
 - **rubric.html**: Main evaluation rubric interface with look-fors checkboxes and rich-text notes
 - **filter-interface.html**: Filter view for special access roles (Administrator, Peer Evaluator, Full Access)
 - **error-page.html**: Error display template with debugging information
-- **pdf-rubric.html**: Template for generating PDF observation reports
 - **finalized-observation-email.html**: Email template for finalized observations
 
 ### Development Notes
@@ -38,7 +37,7 @@ This is a Google Apps Script (GAS) web application called "Peer Evaluator Form" 
 
 1. **Multi-Role System**: Different roles see different rubric views and have different permissions
 2. **Peer Evaluation**: Peer Evaluators can create, edit, and finalize observations of other staff
-3. **PDF Export**: Observations can be exported to styled PDF documents in Google Drive
+3. **PDF Export**: Observations are exported to styled PDF documents using Google's DocumentApp API
 4. **Advanced Caching**: Sophisticated caching system with automatic invalidation
 5. **Role Change Detection**: Automatic cache clearing when user roles change
 6. **Assignment-Based Views**: Users see only assigned subdomains based on their role/year
@@ -89,7 +88,7 @@ Observations are managed through ObservationService.js:
 - Stored in PropertiesService as JSON
 - Associated files stored in Google Drive folder structure
 - Support for media evidence upload
-- PDF export functionality
+- PDF export functionality using DocumentApp API
 
 ## Key Constants and Configuration
 
@@ -151,7 +150,7 @@ removeAutoTrigger();           // Remove
 ### Drive Integration
 
 - Observations create folder structure: `Root Folder > User Folder > Observation Folder`
-- PDF exports are generated using DocumentApp
+- PDF exports are generated using Google's DocumentApp API (not HTML templates)
 - Media evidence uploads are handled through Drive API
 
 ### Security Considerations
