@@ -1089,6 +1089,10 @@ function _addEvidenceSection(body, evidence) {
 
         // If a URL exists, make the item name a clickable hyperlink.
         if (item.url) {
+<<<<<<< HEAD
+=======
+            // The link should cover the item name, which starts after "• ".
+>>>>>>> 39575adf5d1ae6ac84e22bf4e6ac8a40910df789
             // The link should cover the item name, regardless of bullet or prefix.
             const text = textElement.getText();
             const nameStart = text.indexOf(item.name);
