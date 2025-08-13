@@ -546,11 +546,9 @@ function _deleteRecordAndFolder(observationId, requestingUserEmail, allowedStatu
         const row = _findObservationRow(sheet, observationId);
         if (row === -1) {
             debugLog(`Observation ${observationId} already deleted from sheet or never existed.`, { observationId, requestingUserEmail });
-            // Attempt to delete folder anyway, in case of orphaned folder.
-            const observation = getObservationById(observationId); //This will be null, need a better way.
-            if(observation){
-               _deleteObservationFolder(observation.observationId);
-            }
+            // Note: Without the observation data from the sheet, we cannot reliably locate and clean up
+            // any orphaned Google Drive folder since the folder path requires observedName and observedEmail.
+            // This is a known limitation when the sheet record is missing.
             return { success: true };
         }
 
