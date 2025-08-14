@@ -418,6 +418,76 @@ function getObservationScript(observationId) {
 }
 
 /**
+ * Saves component tags for a specific observation.
+ * Component tags map script content sections to rubric components.
+ * @param {string} observationId The ID of the observation.
+ * @param {Object} componentTags The component tags mapping.
+ * @returns {Object} A response object indicating success or failure.
+ */
+function saveComponentTags(observationId, componentTags) {
+    try {
+        setupObservationSheet();
+        const userContext = createUserContext();
+        if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
+            return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
+        }
+
+        const observation = getObservationById(observationId);
+        if (!observation) {
+            return { success: false, error: 'Observation not found.' };
+        }
+
+        if (observation.observerEmail !== userContext.email) {
+            return { success: false, error: 'Permission denied. You did not create this observation.' };
+        }
+
+        // Add or update the componentTags field
+        observation.componentTags = componentTags || {};
+
+        const result = updateObservationInSheet(observation);
+        if (result.success) {
+            debugLog('Component tags updated', { observationId, tagCount: Object.keys(componentTags).length });
+        }
+        return result;
+
+    } catch (error) {
+        console.error('Error saving component tags:', error);
+        return { success: false, error: 'An unexpected error occurred while saving component tags.' };
+    }
+}
+
+/**
+ * Retrieves component tags for a specific observation.
+ * @param {string} observationId The ID of the observation.
+ * @returns {Object|null} The component tags mapping, or null if not found.
+ */
+function getComponentTags(observationId) {
+    try {
+        setupObservationSheet();
+        const userContext = createUserContext();
+        if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
+            return {};
+        }
+
+        const observation = getObservationById(observationId);
+        if (!observation) {
+            return {};
+        }
+
+        // Check permissions - only the observer can access tags
+        if (observation.observerEmail !== userContext.email) {
+            return {};
+        }
+
+        // Return the componentTags if they exist, otherwise return empty object
+        return observation.componentTags || {};
+    } catch (error) {
+        console.error('Error getting component tags:', error);
+        return {}; // Return empty object on error to prevent client-side issues
+    }
+}
+
+/**
  * Finalizes an observation draft.
  * @param {string} observationId The ID of the observation to finalize.
  * @returns {Object} A response object indicating success or failure.

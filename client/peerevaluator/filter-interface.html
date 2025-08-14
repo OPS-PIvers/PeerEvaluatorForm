@@ -851,6 +851,138 @@
             color: var(--color-text-default);
             height: 100%;
         }
+
+        /* Component Tagging System Styles */
+        .script-tagging-toolbar {
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            border-bottom: 2px solid #e2e8f0;
+            padding: 12px 16px;
+        }
+
+        .tagging-controls {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 8px;
+        }
+
+        .component-selector {
+            min-width: 200px;
+            max-width: 300px;
+            padding: 8px 12px;
+            border: 2px solid #cbd5e0;
+            border-radius: 8px;
+            background: white;
+            font-size: 14px;
+            color: var(--color-text-default);
+            transition: all 0.2s ease;
+        }
+
+        .component-selector:focus {
+            outline: none;
+            border-color: #4299e1;
+            box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.1);
+        }
+
+        .btn-tag, .btn-push, .btn-clear-tags {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-tag {
+            background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);
+            color: white;
+            border: 2px solid transparent;
+        }
+
+        .btn-tag:hover {
+            background: linear-gradient(135deg, #3182ce 0%, #2c5aa0 100%);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(49, 130, 206, 0.3);
+        }
+
+        .btn-push {
+            background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+            color: white;
+            border: 2px solid transparent;
+        }
+
+        .btn-push:hover {
+            background: linear-gradient(135deg, #38a169 0%, #2f855a 100%);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(72, 187, 120, 0.3);
+        }
+
+        .btn-clear-tags {
+            background: linear-gradient(135deg, #f56565 0%, #e53e3e 100%);
+            color: white;
+            border: 2px solid transparent;
+        }
+
+        .btn-clear-tags:hover {
+            background: linear-gradient(135deg, #e53e3e 0%, #c53030 100%);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(245, 101, 101, 0.3);
+        }
+
+        .tag-status {
+            font-size: 12px;
+            color: #4a5568;
+            font-style: italic;
+            padding: 4px 8px;
+            background: #f7fafc;
+            border-radius: 4px;
+            border-left: 3px solid #4299e1;
+        }
+
+        /* Tagged content visual indicators */
+        .script-editor-content .ql-editor [style*="background"] {
+            position: relative;
+            border-radius: 3px;
+            padding: 1px 2px;
+        }
+
+        /* Component tag color legend (could be added later if needed) */
+        .tag-legend {
+            display: none; /* Hidden for now, but available for future use */
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+        }
+
+        /* Responsive adjustments for tagging toolbar */
+        @media (max-width: 768px) {
+            .tagging-controls {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 8px;
+            }
+            
+            .component-selector {
+                min-width: unset;
+                max-width: unset;
+            }
+            
+            .btn-tag, .btn-push, .btn-clear-tags {
+                justify-content: center;
+            }
+        }
     </style>
 </head>
 <body>
@@ -2092,6 +2224,212 @@
         function exportScriptPDF() {
             showToast(SCRIPT_EDITOR_CONSTANTS.UI_STRINGS.PDF_UNAVAILABLE, false);
         }
+
+        // === Component Tagging System ===
+        let componentTags = {};
+        const TAG_COLORS = {
+            '1a:': '#e3f2fd', '1b:': '#f3e5f5', '1c:': '#e8f5e8', '1d:': '#fff3e0',
+            '1e:': '#fce4ec', '1f:': '#e0f2f1', '2a:': '#e1f5fe', '2b:': '#f1f8e9',
+            '2c:': '#fef7e0', '2d:': '#ede7f6', '2e:': '#fcf2ff', '3a:': '#e8eaf6',
+            '3b:': '#f9fbe7', '3c:': '#fff8e1', '3d:': '#ffebee', '4a:': '#e0f7fa',
+            '4b:': '#f0f4c3', '4c:': '#ffe0b2', '4d:': '#d1c4e9', '4e:': '#ffcdd2',
+            '4f:': '#b2dfdb'
+        };
+
+        function populateComponentSelector() {
+            const selector = document.getElementById('componentSelector');
+            if (!selector) return;
+            
+            selector.innerHTML = '<option value="">Select Component to Tag</option>';
+            
+            // Get current rubric data from global scope
+            if (window.currentRubricData && window.currentRubricData.domains) {
+                window.currentRubricData.domains.forEach(domain => {
+                    if (domain.components) {
+                        domain.components.forEach(component => {
+                            const option = document.createElement('option');
+                            option.value = component.componentId;
+                            option.textContent = `${domain.name}: ${component.title}`;
+                            selector.appendChild(option);
+                        });
+                    }
+                });
+            }
+        }
+
+        function tagSelectedText() {
+            if (!scriptQuill) {
+                showToast('Script editor not initialized', false);
+                return;
+            }
+            
+            const range = scriptQuill.getSelection();
+            if (!range || range.length === 0) {
+                showToast('Please select text to tag', false);
+                return;
+            }
+            
+            const componentId = document.getElementById('componentSelector').value;
+            if (!componentId) {
+                showToast('Please select a component', false);
+                return;
+            }
+            
+            // Get the selected text
+            const selectedText = scriptQuill.getText(range.index, range.length);
+            if (!selectedText.trim()) {
+                showToast('Selected text is empty', false);
+                return;
+            }
+            
+            // Apply visual formatting to tagged text
+            const tagColor = TAG_COLORS[componentId] || '#e3f2fd';
+            scriptQuill.formatText(range.index, range.length, 'background', tagColor);
+            scriptQuill.formatText(range.index, range.length, 'color', '#1565c0');
+            
+            // Store tag information
+            const tagData = {
+                componentId: componentId,
+                start: range.index,
+                length: range.length,
+                text: selectedText.trim(),
+                timestamp: new Date().toISOString(),
+                color: tagColor
+            };
+            
+            if (!componentTags[componentId]) {
+                componentTags[componentId] = [];
+            }
+            componentTags[componentId].push(tagData);
+            
+            // Update status
+            document.getElementById('tagStatus').textContent = 
+                `Tagged "${selectedText.substring(0, 30)}${selectedText.length > 30 ? '...' : ''}" to ${componentId}`;
+            
+            // Save tags
+            saveComponentTags();
+            
+            showToast('Text tagged successfully', true);
+        }
+
+        function pushTaggedToNotes() {
+            const componentId = document.getElementById('componentSelector').value;
+            if (!componentId) {
+                showToast('Please select a component', false);
+                return;
+            }
+            
+            const tags = componentTags[componentId];
+            if (!tags || tags.length === 0) {
+                showToast('No tagged content for this component', false);
+                return;
+            }
+            
+            // Get the notes editor for this component
+            const notesEditor = window.globalQuillInstances && window.globalQuillInstances[componentId];
+            if (!notesEditor) {
+                showToast('Notes editor not found. Please expand the component notes section first.', false);
+                return;
+            }
+            
+            // Combine all tagged text for this component
+            const taggedContent = tags.map(tag => tag.text).join('\n\n');
+            
+            // Get current notes content
+            const currentContent = notesEditor.root.innerHTML;
+            const separator = currentContent && currentContent !== '<p><br></p>' ? '\n\n' : '';
+            const scriptHeader = '<p><strong>From Script:</strong></p>';
+            const newContent = currentContent + separator + scriptHeader + '<p>' + taggedContent.replace(/\n/g, '</p><p>') + '</p>';
+            
+            // Update notes editor
+            notesEditor.root.innerHTML = newContent;
+            
+            // Trigger save
+            setTimeout(() => {
+                const event = new Event('input', { bubbles: true });
+                notesEditor.root.dispatchEvent(event);
+            }, 100);
+            
+            document.getElementById('tagStatus').textContent = 
+                `Pushed ${tags.length} tagged item(s) to ${componentId} notes`;
+            
+            showToast(`Tagged content added to ${componentId} notes`, true);
+        }
+
+        function clearComponentTags() {
+            const componentId = document.getElementById('componentSelector').value;
+            if (!componentId) {
+                // Clear all tags
+                if (confirm('Clear all component tags from the script?')) {
+                    componentTags = {};
+                    // Remove all formatting - this is a simplified approach
+                    if (scriptQuill) {
+                        const length = scriptQuill.getLength();
+                        scriptQuill.removeFormat(0, length);
+                    }
+                    saveComponentTags();
+                    document.getElementById('tagStatus').textContent = 'All tags cleared';
+                    showToast('All tags cleared', true);
+                }
+            } else {
+                // Clear tags for specific component
+                if (componentTags[componentId] && componentTags[componentId].length > 0) {
+                    if (confirm(`Clear all tags for component ${componentId}?`)) {
+                        delete componentTags[componentId];
+                        saveComponentTags();
+                        document.getElementById('tagStatus').textContent = `Tags cleared for ${componentId}`;
+                        showToast(`Tags cleared for ${componentId}`, true);
+                    }
+                }
+            }
+        }
+
+        function saveComponentTags() {
+            if (!currentObservationId) return;
+            
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    if (result.success) {
+                        console.log('Component tags saved successfully');
+                    } else {
+                        console.error('Failed to save component tags:', result.error);
+                        showToast('Failed to save tags: ' + result.error, false);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    console.error('Error saving component tags:', error);
+                    showToast('Error saving tags: ' + error.message, false);
+                })
+                .saveComponentTags(currentObservationId, componentTags);
+        }
+
+        function loadComponentTags() {
+            if (!currentObservationId) return;
+            
+            google.script.run
+                .withSuccessHandler(function(tags) {
+                    if (tags) {
+                        componentTags = tags;
+                        // Could restore visual formatting here if needed
+                        console.log('Component tags loaded:', componentTags);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    console.error('Error loading component tags:', error);
+                })
+                .getComponentTags(currentObservationId);
+        }
+
+        // Extend the openScriptEditor function to initialize component selector
+        const originalOpenScriptEditor = openScriptEditor;
+        openScriptEditor = function() {
+            originalOpenScriptEditor();
+            // Populate component selector when script editor opens
+            setTimeout(() => {
+                populateComponentSelector();
+                loadComponentTags();
+            }, 100);
+        };
     </script>
 
     <!-- Loading Overlay -->
@@ -2112,6 +2450,22 @@
                     <button class="btn-primary" onclick="exportScriptPDF()">Export PDF</button>
                 </div>
             </div>
+            
+            <!-- Component Tagging Toolbar -->
+            <div class="script-tagging-toolbar">
+                <div class="tagging-controls">
+                    <select id="componentSelector" class="component-selector">
+                        <option value="">Select Component to Tag</option>
+                    </select>
+                    <button class="btn-tag" onclick="tagSelectedText()">🏷️ Tag Selection</button>
+                    <button class="btn-push" onclick="pushTaggedToNotes()">➡️ Push Tagged to Notes</button>
+                    <button class="btn-clear-tags" onclick="clearComponentTags()">🗑️ Clear Tags</button>
+                </div>
+                <div class="tag-status" id="tagStatus">
+                    Select text and choose a component to create tags
+                </div>
+            </div>
+            
             <div class="script-editor-content">
                 <div id="scriptEditor"></div>
             </div>
