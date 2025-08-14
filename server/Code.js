@@ -96,7 +96,7 @@ function doGet(e) {
     const responseMetadata = generateResponseMetadata(userContext, requestId, debugMode);
     
     // Create and configure the HTML template
-    const htmlTemplate = HtmlService.createTemplateFromFile('rubric.html'); // This is now a fallback view
+    const htmlTemplate = HtmlService.createTemplateFromFile('client/staff/rubric.html'); // This is now a fallback view
     htmlTemplate.data = rubricData;
     
     // Generate the HTML output
@@ -3085,7 +3085,7 @@ function applyYearFiltering(domains, role, year) {
  */
 function createFilterSelectionInterface(userContext, requestId) {
   try {
-    const htmlTemplate = HtmlService.createTemplateFromFile('filter-interface.html');
+    const htmlTemplate = HtmlService.createTemplateFromFile('client/peerevaluator/filter-interface.html');
     htmlTemplate.userContext = userContext;
     htmlTemplate.userContext.probationaryYearValue = PROBATIONARY_OBSERVATION_YEAR;
     htmlTemplate.availableRoles = AVAILABLE_ROLES;
@@ -3168,7 +3168,7 @@ function getPageTitle(role) {
  */
 function createEnhancedErrorPage(error, requestId, userContext, userAgent = 'Unknown') {
   try {
-    const htmlTemplate = HtmlService.createTemplateFromFile('error-page.html');
+    const htmlTemplate = HtmlService.createTemplateFromFile('client/shared/error-page.html');
     htmlTemplate.error = {
       message: error.message,
       stack: error.stack,
