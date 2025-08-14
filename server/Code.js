@@ -868,6 +868,7 @@ function _generateAndSavePdf(observationId, userContext) {
 function _createStyledPdfDocument(observation, rubricData, docName) {
     // Create a new Google Document
     const doc = DocumentApp.create(docName);
+    const docId = doc.getId();
     const body = doc.getBody();
     
     // Clear any default content
@@ -876,20 +877,95 @@ function _createStyledPdfDocument(observation, rubricData, docName) {
     // Add document header
     _addDocumentHeader(body, observation);
     
-    // Add rubric content
-    _addRubricContent(body, observation, rubricData);
+    // Track merge operations needed
+    const mergeOperations = [];
     
-    // Save and close the document
+    // Add rubric content and collect merge operations
+    _addRubricContentWithMergeTracking(body, observation, rubricData, mergeOperations);
+    
+    // Save before applying merges
     doc.saveAndClose();
     
+    // Apply all cell merges using Google Docs API
+    if (mergeOperations.length > 0) {
+        _applyTableCellMerges(docId, mergeOperations);
+    }
+    
     // Convert to PDF
-    const docFile = DriveApp.getFileById(doc.getId());
+    const docFile = DriveApp.getFileById(docId);
     const pdfBlob = docFile.getBlob().getAs('application/pdf');
     
     // Clean up - delete the temporary Google Doc
-    DriveApp.getFileById(doc.getId()).setTrashed(true);
+    DriveApp.getFileById(docId).setTrashed(true);
     
     return pdfBlob;
+}
+
+/**
+ * Applies table cell merges using the Google Docs API
+ * @param {string} docId The document ID
+ * @param {Array} mergeOperations Array of merge operation objects
+ */
+function _applyTableCellMerges(docId, mergeOperations) {
+    if (!mergeOperations || mergeOperations.length === 0) {
+        return;
+    }
+    
+    try {
+        // Get the document structure to find the actual table start locations
+        const doc = Docs.Documents.get(docId);
+        const tables = [];
+        
+        // Find all tables in the document
+        function findTables(elements) {
+            elements.forEach(element => {
+                if (element.table) {
+                    tables.push({
+                        startIndex: element.startIndex,
+                        endIndex: element.endIndex,
+                        table: element.table
+                    });
+                } else if (element.paragraph && element.paragraph.elements) {
+                    findTables(element.paragraph.elements);
+                }
+            });
+        }
+        
+        findTables(doc.body.content);
+        
+        if (tables.length === 0) {
+            console.warn('No tables found in document for merging');
+            return;
+        }
+        
+        // Use the first table (our rubric table) for all merge operations
+        const mainTable = tables[0];
+        
+        const requests = mergeOperations.map(operation => ({
+            mergeTableCells: {
+                tableRange: {
+                    columnSpan: operation.columnSpan,
+                    rowSpan: operation.rowSpan || 1,
+                    tableCellLocation: {
+                        tableStartLocation: { index: mainTable.startIndex },
+                        rowIndex: operation.rowIndex,
+                        columnIndex: operation.columnIndex
+                    }
+                }
+            }
+        }));
+        
+        Docs.Documents.batchUpdate({
+            requests: requests
+        }, docId);
+        
+        debugLog('Applied table cell merges', { docId, mergeCount: requests.length, tableStartIndex: mainTable.startIndex });
+        
+    } catch (error) {
+        console.error('Failed to apply table cell merges:', error);
+        debugLog('Table cell merge failed', { docId, error: error.message, mergeOperations });
+        // Don't throw error - continue with unmerged cells rather than failing PDF generation
+    }
 }
 
 /**
@@ -973,6 +1049,92 @@ function _addRubricContent(body, observation, rubricData) {
 }
 
 /**
+ * Adds the rubric content by creating a single table for all observed components,
+ * tracking merge operations for later application via Google Docs API.
+ * @param {DocumentApp.Body} body The document body.
+ * @param {Object} observation The observation data.
+ * @param {Object} rubricData The rubric structure and content.
+ * @param {Array} mergeOperations Array to collect merge operations that need to be applied.
+ */
+function _addRubricContentWithMergeTracking(body, observation, rubricData, mergeOperations) {
+    const observedComponents = [];
+    rubricData.domains.forEach(domain => {
+        if (domain.components) {
+            domain.components.forEach(component => {
+                // Handle both new unified structure and old separate structure for backward compatibility
+                let proficiency = null;
+                let componentData = null;
+                
+                // Try new unified structure first
+                if (observation.observationData && observation.observationData[component.componentId]) {
+                    componentData = observation.observationData[component.componentId];
+                    proficiency = componentData.proficiency;
+                }
+                // Fallback to old structure if new structure doesn't have proficiency
+                else if (typeof observation.observationData?.[component.componentId] === 'string') {
+                    proficiency = observation.observationData[component.componentId];
+                }
+                
+                if (proficiency) {
+                    observedComponents.push({
+                        component: component,
+                        domainName: domain.name,
+                        proficiency: proficiency,
+                        componentData: componentData // Pass the full component data for use in rendering
+                    });
+                }
+            });
+        }
+    });
+
+    if (observedComponents.length === 0) {
+        return;
+    }
+
+    const table = body.appendTable();
+    table.setBorderWidth(0);
+    
+    // Get the table start index for merge operations - need to find the actual character index
+    const bodyElements = body.getNumChildren();
+    let tableStartIndex = 0;
+    for (let i = 0; i < bodyElements; i++) {
+        const element = body.getChild(i);
+        if (element === table) {
+            // For Google Docs API, we need the character index, not element index
+            // This is a rough approximation - the exact index will be calculated during merge
+            tableStartIndex = i * 10; // Placeholder - will be refined in merge function
+            break;
+        }
+    }
+
+    observedComponents.forEach((item, index) => {
+        // Calculate current row index before adding component rows
+        const currentRowIndex = table.getNumRows();
+        
+        _addObservationComponentRowsWithMergeTracking(
+            table, 
+            item.component, 
+            item.domainName, 
+            observation, 
+            item.proficiency, 
+            item.componentData,
+            mergeOperations,
+            tableStartIndex,
+            currentRowIndex
+        );
+        
+        if (index < observedComponents.length - 1) {
+            const spacerRow = table.appendTableRow();
+            const spacerCell = spacerRow.appendTableCell('');
+            const style = {};
+            style[DocumentApp.Attribute.BORDER_WIDTH] = 0;
+            spacerCell.setAttributes(style);
+            spacerCell.setPaddingTop(12);
+        }
+    });
+}
+
+/**
  * Adds a set of rows to the main report table for a single observed component.
  * @param {DocumentApp.Table} table The main report table.
  * @param {Object} component The component data.
@@ -982,81 +1144,125 @@ function _addRubricContent(body, observation, rubricData) {
  * @param {Object} componentData The component-specific data from the unified structure (may be null for old structure).
  */
 function _addObservationComponentRows(table, component, domainName, observation, proficiency, componentData) {
+    // Legacy function - now redirects to new merge tracking version
+    const mergeOperations = [];
+    const tableStartIndex = 0; // Will be ignored since we're not using merge operations here
+    const currentRowIndex = table.getNumRows();
+    
+    _addObservationComponentRowsWithMergeTracking(
+        table, component, domainName, observation, proficiency, componentData,
+        mergeOperations, tableStartIndex, currentRowIndex
+    );
+}
+
+/**
+ * Adds a set of rows to the main report table for a single observed component,
+ * tracking merge operations for later application via Google Docs API.
+ * @param {DocumentApp.Table} table The main report table.
+ * @param {Object} component The component data.
+ * @param {string} domainName The name of the parent domain.
+ * @param {Object} observation The observation data.
+ * @param {string} proficiency The selected proficiency level.
+ * @param {Object} componentData The component-specific data from the unified structure (may be null for old structure).
+ * @param {Array} mergeOperations Array to collect merge operations that need to be applied.
+ * @param {number} tableStartIndex The start index of the table in the document.
+ * @param {number} baseRowIndex The base row index for this component within the table.
+ */
+function _addObservationComponentRowsWithMergeTracking(table, component, domainName, observation, proficiency, componentData, mergeOperations, tableStartIndex, baseRowIndex) {
     // Calculate equal column widths (total 500px divided by 4 columns)
     const COLUMN_WIDTH = 125;
 
     /**
-     * Creates a row with 4 cells and merges them into a single spanning cell
-     * This ensures consistent table structure while achieving the merged appearance
+     * Creates a row with 4 cells and tracks a merge operation for later application
      */
-    const createMergedRow = (text, backgroundColor, fontSize = 12) => {
+    const createRowForMerging = (text, backgroundColor, fontSize = 12) => {
         const row = table.appendTableRow();
         const cells = [];
         
-        // Create 4 cells
+        // Create 4 cells - start with empty cells to avoid extra paragraphs
         for (let i = 0; i < 4; i++) {
-            const cell = row.appendTableCell(i === 0 ? text : '');
+            const cell = row.appendTableCell('');
             cell.setWidth(COLUMN_WIDTH);
             cells.push(cell);
         }
         
-        // Merge cells 1, 2, 3 into cell 0
-        const mergedCell = cells[0];
-        try {
-            for (let i = 1; i < 4; i++) {
-                mergedCell.merge(cells[i]);
-            }
-        } catch (error) {
-            console.warn(`Cell merging failed for row "${text}":`, error);
-        }
+        // Work with the first cell's default paragraph
+        const primaryCell = cells[0];
+        const defaultParagraph = primaryCell.getChild(0).asParagraph();
         
-        // Apply styling to the merged cell
+        // Set text and styling on the default paragraph
+        defaultParagraph.setText(text);
+        defaultParagraph.setSpacingBefore(0).setSpacingAfter(0).setLineSpacing(1);
+        
+        // Apply text styling to the paragraph content
+        const textElement = defaultParagraph.getChild(0).asText();
         const style = {
             [DocumentApp.Attribute.BACKGROUND_COLOR]: backgroundColor,
             [DocumentApp.Attribute.FOREGROUND_COLOR]: COLORS.WHITE,
             [DocumentApp.Attribute.BOLD]: true,
             [DocumentApp.Attribute.FONT_SIZE]: fontSize
         };
-        mergedCell.setAttributes(style);
-        mergedCell.setPaddingTop(8).setPaddingBottom(8).setPaddingLeft(12).setPaddingRight(12);
+        textElement.setAttributes(style);
+        
+        // Set cell padding
+        primaryCell.setPaddingTop(8).setPaddingBottom(8).setPaddingLeft(12).setPaddingRight(12);
 
-        return mergedCell;
+        // Track merge operation for this row
+        const currentRowIndex = table.getNumRows() - 1;
+        mergeOperations.push({
+            tableStartIndex: tableStartIndex,
+            rowIndex: currentRowIndex,
+            columnIndex: 0,
+            columnSpan: 4,
+            rowSpan: 1
+        });
+
+        return primaryCell;
     };
 
-    // === STEP 1: Create all 8 rows with consistent 4-cell structure ===
-    
-    // Row 1: Domain header (will be merged)
-    const domainCell = createMergedRow(domainName, COLORS.DOMAIN_HEADER_BG);
+    // Row 1: Domain header (to be merged)
+    const domainCell = createRowForMerging(domainName, COLORS.DOMAIN_HEADER_BG);
 
-    // Row 2: Subdomain header (will be merged)
-    const subdomainCell = createMergedRow(component.title, COLORS.COMPONENT_HEADER_BG, 11);
+    // Row 2: Subdomain header (to be merged)
+    const subdomainCell = createRowForMerging(component.title, COLORS.COMPONENT_HEADER_BG, 11);
 
-    // Row 3: Proficiency Titles (4 separate cells)
+    // Row 3: Proficiency Titles (4 separate cells - no merge)
     const titlesRow = table.appendTableRow();
-    const titleCells = [];
     PROFICIENCY_LEVELS.TITLES.forEach(level => {
-        const cell = titlesRow.appendTableCell(level);
+        const cell = titlesRow.appendTableCell('');
         cell.setWidth(COLUMN_WIDTH);
-        cell.getChild(0).asParagraph().setAlignment(DocumentApp.HorizontalAlignment.CENTER);
         cell.setBackgroundColor(COLORS.PROFICIENCY_HEADER_BG);
         cell.setPaddingTop(8).setPaddingBottom(8).setPaddingLeft(6).setPaddingRight(6);
         
+        // Work with the default paragraph
+        const paragraph = cell.getChild(0).asParagraph();
+        paragraph.setText(level);
+        paragraph.setAlignment(DocumentApp.HorizontalAlignment.CENTER);
+        paragraph.setSpacingBefore(0).setSpacingAfter(0).setLineSpacing(1);
+        
+        // Apply text styling
+        const textElement = paragraph.getChild(0).asText();
         const style = {};
         style[DocumentApp.Attribute.BOLD] = true;
         style[DocumentApp.Attribute.FONT_SIZE] = 10;
         style[DocumentApp.Attribute.FOREGROUND_COLOR] = COLORS.PROFICIENCY_TEXT;
-        cell.setAttributes(style);
-        titleCells.push(cell);
+        textElement.setAttributes(style);
     });
 
-    // Row 4: Proficiency Descriptions (4 separate cells with selection highlighting)
+    // Row 4: Proficiency Descriptions (4 separate cells - no merge)
     const descriptionsRow = table.appendTableRow();
-    const descriptionCells = [];
     PROFICIENCY_LEVELS.KEYS.forEach(key => {
-        const cell = descriptionsRow.appendTableCell(component[key] || '');
+        const cell = descriptionsRow.appendTableCell('');
         cell.setWidth(COLUMN_WIDTH);
         cell.setPaddingTop(12).setPaddingBottom(12).setPaddingLeft(8).setPaddingRight(8);
         
+        // Work with the default paragraph
+        const paragraph = cell.getChild(0).asParagraph();
+        paragraph.setText(component[key] || '');
+        paragraph.setSpacingBefore(0).setSpacingAfter(0).setLineSpacing(1);
+        
+        // Apply styling to text
+        const textElement = paragraph.getChild(0).asText();
         const style = {};
         style[DocumentApp.Attribute.FONT_SIZE] = 9;
         
@@ -1068,14 +1274,13 @@ function _addObservationComponentRows(table, component, domainName, observation,
         } else {
             style[DocumentApp.Attribute.FOREGROUND_COLOR] = COLORS.PROFICIENCY_TEXT;
         }
-        cell.setAttributes(style);
-        descriptionCells.push(cell);
+        textElement.setAttributes(style);
     });
 
-    // Row 5: Best Practices Header (will be merged)
-    const bestPracticesHeaderCell = createMergedRow('Best Practices aligned with 5D+ and PELSB Standards', COLORS.ROYAL_BLUE, 10);
+    // Row 5: Best Practices Header (to be merged)
+    const bestPracticesHeaderCell = createRowForMerging('Best Practices aligned with 5D+ and PELSB Standards', COLORS.ROYAL_BLUE, 10);
 
-    // Row 6: Look-fors Content (will be merged)
+    // Row 6: Look-fors Content (to be merged)
     const lookforsRow = table.appendTableRow();
     const lookforsCells = [];
     for (let i = 0; i < 4; i++) {
@@ -1084,18 +1289,19 @@ function _addObservationComponentRows(table, component, domainName, observation,
         lookforsCells.push(cell);
     }
     
-    // Merge look-fors cells
+    // Style the look-fors cell and populate content
     const lookforsCell = lookforsCells[0];
-    try {
-        for (let i = 1; i < 4; i++) {
-            lookforsCell.merge(lookforsCells[i]);
-        }
-    } catch (error) {
-        console.warn('Look-fors cell merging failed:', error);
-    }
-    
-    // Style and populate look-fors cell
     lookforsCell.setPaddingTop(8).setPaddingBottom(8).setPaddingLeft(20).setPaddingRight(12);
+    
+    // Track merge operation for look-fors row
+    const lookforsRowIndex = table.getNumRows() - 1;
+    mergeOperations.push({
+        tableStartIndex: tableStartIndex,
+        rowIndex: lookforsRowIndex,
+        columnIndex: 0,
+        columnSpan: 4,
+        rowSpan: 1
+    });
     
     // Handle both new unified structure and old separate structure for look-fors
     let checkedLookFors = [];
@@ -1105,18 +1311,30 @@ function _addObservationComponentRows(table, component, domainName, observation,
         checkedLookFors = observation.checkedLookFors[component.componentId];
     }
     
+    // Remove the default empty paragraph and add content properly
+    const lookforsDefaultParagraph = lookforsCell.getChild(0).asParagraph();
+    
     if (checkedLookFors.length > 0) {
-        checkedLookFors.forEach(lookfor => {
-            lookforsCell.appendListItem(lookfor).setGlyphType(DocumentApp.GlyphType.BULLET);
+        // Use the default paragraph for the first item, then add additional items
+        lookforsDefaultParagraph.setText(`• ${checkedLookFors[0]}`);
+        lookforsDefaultParagraph.setSpacingBefore(0).setSpacingAfter(0).setLineSpacing(1);
+        
+        // Add remaining items as new list items with minimal spacing
+        checkedLookFors.slice(1).forEach(lookfor => {
+            const listItem = lookforsCell.appendListItem(lookfor);
+            listItem.setGlyphType(DocumentApp.GlyphType.BULLET);
+            listItem.setSpacingBefore(0).setSpacingAfter(0).setLineSpacing(1);
         });
     } else {
-        lookforsCell.appendParagraph('No best practices selected.').setItalic(true);
+        lookforsDefaultParagraph.setText('No best practices selected.');
+        lookforsDefaultParagraph.setItalic(true);
+        lookforsDefaultParagraph.setSpacingBefore(0).setSpacingAfter(0).setLineSpacing(1);
     }
 
-    // Row 7: Notes & Evidence Header (will be merged)
-    const notesHeaderCell = createMergedRow('Notes & Evidence', COLORS.NOTES_EVIDENCE_HEADER_BG, 10);
+    // Row 7: Notes & Evidence Header (to be merged)
+    const notesHeaderCell = createRowForMerging('Notes & Evidence', COLORS.NOTES_EVIDENCE_HEADER_BG, 10);
 
-    // Row 8: Notes and Evidence Content (will be merged)
+    // Row 8: Notes and Evidence Content (to be merged)
     const notesRow = table.appendTableRow();
     const notesCells = [];
     for (let i = 0; i < 4; i++) {
@@ -1125,18 +1343,19 @@ function _addObservationComponentRows(table, component, domainName, observation,
         notesCells.push(cell);
     }
     
-    // Merge notes cells
+    // Style the notes cell and populate content
     const notesAndEvidenceCell = notesCells[0];
-    try {
-        for (let i = 1; i < 4; i++) {
-            notesAndEvidenceCell.merge(notesCells[i]);
-        }
-    } catch (error) {
-        console.warn('Notes cell merging failed:', error);
-    }
-    
-    // Style and populate notes cell
     notesAndEvidenceCell.setPaddingTop(8).setPaddingBottom(8).setPaddingLeft(12).setPaddingRight(12);
+    
+    // Track merge operation for notes row
+    const notesRowIndex = table.getNumRows() - 1;
+    mergeOperations.push({
+        tableStartIndex: tableStartIndex,
+        rowIndex: notesRowIndex,
+        columnIndex: 0,
+        columnSpan: 4,
+        rowSpan: 1
+    });
 
     // Handle both new unified structure and old separate structure for notes and evidence
     let notes = null;
@@ -1154,19 +1373,37 @@ function _addObservationComponentRows(table, component, domainName, observation,
         evidence = observation.evidenceLinks[component.componentId];
     }
 
-    let contentAdded = false;
+    // Use the default paragraph for the first content, then append additional content
+    const notesDefaultParagraph = notesAndEvidenceCell.getChild(0).asParagraph();
+    notesDefaultParagraph.setSpacingBefore(0).setSpacingAfter(0).setLineSpacing(1);
+    
+    let hasContent = false;
+    
     if (notes) {
-        _addNotesSection(notesAndEvidenceCell, notes);
-        contentAdded = true;
+        // Use the default paragraph for notes header, then add content
+        notesDefaultParagraph.setText('Observation Notes:');
+        notesDefaultParagraph.setBold(true);
+        _addNotesSectionContent(notesAndEvidenceCell, notes);
+        hasContent = true;
     }
+    
     if (evidence && evidence.length > 0) {
-        if(notes) notesAndEvidenceCell.appendParagraph('').setSpacingBefore(10);
+        if (notes) {
+            // Add spacing between notes and evidence
+            const spacerPara = notesAndEvidenceCell.appendParagraph('');
+            spacerPara.setSpacingBefore(0).setSpacingAfter(0).setSpacingBefore(10);
+        } else {
+            // Use default paragraph for evidence header
+            notesDefaultParagraph.setText('Evidence:');
+            notesDefaultParagraph.setBold(true);
+        }
         _addEvidenceSection(notesAndEvidenceCell, evidence);
-        contentAdded = true;
+        hasContent = true;
     }
 
-    if (!contentAdded) {
-        notesAndEvidenceCell.appendParagraph('No notes or evidence provided.').setItalic(true);
+    if (!hasContent) {
+        notesDefaultParagraph.setText('No notes or evidence provided.');
+        notesDefaultParagraph.setItalic(true);
     }
 }
 
@@ -1177,6 +1414,15 @@ function _addObservationComponentRows(table, component, domainName, observation,
  */
 function _addNotesSection(container, notesHtml) {
     container.appendParagraph('Observation Notes:').setBold(true);
+    _addNotesSectionContent(container, notesHtml);
+}
+
+/**
+ * Adds observation notes content to a container without the header.
+ * @param {DocumentApp.ContainerElement} container The container to add the notes to.
+ * @param {string} notesHtml The HTML content of the notes.
+ */
+function _addNotesSectionContent(container, notesHtml) {
 
     try {
         notesHtml = notesHtml.replace(/<br\s*\/?>/gi, '\n');
@@ -1239,6 +1485,7 @@ function _addNotesSection(container, notesHtml) {
 function _addParagraphWithFormatting(container, text) {
     if (!text.trim()) return;
     const paragraph = container.appendParagraph(stripHtml(text));
+    paragraph.setSpacingBefore(0).setSpacingAfter(0).setLineSpacing(1);
     _applyInlineFormatting(paragraph.getChild(0).asText(), text);
 }
 
@@ -1302,7 +1549,9 @@ function _addBestPracticesSection(body, bestPractices) {
  * @param {Array} evidence Array of evidence objects
  */
 function _addEvidenceSection(container, evidence) {
-    container.appendParagraph('Evidence:').setBold(true);
+    const evidenceHeader = container.appendParagraph('Evidence:');
+    evidenceHeader.setBold(true);
+    evidenceHeader.setSpacingBefore(0).setSpacingAfter(0).setLineSpacing(1);
     
     evidence.forEach(item => {
         // Create the paragraph with the bullet point and item name.
@@ -1312,8 +1561,9 @@ function _addEvidenceSection(container, evidence) {
         // Style the text.
         textElement.setFontSize(9).setForegroundColor(COLORS.ROYAL_BLUE);
 
-        // Apply paragraph styling.
-        evidenceItem.setIndentFirstLine(20).setSpacingAfter(2);
+        // Apply paragraph styling with consistent spacing
+        evidenceItem.setIndentFirstLine(20);
+        evidenceItem.setSpacingBefore(0).setSpacingAfter(0).setLineSpacing(1);
 
         // If a URL exists, make the item name a clickable hyperlink.
         if (item.url) {

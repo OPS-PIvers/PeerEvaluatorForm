@@ -23,7 +23,7 @@ This is a Google Apps Script (GAS) web application called "Peer Evaluator Form" 
 
 1. **Multi-Role System**: Different roles see different rubric views and have different permissions
 2. **Peer Evaluation**: Peer Evaluators can create, edit, and finalize observations of other staff
-3. **PDF Export**: Observations can be exported to styled PDF documents in Google Drive
+3. **PDF Export**: Observations are exported to styled PDF documents using Google's DocumentApp API
 4. **Advanced Caching**: Sophisticated caching system with automatic invalidation
 5. **Role Change Detection**: Automatic cache clearing when user roles change
 6. **Assignment-Based Views**: Users see only assigned subdomains based on their role/year
@@ -37,7 +37,7 @@ This is a Google Apps Script (GAS) web application called "Peer Evaluator Form" 
 
 ## Code Development Guidelines
 
-**=¨ CRITICAL: These guidelines are MANDATORY for every code change.**
+**=ï¿½ CRITICAL: These guidelines are MANDATORY for every code change.**
 
 ### Pre-Development Code Analysis Protocol
 
@@ -63,11 +63,11 @@ grep -r "deprecated\|obsolete\|unused" .
 
 For EVERY piece of existing code found, categorize and act:
 
-**=â Complete & Working Code**
+**=ï¿½ Complete & Working Code**
 -  Action: Extend/enhance existing implementation
 - L Never: Create duplicate functionality
 
-**=á Partial Implementation** 
+**=ï¿½ Partial Implementation** 
 -  Action: Complete existing code OR replace entirely
 - L Never: Leave partial code when adding new code
 
@@ -75,7 +75,7 @@ For EVERY piece of existing code found, categorize and act:
 -  Action: Fix existing code OR replace with working version
 - L Never: Work around broken code with duplicates
 
-**« Duplicate Functions**
+**ï¿½ Duplicate Functions**
 -  Action: Consolidate into single, comprehensive implementation
 - L Never: Leave multiple functions doing the same thing
 
@@ -84,10 +84,10 @@ For EVERY piece of existing code found, categorize and act:
 When implementing new functionality:
 
 1. **= IDENTIFY**: All related existing code
-2. **=Ñ REMOVE**: Duplicates, dead code, commented sections
+2. **=ï¿½ REMOVE**: Duplicates, dead code, commented sections
 3. **=' CONSOLIDATE**: Multiple implementations into one
 4. **( IMPLEMENT**: New/enhanced functionality
-5. **>ê VERIFY**: No conflicts or duplicates remain
+5. **>ï¿½ VERIFY**: No conflicts or duplicates remain
 
 ### Implementation Patterns
 
@@ -177,13 +177,13 @@ setCachedDataEnhanced('cache_key', params, data, ttl);
 
 If you discover conflicting/duplicate code during development:
 
-1. **=Ñ HALT**: Stop current implementation immediately
-2. **=Ë INVENTORY**: List ALL related functions, CSS, HTML
-3. **<¯ CHOOSE**: Select the most complete/correct version
-4. **>ù CLEANUP**: Remove ALL duplicates and incomplete versions
-5. **<× REBUILD**: Create single, comprehensive implementation
+1. **=ï¿½ HALT**: Stop current implementation immediately
+2. **=ï¿½ INVENTORY**: List ALL related functions, CSS, HTML
+3. **<ï¿½ CHOOSE**: Select the most complete/correct version
+4. **>ï¿½ CLEANUP**: Remove ALL duplicates and incomplete versions
+5. **<ï¿½ REBUILD**: Create single, comprehensive implementation
 6. **=, TEST**: Verify functionality works correctly
-7. **=Ý DOCUMENT**: Explain cleanup in commit message
+7. **=ï¿½ DOCUMENT**: Explain cleanup in commit message
 
 ### Real-World Case Study: Evidence Section
 

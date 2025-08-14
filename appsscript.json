@@ -6,6 +6,11 @@
         "userSymbol": "Drive",
         "serviceId": "drive",
         "version": "v2"
+      },
+      {
+        "userSymbol": "Docs",
+        "serviceId": "docs",
+        "version": "v1"
       }
     ]
   },
