@@ -351,6 +351,50 @@ function saveObservationNotes(observationId, componentId, notesContent) {
     }
 }
 
+
+/**
+ * Updates the script content for an observation.
+ * @param {string} observationId The ID of the observation to update.
+ * @param {Object} scriptContent The Quill Delta object representing the script content.
+ * @returns {Object} A response object with success status.
+ */
+function updateObservationScript(observationId, scriptContent) {
+    try {
+        const observation = getObservationById(observationId);
+        if (!observation) {
+            return { success: false, error: 'Observation not found.' };
+        }
+
+        // Add or update the scriptContent field
+        observation.scriptContent = scriptContent;
+
+        // Persist the changes
+        updateObservationInSheet(observation);
+
+        return { success: true };
+    } catch (error) {
+        console.error('Error updating script content:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Retrieves the script content for an observation.
+ * @param {string} observationId The ID of the observation.
+ * @returns {Object|null} The Quill Delta object or null if not found.
+ */
+function getObservationScript(observationId) {
+    try {
+        const observation = getObservationById(observationId);
+        // Return the scriptContent if it exists, otherwise return null
+        return observation ? (observation.scriptContent || null) : null;
+    } catch (error) {
+        console.error('Error getting script content:', error);
+        return null; // Return null on error to prevent client-side issues
+    }
+}
+
+
 /**
  * Finalizes an observation draft.
  * @param {string} observationId The ID of the observation to finalize.
@@ -3060,6 +3104,7 @@ function createFilterSelectionInterface(userContext, requestId) {
     htmlTemplate.availableRoles = AVAILABLE_ROLES;
     htmlTemplate.availableYears = OBSERVATION_YEARS;
     htmlTemplate.requestId = requestId;
+    htmlTemplate.scriptEditorSettings = SCRIPT_EDITOR_SETTINGS;
 
     const htmlOutput = htmlTemplate.evaluate()
       .setTitle(`${userContext.role} - Filter View`)

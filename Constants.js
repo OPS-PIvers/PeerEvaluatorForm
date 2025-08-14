@@ -472,3 +472,26 @@ const COLORS = {
   SELECTED_PROFICIENCY_TEXT: '#1e40af',
   NOTES_EVIDENCE_HEADER_BG: '#4a5568'
 };
+
+/**
+ * Script Editor settings
+ */
+const SCRIPT_EDITOR_SETTINGS = {
+  DEBOUNCE_DELAY: 1500, // ms
+  TOOLBAR_OPTIONS: [
+    ['bold', 'italic', 'underline', 'strike'],
+    ['blockquote', 'code-block'],
+    [{ 'header': 1 }, { 'header': 2 }],
+    [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+    [{ 'color': [] }, { 'background': [] }],
+    ['clean']
+  ],
+  UI_STRINGS: {
+    SAVING: 'Saving script...',
+    SAVED: 'Script saved!',
+    ERROR_SAVING: 'Error saving script: ',
+    SERVER_ERROR: 'Server error while saving script: ',
+    LOAD_ERROR: 'Could not load script: ',
+    PDF_UNAVAILABLE: 'PDF export functionality will be available soon.'
+  }
+};
