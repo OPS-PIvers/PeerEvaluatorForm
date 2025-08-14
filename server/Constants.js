@@ -237,6 +237,16 @@ const SYSTEM_INFO = {
 };
 
 /**
+ * Template file paths for HTML templates
+ */
+const TEMPLATE_PATHS = {
+  STAFF_RUBRIC: 'client/staff/rubric.html',
+  PEER_EVALUATOR_FILTER: 'client/peerevaluator/filter-interface.html',
+  SHARED_ERROR: 'client/shared/error-page.html',
+  SHARED_EMAIL: 'client/shared/finalized-observation-email.html'
+};
+
+/**
  * UI and Log message strings for consistency
  */
 const UI_STRINGS = {

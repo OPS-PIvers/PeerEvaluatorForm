@@ -96,7 +96,7 @@ function doGet(e) {
     const responseMetadata = generateResponseMetadata(userContext, requestId, debugMode);
     
     // Create and configure the HTML template
-    const htmlTemplate = HtmlService.createTemplateFromFile('rubric.html'); // This is now a fallback view
+    const htmlTemplate = HtmlService.createTemplateFromFile(TEMPLATE_PATHS.STAFF_RUBRIC); // This is now a fallback view
     htmlTemplate.data = rubricData;
     
     // Generate the HTML output
@@ -1347,12 +1347,12 @@ function _addObservationComponentRowsWithMergeTracking(table, component, domainN
     }
     
     // Remove the default empty paragraph and add content properly
-    const defaultParagraph = lookforsCell.getChild(0).asParagraph();
+    const lookforsDefaultParagraph = lookforsCell.getChild(0).asParagraph();
     
     if (checkedLookFors.length > 0) {
         // Use the default paragraph for the first item, then add additional items
-        defaultParagraph.setText(`• ${checkedLookFors[0]}`);
-        defaultParagraph.setSpacingBefore(0).setSpacingAfter(0).setLineSpacing(1);
+        lookforsDefaultParagraph.setText(`• ${checkedLookFors[0]}`);
+        lookforsDefaultParagraph.setSpacingBefore(0).setSpacingAfter(0).setLineSpacing(1);
         
         // Add remaining items as new list items with minimal spacing
         checkedLookFors.slice(1).forEach(lookfor => {
@@ -1361,9 +1361,9 @@ function _addObservationComponentRowsWithMergeTracking(table, component, domainN
             listItem.setSpacingBefore(0).setSpacingAfter(0).setLineSpacing(1);
         });
     } else {
-        defaultParagraph.setText('No best practices selected.');
-        defaultParagraph.setItalic(true);
-        defaultParagraph.setSpacingBefore(0).setSpacingAfter(0).setLineSpacing(1);
+        lookforsDefaultParagraph.setText('No best practices selected.');
+        lookforsDefaultParagraph.setItalic(true);
+        lookforsDefaultParagraph.setSpacingBefore(0).setSpacingAfter(0).setLineSpacing(1);
     }
 
     // Row 7: Notes & Evidence Header (to be merged)
@@ -1409,15 +1409,15 @@ function _addObservationComponentRowsWithMergeTracking(table, component, domainN
     }
 
     // Use the default paragraph for the first content, then append additional content
-    const defaultParagraph = notesAndEvidenceCell.getChild(0).asParagraph();
-    defaultParagraph.setSpacingBefore(0).setSpacingAfter(0).setLineSpacing(1);
+    const notesDefaultParagraph = notesAndEvidenceCell.getChild(0).asParagraph();
+    notesDefaultParagraph.setSpacingBefore(0).setSpacingAfter(0).setLineSpacing(1);
     
     let hasContent = false;
     
     if (notes) {
         // Use the default paragraph for notes header, then add content
-        defaultParagraph.setText('Observation Notes:');
-        defaultParagraph.setBold(true);
+        notesDefaultParagraph.setText('Observation Notes:');
+        notesDefaultParagraph.setBold(true);
         _addNotesSectionContent(notesAndEvidenceCell, notes);
         hasContent = true;
     }
@@ -1429,16 +1429,16 @@ function _addObservationComponentRowsWithMergeTracking(table, component, domainN
             spacerPara.setSpacingBefore(0).setSpacingAfter(0).setSpacingBefore(10);
         } else {
             // Use default paragraph for evidence header
-            defaultParagraph.setText('Evidence:');
-            defaultParagraph.setBold(true);
+            notesDefaultParagraph.setText('Evidence:');
+            notesDefaultParagraph.setBold(true);
         }
         _addEvidenceSection(notesAndEvidenceCell, evidence);
         hasContent = true;
     }
 
     if (!hasContent) {
-        defaultParagraph.setText('No notes or evidence provided.');
-        defaultParagraph.setItalic(true);
+        notesDefaultParagraph.setText('No notes or evidence provided.');
+        notesDefaultParagraph.setItalic(true);
     }
 }
 
@@ -1617,85 +1617,6 @@ function _addEvidenceSection(container, evidence) {
  * @param {string} observationId The ID of the observation to regenerate PDF for.
  * @returns {Object} A response object with success status and PDF URL.
  */
-function regenerateObservationPdf(observationId) {
-    try {
-        setupObservationSheet(); // Ensure the sheet is ready
-        const userContext = createUserContext();
-        if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
-            return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
-        }
-
-        const observation = getObservationById(observationId);
-        if (!observation) {
-            return { success: false, error: 'Observation not found.' };
-        }
-
-        if (observation.observerEmail !== userContext.email) {
-            return { success: false, error: 'Permission denied. You did not create this observation.' };
-        }
-
-        if (observation.status !== OBSERVATION_STATUS.FINALIZED) {
-            return { success: false, error: 'PDF can only be regenerated for finalized observations.' };
-        }
-
-        debugLog('Starting PDF regeneration', { observationId, requestedBy: userContext.email });
-
-        // Generate the PDF
-        const pdfResult = _generateAndSavePdf(observationId, userContext);
-        
-        if (pdfResult.success) {
-            // Update the observation with the new PDF URL and status
-            const spreadsheet = openSpreadsheet();
-            const sheet = getSheetByName(spreadsheet, "Observation_Data");
-            if (sheet) {
-                const row = findObservationRow(sheet, observationId);
-                if (row !== -1) {
-                    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-                    const pdfUrlCol = headers.indexOf('pdfUrl') + 1;
-                    const pdfStatusCol = headers.indexOf('pdfStatus') + 1;
-                    const lastModifiedCol = headers.indexOf('lastModifiedAt') + 1;
-                    
-                    if (pdfUrlCol > 0) {
-                        sheet.getRange(row, pdfUrlCol).setValue(pdfResult.pdfUrl);
-                    }
-                    if (pdfStatusCol > 0) {
-                        sheet.getRange(row, pdfStatusCol).setValue('generated');
-                    }
-                    if (lastModifiedCol > 0) {
-                        sheet.getRange(row, lastModifiedCol).setValue(new Date().toISOString());
-                    }
-                    SpreadsheetApp.flush();
-                }
-            }
-            
-            debugLog('PDF successfully regenerated', { observationId, pdfUrl: pdfResult.pdfUrl });
-            return { success: true, pdfUrl: pdfResult.pdfUrl };
-            
-        } else {
-            // PDF regeneration failed - update status
-            const spreadsheet = openSpreadsheet();
-            const sheet = getSheetByName(spreadsheet, "Observation_Data");
-            if (sheet) {
-                const row = findObservationRow(sheet, observationId);
-                if (row !== -1) {
-                    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-                    const pdfStatusCol = headers.indexOf('pdfStatus') + 1;
-                    if (pdfStatusCol > 0) {
-                        sheet.getRange(row, pdfStatusCol).setValue('failed');
-                        SpreadsheetApp.flush();
-                    }
-                }
-            }
-            
-            debugLog('PDF regeneration failed', { observationId, error: pdfResult.error });
-            return { success: false, error: pdfResult.error };
-        }
-
-    } catch (error) {
-        console.error(`Error regenerating PDF for observation ${observationId}:`, error);
-        return { success: false, error: 'An unexpected error occurred while regenerating the PDF.' };
-    }
-}
 
 
 /**
@@ -3120,7 +3041,7 @@ function applyYearFiltering(domains, role, year) {
  */
 function createFilterSelectionInterface(userContext, requestId) {
   try {
-    const htmlTemplate = HtmlService.createTemplateFromFile('filter-interface.html');
+    const htmlTemplate = HtmlService.createTemplateFromFile(TEMPLATE_PATHS.PEER_EVALUATOR_FILTER);
     htmlTemplate.userContext = userContext;
     htmlTemplate.userContext.probationaryYearValue = PROBATIONARY_OBSERVATION_YEAR;
     htmlTemplate.availableRoles = AVAILABLE_ROLES;
@@ -3203,7 +3124,7 @@ function getPageTitle(role) {
  */
 function createEnhancedErrorPage(error, requestId, userContext, userAgent = 'Unknown') {
   try {
-    const htmlTemplate = HtmlService.createTemplateFromFile('error-page.html');
+    const htmlTemplate = HtmlService.createTemplateFromFile(TEMPLATE_PATHS.SHARED_ERROR);
     htmlTemplate.error = {
       message: error.message,
       stack: error.stack,
