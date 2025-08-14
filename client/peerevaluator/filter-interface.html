@@ -2289,48 +2289,111 @@
                 return;
             }
 
-            // Save current script content first
-            if (scriptQuill) {
-                saveScriptContent();
-            }
-
             // Show loading state
             const exportBtn = document.querySelector('button[onclick="exportScriptPDF()"]');
             const originalText = exportBtn ? exportBtn.textContent : 'Export PDF';
             if (exportBtn) {
                 exportBtn.disabled = true;
-                exportBtn.textContent = 'Generating...';
+                exportBtn.textContent = 'Saving...';
             }
 
-            showToast('Generating script PDF...', true);
+            // Save current script content first and wait for completion
+            if (scriptQuill) {
+                const content = scriptQuill.getContents();
+                scriptContent = content; // Keep local copy
 
-            // Generate PDF via server
-            google.script.run
-                .withSuccessHandler(function(result) {
-                    if (exportBtn) {
-                        exportBtn.disabled = false;
-                        exportBtn.textContent = originalText;
-                    }
+                showToast('Saving script content...', true);
 
-                    if (result.success) {
-                        showToast('Script PDF generated successfully!', true);
-                        // Open PDF in new tab
-                        if (result.pdfUrl) {
-                            window.open(result.pdfUrl, '_blank');
+                // Save script content and wait for completion before generating PDF
+                google.script.run
+                    .withSuccessHandler(function(saveResult) {
+                        if (saveResult.success) {
+                            // Script saved successfully, now generate PDF
+                            if (exportBtn) {
+                                exportBtn.textContent = 'Generating PDF...';
+                            }
+                            showToast('Generating script PDF...', true);
+                            
+                            // Generate PDF via server
+                            google.script.run
+                                .withSuccessHandler(function(result) {
+                                    if (exportBtn) {
+                                        exportBtn.disabled = false;
+                                        exportBtn.textContent = originalText;
+                                    }
+                                    
+                                    if (result.success) {
+                                        showToast('Script PDF generated successfully!', true);
+                                        // Open PDF in new tab
+                                        if (result.pdfUrl) {
+                                            window.open(result.pdfUrl, '_blank');
+                                        }
+                                    } else {
+                                        showToast('Error generating script PDF: ' + result.error, false);
+                                    }
+                                })
+                                .withFailureHandler(function(error) {
+                                    if (exportBtn) {
+                                        exportBtn.disabled = false;
+                                        exportBtn.textContent = originalText;
+                                    }
+                                    showToast('Failed to generate script PDF: ' + error.message, false);
+                                    console.error('Script PDF generation failed:', error);
+                                })
+                                .generateScriptPDF(currentObservationId);
+                        } else {
+                            // Save failed
+                            if (exportBtn) {
+                                exportBtn.disabled = false;
+                                exportBtn.textContent = originalText;
+                            }
+                            showToast('Failed to save script content: ' + saveResult.error, false);
                         }
-                    } else {
-                        showToast('Error generating script PDF: ' + (result.error || 'Unknown error'), false);
-                    }
-                })
-                .withFailureHandler(function(error) {
-                    if (exportBtn) {
-                        exportBtn.disabled = false;
-                        exportBtn.textContent = originalText;
-                    }
-                    showToast('Failed to generate script PDF: ' + error.message, false);
-                    console.error('Script PDF generation failed:', error);
-                })
-                .generateScriptPDF(currentObservationId);
+                    })
+                    .withFailureHandler(function(error) {
+                        if (exportBtn) {
+                            exportBtn.disabled = false;
+                            exportBtn.textContent = originalText;
+                        }
+                        showToast('Error saving script content: ' + error.message, false);
+                        console.error('Script save failed:', error);
+                    })
+                    .updateObservationScript(currentObservationId, content);
+            } else {
+                // No script content to save, directly generate PDF
+                if (exportBtn) {
+                    exportBtn.textContent = 'Generating PDF...';
+                }
+                showToast('Generating script PDF...', true);
+                
+                // Generate PDF via server
+                google.script.run
+                    .withSuccessHandler(function(result) {
+                        if (exportBtn) {
+                            exportBtn.disabled = false;
+                            exportBtn.textContent = originalText;
+                        }
+
+                        if (result.success) {
+                            showToast('Script PDF generated successfully!', true);
+                            // Open PDF in new tab
+                            if (result.pdfUrl) {
+                                window.open(result.pdfUrl, '_blank');
+                            }
+                        } else {
+                            showToast('Error generating script PDF: ' + (result.error || 'Unknown error'), false);
+                        }
+                    })
+                    .withFailureHandler(function(error) {
+                        if (exportBtn) {
+                            exportBtn.disabled = false;
+                            exportBtn.textContent = originalText;
+                        }
+                        showToast('Failed to generate script PDF: ' + error.message, false);
+                        console.error('Script PDF generation failed:', error);
+                    })
+                    .generateScriptPDF(currentObservationId);
+            }
         }
 
         // === Component Tagging System ===
@@ -2360,11 +2423,14 @@
                 window.rubricData.domains.forEach(domain => {
                     if (domain.components && domain.components.length > 0) {
                         domain.components.forEach(component => {
-                            const option = document.createElement('option');
-                            option.value = component.componentId;
-                            option.textContent = `${domain.name}: ${component.title}`;
-                            selector.appendChild(option);
-                            hasComponents = true;
+                            // Only show assigned components to match main rubric behavior
+                            if (component.isAssigned) {
+                                const option = document.createElement('option');
+                                option.value = component.componentId;
+                                option.textContent = `${domain.name}: ${component.title}`;
+                                selector.appendChild(option);
+                                hasComponents = true;
+                            }
                         });
                     }
                 });
@@ -2453,13 +2519,40 @@
                 return;
             }
             
-            // Get the notes editor for this component
-            const notesEditor = window.globalQuillInstances && window.globalQuillInstances[componentId];
+            // Get the notes editor for this component, auto-expand if needed
+            let notesEditor = window.globalQuillInstances && window.globalQuillInstances[componentId];
             if (!notesEditor) {
-                showToast('Notes editor not found. Please expand the component notes section first.', false);
-                return;
+                // Try to auto-expand the component's notes section
+                const evidenceSectionId = `evidence-${componentId}`;
+                const evidenceSection = document.getElementById(evidenceSectionId);
+                
+                if (evidenceSection) {
+                    // Expand the evidence section (this will initialize the editor)
+                    toggleEvidenceSection(evidenceSectionId);
+                    
+                    // Give it a moment to initialize, then try again
+                    setTimeout(() => {
+                        notesEditor = window.globalQuillInstances && window.globalQuillInstances[componentId];
+                        if (!notesEditor) {
+                            showToast(`Could not initialize notes editor for ${componentId}. Please expand the component manually.`, false);
+                            return;
+                        }
+                        
+                        // Continue with the push operation
+                        completePushToNotes(componentId, tags, notesEditor);
+                    }, 200);
+                    return;
+                } else {
+                    showToast(`Notes editor not found for ${componentId}. Component may not be visible or available.`, false);
+                    return;
+                }
             }
             
+            // Continue with the push operation immediately if editor is already available
+            completePushToNotes(componentId, tags, notesEditor);
+        }
+        
+        function completePushToNotes(componentId, tags, notesEditor) {
             // Combine all tagged text for this component
             const taggedContent = tags.map(tag => tag.text).join('\n\n');
             
