@@ -21,6 +21,7 @@ const UiService = (function() {
       htmlTemplate.availableRoles = AVAILABLE_ROLES;
       htmlTemplate.availableYears = OBSERVATION_YEARS;
       htmlTemplate.requestId = requestId;
+      htmlTemplate.scriptEditorSettings = SCRIPT_EDITOR_SETTINGS;
 
       const htmlOutput = htmlTemplate.evaluate()
         .setTitle(`${userContext.role} - Filter View`)
