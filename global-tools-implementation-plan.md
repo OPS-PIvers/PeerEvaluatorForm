@@ -386,8 +386,7 @@ function uploadGlobalRecording(observationId, base64Data, filename, recordingTyp
 - [x] Global tools bar appears for evaluators in observation editing mode
 - [x] Audio recording starts/stops with clear visual feedback
 - [x] Video recording starts/stops with clear visual feedback
-- [ ] Recorded files are successfully uploaded to observation folder
-        - "Error saving audio recording: getOrCreateObservationFolder is not defined"
+- [x] Recorded files are successfully uploaded to observation folder
 - [x] No errors in browser console during recording operations
 - [x] Responsive design works on mobile devices
 - [x] Permissions are properly requested and handled

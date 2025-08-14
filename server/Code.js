@@ -1225,32 +1225,22 @@ function _addObservationComponentRowsWithMergeTracking(table, component, domainN
         const row = table.appendTableRow();
         const cells = [];
         
-        // Create 4 cells - start with empty cells to avoid extra paragraphs
+        // Create 4 cells
         for (let i = 0; i < 4; i++) {
-            const cell = row.appendTableCell('');
+            const cell = row.appendTableCell(i === 0 ? text : '');
             cell.setWidth(COLUMN_WIDTH);
             cells.push(cell);
         }
         
-        // Work with the first cell's default paragraph
+        // Style the first cell (which will become the merged cell)
         const primaryCell = cells[0];
-        const defaultParagraph = primaryCell.getChild(0).asParagraph();
-        
-        // Set text and styling on the default paragraph
-        defaultParagraph.setText(text);
-        defaultParagraph.setSpacingBefore(0).setSpacingAfter(0).setLineSpacing(1);
-        
-        // Apply text styling to the paragraph content
-        const textElement = defaultParagraph.getChild(0).asText();
         const style = {
             [DocumentApp.Attribute.BACKGROUND_COLOR]: backgroundColor,
             [DocumentApp.Attribute.FOREGROUND_COLOR]: COLORS.WHITE,
             [DocumentApp.Attribute.BOLD]: true,
             [DocumentApp.Attribute.FONT_SIZE]: fontSize
         };
-        textElement.setAttributes(style);
-        
-        // Set cell padding
+        primaryCell.setAttributes(style);
         primaryCell.setPaddingTop(8).setPaddingBottom(8).setPaddingLeft(12).setPaddingRight(12);
 
         // Track merge operation for this row
@@ -1275,40 +1265,26 @@ function _addObservationComponentRowsWithMergeTracking(table, component, domainN
     // Row 3: Proficiency Titles (4 separate cells - no merge)
     const titlesRow = table.appendTableRow();
     PROFICIENCY_LEVELS.TITLES.forEach(level => {
-        const cell = titlesRow.appendTableCell('');
+        const cell = titlesRow.appendTableCell(level);
         cell.setWidth(COLUMN_WIDTH);
+        cell.getChild(0).asParagraph().setAlignment(DocumentApp.HorizontalAlignment.CENTER);
         cell.setBackgroundColor(COLORS.PROFICIENCY_HEADER_BG);
         cell.setPaddingTop(8).setPaddingBottom(8).setPaddingLeft(6).setPaddingRight(6);
         
-        // Work with the default paragraph
-        const paragraph = cell.getChild(0).asParagraph();
-        paragraph.setText(level);
-        paragraph.setAlignment(DocumentApp.HorizontalAlignment.CENTER);
-        paragraph.setSpacingBefore(0).setSpacingAfter(0).setLineSpacing(1);
-        
-        // Apply text styling
-        const textElement = paragraph.getChild(0).asText();
         const style = {};
         style[DocumentApp.Attribute.BOLD] = true;
         style[DocumentApp.Attribute.FONT_SIZE] = 10;
         style[DocumentApp.Attribute.FOREGROUND_COLOR] = COLORS.PROFICIENCY_TEXT;
-        textElement.setAttributes(style);
+        cell.setAttributes(style);
     });
 
     // Row 4: Proficiency Descriptions (4 separate cells - no merge)
     const descriptionsRow = table.appendTableRow();
     PROFICIENCY_LEVELS.KEYS.forEach(key => {
-        const cell = descriptionsRow.appendTableCell('');
+        const cell = descriptionsRow.appendTableCell(component[key] || '');
         cell.setWidth(COLUMN_WIDTH);
         cell.setPaddingTop(12).setPaddingBottom(12).setPaddingLeft(8).setPaddingRight(8);
         
-        // Work with the default paragraph
-        const paragraph = cell.getChild(0).asParagraph();
-        paragraph.setText(component[key] || '');
-        paragraph.setSpacingBefore(0).setSpacingAfter(0).setLineSpacing(1);
-        
-        // Apply styling to text
-        const textElement = paragraph.getChild(0).asText();
         const style = {};
         style[DocumentApp.Attribute.FONT_SIZE] = 9;
         
@@ -1320,7 +1296,7 @@ function _addObservationComponentRowsWithMergeTracking(table, component, domainN
         } else {
             style[DocumentApp.Attribute.FOREGROUND_COLOR] = COLORS.PROFICIENCY_TEXT;
         }
-        textElement.setAttributes(style);
+        cell.setAttributes(style);
     });
 
     // Row 5: Best Practices Header (to be merged)
