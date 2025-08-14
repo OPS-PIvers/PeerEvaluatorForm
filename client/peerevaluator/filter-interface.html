@@ -2241,15 +2241,39 @@
         }
 
         function loadScriptContent() {
-            if (!currentObservationId) return;
+            if (!currentObservationId) {
+                console.warn('Cannot load script content: currentObservationId is not set', {
+                    currentObservationId,
+                    currentObservedUser,
+                    scriptQuillInitialized: !!scriptQuill
+                });
+                return;
+            }
+
+            console.log('Loading script content for observation:', currentObservationId);
 
             google.script.run
                 .withSuccessHandler(function(content) {
+                    console.log('Script content loaded from server:', {
+                        observationId: currentObservationId,
+                        hasContent: !!content,
+                        contentType: typeof content,
+                        contentKeys: content ? Object.keys(content) : 'N/A',
+                        quillReady: !!scriptQuill
+                    });
+                    
                     if (content && scriptQuill) {
                         if(typeof content === 'object' && content !== null && Object.keys(content).length > 0) {
                             scriptQuill.setContents(content, 'silent');
                             scriptContent = content;
+                            console.log('Script content successfully loaded into editor');
+                        } else {
+                            console.log('Script content exists but is empty or invalid format');
                         }
+                    } else if (!scriptQuill) {
+                        console.error('Cannot load script content: Quill editor not initialized');
+                    } else {
+                        console.log('No existing script content found for this observation');
                     }
                 })
                 .withFailureHandler(function(error) {
@@ -2320,22 +2344,20 @@
             '4f:': '#b2dfdb'
         };
 
-        function populateComponentSelector(retryCount = 0) {
+        function populateComponentSelector() {
             const selector = document.getElementById('componentSelector');
-            if (!selector) return;
-            
-            // Show loading state initially
-            if (retryCount === 0) {
-                selector.innerHTML = '<option value="">Loading components...</option>';
+            if (!selector) {
+                console.warn('Component selector element not found');
+                return;
             }
             
-            // Check if rubric data is available
-            if (window.currentRubricData && window.currentRubricData.domains && window.currentRubricData.domains.length > 0) {
+            // Check if rubric data is available (using the same source as the main rubric)
+            if (window.rubricData && window.rubricData.domains && window.rubricData.domains.length > 0) {
                 // Data is available, populate the selector
                 selector.innerHTML = '<option value="">Select Component to Tag</option>';
                 
                 let hasComponents = false;
-                window.currentRubricData.domains.forEach(domain => {
+                window.rubricData.domains.forEach(domain => {
                     if (domain.components && domain.components.length > 0) {
                         domain.components.forEach(component => {
                             const option = document.createElement('option');
@@ -2349,19 +2371,17 @@
                 
                 if (!hasComponents) {
                     selector.innerHTML = '<option value="">No components available</option>';
+                    console.warn('Rubric data exists but contains no components');
                 }
             } else {
-                // Data not available yet, retry up to 10 times with exponential backoff
-                if (retryCount < 10) {
-                    const delay = Math.min(1000, 200 * Math.pow(1.5, retryCount)); // Max 1 second delay
-                    setTimeout(() => {
-                        populateComponentSelector(retryCount + 1);
-                    }, delay);
-                } else {
-                    // Max retries reached, show error state
-                    selector.innerHTML = '<option value="">Failed to load components</option>';
-                    console.warn('Failed to load component selector data after maximum retries');
-                }
+                // Rubric data not available - this should not happen if called after rubric is loaded
+                selector.innerHTML = '<option value="">Rubric data not loaded</option>';
+                console.warn('Component selector called but rubric data not available:', {
+                    hasWindow: typeof window !== 'undefined',
+                    hasRubricData: !!window.rubricData,
+                    hasDomains: window.rubricData && !!window.rubricData.domains,
+                    domainsLength: window.rubricData && window.rubricData.domains ? window.rubricData.domains.length : 'N/A'
+                });
             }
         }
 
