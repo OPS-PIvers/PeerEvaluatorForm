@@ -17,15 +17,6 @@
 //   TIMEOUT_ERROR: 'timeout_error'
 // };
 
-/**
- * Validation severity levels
- */
-const VALIDATION_SEVERITY = {
-  CRITICAL: 'critical',    // System cannot function
-  ERROR: 'error',          // Feature broken but system works
-  WARNING: 'warning',      // Potential issue
-  INFO: 'info'            // Informational only
-};
 
 /**
  * Comprehensive role validation
