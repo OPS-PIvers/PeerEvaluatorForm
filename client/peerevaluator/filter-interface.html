@@ -2222,7 +2222,53 @@
         }
 
         function exportScriptPDF() {
-            showToast(SCRIPT_EDITOR_CONSTANTS.UI_STRINGS.PDF_UNAVAILABLE, false);
+            if (!currentObservationId) {
+                showToast('No observation context found', false);
+                return;
+            }
+
+            // Save current script content first
+            if (scriptQuill) {
+                saveScriptContent();
+            }
+
+            // Show loading state
+            const exportBtn = document.querySelector('button[onclick="exportScriptPDF()"]');
+            const originalText = exportBtn ? exportBtn.textContent : 'Export PDF';
+            if (exportBtn) {
+                exportBtn.disabled = true;
+                exportBtn.textContent = 'Generating...';
+            }
+
+            showToast('Generating script PDF...', true);
+
+            // Generate PDF via server
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    if (exportBtn) {
+                        exportBtn.disabled = false;
+                        exportBtn.textContent = originalText;
+                    }
+
+                    if (result.success) {
+                        showToast('Script PDF generated successfully!', true);
+                        // Open PDF in new tab
+                        if (result.pdfUrl) {
+                            window.open(result.pdfUrl, '_blank');
+                        }
+                    } else {
+                        showToast('Error generating script PDF: ' + (result.error || 'Unknown error'), false);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    if (exportBtn) {
+                        exportBtn.disabled = false;
+                        exportBtn.textContent = originalText;
+                    }
+                    showToast('Failed to generate script PDF: ' + error.message, false);
+                    console.error('Script PDF generation failed:', error);
+                })
+                .generateScriptPDF(currentObservationId);
         }
 
         // === Component Tagging System ===

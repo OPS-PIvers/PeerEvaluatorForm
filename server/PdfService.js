@@ -347,6 +347,46 @@ const PdfService = (function() {
       );
       details.getChild(0).asText().setFontSize(11).setForegroundColor('#4a5568');
 
+      // Add Global Media section if any script PDF or recordings exist
+      const hasScriptPdf = observation.scriptPdfUrl;
+      const hasAudioRecordings = observation.globalRecordings && observation.globalRecordings.audio && observation.globalRecordings.audio.length > 0;
+      const hasVideoRecordings = observation.globalRecordings && observation.globalRecordings.video && observation.globalRecordings.video.length > 0;
+
+      if (hasScriptPdf || hasAudioRecordings || hasVideoRecordings) {
+          body.appendParagraph(''); // Empty line
+          
+          const mediaHeader = body.appendParagraph('Global Media & Documentation');
+          mediaHeader.setHeading(DocumentApp.ParagraphHeading.HEADING2);
+          mediaHeader.getChild(0).asText().setFontSize(14).setBold(true).setForegroundColor('#2d3748');
+
+          // Script PDF link
+          if (hasScriptPdf) {
+              const scriptParagraph = body.appendParagraph(`📝 Observation Script Document: ${observation.scriptPdfUrl}`);
+              scriptParagraph.getChild(0).asText().setFontSize(11).setForegroundColor('#2563eb');
+              scriptParagraph.setLinkUrl(observation.scriptPdfUrl);
+          }
+
+          // Audio recordings
+          if (hasAudioRecordings) {
+              observation.globalRecordings.audio.forEach((recording, index) => {
+                  const audioParagraph = body.appendParagraph(`🎤 Audio Recording ${index + 1}: ${recording.url}`);
+                  audioParagraph.getChild(0).asText().setFontSize(11).setForegroundColor('#059669');
+                  audioParagraph.setLinkUrl(recording.url);
+              });
+          }
+
+          // Video recordings
+          if (hasVideoRecordings) {
+              observation.globalRecordings.video.forEach((recording, index) => {
+                  const videoParagraph = body.appendParagraph(`📹 Video Recording ${index + 1}: ${recording.url}`);
+                  videoParagraph.getChild(0).asText().setFontSize(11).setForegroundColor('#dc2626');
+                  videoParagraph.setLinkUrl(recording.url);
+              });
+          }
+
+          body.appendParagraph(''); // Empty line after media section
+      }
+
       // Add some spacing
       body.appendParagraph('').setSpacingAfter(10);
   }

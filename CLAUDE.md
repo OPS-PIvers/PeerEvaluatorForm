@@ -71,10 +71,17 @@ This is a Google Apps Script (GAS) web application called "Peer Evaluator Form" 
 
 1. **Multi-Role System**: Different roles see different rubric views and have different permissions
 2. **Peer Evaluation**: Peer Evaluators can create, edit, and finalize observations of other staff
-3. **PDF Export**: Observations are exported to styled PDF documents using Google's DocumentApp API
-4. **Advanced Caching**: Sophisticated caching system with automatic invalidation
-5. **Role Change Detection**: Automatic cache clearing when user roles change
-6. **Assignment-Based Views**: Users see only assigned subdomains based on their role/year
+3. **Global Observation Tools**: Complete suite of recording and documentation tools for peer evaluators:
+   - **Audio/Video Recording**: Browser-based MediaRecorder API for microphone and camera recording
+   - **Script Editor**: Rich-text Quill.js editor with component tagging system for live note-taking
+   - **Component Tagging**: Tag script sections to specific rubric components for auto-population of Notes fields
+   - **Script PDF Export**: Separate PDF generation for script content with component organization
+4. **PDF Export**: Observations are exported to styled PDF documents using Google's DocumentApp API
+   - Main observation PDFs include links to script PDFs and global recordings
+   - Script PDFs feature component-tagged content organization and professional formatting
+5. **Advanced Caching**: Sophisticated caching system with automatic invalidation
+6. **Role Change Detection**: Automatic cache clearing when user roles change
+7. **Assignment-Based Views**: Users see only assigned subdomains based on their role/year
 
 ### Data Structure
 
