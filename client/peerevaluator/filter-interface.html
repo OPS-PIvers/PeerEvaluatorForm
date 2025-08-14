@@ -1992,7 +1992,7 @@
         }
 
         // === Script Editor Functions ===
-        const SCRIPT_EDITOR_CONSTANTS = <?= JSON.stringify(scriptEditorSettings) ?>;
+        const SCRIPT_EDITOR_CONSTANTS = <?!= JSON.stringify(scriptEditorSettings) ?>;
         let scriptQuill = null;
         let scriptContent = {};
 
