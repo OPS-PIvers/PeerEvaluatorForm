@@ -3,20 +3,6 @@
  * This file handles cache versioning, dependencies, and invalidation
  */
 
-/**
- * Master cache version - increment this when making major cache changes
- */
-const CACHE_VERSION = '1.0.0';
-
-/**
- * Cache dependency map - defines which caches depend on others
- */
-const CACHE_DEPENDENCIES = {
-  'staff_data': ['user_*', 'role_mappings'], // When staff_data changes, clear user and role caches
-  'settings_data': ['role_sheet_*', 'domain_mappings'],
-  'user_*': ['role_sheet_*'], // When any user data changes, clear role sheets
-  'role_sheet_*': [] // Role sheets have no dependencies
-};
 
 // Script-scoped cache for the master cache version
 let scriptScopedMasterCacheVersion = null;

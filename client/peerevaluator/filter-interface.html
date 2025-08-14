@@ -772,6 +772,85 @@
         .evidence-item a:hover {
             text-decoration: underline;
         }
+
+        /* Script Editor Modal Styles */
+        .script-editor-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .script-editor-container {
+            background: white;
+            width: 95%;
+            height: 90%;
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .script-editor-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 24px;
+            border-bottom: 2px solid var(--color-gray-border-medium);
+        }
+
+        .script-editor-header h2 {
+            font-size: 1.5rem;
+            color: var(--color-gray-text-light);
+        }
+
+        .script-editor-controls {
+            display: flex;
+            gap: 12px;
+        }
+
+        .script-editor-controls .btn-primary {
+            background-color: var(--color-green-base);
+            border-color: var(--color-green-base);
+        }
+
+        .script-editor-controls .btn-primary:hover {
+            background-color: var(--color-green-dark);
+            border-color: var(--color-green-dark);
+        }
+
+        .script-editor-content {
+            flex-grow: 1;
+            padding: 0 24px 24px 24px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        #scriptEditor {
+            height: 100%;
+            border: 1px solid var(--color-gray-border-light);
+            border-radius: 6px;
+            background-color: var(--color-white);
+        }
+
+        /* Quill toolbar customization */
+        .script-editor-toolbar {
+            padding: 12px 0;
+        }
+
+        #scriptEditor .ql-editor {
+            font-size: 16px;
+            line-height: 1.6;
+            color: var(--color-text-default);
+            height: 100%;
+        }
     </style>
 </head>
 <body>
@@ -1911,6 +1990,92 @@
             // Placeholder for now
             console.log(`Recording saved: ${type} at ${fileUrl} with name ${filename}`);
         }
+
+        // === Script Editor Functions ===
+        const SCRIPT_EDITOR_CONSTANTS = <?= JSON.stringify(scriptEditorSettings) ?>;
+        let scriptQuill = null;
+        let scriptContent = {};
+
+        function openScriptEditor() {
+            const modal = document.getElementById('scriptEditorModal');
+            modal.style.display = 'flex';
+
+            if (!scriptQuill) {
+                // Initialize Quill editor using constants
+                scriptQuill = new Quill('#scriptEditor', {
+                    theme: 'snow',
+                    modules: {
+                        toolbar: SCRIPT_EDITOR_CONSTANTS.TOOLBAR_OPTIONS
+                    }
+                });
+
+                // Load existing content
+                loadScriptContent();
+
+                // Auto-save on content change
+                let debounceTimer;
+                scriptQuill.on('text-change', function(delta, oldDelta, source) {
+                    if (source === 'user') {
+                        clearTimeout(debounceTimer);
+                        debounceTimer = setTimeout(() => {
+                            saveScriptContent();
+                        }, SCRIPT_EDITOR_CONSTANTS.DEBOUNCE_DELAY);
+                    }
+                });
+            }
+        }
+
+        function closeScriptEditor() {
+            const modal = document.getElementById('scriptEditorModal');
+            modal.style.display = 'none';
+        }
+
+        function saveScriptContent() {
+            if (!scriptQuill || !currentObservationId) return;
+
+            const content = scriptQuill.getContents();
+            scriptContent = content; // Keep local copy
+
+            showToast(SCRIPT_EDITOR_CONSTANTS.UI_STRINGS.SAVING, false);
+
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    if (result.success) {
+                        showToast(SCRIPT_EDITOR_CONSTANTS.UI_STRINGS.SAVED, true);
+                    } else {
+                        console.error('Failed to save script content:', result.error);
+                        showToast(SCRIPT_EDITOR_CONSTANTS.UI_STRINGS.ERROR_SAVING + result.error, false);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    console.error('Error saving script content:', error);
+                    showToast(SCRIPT_EDITOR_CONSTANTS.UI_STRINGS.SERVER_ERROR + error.message, false);
+                })
+                .updateObservationScript(currentObservationId, content);
+        }
+
+        function loadScriptContent() {
+            if (!currentObservationId) return;
+
+            google.script.run
+                .withSuccessHandler(function(content) {
+                    if (content && scriptQuill) {
+                        if(typeof content === 'object' && content !== null && Object.keys(content).length > 0) {
+                            scriptQuill.setContents(content, 'silent');
+                            scriptContent = content;
+                        }
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    console.error('Error loading script content:', error);
+                    showToast(SCRIPT_EDITOR_CONSTANTS.UI_STRINGS.LOAD_ERROR + error.message, false);
+                })
+                .getObservationScript(currentObservationId);
+        }
+
+        function exportScriptPDF() {
+            showToast(SCRIPT_EDITOR_CONSTANTS.UI_STRINGS.PDF_UNAVAILABLE, false);
+        }
     </script>
 
     <!-- Loading Overlay -->
@@ -1918,6 +2083,22 @@
         <div class="loading-content">
             <div class="loading-spinner"></div>
             <div class="loading-text" id="loading-text">Loading...</div>
+        </div>
+    </div>
+
+    <!-- Script Editor Modal -->
+    <div class="script-editor-modal" id="scriptEditorModal" style="display: none;">
+        <div class="script-editor-container">
+            <div class="script-editor-header">
+                <h2>Observation Script Editor</h2>
+                <div class="script-editor-controls">
+                    <button class="btn-secondary" onclick="closeScriptEditor()">Close</button>
+                    <button class="btn-primary" onclick="exportScriptPDF()">Export PDF</button>
+                </div>
+            </div>
+            <div class="script-editor-content">
+                <div id="scriptEditor"></div>
+            </div>
         </div>
     </div>
 </body>

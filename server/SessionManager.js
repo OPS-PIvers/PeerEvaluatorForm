@@ -3,16 +3,6 @@
  * This file handles user session tracking, role change detection, and state persistence
  */
 
-/**
- * Session state constants
- */
-const SESSION_CONSTANTS = {
-  SESSION_DURATION: 24 * 60 * 60 * 1000, // 24 hours in milliseconds
-  STATE_CHECK_INTERVAL: 5 * 60 * 1000,   // 5 minutes in milliseconds
-  SESSION_KEY_PREFIX: 'session_',
-  USER_STATE_PREFIX: 'user_state_',
-  ROLE_HISTORY_PREFIX: 'role_history_'
-};
 
 /**
  * Create or retrieve user session information

@@ -4,7 +4,6 @@
  * This service manages observation records, which are stored as rows in the "Observation_Data" Google Sheet.
  */
 
-const OBSERVATION_SHEET_NAME = "Observation_Data";
 
 /**
  * Retrieves the entire observations database from the Google Sheet.
@@ -14,7 +13,7 @@ const OBSERVATION_SHEET_NAME = "Observation_Data";
 function _getObservationsDb() {
   try {
     const spreadsheet = openSpreadsheet();
-    const sheet = getSheetByName(spreadsheet, OBSERVATION_SHEET_NAME);
+    const sheet = getSheetByName(spreadsheet, SHEET_NAMES.OBSERVATION_DATA);
     if (!sheet || sheet.getLastRow() < 2) {
       return []; // No headers or no data
     }
@@ -67,9 +66,9 @@ function _saveLookForSelection(observationId, componentId, lookForText, isChecke
 
   try {
     const spreadsheet = openSpreadsheet();
-    const sheet = getSheetByName(spreadsheet, OBSERVATION_SHEET_NAME);
+    const sheet = getSheetByName(spreadsheet, SHEET_NAMES.OBSERVATION_DATA);
     if (!sheet) {
-      throw new Error(`Sheet "${OBSERVATION_SHEET_NAME}" not found.`);
+      throw new Error(`Sheet "${SHEET_NAMES.OBSERVATION_DATA}" not found.`);
     }
 
     const row = _findObservationRow(sheet, observationId);
@@ -145,9 +144,9 @@ function _saveLookForSelection(observationId, componentId, lookForText, isChecke
 function _appendObservationToSheet(observation) {
   try {
     const spreadsheet = openSpreadsheet();
-    const sheet = getSheetByName(spreadsheet, OBSERVATION_SHEET_NAME);
+    const sheet = getSheetByName(spreadsheet, SHEET_NAMES.OBSERVATION_DATA);
     if (!sheet) {
-      throw new Error(`Sheet "${OBSERVATION_SHEET_NAME}" not found.`);
+      throw new Error(`Sheet "${SHEET_NAMES.OBSERVATION_DATA}" not found.`);
     }
 
     const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
@@ -313,9 +312,9 @@ function _saveProficiencySelection(observationId, componentId, proficiency) {
 
   try {
     const spreadsheet = openSpreadsheet();
-    const sheet = getSheetByName(spreadsheet, OBSERVATION_SHEET_NAME);
+    const sheet = getSheetByName(spreadsheet, SHEET_NAMES.OBSERVATION_DATA);
     if (!sheet) {
-      throw new Error(`Sheet "${OBSERVATION_SHEET_NAME}" not found.`);
+      throw new Error(`Sheet "${SHEET_NAMES.OBSERVATION_DATA}" not found.`);
     }
 
     const row = _findObservationRow(sheet, observationId);
@@ -460,9 +459,9 @@ function uploadMediaEvidence(observationId, componentId, base64Data, fileName, m
 
   try {
     const spreadsheet = openSpreadsheet();
-    const sheet = getSheetByName(spreadsheet, OBSERVATION_SHEET_NAME);
+    const sheet = getSheetByName(spreadsheet, SHEET_NAMES.OBSERVATION_DATA);
     if (!sheet) {
-      throw new Error(`Sheet "${OBSERVATION_SHEET_NAME}" not found.`);
+      throw new Error(`Sheet "${SHEET_NAMES.OBSERVATION_DATA}" not found.`);
     }
 
     const row = _findObservationRow(sheet, observationId);
@@ -551,9 +550,9 @@ function _deleteRecordAndFolder(observationId, requestingUserEmail, allowedStatu
     }
     try {
         const spreadsheet = openSpreadsheet();
-        const sheet = getSheetByName(spreadsheet, OBSERVATION_SHEET_NAME);
+        const sheet = getSheetByName(spreadsheet, SHEET_NAMES.OBSERVATION_DATA);
         if (!sheet) {
-            throw new Error(`Sheet "${OBSERVATION_SHEET_NAME}" not found.`);
+            throw new Error(`Sheet "${SHEET_NAMES.OBSERVATION_DATA}" not found.`);
         }
 
         const row = _findObservationRow(sheet, observationId);
@@ -654,9 +653,9 @@ function updateObservationStatus(observationId, newStatus, requestingUserEmail) 
 
     try {
         const spreadsheet = openSpreadsheet();
-        const sheet = getSheetByName(spreadsheet, OBSERVATION_SHEET_NAME);
+        const sheet = getSheetByName(spreadsheet, SHEET_NAMES.OBSERVATION_DATA);
         if (!sheet) {
-            throw new Error(`Sheet "${OBSERVATION_SHEET_NAME}" not found.`);
+            throw new Error(`Sheet "${SHEET_NAMES.OBSERVATION_DATA}" not found.`);
         }
 
         const row = _findObservationRow(sheet, observationId);
@@ -724,9 +723,9 @@ function updateObservationPdfUrl(observationId, pdfUrl) {
 
   try {
     const spreadsheet = openSpreadsheet();
-    const sheet = getSheetByName(spreadsheet, OBSERVATION_SHEET_NAME);
+    const sheet = getSheetByName(spreadsheet, SHEET_NAMES.OBSERVATION_DATA);
     if (!sheet) {
-      throw new Error(`Sheet "${OBSERVATION_SHEET_NAME}" not found.`);
+      throw new Error(`Sheet "${SHEET_NAMES.OBSERVATION_DATA}" not found.`);
     }
 
     const row = _findObservationRow(sheet, observationId);
@@ -772,8 +771,8 @@ function _saveObservationNotes(observationId, componentId, notesContent) {
 
   try {
     const spreadsheet = openSpreadsheet();
-    const sheet = getSheetByName(spreadsheet, OBSERVATION_SHEET_NAME);
-    if (!sheet) throw new Error(`Sheet "${OBSERVATION_SHEET_NAME}" not found.`);
+    const sheet = getSheetByName(spreadsheet, SHEET_NAMES.OBSERVATION_DATA);
+    if (!sheet) throw new Error(`Sheet "${SHEET_NAMES.OBSERVATION_DATA}" not found.`);
 
     const row = _findObservationRow(sheet, observationId);
     if (row === -1) return { success: false, error: 'Observation not found.' };
@@ -839,9 +838,9 @@ function updateObservationInSheet(observation) {
 
     try {
         const spreadsheet = openSpreadsheet();
-        const sheet = getSheetByName(spreadsheet, OBSERVATION_SHEET_NAME);
+        const sheet = getSheetByName(spreadsheet, SHEET_NAMES.OBSERVATION_DATA);
         if (!sheet) {
-            throw new Error(`Sheet "${OBSERVATION_SHEET_NAME}" not found.`);
+            throw new Error(`Sheet "${SHEET_NAMES.OBSERVATION_DATA}" not found.`);
         }
 
         const row = _findObservationRow(sheet, observation.observationId);
@@ -896,7 +895,7 @@ function updateObservationInSheet(observation) {
 function deleteAllObservations_DANGEROUS() {
     try {
         const spreadsheet = openSpreadsheet();
-        const sheet = getSheetByName(spreadsheet, OBSERVATION_SHEET_NAME);
+        const sheet = getSheetByName(spreadsheet, SHEET_NAMES.OBSERVATION_DATA);
         if (sheet && sheet.getLastRow() > 1) {
             sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).clearContent();
         }
