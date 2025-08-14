@@ -1342,6 +1342,16 @@
             const rubricHtml = generateInteractiveRubricHtml(rubricData, observation);
             document.getElementById('rubricContainer').innerHTML = rubricHtml;
             
+            // Initialize notes data from observation if available
+            if (observation && observation.observationData) {
+                Object.keys(observation.observationData).forEach(componentId => {
+                    const componentData = observation.observationData[componentId];
+                    if (componentData && componentData.notes) {
+                        window.globalObservationNotes[componentId] = componentData.notes;
+                    }
+                });
+            }
+            
             // Show global tools bar for evaluators after DOM injection
             if (rubricData.userContext.isEvaluator) {
                 updateComponentVisibility();
@@ -1397,7 +1407,7 @@
                 domain.components.forEach((comp, compIdx) => {
                     const componentId = comp.componentId;
                     const isAssigned = comp.isAssigned || false;
-                    const selectedProficiency = observation?.observationData?.[componentId];
+                    const selectedProficiency = observation?.observationData?.[componentId]?.proficiency;
                     const evidence = observation?.evidenceLinks?.[componentId] || [];
 
                     html += `<div class="component-section ${isAssigned ? 'component-assigned' : 'component-not-assigned'}" data-component-id="${componentId}" data-is-assigned="${isAssigned}"><div class="performance-levels-content">`;
@@ -1422,8 +1432,14 @@
                             const practiceId = `practice-${domainIdx}-${compIdx}-${practiceIdx}`;
                             const sanitizedPractice = escapeHtml(practice);
                             const onchangeHandler = isEvaluator ? `onchange="handleLookForChange(this, '${componentId}')"` : '';
+                            
+                            // Check if this practice is already selected in existing observation data
+                            const existingLookfors = observation?.observationData?.[componentId]?.lookfors || [];
+                            const isChecked = existingLookfors.includes(practice);
+                            const checkedAttribute = isChecked ? 'checked' : '';
+                            
                             html += `<div class="look-for-item">`;
-                            html += `<input type="checkbox" id="${practiceId}" ${onchangeHandler}><label for="${practiceId}">${sanitizedPractice}</label>`;
+                            html += `<input type="checkbox" id="${practiceId}" ${checkedAttribute} ${onchangeHandler}><label for="${practiceId}">${sanitizedPractice}</label>`;
                             html += `</div>`;
                         });
                         html += `</div></div></div>`;
