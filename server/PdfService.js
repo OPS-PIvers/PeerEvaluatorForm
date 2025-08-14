@@ -189,25 +189,19 @@ const PdfService = (function() {
               // Use the already created styled PDF blob
               const pdfFile = obsFolder.createFile(pdfBlob).setName(docName + ".pdf");
 
-              // Share PDF with specific users only for privacy protection
-              // Add the peer evaluator (observer) as editor so they can regenerate if needed
-              pdfFile.addEditor(observation.observerEmail);
-
-              // Add the observed staff member as viewer so they can see their evaluation
-              pdfFile.addViewer(observation.observedEmail);
+              // PDF sharing will be handled at the folder level during finalization
+              // Individual file permissions are not set here
 
               // Get file ID and construct direct view URL for better compatibility
               const fileId = pdfFile.getId();
               const originalUrl = pdfFile.getUrl();
               const directViewUrl = `https://drive.google.com/file/d/${fileId}/view`;
 
-              debugLog('Successfully created PDF file with user-specific sharing', {
+              debugLog('Successfully created PDF file (sharing handled at folder level)', {
                   observationId,
                   fileId: fileId,
                   originalUrl: originalUrl,
-                  directViewUrl: directViewUrl,
-                  sharedWithObserver: observation.observerEmail,
-                  sharedWithObserved: observation.observedEmail
+                  directViewUrl: directViewUrl
               });
 
               return { success: true, pdfUrl: directViewUrl };

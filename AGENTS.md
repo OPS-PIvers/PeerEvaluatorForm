@@ -8,7 +8,7 @@ This is a Google Apps Script (GAS) web application that serves a dynamic, multi-
 
 The application's backend is powered by Google Sheets, which acts as a database for user roles, rubric content, and configuration settings. The frontend is rendered using HTML Service, with client-side interactions handled by JavaScript that communicates with the GAS backend.
 
-A key feature is the **Peer Evaluation** system, which allows designated "Peer Evaluators" to conduct observations of other staff members, record proficiency levels against rubric components, upload evidence to Google Drive, and generate PDF summary reports.
+A key feature is the **Peer Evaluation** system, which allows designated "Peer Evaluators" to conduct observations of other staff members, record proficiency levels against rubric components, upload evidence to private Google Drive folders, and generate PDF summary reports. All observation materials remain private until finalization, when the entire observation folder is shared with the observed staff member.
 
 ## 2. Core Architecture & Key Features
 
@@ -32,7 +32,7 @@ The project follows a modular, service-oriented architecture.
     -   **Dynamic Rubric Rendering:** The rubric is generated based on the user's role and assigned subdomains for their specific evaluation year.
     -   **Advanced Caching:** A sophisticated, versioned caching system (`CacheManager.js`) using `CacheService` to minimize Google Sheets API calls and improve performance.
     -   **Automatic Change Detection:** An `onEdit` trigger automatically clears relevant caches when user roles or rubric content are modified in the Google Sheet, ensuring data consistency.
-    -   **PDF Generation:** Converts finalized observations into styled PDF documents using Google's DocumentApp API and saves them to Google Drive.
+    -   **PDF Generation:** Converts finalized observations into styled PDF documents using Google's DocumentApp API and saves them to private Google Drive folders, with sharing handled at the folder level upon finalization.
 
 ## 3. File Tree and Descriptions
 
@@ -114,7 +114,7 @@ The project follows a modular, service-oriented architecture.
 ## 5. Data Structures
 
 -   **User Context Object:** The object returned by `createUserContext()` is central to the application. It contains everything the server and client need to know about the current user's session.
--   **Observation Object:** The structure used for an observation record, which is stored as a row in the `Observation_Data` sheet. It includes observer/observed info, status, timestamps, and the actual observation data stored within the unified `observationData` structure (containing proficiency levels, notes, and look-for selections) and `evidenceLinks`.
+-   **Observation Object:** The structure used for an observation record, which is stored as a row in the `Observation_Data` sheet. It includes observer/observed info, status, timestamps, and the actual observation data stored within the unified `observationData` structure (containing proficiency levels, notes, and look-for selections) and `evidenceLinks`. Associated files remain private in Google Drive folders until observation finalization triggers folder-level sharing.
 -   **Rubric Data Object:** The object returned by `getAllDomainsData()` and passed to the HTML templates. It contains the title, subtitle, and an array of `domains`, which in turn contain an array of `components`.
 
 ## 6. Deployment & Environment Setup
@@ -122,7 +122,7 @@ The project follows a modular, service-oriented architecture.
 This section outlines the technical configuration of the Google Apps Script project, based on the `appsscript.json` manifest file.
 
 -   **Deployment Model:** The project is deployed as a Google Apps Script web app.
--   **Execution (`executeAs`):** The web app is configured to run as **`USER_ACCESSING`**. This means that when the script accesses Google services (such as Sheets or Drive), it does so using the permissions of the user currently accessing the web app. This is critical for security, as it ensures that API calls respect the permissions of the currently logged-in user.
+-   **Execution (`executeAs`):** The web app is configured to run as **`USER_ACCESSING`**. This means that when the script accesses Google services (such as Sheets or Drive), it does so using the permissions of the user currently accessing the web app. This is critical for security, as it ensures that API calls respect the permissions of the currently logged-in user. The folder-level sharing model maintains this security by only granting specific users access to observation materials when appropriate.
 -   **Access (`access`):** The web app is configured for **`DOMAIN`** access, meaning only users within the same Google Workspace domain can access it.
 -   **Runtime:** The project uses the modern **`V8`** runtime.
 -   **Timezone:** The script's timezone is set to **`America/Chicago`**.

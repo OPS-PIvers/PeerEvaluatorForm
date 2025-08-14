@@ -119,10 +119,11 @@ To add a new role:
 ### Observation System
 
 Observations are managed through server/ObservationService.js:
-- Stored in PropertiesService as JSON
-- Associated files stored in Google Drive folder structure
+- Stored in Observation_Data sheet as database records
+- Associated files stored in Google Drive folder structure (private until finalized)
 - Support for media evidence upload
 - PDF export functionality using DocumentApp API
+- Folder-level sharing on finalization - all materials shared simultaneously with observed staff member
 
 ## Key Constants and Configuration
 
@@ -186,13 +187,17 @@ removeAutoTrigger();           // Remove
 - Observations create folder structure: `Root Folder > User Folder > Observation Folder`
 - PDF exports are generated using Google's DocumentApp API (not HTML templates)
 - Media evidence uploads are handled through Drive API
+- All observation materials remain private until finalization
+- Upon finalization, the entire observation subfolder is shared as view-only with the observed staff member
+- Peer evaluators maintain editor access to the observation folder for regeneration capabilities
 
 ### Security Considerations
 
 - Web app executes as "User accessing" for proper permissions
 - Email validation prevents unauthorized access
 - Role-based access controls throughout
-- Evidence files have view-only sharing permissions
+- Observation materials are private during draft phase, shared only upon finalization
+- Folder-level sharing ensures consistent access control for all observation materials
 
 ## Error Handling
 

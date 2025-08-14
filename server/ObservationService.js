@@ -374,6 +374,35 @@ function _getObservationFolder(observation) {
 }
 
 /**
+ * Shares the entire observation folder with the observed staff member as view-only
+ * and ensures the peer evaluator has editor access.
+ * @param {Object} observation The finalized observation object.
+ * @private
+ */
+function _shareObservationFolder(observation) {
+  try {
+    const obsFolder = _getObservationFolder(observation);
+    
+    // Add the observed staff member as viewer so they can access all materials
+    obsFolder.addViewer(observation.observedEmail);
+    
+    // Ensure the peer evaluator has editor access for regeneration capabilities
+    obsFolder.addEditor(observation.observerEmail);
+    
+    debugLog(`Observation folder shared with observed staff member`, { 
+      observationId: observation.observationId,
+      folderId: obsFolder.getId(),
+      sharedWith: observation.observedEmail,
+      editorAccess: observation.observerEmail
+    });
+
+  } catch (error) {
+    console.error(`Failed to share observation folder for ${observation.observationId}:`, error);
+    // Do not block the finalization process if folder sharing fails, just log the error
+  }
+}
+
+/**
  * Sends a notification email to the observed staff member when an observation is finalized.
  * @param {Object} observation The finalized observation object.
  * @private
@@ -462,7 +491,7 @@ function uploadMediaEvidence(observationId, componentId, base64Data, fileName, m
     // Create the file in the observation folder
     const file = obsFolder.createFile(blob);
     const fileUrl = file.getUrl();
-    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); // Make it viewable
+    // File remains private until observation is finalized
 
     // Get current evidence links from the sheet
     const evidenceLinksCell = sheet.getRange(row, evidenceLinksCol);
@@ -658,6 +687,10 @@ function updateObservationStatus(observationId, newStatus, requestingUserEmail) 
             // Send email notification - get the full observation data for the email
             const updatedObservation = getObservationById(observationId);
             if (updatedObservation) {
+                // Share the observation folder with the observed staff member
+                _shareObservationFolder(updatedObservation);
+                
+                // Send email notification
                 _sendFinalizedEmail(updatedObservation);
             }
         }

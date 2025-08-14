@@ -46,7 +46,7 @@ This is a Google Apps Script (GAS) web application called "Peer Evaluator Form" 
 - **server/SessionManager.js**: Handles user sessions, role change detection, and state persistence
 - **server/SheetService.js**: Data access layer for Google Sheets operations
 - **server/UserService.js**: User authentication, validation, and context creation
-- **server/ObservationService.js**: Manages peer evaluation observations using PropertiesService as a database
+- **server/ObservationService.js**: Manages peer evaluation observations using Observation_Data sheet as database, with folder-level sharing on finalization
 - **server/CacheManager.js**: Advanced caching system with versioning and dependency management
 - **server/ValidationService.js**: Data validation and error handling
 - **server/Utils.js**: Utility functions and constants
@@ -65,7 +65,7 @@ This is a Google Apps Script (GAS) web application called "Peer Evaluator Form" 
 - **Staff Sheet**: Contains user information (Name, Email, Role, Year)
 - **Settings Sheet**: Contains role-year mappings for subdomain assignments
 - **Role-Specific Sheets**: Individual sheets for each role containing rubric data
-- **PropertiesService**: Used as database for observation records
+- **Observation_Data Sheet**: Used as database for observation records with private file storage until finalization
 
 ## Code Development Guidelines
 
@@ -324,6 +324,8 @@ logPerformanceMetrics(operation, time, metadata);
 - Web app executes as "User accessing" for proper permissions
 - Email validation prevents unauthorized access
 - Role-based access controls throughout
-- Evidence files have view-only sharing permissions
+- Observation materials remain private during draft phase, shared only upon finalization
+- Folder-level sharing ensures consistent access control for all observation materials
+- Peer evaluators maintain editor access for regeneration capabilities
 - Never commit secrets or keys to repository
 - Always use proper error handling and validation
