@@ -258,6 +258,48 @@
             background: #f8f9fa;
             border-bottom: 1px solid #dee2e6;
         }
+
+        .global-tools-bar {
+            background: var(--color-white);
+            border-bottom: 2px solid var(--color-gray-border-medium);
+            padding: 16px 24px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .global-tools-container {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .global-tool-btn {
+            background: var(--color-blue-base);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .global-tool-btn:hover {
+            background: var(--color-blue-dark);
+            transform: translateY(-1px);
+        }
+
+        .global-tool-btn.recording {
+            background: var(--color-red-base);
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
         
         /* PDF Button States */
         .btn-pdf-failed { 
@@ -1244,6 +1286,31 @@
                 </div>`;
             }
 
+            if (isEvaluator) {
+                // Show global tools bar
+                setTimeout(() => {
+                    const globalToolsBar = document.getElementById('globalToolsBar');
+                    if (globalToolsBar) {
+                        globalToolsBar.style.display = 'block';
+                    }
+                }, 100);
+            }
+
+            html += `
+            <div class="global-tools-bar" id="globalToolsBar" style="display: none;">
+                <div class="global-tools-container">
+                    <button class="global-tool-btn" id="recordAudioBtn" onclick="toggleAudioRecording()">
+                        🎤 Record Audio
+                    </button>
+                    <button class="global-tool-btn" id="recordVideoBtn" onclick="toggleVideoRecording()">
+                        📹 Record Video
+                    </button>
+                    <button class="global-tool-btn" id="scriptEditorBtn" onclick="openScriptEditor()">
+                        📝 Script Editor
+                    </button>
+                </div>
+            </div>`;
+
             // Old navigation buttons removed - now handled by sticky nav
 
             data.domains.forEach((domain, domainIdx) => {
@@ -1729,6 +1796,115 @@
         document.addEventListener('DOMContentLoaded', () => {
           showView('quickActionsView');
         });
+
+        let audioRecorder = null;
+        let audioStream = null;
+        let isRecordingAudio = false;
+
+        async function toggleAudioRecording() {
+            const btn = document.getElementById('recordAudioBtn');
+
+            if (!isRecordingAudio) {
+                try {
+                    audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    audioRecorder = new MediaRecorder(audioStream);
+
+                    const audioChunks = [];
+                    audioRecorder.ondataavailable = event => audioChunks.push(event.data);
+
+                    audioRecorder.onstop = () => {
+                        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                        uploadRecording(audioBlob, 'audio');
+                    };
+
+                    audioRecorder.start();
+                    isRecordingAudio = true;
+                    btn.textContent = '🛑 Stop Audio';
+                    btn.classList.add('recording');
+
+                } catch (error) {
+                    showToast('Error accessing microphone: ' + error.message, false);
+                }
+            } else {
+                audioRecorder.stop();
+                audioStream.getTracks().forEach(track => track.stop());
+                isRecordingAudio = false;
+                btn.textContent = '🎤 Record Audio';
+                btn.classList.remove('recording');
+            }
+        }
+
+        let videoRecorder = null;
+        let videoStream = null;
+        let isRecordingVideo = false;
+
+        async function toggleVideoRecording() {
+            const btn = document.getElementById('recordVideoBtn');
+
+            if (!isRecordingVideo) {
+                try {
+                    videoStream = await navigator.mediaDevices.getUserMedia({
+                        video: true,
+                        audio: true
+                    });
+                    videoRecorder = new MediaRecorder(videoStream);
+
+                    const videoChunks = [];
+                    videoRecorder.ondataavailable = event => videoChunks.push(event.data);
+
+                    videoRecorder.onstop = () => {
+                        const videoBlob = new Blob(videoChunks, { type: 'video/webm' });
+                        uploadRecording(videoBlob, 'video');
+                    };
+
+                    videoRecorder.start();
+                    isRecordingVideo = true;
+                    btn.textContent = '🛑 Stop Video';
+                    btn.classList.add('recording');
+
+                } catch (error) {
+                    showToast('Error accessing camera: ' + error.message, false);
+                }
+            } else {
+                videoRecorder.stop();
+                videoStream.getTracks().forEach(track => track.stop());
+                isRecordingVideo = false;
+                btn.textContent = '📹 Record Video';
+                btn.classList.remove('recording');
+            }
+        }
+
+        function uploadRecording(blob, type) {
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            const filename = `${type}-recording-${timestamp}.webm`;
+
+            // Convert blob to base64
+            const reader = new FileReader();
+            reader.onload = function() {
+                const base64Data = reader.result.split(',')[1];
+
+                google.script.run
+                    .withSuccessHandler(function(result) {
+                        if (result.success) {
+                            showToast(`${type} recording saved successfully!`, true);
+                            // Add to global recordings list
+                            addGlobalRecording(result.fileUrl, filename, type);
+                        } else {
+                            showToast(`Error saving ${type} recording: ` + result.error, false);
+                        }
+                    })
+                    .withFailureHandler(function(error) {
+                        showToast(`Failed to save ${type} recording: ` + error.message, false);
+                    })
+                    .uploadGlobalRecording(currentObservationId, base64Data, filename, type);
+            };
+            reader.readAsDataURL(blob);
+        }
+
+        function addGlobalRecording(fileUrl, filename, type) {
+            // Placeholder for now
+            console.log(`Recording saved: ${type} at ${fileUrl} with name ${filename}`);
+        }
     </script>
 
     <!-- Loading Overlay -->
