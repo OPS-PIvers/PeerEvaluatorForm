@@ -1525,6 +1525,16 @@
             } else if (isExpanded) {
                 console.log('Quill instance already exists for component:', componentId);
             }
+
+            // Store state in sessionStorage for persistence
+            try {
+                const storageKey = 'evidenceState_' + (window.pageLoadInfo?.cacheVersion || 'default');
+                const allStates = JSON.parse(sessionStorage.getItem(storageKey) || '{}');
+                allStates[componentId] = isExpanded;
+                sessionStorage.setItem(storageKey, JSON.stringify(allStates));
+            } catch (e) {
+                console.warn('Could not save evidence section state:', e);
+            }
         }
 
         // Consolidated Quill initialization function - make globally available
@@ -1589,17 +1599,6 @@
             } catch (error) {
                 console.error('Error initializing Quill editor:', error);
                 return false;
-            }
-        }
-
-            // Store state in sessionStorage for persistence
-            try {
-                const storageKey = 'evidenceState_' + (window.pageLoadInfo?.cacheVersion || 'default');
-                const allStates = JSON.parse(sessionStorage.getItem(storageKey) || '{}');
-                allStates[componentId] = isExpanded;
-                sessionStorage.setItem(storageKey, JSON.stringify(allStates));
-            } catch (e) {
-                console.warn('Could not save evidence section state:', e);
             }
         }
         
@@ -1850,7 +1849,8 @@
                     state.recorder.ondataavailable = event => chunks.push(event.data);
 
                     state.recorder.onstop = () => {
-                        const blob = new Blob(chunks, { type: `${type}/webm` });
+                        const mimeType = type === 'audio' ? 'audio/webm' : 'video/webm';
+                        const blob = new Blob(chunks, { type: mimeType });
                         uploadRecording(blob, type);
                     };
 
