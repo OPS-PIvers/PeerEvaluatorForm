@@ -97,6 +97,38 @@ const DEFAULT_ROLE_CONFIG = {
 };
 
 /**
+ * Legacy DOMAIN_CONFIGS for backward compatibility
+ * Kept in Code.js to avoid cross-file dependency issues
+ * @deprecated Use ConfigurationService.loadRoleConfiguration() instead
+ */
+const DOMAIN_CONFIGS = {
+  1: {
+    name: 'Domain 1: Planning and Preparation',
+    startRow: 3,   // 1-indexed - Domain 1 starts at row 3
+    endRow: 22,    // 1-indexed - estimated end row (adjust as needed)
+    subdomains: ['1a:', '1b:', '1c:', '1d:', '1e:', '1f:']
+  },
+  2: {
+    name: 'Domain 2: The Classroom Environment',
+    startRow: 23,  // 1-indexed - Domain 2 starts at row 23
+    endRow: 39,    // 1-indexed - estimated end row (adjust as needed)
+    subdomains: ['2a:', '2b:', '2c:', '2d:', '2e:']
+  },
+  3: {
+    name: 'Domain 3: Instruction',
+    startRow: 40,  // 1-indexed - Domain 3 starts at row 40
+    endRow: 56,    // 1-indexed - estimated end row (adjust as needed)
+    subdomains: ['3a:', '3b:', '3c:', '3d:', '3e:']
+  },
+  4: {
+    name: 'Domain 4: Professional Responsibilities',
+    startRow: 57,  // 1-indexed - Domain 4 starts at row 57
+    endRow: 76,    // 1-indexed - estimated end row (adjust as needed)
+    subdomains: ['4a:', '4b:', '4c:', '4d:', '4e:', '4f:']
+  }
+};
+
+/**
  * Validation patterns for data integrity
  */
 const VALIDATION_PATTERNS = {
@@ -132,6 +164,21 @@ const CACHE_SETTINGS = {
   ROLE_CONFIG_TTL: 600,                      // 10 minutes for role configurations
   SHEET_DATA_TTL: FOUR_HOURS_IN_SECONDS,     // 4 hours for sheet data - improves performance by reducing frequent spreadsheet reads
   DEFAULT_TTL: 300                           // Default cache time
+};
+
+/**
+ * Master cache version - increment this when making major cache changes
+ */
+const CACHE_VERSION = '1.0.0';
+
+/**
+ * Cache dependency map - defines which caches depend on others
+ */
+const CACHE_DEPENDENCIES = {
+  'staff_data': ['user_*', 'role_mappings'], // When staff_data changes, clear user and role caches
+  'settings_data': ['role_sheet_*', 'domain_mappings'],
+  'user_*': ['role_sheet_*'], // When any user data changes, clear role sheets
+  'role_sheet_*': [] // Role sheets have no dependencies
 };
 
 /**
@@ -288,6 +335,17 @@ const TRIGGER_MONITORING = {
 };
 
 /**
+ * Session state constants
+ */
+const SESSION_CONSTANTS = {
+  SESSION_DURATION: 24 * 60 * 60 * 1000, // 24 hours in milliseconds
+  STATE_CHECK_INTERVAL: 5 * 60 * 1000,   // 5 minutes in milliseconds
+  SESSION_KEY_PREFIX: 'session_',
+  USER_STATE_PREFIX: 'user_state_',
+  ROLE_HISTORY_PREFIX: 'role_history_'
+};
+
+/**
  * Validation error types for consistent error reporting
  */
 const VALIDATION_ERROR_TYPES = {
@@ -317,6 +375,16 @@ const VALIDATION_ERROR_TYPES = {
 
   // Trigger and Automation
   TRIGGER_ERROR: 'trigger_error'          // Error within an automated trigger
+};
+
+/**
+ * Validation severity levels
+ */
+const VALIDATION_SEVERITY = {
+  CRITICAL: 'critical',    // System cannot function
+  ERROR: 'error',          // Feature broken but system works
+  WARNING: 'warning',      // Potential issue
+  INFO: 'info'            // Informational only
 };
 
 /**

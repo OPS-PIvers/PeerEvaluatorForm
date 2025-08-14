@@ -6,37 +6,6 @@
  * while adding support for multiple roles and automatic cache management.
  */
 
-/**
- * Legacy DOMAIN_CONFIGS for backward compatibility
- * Kept in Code.js to avoid cross-file dependency issues
- * @deprecated Use ConfigurationService.loadRoleConfiguration() instead
- */
-const DOMAIN_CONFIGS = {
-  1: {
-    name: 'Domain 1: Planning and Preparation',
-    startRow: 3,   // 1-indexed - Domain 1 starts at row 3
-    endRow: 22,    // 1-indexed - estimated end row (adjust as needed)
-    subdomains: ['1a:', '1b:', '1c:', '1d:', '1e:', '1f:']
-  },
-  2: {
-    name: 'Domain 2: The Classroom Environment',
-    startRow: 23,  // 1-indexed - Domain 2 starts at row 23
-    endRow: 39,    // 1-indexed - estimated end row (adjust as needed)
-    subdomains: ['2a:', '2b:', '2c:', '2d:', '2e:']
-  },
-  3: {
-    name: 'Domain 3: Instruction',
-    startRow: 40,  // 1-indexed - Domain 3 starts at row 40
-    endRow: 56,    // 1-indexed - estimated end row (adjust as needed)
-    subdomains: ['3a:', '3b:', '3c:', '3d:', '3e:']
-  },
-  4: {
-    name: 'Domain 4: Professional Responsibilities',
-    startRow: 57,  // 1-indexed - Domain 4 starts at row 57
-    endRow: 76,    // 1-indexed - estimated end row (adjust as needed)
-    subdomains: ['4a:', '4b:', '4c:', '4d:', '4e:', '4f:']
-  }
-};
 
 /**
  * =================================================================
