@@ -688,6 +688,52 @@ function updateObservationMetadata(observationId, metadata) {
     }
 }
 
+function uploadGlobalRecording(observationId, base64Data, filename, recordingType) {
+    const lock = LockService.getScriptLock();
+    lock.waitLock(30000); // Wait up to 30 seconds
+
+    try {
+        const observation = getObservationById(observationId);
+        if (!observation) {
+            return { success: false, error: 'Observation not found.' };
+        }
+
+        // Convert base64 to blob with dynamic MIME type
+        const binaryData = Utilities.base64Decode(base64Data);
+        const mimeType = recordingType === 'video' ? 'video/webm' : 'audio/webm';
+        const blob = Utilities.newBlob(binaryData, mimeType, filename);
+
+        // Create/get observation folder
+        const folder = getOrCreateObservationFolder(observationId);
+
+        // Save file with specific permissions
+        const file = folder.createFile(blob);
+        file.addEditor(observation.observerEmail);
+        file.addViewer(observation.observedEmail);
+
+        // Update observation data
+        if (!observation.globalRecordings) {
+            observation.globalRecordings = { audio: [], video: [] };
+        }
+
+        observation.globalRecordings[recordingType].push({
+            url: file.getUrl(),
+            filename: filename,
+            timestamp: new Date().toISOString()
+        });
+
+        updateObservationInSheet(observation);
+
+        return { success: true, fileUrl: file.getUrl() };
+
+    } catch (error) {
+        console.error('Error uploading global recording:', error);
+        return { success: false, error: error.message };
+    } finally {
+        lock.releaseLock();
+    }
+}
+
 
 /**
  * Generates and saves a PDF for an observation to Google Drive.

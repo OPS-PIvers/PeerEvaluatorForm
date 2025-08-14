@@ -258,6 +258,48 @@
             background: #f8f9fa;
             border-bottom: 1px solid #dee2e6;
         }
+
+        .global-tools-bar {
+            background: var(--color-white);
+            border-bottom: 2px solid var(--color-gray-border-medium);
+            padding: 16px 24px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .global-tools-container {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .global-tool-btn {
+            background: var(--color-blue-base);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .global-tool-btn:hover {
+            background: var(--color-blue-dark);
+            transform: translateY(-1px);
+        }
+
+        .global-tool-btn.recording {
+            background: var(--color-red-base);
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
         
         /* PDF Button States */
         .btn-pdf-failed { 
@@ -1221,8 +1263,15 @@
             const rubricHtml = generateInteractiveRubricHtml(rubricData, observation);
             document.getElementById('rubricContainer').innerHTML = rubricHtml;
             
+            // Show global tools bar for evaluators after DOM injection
             if (rubricData.userContext.isEvaluator) {
                 updateComponentVisibility();
+                
+                // Show global tools bar after HTML is in the DOM
+                const globalToolsBar = document.getElementById('globalToolsBar');
+                if (globalToolsBar) {
+                    globalToolsBar.style.display = 'block';
+                }
             }
             restoreLookForsState();
             showView('rubricContainer');
@@ -1243,6 +1292,23 @@
                     </div>
                 </div>`;
             }
+
+            // Global tools bar visibility will be handled after DOM injection
+
+            html += `
+            <div class="global-tools-bar" id="globalToolsBar" style="display: none;">
+                <div class="global-tools-container">
+                    <button class="global-tool-btn" id="recordAudioBtn" onclick="toggleAudioRecording()">
+                        🎤 Record Audio
+                    </button>
+                    <button class="global-tool-btn" id="recordVideoBtn" onclick="toggleVideoRecording()">
+                        📹 Record Video
+                    </button>
+                    <button class="global-tool-btn" id="scriptEditorBtn" onclick="openScriptEditor()">
+                        📝 Script Editor
+                    </button>
+                </div>
+            </div>`;
 
             // Old navigation buttons removed - now handled by sticky nav
 
@@ -1729,6 +1795,106 @@
         document.addEventListener('DOMContentLoaded', () => {
           showView('quickActionsView');
         });
+
+        // Consolidated recording state management
+        const recordingState = {
+            audio: { recorder: null, stream: null, isRecording: false },
+            video: { recorder: null, stream: null, isRecording: false }
+        };
+
+        // Recording configuration
+        const recordingConfig = {
+            audio: {
+                constraints: { audio: true },
+                buttonId: 'recordAudioBtn',
+                startText: '🛑 Stop Audio',
+                stopText: '🎤 Record Audio',
+                errorMessage: 'Error accessing microphone: '
+            },
+            video: {
+                constraints: { video: true, audio: true },
+                buttonId: 'recordVideoBtn', 
+                startText: '🛑 Stop Video',
+                stopText: '📹 Record Video',
+                errorMessage: 'Error accessing camera: '
+            }
+        };
+
+        async function toggleRecording(type) {
+            const state = recordingState[type];
+            const config = recordingConfig[type];
+            const btn = document.getElementById(config.buttonId);
+
+            if (!state.isRecording) {
+                try {
+                    state.stream = await navigator.mediaDevices.getUserMedia(config.constraints);
+                    state.recorder = new MediaRecorder(state.stream);
+
+                    const chunks = [];
+                    state.recorder.ondataavailable = event => chunks.push(event.data);
+
+                    state.recorder.onstop = () => {
+                        const blob = new Blob(chunks, { type: `${type}/webm` });
+                        uploadRecording(blob, type);
+                    };
+
+                    state.recorder.start();
+                    state.isRecording = true;
+                    btn.textContent = config.startText;
+                    btn.classList.add('recording');
+
+                } catch (error) {
+                    showToast(config.errorMessage + error.message, false);
+                }
+            } else {
+                state.recorder.stop();
+                state.stream.getTracks().forEach(track => track.stop());
+                state.isRecording = false;
+                btn.textContent = config.stopText;
+                btn.classList.remove('recording');
+            }
+        }
+
+        // Wrapper functions for backwards compatibility
+        async function toggleAudioRecording() {
+            await toggleRecording('audio');
+        }
+
+        async function toggleVideoRecording() {
+            await toggleRecording('video');
+        }
+
+        function uploadRecording(blob, type) {
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            const filename = `${type}-recording-${timestamp}.webm`;
+
+            // Convert blob to base64
+            const reader = new FileReader();
+            reader.onload = function() {
+                const base64Data = reader.result.split(',')[1];
+
+                google.script.run
+                    .withSuccessHandler(function(result) {
+                        if (result.success) {
+                            showToast(`${type} recording saved successfully!`, true);
+                            // Add to global recordings list
+                            addGlobalRecording(result.fileUrl, filename, type);
+                        } else {
+                            showToast(`Error saving ${type} recording: ` + result.error, false);
+                        }
+                    })
+                    .withFailureHandler(function(error) {
+                        showToast(`Failed to save ${type} recording: ` + error.message, false);
+                    })
+                    .uploadGlobalRecording(currentObservationId, base64Data, filename, type);
+            };
+            reader.readAsDataURL(blob);
+        }
+
+        function addGlobalRecording(fileUrl, filename, type) {
+            // Placeholder for now
+            console.log(`Recording saved: ${type} at ${fileUrl} with name ${filename}`);
+        }
     </script>
 
     <!-- Loading Overlay -->
