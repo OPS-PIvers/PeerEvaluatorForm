@@ -738,7 +738,7 @@ function _saveObservationNotes(observationId, componentId, notesContent) {
   return _updateObservationJsonData(observationId, 'observationData', (currentData) => {
     // Ensure the component object exists, preserving other properties
     if (!currentData[componentId]) {
-      currentData[componentId] = { lookfors: [], proficiency: '' };
+      currentData[componentId] = { lookfors: [], proficiency: '', notes: '' };
     }
     
     // Sanitize and update the notes
