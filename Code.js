@@ -1312,12 +1312,12 @@ function _addObservationComponentRowsWithMergeTracking(table, component, domainN
     }
     
     // Remove the default empty paragraph and add content properly
-    const defaultParagraph = lookforsCell.getChild(0).asParagraph();
+    const lookforsDefaultParagraph = lookforsCell.getChild(0).asParagraph();
     
     if (checkedLookFors.length > 0) {
         // Use the default paragraph for the first item, then add additional items
-        defaultParagraph.setText(`• ${checkedLookFors[0]}`);
-        defaultParagraph.setSpacingBefore(0).setSpacingAfter(0).setLineSpacing(1);
+        lookforsDefaultParagraph.setText(`• ${checkedLookFors[0]}`);
+        lookforsDefaultParagraph.setSpacingBefore(0).setSpacingAfter(0).setLineSpacing(1);
         
         // Add remaining items as new list items with minimal spacing
         checkedLookFors.slice(1).forEach(lookfor => {
@@ -1326,9 +1326,9 @@ function _addObservationComponentRowsWithMergeTracking(table, component, domainN
             listItem.setSpacingBefore(0).setSpacingAfter(0).setLineSpacing(1);
         });
     } else {
-        defaultParagraph.setText('No best practices selected.');
-        defaultParagraph.setItalic(true);
-        defaultParagraph.setSpacingBefore(0).setSpacingAfter(0).setLineSpacing(1);
+        lookforsDefaultParagraph.setText('No best practices selected.');
+        lookforsDefaultParagraph.setItalic(true);
+        lookforsDefaultParagraph.setSpacingBefore(0).setSpacingAfter(0).setLineSpacing(1);
     }
 
     // Row 7: Notes & Evidence Header (to be merged)
@@ -1374,15 +1374,15 @@ function _addObservationComponentRowsWithMergeTracking(table, component, domainN
     }
 
     // Use the default paragraph for the first content, then append additional content
-    const defaultParagraph = notesAndEvidenceCell.getChild(0).asParagraph();
-    defaultParagraph.setSpacingBefore(0).setSpacingAfter(0).setLineSpacing(1);
+    const notesDefaultParagraph = notesAndEvidenceCell.getChild(0).asParagraph();
+    notesDefaultParagraph.setSpacingBefore(0).setSpacingAfter(0).setLineSpacing(1);
     
     let hasContent = false;
     
     if (notes) {
         // Use the default paragraph for notes header, then add content
-        defaultParagraph.setText('Observation Notes:');
-        defaultParagraph.setBold(true);
+        notesDefaultParagraph.setText('Observation Notes:');
+        notesDefaultParagraph.setBold(true);
         _addNotesSectionContent(notesAndEvidenceCell, notes);
         hasContent = true;
     }
@@ -1394,16 +1394,16 @@ function _addObservationComponentRowsWithMergeTracking(table, component, domainN
             spacerPara.setSpacingBefore(0).setSpacingAfter(0).setSpacingBefore(10);
         } else {
             // Use default paragraph for evidence header
-            defaultParagraph.setText('Evidence:');
-            defaultParagraph.setBold(true);
+            notesDefaultParagraph.setText('Evidence:');
+            notesDefaultParagraph.setBold(true);
         }
         _addEvidenceSection(notesAndEvidenceCell, evidence);
         hasContent = true;
     }
 
     if (!hasContent) {
-        defaultParagraph.setText('No notes or evidence provided.');
-        defaultParagraph.setItalic(true);
+        notesDefaultParagraph.setText('No notes or evidence provided.');
+        notesDefaultParagraph.setItalic(true);
     }
 }
 
