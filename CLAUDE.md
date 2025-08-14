@@ -24,11 +24,13 @@ This is a Google Apps Script (GAS) web application called "Peer Evaluator Form" 
 ├── server/                          # Server-side JavaScript modules
 │   ├── CLAUDE.md                    # Server-specific Claude instructions
 │   ├── CacheManager.js              # Advanced caching system with versioning
-│   ├── Code.js                      # Main orchestrator and entry point
+│   ├── Code.js                      # Main orchestrator and entry point (streamlined)
 │   ├── Constants.js                 # Global constants and configuration
 │   ├── ObservationService.js        # Manages peer evaluation observations
+│   ├── PdfService.js                # PDF generation, styling, and Drive integration
 │   ├── SessionManager.js            # User sessions and state persistence
 │   ├── SheetService.js              # Data access layer for Google Sheets
+│   ├── UiService.js                 # Server-side UI component generation and pages
 │   ├── UserService.js               # User authentication and context creation
 │   ├── Utils.js                     # Utility functions and constants
 │   └── ValidationService.js         # Data validation and error handling
@@ -42,11 +44,13 @@ This is a Google Apps Script (GAS) web application called "Peer Evaluator Form" 
 
 ### Main Components
 
-- **server/Code.js**: Main orchestrator and entry point containing the `doGet()` function and server-side functions for AJAX
+- **server/Code.js**: Main orchestrator and entry point containing the `doGet()` function and server-side functions for AJAX (streamlined after refactoring)
 - **server/SessionManager.js**: Handles user sessions, role change detection, and state persistence
 - **server/SheetService.js**: Data access layer for Google Sheets operations
 - **server/UserService.js**: User authentication, validation, and context creation
 - **server/ObservationService.js**: Manages peer evaluation observations using Observation_Data sheet as database
+- **server/PdfService.js**: PDF generation, styling, and Google Drive integration for observation documents
+- **server/UiService.js**: Server-side UI component generation including error pages and filter interfaces
 - **server/CacheManager.js**: Advanced caching system with versioning and dependency management
 - **server/ValidationService.js**: Data validation and error handling
 - **server/Utils.js**: Utility functions and constants
