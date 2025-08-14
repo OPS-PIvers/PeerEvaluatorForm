@@ -645,12 +645,10 @@ const PdfService = (function() {
           rowSpan: 1
       });
 
-      // Handle both new unified structure and old separate structure for look-fors
+      // Extract look-fors from unified observationData structure
       let checkedLookFors = [];
       if (componentData && componentData.lookfors) {
           checkedLookFors = componentData.lookfors;
-      } else if (observation.checkedLookFors?.[component.componentId]) {
-          checkedLookFors = observation.checkedLookFors[component.componentId];
       }
 
       // Remove the default empty paragraph and add content properly

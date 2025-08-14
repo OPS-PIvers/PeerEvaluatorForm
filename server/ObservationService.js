@@ -794,7 +794,6 @@ function updateObservationInSheet(observation) {
             // Convert objects to JSON strings for storage
             if ((header === 'observationData' || 
                  header === 'evidenceLinks' || 
-                 header === 'checkedLookFors' || 
                  header === 'observationNotes') && 
                 typeof value === 'object') {
                 return JSON.stringify(value, null, 2);
