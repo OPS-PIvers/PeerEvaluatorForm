@@ -1786,10 +1786,10 @@
                         const content = document.getElementById(contentId);
                         if (content) {
                             content.classList.add('expanded');
-                            // Re-initialize Quill editor if needed
+                            // For dynamic content, use global Quill management if available
                             setTimeout(() => {
-                                if (!quillInstances[componentId]) {
-                                    toggleEvidenceSection(contentId);
+                                if (window.globalQuillInstances && !window.globalQuillInstances[componentId] && window.initializeQuillEditor) {
+                                    window.initializeQuillEditor(componentId);
                                 }
                             }, 100);
                         }

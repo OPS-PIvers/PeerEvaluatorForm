@@ -1495,9 +1495,9 @@
             }
         }
         
-        // Initialize Quill instances and observation notes tracking
-        const quillInstances = {};
-        let observationNotes = {};
+        // Global Quill management system - consolidated for both interfaces
+        window.globalQuillInstances = window.globalQuillInstances || {};
+        window.globalObservationNotes = window.globalObservationNotes || {};
         
         function toggleEvidenceSection(contentId) {
             console.log('toggleEvidenceSection called with:', contentId);
@@ -1520,61 +1520,77 @@
             }
 
             // Initialize Quill on first expansion if not already initialized
-            if (isExpanded && !quillInstances[componentId]) {
-                console.log('Attempting to initialize Quill editor for:', componentId);
-                const escapedComponentId = CSS.escape(componentId);
-                const editorId = 'notes-editor-' + escapedComponentId;
-                const editorElement = document.getElementById(editorId);
-                
-                if (editorElement) {
-                    console.log('Found editor element:', editorId);
-                    try {
-                        // Check if Quill is available
-                        if (typeof Quill === 'undefined') {
-                            console.error('Quill library failed to load from CDN');
-                            showToast('Rich text editor unavailable. Please refresh the page.');
-                            return;
-                        }
-                        
-                        const editor = new Quill(editorElement, {
-                            theme: 'snow',
-                            modules: {
-                                toolbar: [
-                                    [{ 'header': [1, 2, false] }],
-                                    ['bold', 'italic', 'underline'],
-                                    [{'list': 'ordered'}, {'list': 'bullet'}],
-                                    ['clean']
-                                ]
-                            }
-                        });
-                        console.log('Quill editor created successfully');
-
-                        // Load existing notes 
-                        if (observationNotes[componentId]) {
-                            editor.root.innerHTML = observationNotes[componentId];
-                            console.log('Loaded existing notes for component:', componentId);
-                        }
-
-                        // Add debounced auto-save
-                        let timeout;
-                        editor.on('text-change', () => {
-                            clearTimeout(timeout);
-                            timeout = setTimeout(() => {
-                                saveNotes(componentId, editor.root.innerHTML);
-                            }, 1500); // Save 1.5 seconds after typing stops
-                        });
-
-                        quillInstances[componentId] = editor;
-                        console.log('Quill editor initialized for component:', componentId);
-                    } catch (error) {
-                        console.error('Error initializing Quill editor:', error);
-                    }
-                } else {
-                    console.error('Notes editor element not found:', editorId);
-                }
+            if (isExpanded && !window.globalQuillInstances[componentId]) {
+                initializeQuillEditor(componentId);
             } else if (isExpanded) {
                 console.log('Quill instance already exists for component:', componentId);
             }
+        }
+
+        // Consolidated Quill initialization function - make globally available
+        window.initializeQuillEditor = function(componentId) {
+            console.log('Attempting to initialize Quill editor for:', componentId);
+            const escapedComponentId = CSS.escape(componentId);
+            const editorId = 'notes-editor-' + escapedComponentId;
+            const editorElement = document.getElementById(editorId);
+            
+            if (!editorElement) {
+                console.error('Notes editor element not found:', editorId);
+                return false;
+            }
+
+            // Check if this element already has a Quill instance (prevent duplicates)
+            if (editorElement.__quill) {
+                console.log('Quill already initialized on this element:', editorId);
+                window.globalQuillInstances[componentId] = editorElement.__quill;
+                return true;
+            }
+            
+            console.log('Found editor element:', editorId);
+            try {
+                // Check if Quill is available
+                if (typeof Quill === 'undefined') {
+                    console.error('Quill library failed to load from CDN');
+                    showToast('Rich text editor unavailable. Please refresh the page.');
+                    return false;
+                }
+                
+                const editor = new Quill(editorElement, {
+                    theme: 'snow',
+                    modules: {
+                        toolbar: [
+                            [{ 'header': [1, 2, false] }],
+                            ['bold', 'italic', 'underline'],
+                            [{'list': 'ordered'}, {'list': 'bullet'}],
+                            ['clean']
+                        ]
+                    }
+                });
+                console.log('Quill editor created successfully');
+
+                // Load existing notes 
+                if (window.globalObservationNotes[componentId]) {
+                    editor.root.innerHTML = window.globalObservationNotes[componentId];
+                    console.log('Loaded existing notes for component:', componentId);
+                }
+
+                // Add debounced auto-save
+                let timeout;
+                editor.on('text-change', () => {
+                    clearTimeout(timeout);
+                    timeout = setTimeout(() => {
+                        saveNotes(componentId, editor.root.innerHTML);
+                    }, 1500); // Save 1.5 seconds after typing stops
+                });
+
+                window.globalQuillInstances[componentId] = editor;
+                console.log('Quill editor initialized for component:', componentId);
+                return true;
+            } catch (error) {
+                console.error('Error initializing Quill editor:', error);
+                return false;
+            }
+        }
 
             // Store state in sessionStorage for persistence
             try {
@@ -1594,8 +1610,8 @@
                 return;
             }
 
-            // Update local data
-            observationNotes[componentId] = content;
+            // Update local data using global storage
+            window.globalObservationNotes[componentId] = content;
 
             google.script.run
                 .withSuccessHandler(() => console.log(`Notes saved for ${componentId}`))

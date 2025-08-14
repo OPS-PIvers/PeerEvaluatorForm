@@ -827,6 +827,69 @@ function sanitizeHtml(html) {
 }
 
 /**
+ * Updates an entire observation record in the Google Sheet.
+ * This is a generic function that can update any fields in the observation object.
+ * @param {Object} observation The complete observation object with updated data.
+ * @returns {{success: boolean, error?: string}} A response object.
+ */
+function updateObservationInSheet(observation) {
+    if (!observation || !observation.observationId) {
+        return { success: false, error: 'Valid observation object with observationId is required.' };
+    }
+
+    try {
+        const spreadsheet = openSpreadsheet();
+        const sheet = getSheetByName(spreadsheet, OBSERVATION_SHEET_NAME);
+        if (!sheet) {
+            throw new Error(`Sheet "${OBSERVATION_SHEET_NAME}" not found.`);
+        }
+
+        const row = _findObservationRow(sheet, observation.observationId);
+        if (row === -1) {
+            return { success: false, error: 'Observation not found in sheet.' };
+        }
+
+        // Get headers to map observation fields to columns
+        const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+        
+        // Update lastModifiedAt timestamp
+        observation.lastModifiedAt = new Date().toISOString();
+
+        // Prepare row data by mapping observation fields to header columns
+        const rowData = headers.map(header => {
+            let value = observation[header];
+            
+            // Convert objects to JSON strings for storage
+            if ((header === 'observationData' || 
+                 header === 'evidenceLinks' || 
+                 header === 'checkedLookFors' || 
+                 header === 'observationNotes') && 
+                typeof value === 'object') {
+                return JSON.stringify(value, null, 2);
+            }
+            
+            // Return the value as is, or empty string if undefined
+            return value !== undefined ? value : '';
+        });
+
+        // Update the entire row with new data
+        sheet.getRange(row, 1, 1, rowData.length).setValues([rowData]);
+        SpreadsheetApp.flush(); // Ensure the data is written immediately
+
+        debugLog('Updated observation in sheet', { 
+            observationId: observation.observationId, 
+            row: row 
+        });
+        
+        return { success: true };
+
+    } catch (error) {
+        console.error(`Error updating observation ${observation.observationId} in sheet:`, error);
+        return { success: false, error: 'An unexpected error occurred while updating observation.' };
+    }
+}
+
+/**
  * A test function to clear all observations from the properties service.
  * USE WITH CAUTION.
  */
