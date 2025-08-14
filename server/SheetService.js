@@ -938,7 +938,8 @@ function setupObservationSheet() {
       "observationId", "observerEmail", "observedEmail", "observedName",
       "observedRole", "observedYear", "status", "createdAt",
       "lastModifiedAt", "finalizedAt", "observationData", "evidenceLinks",
-      "observationName", "observationDate", "pdfUrl", "pdfStatus"
+      "scriptContent", "componentTags", "observationName", "observationDate",
+      "pdfUrl", "pdfStatus"
     ];
 
     // Check if headers are already present

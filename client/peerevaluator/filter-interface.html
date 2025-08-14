@@ -2262,18 +2262,21 @@
                         quillReady: !!scriptQuill
                     });
                     
-                    if (content && scriptQuill) {
-                        if(typeof content === 'object' && content !== null && Object.keys(content).length > 0) {
-                            scriptQuill.setContents(content, 'silent');
-                            scriptContent = content;
-                            console.log('Script content successfully loaded into editor');
-                        } else {
-                            console.log('Script content exists but is empty or invalid format');
-                        }
-                    } else if (!scriptQuill) {
+                    if (!scriptQuill) {
                         console.error('Cannot load script content: Quill editor not initialized');
+                        return;
+                    }
+
+                    // Check if content is a valid, non-empty object
+                    if (content && typeof content === 'object' && Object.keys(content).length > 0) {
+                        scriptQuill.setContents(content, 'silent');
+                        scriptContent = content;
+                        console.log('Script content successfully loaded into editor');
                     } else {
-                        console.log('No existing script content found for this observation');
+                        // This block now handles null, undefined, or empty object content
+                        scriptQuill.setContents([], 'silent'); // Clear the editor
+                        scriptContent = {}; // Reset local content
+                        console.log('No existing script content found or content was invalid; editor cleared.');
                     }
                 })
                 .withFailureHandler(function(error) {
