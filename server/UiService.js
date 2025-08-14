@@ -105,7 +105,7 @@ const UiService = (function() {
         requestId: requestId,
         timestamp: new Date().toISOString(),
         version: SYSTEM_INFO.VERSION,
-        userEmail: userContext ? userContext.email : (Session.getActiveUser().getEmail() || 'N/A'),
+        userEmail: userContext ? userContext.email : (Session.getActiveUser() ? Session.getActiveUser().getEmail() : 'N/A'),
         userAgent: userAgent
       };
 

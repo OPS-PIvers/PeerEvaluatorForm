@@ -68,9 +68,9 @@ const PdfService = (function() {
 
       try {
           const spreadsheet = openSpreadsheet();
-          const sheet = getSheetByName(spreadsheet, "Observation_Data");
+          const sheet = getSheetByName(spreadsheet, SHEET_NAMES.OBSERVATION_DATA);
           if (!sheet) {
-              console.error(`Sheet '${"Observation_Data"}' not found. Cannot update PDF status.`);
+              console.error(`Sheet '${SHEET_NAMES.OBSERVATION_DATA}' not found. Cannot update PDF status.`);
               return { success: false, error: 'Observation sheet not found' };
           }
 
