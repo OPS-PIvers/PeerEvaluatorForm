@@ -38,31 +38,37 @@ The project follows a modular, service-oriented architecture.
 
 ```
 /workspaces/PeerEvaluatorForm/
-├─── AGENTS.md                          # This file - Comprehensive AI agent guide.
-├─── CLAUDE.md                          # Instructional context for Claude AI.
-├─── CacheManager.js                    # Advanced versioned caching system.
-├─── Code.js                           # Main server-side entry point (doGet) and orchestrator.
-├─── Constants.js                      # Global constants (sheet names, roles, cache settings, etc.).
-├─── GEMINI.md                         # Instructional context for Gemini AI.
-├─── ObservationService.js             # Backend logic for managing observation records.
-├─── SessionManager.js                 # User sessions and state change detection.
-├─── SheetService.js                   # Data access layer for all Google Sheets operations.
-├─── UserService.js                    # User authentication, role retrieval, and context creation.
-├─── Utils.js                          # General utility and helper functions.
-├─── ValidationService.js              # Data validation and system health checks.
-├─── appsscript.json                   # GAS manifest: scopes, dependencies, and web app settings.
-├─── error-page.html                   # HTML template for displaying fatal errors.
-├─── filter-interface.html             # HTML/JS for filter view (special access roles).
-├─── finalized-observation-email.html  # HTML template for finalized observation emails.
-├─── lookfors-todo.md                  # Development notes for look-fors functionality.
-├─── observation-notes-todo.md         # Development notes for observation notes.
-├─── performance-todo.md               # Development notes for performance optimization.
-└─── rubric.html                       # Main HTML/JS template for evaluation rubric interface.
+├─── client/                                    # Client-side HTML templates and resources
+│    ├─── CLAUDE.md                            # Client-specific Claude instructions
+│    ├─── peerevaluator/
+│    │    └─── filter-interface.html           # HTML/JS for filter view (special access roles)
+│    ├─── shared/
+│    │    ├─── error-page.html                 # HTML template for displaying fatal errors
+│    │    └─── finalized-observation-email.html # HTML template for finalized observation emails
+│    └─── staff/
+│         └─── rubric.html                     # Main HTML/JS template for evaluation rubric interface
+├─── server/                                   # Server-side JavaScript modules
+│    ├─── CLAUDE.md                            # Server-specific Claude instructions
+│    ├─── CacheManager.js                      # Advanced versioned caching system
+│    ├─── Code.js                              # Main server-side entry point (doGet) and orchestrator
+│    ├─── Constants.js                         # Global constants (sheet names, roles, cache settings, etc.)
+│    ├─── ObservationService.js                # Backend logic for managing observation records
+│    ├─── SessionManager.js                    # User sessions and state change detection
+│    ├─── SheetService.js                      # Data access layer for all Google Sheets operations
+│    ├─── UserService.js                       # User authentication, role retrieval, and context creation
+│    ├─── Utils.js                             # General utility and helper functions
+│    └─── ValidationService.js                 # Data validation and system health checks
+├─── AGENTS.md                                 # This file - Comprehensive AI agent guide
+├─── CLAUDE.md                                 # Instructional context for Claude AI
+├─── GEMINI.md                                 # Instructional context for Gemini AI
+├─── appsscript.json                           # GAS manifest: scopes, dependencies, and web app settings
+├─── global-tools-implementation-plan.md       # Development planning document
+└─── performance-todo.md                       # Development notes for performance optimization
 ```
 
 ## 4. Function Index by File
 
-### `Code.js` (Orchestrator)
+### `server/Code.js` (Orchestrator)
 -   `doGet(e)`: **Primary entry point for the web app.** Determines user context and decides whether to show the rubric (`rubric.html`) or the filter interface (`filter-interface.html`).
 -   `loadRubricData(filterParams)`: Server-side function called by the client to fetch data based on filters.
 -   `getStaffListForDropdown(role, year)`: Fetches a list of staff members for the filter UI.
@@ -74,17 +80,17 @@ The project follows a modular, service-oriented architecture.
 -   `exportObservationToPdf(observationId)`: Generates and saves a PDF report using DocumentApp API.
 -   `onEditTrigger(e)`: The function executed by the `onEdit` trigger. Detects changes in the `Staff` sheet or rubric sheets and clears caches accordingly.
 
-### `UserService.js`
+### `server/UserService.js`
 -   `createUserContext(email)`: **Crucial function.** Creates a comprehensive context object for the current user, including their role, year, permissions, and any detected state changes.
 -   `getUserByEmail(email)`: Retrieves a user's record from the `Staff` sheet.
 -   `validateUserAccess(email)`: Validates if a user has access to the system.
 
-### `SheetService.js`
+### `server/SheetService.js`
 -   `getStaffData()`: Reads and parses all user data from the `Staff` sheet.
 -   `getSettingsData()`: Reads and parses the role-to-subdomain mappings from the `Settings` sheet.
 -   `getRoleSheetData(roleName)`: Reads the entire content of a specific role's rubric sheet (e.g., `Teacher`).
 
-### `ObservationService.js`
+### `server/ObservationService.js`
 -   `_getObservationsDb()`: Retrieves all observation records from the `Observation_Data` sheet.
 -   `_appendObservationToSheet(observation)`: Appends a new observation record to the `Observation_Data` sheet.
 -   `createNewObservation(...)`: Creates a new observation record.
@@ -93,16 +99,16 @@ The project follows a modular, service-oriented architecture.
 -   `updateObservationStatus(...)`: Changes an observation's status (e.g., to "Finalized").
 -   `uploadMediaEvidence(...)`: Handles file uploads to Google Drive.
 
-### `CacheManager.js`
+### `server/CacheManager.js`
 -   `generateCacheKey(...)`: Creates a versioned key for caching.
 -   `getCachedDataEnhanced(...)` / `setCachedDataEnhanced(...)`: Advanced get/set functions for the cache.
 -   `incrementMasterCacheVersion()`: Invalidates all caches by changing the master version key.
 -   `forceCleanAllCaches()`: Emergency function to clear all caches.
 
-### `filter-interface.html` (Client-Side JS)
+### `client/peerevaluator/filter-interface.html` (Client-Side JS)
 -   Contains the JavaScript logic for the dashboard/filter view presented to users with special access roles. It handles UI interactions for selecting roles, years, and staff members, and then calls the appropriate server-side functions.
 
-### `rubric.html` (Client-Side JS)
+### `client/staff/rubric.html` (Client-Side JS)
 -   Contains the JavaScript logic for rendering the main rubric interface. It handles toggling look-fors, switching between "full" and "assigned" views, and will handle the interactive rating selection.
 
 ## 5. Data Structures
@@ -131,12 +137,12 @@ This section outlines the technical configuration of the Google Apps Script proj
 
 ## 7. Development Workflow & Coding Conventions
 
--   **Modularity:** Code is separated into "services" based on functionality (`UserService`, `SheetService`, etc.). `Code.js` acts as the main controller that orchestrates these services.
--   **Constants:** All hardcoded strings, sheet names, and configuration values should be defined in `Constants.js`.
--   **Caching:** All functions that read data from Google Sheets should be aggressively cached using the functions in `CacheManager.js` to ensure performance.
+-   **Modularity:** Code is separated into "services" based on functionality (`server/UserService`, `server/SheetService`, etc.). `server/Code.js` acts as the main controller that orchestrates these services.
+-   **Constants:** All hardcoded strings, sheet names, and configuration values should be defined in `server/Constants.js`.
+-   **Caching:** All functions that read data from Google Sheets should be aggressively cached using the functions in `server/CacheManager.js` to ensure performance.
 -   **Client-Server Communication:** Use `google.script.run` for all communication from the client (`.html` files) to the server (`.js` files).
 -   **Error Handling:** Wrap potentially failing operations (especially API calls) in `try...catch` blocks. Use the `formatErrorMessage` utility for consistent error logging.
--   **Validation:** Use the functions in `ValidationService.js` to validate data and system health.
+-   **Validation:** Use the functions in `server/ValidationService.js` to validate data and system health.
 -   **Debugging:** Use the `debugLog()` utility for logging. The application supports a `?debug=true` URL parameter to enable more verbose logging and display a debug info panel on the UI.
 
 ### 7.1 **MANDATORY: Existing Code Analysis Protocol**

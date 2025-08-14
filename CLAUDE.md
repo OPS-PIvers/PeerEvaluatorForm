@@ -8,29 +8,59 @@ This is a Google Apps Script (GAS) web application called "Peer Evaluator Form" 
 
 ## Core Architecture
 
+## Project File Structure
+
+```
+/workspaces/PeerEvaluatorForm/
+├── client/                           # Client-side HTML templates and resources
+│   ├── CLAUDE.md                    # Client-specific Claude instructions
+│   ├── peerevaluator/
+│   │   └── filter-interface.html    # Filter view for special access roles
+│   ├── shared/
+│   │   ├── error-page.html          # Error display template with debugging information
+│   │   └── finalized-observation-email.html # Email template for finalized observations
+│   └── staff/
+│       └── rubric.html              # Main evaluation rubric interface
+├── server/                          # Server-side JavaScript modules
+│   ├── CLAUDE.md                    # Server-specific Claude instructions
+│   ├── CacheManager.js              # Advanced caching system with versioning
+│   ├── Code.js                      # Main orchestrator and entry point
+│   ├── Constants.js                 # Global constants and configuration
+│   ├── ObservationService.js        # Manages peer evaluation observations
+│   ├── SessionManager.js            # User sessions and state persistence
+│   ├── SheetService.js              # Data access layer for Google Sheets
+│   ├── UserService.js               # User authentication and context creation
+│   ├── Utils.js                     # Utility functions and constants
+│   └── ValidationService.js         # Data validation and error handling
+├── AGENTS.md                        # AI agent comprehensive guide
+├── CLAUDE.md                        # This file - Claude AI instructions
+├── GEMINI.md                        # Gemini AI instructions
+├── appsscript.json                  # Google Apps Script manifest
+├── global-tools-implementation-plan.md # Development planning document
+└── performance-todo.md              # Performance optimization notes
+```
+
 ### Main Components
 
-- **Code.js**: Main orchestrator and entry point containing the `doGet()` function and server-side functions for AJAX
-- **SessionManager.js**: Handles user sessions, role change detection, and state persistence
-- **SheetService.js**: Data access layer for Google Sheets operations
-- **UserService.js**: User authentication, validation, and context creation
-- **ObservationService.js**: Manages peer evaluation observations using Observation_Data sheet as database
-- **CacheManager.js**: Advanced caching system with versioning and dependency management
-- **ValidationService.js**: Data validation and error handling
-- **Utils.js**: Utility functions and constants
-- **Constants.js**: Global constants including sheet names, roles, cache settings, and validation patterns
+- **server/Code.js**: Main orchestrator and entry point containing the `doGet()` function and server-side functions for AJAX
+- **server/SessionManager.js**: Handles user sessions, role change detection, and state persistence
+- **server/SheetService.js**: Data access layer for Google Sheets operations
+- **server/UserService.js**: User authentication, validation, and context creation
+- **server/ObservationService.js**: Manages peer evaluation observations using Observation_Data sheet as database
+- **server/CacheManager.js**: Advanced caching system with versioning and dependency management
+- **server/ValidationService.js**: Data validation and error handling
+- **server/Utils.js**: Utility functions and constants
+- **server/Constants.js**: Global constants including sheet names, roles, cache settings, and validation patterns
 
 ### HTML Templates
 
-- **rubric.html**: Main evaluation rubric interface with look-fors checkboxes and rich-text notes
-- **filter-interface.html**: Filter view for special access roles (Administrator, Peer Evaluator, Full Access)
-- **error-page.html**: Error display template with debugging information
-- **finalized-observation-email.html**: Email template for finalized observations
+- **client/staff/rubric.html**: Main evaluation rubric interface with look-fors checkboxes and rich-text notes
+- **client/peerevaluator/filter-interface.html**: Filter view for special access roles (Administrator, Peer Evaluator, Full Access)
+- **client/shared/error-page.html**: Error display template with debugging information
+- **client/shared/finalized-observation-email.html**: Email template for finalized observations
 
 ### Development Notes
 
-- **lookfors-todo.md**: Development notes for look-fors functionality
-- **observation-notes-todo.md**: Development notes for observation notes
 - **performance-todo.md**: Performance optimization notes
 
 ### Key Features
@@ -77,14 +107,14 @@ clearUserCaches('user@email.com');
 ### Role Management
 
 To add a new role:
-1. Add to `AVAILABLE_ROLES` constant in Constants.js
+1. Add to `AVAILABLE_ROLES` constant in server/Constants.js
 2. Create corresponding sheet with rubric data
 3. Add role-year mappings in Settings sheet
 4. Update validation logic if needed
 
 ### Observation System
 
-Observations are managed through ObservationService.js:
+Observations are managed through server/ObservationService.js:
 - Stored in PropertiesService as JSON
 - Associated files stored in Google Drive folder structure
 - Support for media evidence upload

@@ -8,16 +8,48 @@ This is a Google Apps Script (GAS) web application called "Peer Evaluator Form" 
 
 ## Core Architecture
 
+## Project File Structure
+
+```
+/workspaces/PeerEvaluatorForm/
+├── client/                           # Client-side HTML templates and resources
+│   ├── CLAUDE.md                    # Client-specific Claude instructions
+│   ├── peerevaluator/
+│   │   └── filter-interface.html    # Filter view for special access roles
+│   ├── shared/
+│   │   ├── error-page.html          # Error display template with debugging information
+│   │   └── finalized-observation-email.html # Email template for finalized observations
+│   └── staff/
+│       └── rubric.html              # Main evaluation rubric interface
+├── server/                          # Server-side JavaScript modules
+│   ├── CLAUDE.md                    # Server-specific Claude instructions
+│   ├── CacheManager.js              # Advanced caching system with versioning
+│   ├── Code.js                      # Main orchestrator and entry point
+│   ├── Constants.js                 # Global constants and configuration
+│   ├── ObservationService.js        # Manages peer evaluation observations
+│   ├── SessionManager.js            # User sessions and state persistence
+│   ├── SheetService.js              # Data access layer for Google Sheets
+│   ├── UserService.js               # User authentication and context creation
+│   ├── Utils.js                     # Utility functions and constants
+│   └── ValidationService.js         # Data validation and error handling
+├── AGENTS.md                        # AI agent comprehensive guide
+├── CLAUDE.md                        # Claude AI instructions
+├── GEMINI.md                        # This file - Gemini AI instructions
+├── appsscript.json                  # Google Apps Script manifest
+├── global-tools-implementation-plan.md # Development planning document
+└── performance-todo.md              # Performance optimization notes
+```
+
 ### Main Components
 
-- **Code.js**: Main orchestrator and entry point containing the `doGet()` function and server-side functions for AJAX
-- **SessionManager.js**: Handles user sessions, role change detection, and state persistence
-- **SheetService.js**: Data access layer for Google Sheets operations
-- **UserService.js**: User authentication, validation, and context creation
-- **ObservationService.js**: Manages peer evaluation observations using PropertiesService as a database
-- **CacheManager.js**: Advanced caching system with versioning and dependency management
-- **ValidationService.js**: Data validation and error handling
-- **Utils.js**: Utility functions and constants
+- **server/Code.js**: Main orchestrator and entry point containing the `doGet()` function and server-side functions for AJAX
+- **server/SessionManager.js**: Handles user sessions, role change detection, and state persistence
+- **server/SheetService.js**: Data access layer for Google Sheets operations
+- **server/UserService.js**: User authentication, validation, and context creation
+- **server/ObservationService.js**: Manages peer evaluation observations using PropertiesService as a database
+- **server/CacheManager.js**: Advanced caching system with versioning and dependency management
+- **server/ValidationService.js**: Data validation and error handling
+- **server/Utils.js**: Utility functions and constants
 
 ### Key Features
 
@@ -164,7 +196,7 @@ google.script.run
 
 #### Caching Integration
 ```javascript
-// CORRECT: Use existing caching system
+// CORRECT: Use existing caching system from server/CacheManager.js
 const cachedData = getCachedDataEnhanced('cache_key', params);
 if (cachedData?.data) {
     return cachedData.data;

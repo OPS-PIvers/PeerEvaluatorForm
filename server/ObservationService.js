@@ -372,6 +372,19 @@ function _saveProficiencySelection(observationId, componentId, proficiency) {
 }
 
 /**
+ * Retrieves or creates the specific Google Drive folder for a given observation ID.
+ * @param {string} observationId The observation ID.
+ * @returns {GoogleAppsScript.Drive.Folder} The Google Drive folder for the observation.
+ */
+function getOrCreateObservationFolder(observationId) {
+  const observation = getObservationById(observationId);
+  if (!observation) {
+    throw new Error(`Observation not found for ID: ${observationId}`);
+  }
+  return _getObservationFolder(observation);
+}
+
+/**
  * Retrieves or creates the specific Google Drive folder for a given observation.
  * @param {Object} observation The observation object.
  * @returns {GoogleAppsScript.Drive.Folder} The Google Drive folder for the observation.
