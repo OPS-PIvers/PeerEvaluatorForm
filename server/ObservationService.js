@@ -29,7 +29,7 @@ function _getObservationsDb() {
       headers.forEach((header, index) => {
         let value = row[index];
         // Safely parse JSON fields
-        if ((header === 'observationData' || header === 'evidenceLinks' || header === 'checkedLookFors' || header === 'observationNotes') && typeof value === 'string' && value) {
+        if ((header === 'observationData' || header === 'evidenceLinks' || header === 'observationNotes') && typeof value === 'string' && value) {
           try {
             value = JSON.parse(value);
           } catch (e) {
@@ -60,75 +60,25 @@ function _saveLookForSelection(observationId, componentId, lookForText, isChecke
     return { success: false, error: 'Observation ID, component ID, and look-for text are required.' };
   }
 
-  // Use a lock to prevent simultaneous edits from causing data corruption
-  const lock = LockService.getScriptLock();
-  lock.waitLock(30000); // Wait up to 30 seconds
-
-  try {
-    const spreadsheet = openSpreadsheet();
-    const sheet = getSheetByName(spreadsheet, SHEET_NAMES.OBSERVATION_DATA);
-    if (!sheet) {
-      throw new Error(`Sheet "${SHEET_NAMES.OBSERVATION_DATA}" not found.`);
-    }
-
-    const row = _findObservationRow(sheet, observationId);
-    if (row === -1) {
-      return { success: false, error: 'Observation not found.' };
-    }
-
-    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-    // CORRECTED: Target the 'observationData' column, not the non-existent 'checkedLookFors'
-    const observationDataCol = headers.indexOf('observationData') + 1;
-    const lastModifiedCol = headers.indexOf('lastModifiedAt') + 1;
-
-    if (observationDataCol === 0) {
-        return { success: false, error: 'observationData column not found in the sheet.' };
-    }
-
-    const observationDataCell = sheet.getRange(row, observationDataCol);
-    const currentDataString = observationDataCell.getValue();
-    let observationData = {};
-    try {
-        if (currentDataString) {
-            observationData = JSON.parse(currentDataString);
-        }
-    } catch (e) {
-        console.warn(`Could not parse observationData for ${observationId}. Starting fresh. Data: ${currentDataString}`);
-    }
-
+  return _updateObservationJsonData(observationId, 'observationData', (currentData) => {
     // Ensure the data structure for the component exists
-    if (!observationData[componentId]) {
-        observationData[componentId] = { lookfors: [], proficiency: '', notes: '' };
-    } else if (!observationData[componentId].lookfors) {
-        observationData[componentId].lookfors = [];
+    if (!currentData[componentId]) {
+      currentData[componentId] = { lookfors: [], proficiency: '', notes: '' };
+    } else if (!currentData[componentId].lookfors) {
+      currentData[componentId].lookfors = [];
     }
 
     // Use a Set for efficient add/delete operations
-    const set = new Set(observationData[componentId].lookfors);
-
+    const lookForsSet = new Set(currentData[componentId].lookfors);
     if (isChecked) {
-        set.add(lookForText);
+      lookForsSet.add(lookForText);
     } else {
-        set.delete(lookForText);
+      lookForsSet.delete(lookForText);
     }
+    currentData[componentId].lookfors = Array.from(lookForsSet);
 
-    observationData[componentId].lookfors = Array.from(set);
-
-    // Save the updated object back to the cell
-    observationDataCell.setValue(JSON.stringify(observationData, null, 2));
-    if (lastModifiedCol > 0) {
-        sheet.getRange(row, lastModifiedCol).setValue(new Date().toISOString());
-    }
-    SpreadsheetApp.flush(); // Ensure the change is saved immediately
-
-    debugLog('Look-for selection saved', { observationId, componentId, lookForText, isChecked });
-    return { success: true };
-  } catch (error) {
-    console.error(`Error saving look-for for observation ${observationId}:`, error);
-    return { success: false, error: 'An unexpected error occurred.' };
-  } finally {
-    lock.releaseLock();
-  }
+    return currentData;
+  });
 }
 
 /**
@@ -152,7 +102,7 @@ function _appendObservationToSheet(observation) {
     const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
     const rowData = headers.map(header => {
       let value = observation[header];
-      if ((header === 'observationData' || header === 'evidenceLinks' || header === 'checkedLookFors' || header === 'observationNotes') && typeof value === 'object') {
+      if ((header === 'observationData' || header === 'evidenceLinks' || header === 'observationNotes') && typeof value === 'object') {
         return JSON.stringify(value, null, 2);
       }
       return value;
@@ -182,6 +132,70 @@ function getObservationById(observationId) {
         console.error(`Error in getObservationById for ${observationId}:`, error);
         return null;
     }
+}
+
+/**
+ * A centralized and locked function to update the JSON data within an observation row.
+ * This prevents race conditions from multiple simultaneous client-side auto-saves.
+ * @param {string} observationId The ID of the observation to update.
+ * @param {string} dataColumnName The name of the column containing the JSON to update (e.g., 'observationData').
+ * @param {function(Object): Object} updateFn A function that receives the current data object and returns the updated object.
+ * @returns {Object} A response object with success status.
+ * @private
+ */
+function _updateObservationJsonData(observationId, dataColumnName, updateFn) {
+  if (!observationId || !dataColumnName || typeof updateFn !== 'function') {
+    return { success: false, error: 'Invalid arguments for updating observation JSON data.' };
+  }
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000); // Wait up to 30 seconds
+
+  try {
+    const spreadsheet = openSpreadsheet();
+    const sheet = getSheetByName(spreadsheet, SHEET_NAMES.OBSERVATION_DATA);
+    if (!sheet) throw new Error(`Sheet "${SHEET_NAMES.OBSERVATION_DATA}" not found.`);
+
+    const row = _findObservationRow(sheet, observationId);
+    if (row === -1) return { success: false, error: 'Observation not found.' };
+
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const dataCol = headers.indexOf(dataColumnName) + 1;
+    const lastModifiedCol = headers.indexOf('lastModifiedAt') + 1;
+
+    if (dataCol === 0) {
+      return { success: false, error: `Column "${dataColumnName}" not found in the sheet.` };
+    }
+
+    const dataCell = sheet.getRange(row, dataCol);
+    const currentDataString = dataCell.getValue();
+    let currentData = {};
+    try {
+      if (currentDataString) {
+        currentData = JSON.parse(currentDataString);
+      }
+    } catch (e) {
+      console.warn(`Could not parse ${dataColumnName} for ${observationId}. Starting fresh. Data: ${currentDataString}`);
+    }
+
+    // Apply the update function to the data
+    const updatedData = updateFn(currentData);
+
+    // Save the updated object back to the cell
+    dataCell.setValue(JSON.stringify(updatedData, null, 2));
+    if (lastModifiedCol > 0) {
+      sheet.getRange(row, lastModifiedCol).setValue(new Date().toISOString());
+    }
+    SpreadsheetApp.flush();
+
+    debugLog(`${dataColumnName} updated`, { observationId, column: dataColumnName });
+    return { success: true };
+  } catch (error) {
+    console.error(`Error updating ${dataColumnName} for observation ${observationId}:`, error);
+    return { success: false, error: 'An unexpected error occurred during data update.' };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 
@@ -258,7 +272,6 @@ function createNewObservation(observerEmail, observedEmail) {
       observationDate: null,
       observationData: {}, // e.g., { "1a:": "proficient", "1b:": "basic" }
       evidenceLinks: {}, // e.g., { "1a:": [{url: "...", name: "...", uploadedAt: "..."}, ...] }
-      checkedLookFors: {}, // e.g., { "1a:": ["Look-for text 1", "Look-for text 2"] }
       observationNotes: {}
     };
 
@@ -310,64 +323,17 @@ function _saveProficiencySelection(observationId, componentId, proficiency) {
     return { success: false, error: 'Observation ID, component ID, and proficiency level are required.' };
   }
 
-  try {
-    const spreadsheet = openSpreadsheet();
-    const sheet = getSheetByName(spreadsheet, SHEET_NAMES.OBSERVATION_DATA);
-    if (!sheet) {
-      throw new Error(`Sheet "${SHEET_NAMES.OBSERVATION_DATA}" not found.`);
-    }
-
-    const row = _findObservationRow(sheet, observationId);
-    if (row === -1) {
-      return { success: false, error: 'Observation not found.' };
-    }
-
-    // Get the current observation data from the sheet
-    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-    const observationDataCol = headers.indexOf('observationData') + 1;
-    const lastModifiedCol = headers.indexOf('lastModifiedAt') + 1;
-
-    if (observationDataCol === 0) {
-        return { success: false, error: 'observationData column not found in the sheet.' };
-    }
-
-    const observationDataCell = sheet.getRange(row, observationDataCol);
-    const currentDataString = observationDataCell.getValue();
-    let currentData = {};
-    try {
-        if(currentDataString){
-            currentData = JSON.parse(currentDataString);
-        }
-    } catch(e){
-        console.warn(`Could not parse observationData for ${observationId}. Starting fresh. Data: ${currentDataString}`);
-    }
-
-    // Update the data using unified structure
+  return _updateObservationJsonData(observationId, 'observationData', (currentData) => {
+    // Ensure the component object exists, preserving other properties
     if (!currentData[componentId]) {
-        currentData[componentId] = {};
+      currentData[componentId] = { lookfors: [], notes: '' };
     }
     
-    // Preserve existing lookfors and notes when updating proficiency
-    const existingData = currentData[componentId];
-    currentData[componentId] = {
-        proficiency: proficiency,
-        lookfors: existingData.lookfors || [],
-        notes: existingData.notes || ''
-    };
+    // Update the proficiency
+    currentData[componentId].proficiency = proficiency;
 
-    // Write the updated data back to the sheet
-    observationDataCell.setValue(JSON.stringify(currentData, null, 2));
-    if(lastModifiedCol > 0){
-        sheet.getRange(row, lastModifiedCol).setValue(new Date().toISOString());
-    }
-    SpreadsheetApp.flush(); // Ensure the data is written immediately
-
-    debugLog('Proficiency selection saved', { observationId, componentId, proficiency });
-    return { success: true };
-  } catch (error) {
-    console.error(`Error saving proficiency for observation ${observationId}:`, error);
-    return { success: false, error: 'An unexpected error occurred.' };
-  }
+    return currentData;
+  });
 }
 
 /**
@@ -769,50 +735,17 @@ function _saveObservationNotes(observationId, componentId, notesContent) {
     return { success: false, error: 'Observation ID and component ID are required.' };
   }
 
-  try {
-    const spreadsheet = openSpreadsheet();
-    const sheet = getSheetByName(spreadsheet, SHEET_NAMES.OBSERVATION_DATA);
-    if (!sheet) throw new Error(`Sheet "${SHEET_NAMES.OBSERVATION_DATA}" not found.`);
-
-    const row = _findObservationRow(sheet, observationId);
-    if (row === -1) return { success: false, error: 'Observation not found.' };
-
-    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-    const observationDataCol = headers.indexOf('observationData') + 1;
-    const lastModifiedCol = headers.indexOf('lastModifiedAt') + 1;
-
-    if (observationDataCol === 0) {
-        return { success: false, error: 'observationData column not found.' };
-    }
-
-    const observationDataCell = sheet.getRange(row, observationDataCol);
-    const currentDataString = observationDataCell.getValue();
-    let observationData = {};
-    try {
-        if(currentDataString) observationData = JSON.parse(currentDataString);
-    } catch(e){
-        console.warn(`Could not parse observationData for ${observationId}.`);
-    }
-
-    // Ensure the component exists in the data structure
-    if (!observationData[componentId]) {
-        observationData[componentId] = { lookfors: [], proficiency: '', notes: '' };
+  return _updateObservationJsonData(observationId, 'observationData', (currentData) => {
+    // Ensure the component object exists, preserving other properties
+    if (!currentData[componentId]) {
+      currentData[componentId] = { lookfors: [], proficiency: '', notes: '' };
     }
     
-    // Sanitize HTML content before saving to unified structure
-    observationData[componentId].notes = sanitizeHtml(notesContent);
+    // Sanitize and update the notes
+    currentData[componentId].notes = sanitizeHtml(notesContent);
 
-    observationDataCell.setValue(JSON.stringify(observationData, null, 2));
-    if(lastModifiedCol > 0){
-        sheet.getRange(row, lastModifiedCol).setValue(new Date().toISOString());
-    }
-    SpreadsheetApp.flush();
-
-    return { success: true };
-  } catch (error) {
-    console.error(`Error saving notes for observation ${observationId}:`, error);
-    return { success: false, error: 'An unexpected error occurred.' };
-  }
+    return currentData;
+  });
 }
 
 // Add a simple HTML sanitizer to prevent script injection
@@ -861,7 +794,6 @@ function updateObservationInSheet(observation) {
             // Convert objects to JSON strings for storage
             if ((header === 'observationData' || 
                  header === 'evidenceLinks' || 
-                 header === 'checkedLookFors' || 
                  header === 'observationNotes') && 
                 typeof value === 'object') {
                 return JSON.stringify(value, null, 2);

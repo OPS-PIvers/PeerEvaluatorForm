@@ -114,7 +114,7 @@ The project follows a modular, service-oriented architecture.
 ## 5. Data Structures
 
 -   **User Context Object:** The object returned by `createUserContext()` is central to the application. It contains everything the server and client need to know about the current user's session.
--   **Observation Object:** The structure used for an observation record, which is stored as a row in the `Observation_Data` sheet. It includes observer/observed info, status, timestamps, and the actual observation data (`observationData`, `evidenceLinks`, and `checkedLookFors`).
+-   **Observation Object:** The structure used for an observation record, which is stored as a row in the `Observation_Data` sheet. It includes observer/observed info, status, timestamps, and the actual observation data stored within the unified `observationData` structure (containing proficiency levels, notes, and look-for selections) and `evidenceLinks`.
 -   **Rubric Data Object:** The object returned by `getAllDomainsData()` and passed to the HTML templates. It contains the title, subtitle, and an array of `domains`, which in turn contain an array of `components`.
 
 ## 6. Deployment & Environment Setup
