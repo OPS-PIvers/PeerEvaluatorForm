@@ -2211,6 +2211,25 @@
         const SCRIPT_EDITOR_CONSTANTS = <?!= JSON.stringify(scriptEditorSettings) ?>;
         let scriptQuill = null;
         let scriptContent = {};
+        let isScriptDirty = false;
+        let scriptSaveDebounceTimer;
+
+        function updateSaveButtonState() {
+            const saveBtn = document.getElementById('saveScriptBtn');
+            if (!saveBtn) return;
+
+            if (isScriptDirty) {
+                saveBtn.textContent = 'Save all changes';
+                saveBtn.disabled = false;
+                saveBtn.classList.remove('btn-secondary');
+                saveBtn.classList.add('btn-primary');
+            } else {
+                saveBtn.textContent = 'Saved!';
+                saveBtn.disabled = true;
+                saveBtn.classList.remove('btn-primary');
+                saveBtn.classList.add('btn-secondary');
+            }
+        }
 
         function openScriptEditor() {
             const modal = document.getElementById('scriptEditorModal');
@@ -2229,85 +2248,94 @@
                 loadScriptContent();
 
                 // Auto-save on content change
-                let debounceTimer;
                 scriptQuill.on('text-change', function(delta, oldDelta, source) {
                     if (source === 'user') {
-                        clearTimeout(debounceTimer);
-                        debounceTimer = setTimeout(() => {
-                            saveScriptContent();
-                        }, SCRIPT_EDITOR_CONSTANTS.DEBOUNCE_DELAY);
+                        isScriptDirty = true;
+                        updateSaveButtonState();
+                        clearTimeout(scriptSaveDebounceTimer);
+                        scriptSaveDebounceTimer = setTimeout(() => {
+                            silentSaveScriptContent();
+                        }, 5000); // 5 second debounce for silent auto-save
                     }
                 });
             }
+            isScriptDirty = false;
+            updateSaveButtonState();
         }
 
         function closeScriptEditor() {
+            if (isScriptDirty) {
+                if (!confirm('You have unsaved changes that will be lost. Are you sure you want to close?')) {
+                    return;
+                }
+            }
             const modal = document.getElementById('scriptEditorModal');
             modal.style.display = 'none';
+            isScriptDirty = false;
+        }
+
+        function manualSaveScriptContent() {
+            if (!scriptQuill || !currentObservationId) return;
+
+            showToast(SCRIPT_EDITOR_CONSTANTS.UI_STRINGS.SAVING, false);
+            saveScriptContent().then(success => {
+                if (success) {
+                    showToast(SCRIPT_EDITOR_CONSTANTS.UI_STRINGS.SAVED, true);
+                }
+            });
+        }
+
+        function silentSaveScriptContent() {
+            if (!scriptQuill || !currentObservationId || !isScriptDirty) return;
+            console.log('Silently saving script content...');
+            saveScriptContent();
         }
 
         function saveScriptContent() {
-            if (!scriptQuill || !currentObservationId) return;
+            return new Promise((resolve, reject) => {
+                if (!scriptQuill || !currentObservationId) return reject(false);
 
-            const content = scriptQuill.getContents();
-            scriptContent = content; // Keep local copy
+                const content = scriptQuill.getContents();
+                scriptContent = content; // Keep local copy
 
-            showToast(SCRIPT_EDITOR_CONSTANTS.UI_STRINGS.SAVING, false);
-
-            google.script.run
-                .withSuccessHandler(function(result) {
-                    if (result.success) {
-                        showToast(SCRIPT_EDITOR_CONSTANTS.UI_STRINGS.SAVED, true);
-                    } else {
-                        console.error('Failed to save script content:', result.error);
-                        showToast(SCRIPT_EDITOR_CONSTANTS.UI_STRINGS.ERROR_SAVING + result.error, false);
-                    }
-                })
-                .withFailureHandler(function(error) {
-                    console.error('Error saving script content:', error);
-                    showToast(SCRIPT_EDITOR_CONSTANTS.UI_STRINGS.SERVER_ERROR + error.message, false);
-                })
-                .updateObservationScript(currentObservationId, content);
+                google.script.run
+                    .withSuccessHandler(function(result) {
+                        if (result.success) {
+                            isScriptDirty = false;
+                            updateSaveButtonState();
+                            resolve(true);
+                        } else {
+                            console.error('Failed to save script content:', result.error);
+                            showToast(SCRIPT_EDITOR_CONSTANTS.UI_STRINGS.ERROR_SAVING + result.error, false);
+                            reject(false);
+                        }
+                    })
+                    .withFailureHandler(function(error) {
+                        console.error('Error saving script content:', error);
+                        showToast(SCRIPT_EDITOR_CONSTANTS.UI_STRINGS.SERVER_ERROR + error.message, false);
+                        reject(false);
+                    })
+                    .updateObservationScript(currentObservationId, content);
+            });
         }
 
         function loadScriptContent() {
             if (!currentObservationId) {
-                console.warn('Cannot load script content: currentObservationId is not set', {
-                    currentObservationId,
-                    currentObservedUser,
-                    scriptQuillInitialized: !!scriptQuill
-                });
+                console.warn('Cannot load script content: currentObservationId is not set');
                 return;
             }
-
-            console.log('Loading script content for observation:', currentObservationId);
-
             google.script.run
                 .withSuccessHandler(function(content) {
-                    console.log('Script content loaded from server:', {
-                        observationId: currentObservationId,
-                        hasContent: !!content,
-                        contentType: typeof content,
-                        contentKeys: content ? Object.keys(content) : 'N/A',
-                        quillReady: !!scriptQuill
-                    });
-                    
-                    if (!scriptQuill) {
-                        console.error('Cannot load script content: Quill editor not initialized');
-                        return;
-                    }
-
-                    // Check if content is a valid, non-empty object
+                    if (!scriptQuill) return;
                     if (content && typeof content === 'object' && Object.keys(content).length > 0) {
                         scriptQuill.setContents(content, 'silent');
                         scriptContent = content;
-                        console.log('Script content successfully loaded into editor');
                     } else {
-                        // This block now handles null, undefined, or empty object content
-                        scriptQuill.setContents([], 'silent'); // Clear the editor
-                        scriptContent = {}; // Reset local content
-                        console.log('No existing script content found or content was invalid; editor cleared.');
+                        scriptQuill.setContents([], 'silent');
+                        scriptContent = {};
                     }
+                    isScriptDirty = false;
+                    updateSaveButtonState();
                 })
                 .withFailureHandler(function(error) {
                     console.error('Error loading script content:', error);
@@ -2702,6 +2730,7 @@
             <div class="script-editor-header">
                 <h2>Observation Script Editor</h2>
                 <div class="script-editor-controls">
+                    <button id="saveScriptBtn" class="btn-secondary" onclick="manualSaveScriptContent()" disabled>Saved!</button>
                     <button class="btn-secondary" onclick="closeScriptEditor()">Close</button>
                     <button class="btn-primary" onclick="exportScriptPDF()">Export PDF</button>
                 </div>
