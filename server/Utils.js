@@ -748,6 +748,12 @@ function addHtmlContentToDoc(container, html) {
                     applyInlineFormatting(headerText, currentText.trim());
                     currentText = '';
                 }
+            } else if (tagName === 'ul' || tagName === 'ol') {
+                // Handle text before a list starts.
+                if (!isClosing && currentText.trim()) {
+                    addParagraphWithFormatting(container, currentText.trim());
+                    currentText = '';
+                }
             } else if (tagName === 'li' && isClosing) {
                 if (currentText.trim()) {
                     const listItem = container.appendListItem(stripHtml(currentText.trim()));

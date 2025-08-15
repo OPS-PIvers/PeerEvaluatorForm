@@ -933,13 +933,43 @@ function _createScriptPdfDocument(observation, scriptContent, docName, contentSo
     body.appendParagraph('');
 
     // --- Script Content Section ---
-    body.appendParagraph('Script Content').setHeading(DocumentApp.ParagraphHeading.HEADING2);
+    if (contentSource === 'observation' && observation.componentTags && Object.keys(observation.componentTags).length > 0) {
+        // If there are component tags, group the content by component
+        const componentTags = observation.componentTags;
+
+        // Get all rubric data to look up component titles
+        const rubricData = getAllDomainsData(observation.observedRole, observation.observedYear, 'full');
+
+        Object.keys(componentTags).forEach(componentId => {
+            const tags = componentTags[componentId];
+            if (Array.isArray(tags) && tags.length > 0) {
+                // Find component name from rubric data
+                let componentName = componentId;
+                if (rubricData && rubricData.domains) {
+                    rubricData.domains.forEach(domain => {
+                        const component = domain.components.find(c => c.componentId === componentId);
+                        if(component) {
+                            componentName = component.title;
+                        }
+                    });
+                }
+
+                body.appendParagraph(componentName).setHeading(DocumentApp.ParagraphHeading.HEADING2);
+                const content = tags.map(tag => tag.text).join('\n');
+                body.appendParagraph(content).setSpacingAfter(12);
+            }
+        });
+
+        body.appendParagraph('---').setAlignment(DocumentApp.HorizontalAlignment.CENTER);
+        body.appendParagraph('');
+    }
+
+    // Always include the full script content at the end
+    body.appendParagraph('Full Script Content').setHeading(DocumentApp.ParagraphHeading.HEADING2);
 
     if (contentSource === 'html') {
-        // Use the robust HTML content parser
         addHtmlContentToDoc(body, scriptContent);
     } else if (contentSource === 'observation' && scriptContent.ops) {
-        // Quill Delta parsing
         scriptContent.ops.forEach(op => {
             if (op.insert && typeof op.insert === 'string') {
                 const text = op.insert;
