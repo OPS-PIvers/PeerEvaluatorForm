@@ -386,17 +386,47 @@ function _shareObservationFolder(observation) {
   try {
     const obsFolder = _getObservationFolder(observation);
     
-    // Add the observed staff member as viewer so they can access all materials
-    obsFolder.addViewer(observation.observedEmail);
+    // Check current permissions to avoid redundant sharing notifications
+    const editors = obsFolder.getEditors();
+    const viewers = obsFolder.getViewers();
     
-    // Ensure the peer evaluator has editor access for regeneration capabilities
-    obsFolder.addEditor(observation.observerEmail);
+    const observerHasEditor = editors.some(editor => editor.getEmail() === observation.observerEmail);
+    const observedHasViewer = viewers.some(viewer => viewer.getEmail() === observation.observedEmail) ||
+                             editors.some(editor => editor.getEmail() === observation.observedEmail);
     
-    debugLog(`Observation folder shared with observed staff member`, { 
+    // Add the observed staff member as viewer if they don't already have access
+    if (!observedHasViewer) {
+      obsFolder.addViewer(observation.observedEmail);
+      debugLog(`Added viewer access for observed staff member`, { 
+        observationId: observation.observationId,
+        sharedWith: observation.observedEmail
+      });
+    } else {
+      debugLog(`Observed staff member already has access`, { 
+        observationId: observation.observationId,
+        email: observation.observedEmail
+      });
+    }
+    
+    // Ensure the peer evaluator has editor access only if they don't already have it
+    if (!observerHasEditor) {
+      obsFolder.addEditor(observation.observerEmail);
+      debugLog(`Added editor access for peer evaluator`, { 
+        observationId: observation.observationId,
+        editorAccess: observation.observerEmail
+      });
+    } else {
+      debugLog(`Peer evaluator already has editor access`, { 
+        observationId: observation.observationId,
+        email: observation.observerEmail
+      });
+    }
+    
+    debugLog(`Observation folder sharing completed`, { 
       observationId: observation.observationId,
       folderId: obsFolder.getId(),
-      sharedWith: observation.observedEmail,
-      editorAccess: observation.observerEmail
+      observedEmail: observation.observedEmail,
+      observerEmail: observation.observerEmail
     });
 
   } catch (error) {
