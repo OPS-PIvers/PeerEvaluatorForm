@@ -2211,8 +2211,10 @@
         const SCRIPT_EDITOR_CONSTANTS = <?!= JSON.stringify(scriptEditorSettings) ?>;
         let scriptQuill = null;
         let scriptContent = {};
+        const SILENT_SAVE_DEBOUNCE_MS = 5000;
         let isScriptDirty = false;
         let scriptSaveDebounceTimer;
+        let isSavingScript = false;
 
         function updateSaveButtonState() {
             const saveBtn = document.getElementById('saveScriptBtn');
@@ -2255,7 +2257,7 @@
                         clearTimeout(scriptSaveDebounceTimer);
                         scriptSaveDebounceTimer = setTimeout(() => {
                             silentSaveScriptContent();
-                        }, 5000); // 5 second debounce for silent auto-save
+                        }, SILENT_SAVE_DEBOUNCE_MS);
                     }
                 });
             }
@@ -2275,31 +2277,44 @@
         }
 
         function manualSaveScriptContent() {
-            if (!scriptQuill || !currentObservationId) return;
+            if (!scriptQuill || !currentObservationId || isSavingScript) return;
 
             showToast(SCRIPT_EDITOR_CONSTANTS.UI_STRINGS.SAVING, false);
             saveScriptContent().then(success => {
                 if (success) {
                     showToast(SCRIPT_EDITOR_CONSTANTS.UI_STRINGS.SAVED, true);
                 }
+            }).catch(error => {
+                // Log errors, but don't show a toast as saveScriptContent already does.
+                console.warn("Could not manually save script:", error.message);
             });
         }
 
         function silentSaveScriptContent() {
-            if (!scriptQuill || !currentObservationId || !isScriptDirty) return;
+            if (!scriptQuill || !currentObservationId || !isScriptDirty || isSavingScript) return;
             console.log('Silently saving script content...');
-            saveScriptContent();
+            saveScriptContent().catch(error => {
+                // Silent saves should not bother the user, so just log.
+                console.warn("Could not silently save script:", error.message);
+            });
         }
 
         function saveScriptContent() {
             return new Promise((resolve, reject) => {
-                if (!scriptQuill || !currentObservationId) return reject(false);
+                if (isSavingScript) {
+                    return reject(new Error('A save operation is already in progress.'));
+                }
+                if (!scriptQuill || !currentObservationId) {
+                    return reject(new Error('Quill editor or observation ID is not available.'));
+                }
 
+                isSavingScript = true;
                 const content = scriptQuill.getContents();
                 scriptContent = content; // Keep local copy
 
                 google.script.run
                     .withSuccessHandler(function(result) {
+                        isSavingScript = false;
                         if (result.success) {
                             isScriptDirty = false;
                             updateSaveButtonState();
@@ -2307,13 +2322,14 @@
                         } else {
                             console.error('Failed to save script content:', result.error);
                             showToast(SCRIPT_EDITOR_CONSTANTS.UI_STRINGS.ERROR_SAVING + result.error, false);
-                            reject(false);
+                            reject(new Error(result.error || 'Unknown save error'));
                         }
                     })
                     .withFailureHandler(function(error) {
+                        isSavingScript = false;
                         console.error('Error saving script content:', error);
                         showToast(SCRIPT_EDITOR_CONSTANTS.UI_STRINGS.SERVER_ERROR + error.message, false);
-                        reject(false);
+                        reject(error);
                     })
                     .updateObservationScript(currentObservationId, content);
             });
