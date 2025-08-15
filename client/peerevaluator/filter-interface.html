@@ -1554,6 +1554,11 @@
                         window.globalObservationNotes[componentId] = componentData.notes;
                     }
                 });
+                
+                // Schedule recovery for components with notes data
+                setTimeout(() => {
+                    ensureEditorsForNotesData(rubricData.userContext.isEvaluator);
+                }, 500);
             }
             
             // Show global tools bar for evaluators after DOM injection
@@ -1851,7 +1856,29 @@
             // Check if this element already has a Quill instance (prevent duplicates)
             if (editorElement.__quill) {
                 console.log('Quill already initialized on this element:', editorId);
-                window.globalQuillInstances[componentId] = editorElement.__quill;
+                const existingEditor = editorElement.__quill;
+                window.globalQuillInstances[componentId] = existingEditor;
+                
+                // Load existing notes content if available and not already loaded
+                if (window.globalObservationNotes[componentId] && 
+                    (!existingEditor.root.innerHTML || existingEditor.root.innerHTML === '<p><br></p>')) {
+                    existingEditor.root.innerHTML = window.globalObservationNotes[componentId];
+                    console.log('Loaded existing notes for component:', componentId);
+                }
+                
+                // Ensure auto-save is set up (check if already has listeners to avoid duplicates)
+                if (!existingEditor._hasAutoSaveListener) {
+                    let timeout;
+                    existingEditor.on('text-change', () => {
+                        clearTimeout(timeout);
+                        timeout = setTimeout(() => {
+                            saveNotes(componentId, existingEditor.root.innerHTML);
+                        }, 1500);
+                    });
+                    existingEditor._hasAutoSaveListener = true;
+                    console.log('Auto-save listener attached to existing editor for:', componentId);
+                }
+                
                 return true;
             }
             
@@ -1891,6 +1918,7 @@
                         saveNotes(componentId, editor.root.innerHTML);
                     }, 1500); // Save 1.5 seconds after typing stops
                 });
+                editor._hasAutoSaveListener = true;
 
                 window.globalQuillInstances[componentId] = editor;
                 console.log('Quill editor initialized for component:', componentId);
@@ -1918,6 +1946,60 @@
                     showToast('Error saving notes. Please check your connection.');
                 })
                 .saveObservationNotes(currentObservationId, componentId, content);
+        }
+
+        // Recovery mechanism to ensure all components with notes data have editors
+        function ensureEditorsForNotesData(isEvaluator) {
+            if (!isEvaluator || !window.globalObservationNotes) {
+                return;
+            }
+            
+            console.log('Running recovery mechanism for orphaned notes data...');
+            
+            Object.keys(window.globalObservationNotes).forEach(componentId => {
+                const notesContent = window.globalObservationNotes[componentId];
+                if (notesContent && notesContent.trim() !== '' && notesContent !== '<p><br></p>') {
+                    // Check if editor exists
+                    if (!window.globalQuillInstances[componentId]) {
+                        console.log(`Found orphaned notes data for ${componentId}, attempting to initialize editor...`);
+                        
+                        // Check if the evidence section exists but is collapsed
+                        const evidenceSectionId = `evidence-${componentId}`;
+                        const evidenceSection = document.getElementById(evidenceSectionId);
+                        
+                        if (evidenceSection) {
+                            // Expand the section if collapsed
+                            const content = document.getElementById(evidenceSectionId);
+                            if (content && !content.classList.contains('expanded')) {
+                                console.log(`Expanding collapsed section for ${componentId} to recover notes...`);
+                                toggleEvidenceSection(evidenceSectionId);
+                            }
+                            
+                            // Try to initialize the editor with a slight delay
+                            setTimeout(() => {
+                                if (!window.globalQuillInstances[componentId]) {
+                                    console.log(`Force initializing editor for ${componentId}...`);
+                                    const success = window.initializeQuillEditor(componentId);
+                                    if (success) {
+                                        console.log(`Successfully recovered notes editor for ${componentId}`);
+                                    } else {
+                                        console.warn(`Failed to recover notes editor for ${componentId}`);
+                                    }
+                                }
+                            }, 200);
+                        } else {
+                            console.warn(`Evidence section not found for ${componentId}, cannot recover notes`);
+                        }
+                    } else {
+                        // Editor exists, ensure content is loaded
+                        const editor = window.globalQuillInstances[componentId];
+                        if (editor && (!editor.root.innerHTML || editor.root.innerHTML === '<p><br></p>')) {
+                            editor.root.innerHTML = notesContent;
+                            console.log(`Restored content to existing editor for ${componentId}`);
+                        }
+                    }
+                }
+            });
         }
 
         function triggerFileUpload(componentId) {
@@ -2607,21 +2689,30 @@
                         const evidenceSection = document.getElementById(evidenceSectionId);
                         if (evidenceSection) {
                             toggleEvidenceSection(evidenceSectionId);
-                            const attemptPush = (retries = 5) => {
+                            const attemptPush = (retries = 8) => { // Increased retries
                                 if (retries <= 0) {
                                     console.warn(`Could not initialize notes editor for ${componentId} after multiple attempts.`);
+                                    showToast(`Could not push to ${componentId} notes - editor initialization failed`, false);
                                     return;
                                 }
+                                
+                                // Try to force initialization if editor doesn't exist
+                                if (!window.globalQuillInstances[componentId]) {
+                                    console.log(`Attempting to force initialize editor for ${componentId}, retries left: ${retries}`);
+                                    window.initializeQuillEditor(componentId);
+                                }
+                                
                                 notesEditor = window.globalQuillInstances && window.globalQuillInstances[componentId];
                                 if (notesEditor) {
                                     completePushToNotes(componentId, tags, notesEditor);
                                 } else {
-                                    setTimeout(() => attemptPush(retries - 1), 200);
+                                    setTimeout(() => attemptPush(retries - 1), 300); // Increased delay
                                 }
                             };
                             attemptPush();
                         } else {
-                            console.warn(`Notes editor not found for ${componentId}.`);
+                            console.warn(`Evidence section not found for ${componentId}.`);
+                            showToast(`Could not find notes section for ${componentId}`, false);
                         }
                     } else {
                         completePushToNotes(componentId, tags, notesEditor);
