@@ -182,7 +182,6 @@ function setDynamicCache(baseKey, params, data) {
  * Sets data in the session cache layer.
  * Use for user-specific session information.
  * @param {string} baseKey - The base key for the cache entry.
- *_
  * @param {Object} params - Parameters to make the key unique.
  * @param {*} data - The data to be cached.
  */

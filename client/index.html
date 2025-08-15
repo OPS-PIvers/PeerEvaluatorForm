@@ -922,7 +922,10 @@
             color: #4a5568;
             margin-bottom: 10px;
             font-size: 0.9rem;
-            font-weight: .ql-toolbar {
+        font-weight: 600;
+        }
+
+        .ql-toolbar {
             border-top: 1px solid #d1d5db;
             border-left: 1px solid #d1d5db;
             border-right: 1px solid #d1d5db;
@@ -991,6 +994,15 @@
                 domainsHtml += renderDomain(domain, index);
             });
             return domainsHtml;
+        }
+
+        let currentObservationId = null;
+
+        function toggleEvidenceSection(button) {
+            const content = button.nextElementSibling;
+            if (content) {
+                content.classList.toggle('expanded');
+            }
         }
 
         function showToast(message, isSuccess = false) {
@@ -1071,25 +1083,6 @@
                 .saveLookForSelection(currentObservationId, componentId, lookForText, isChecked);
         }
 
-        function saveChanges() {
-            showLoading('Saving changes...');
-            google.script.run
-                .withSuccessHandler(function(response) {
-                    hideLoading();
-                    if (response.success) {
-                        pendingChanges = { proficiencies: {}, notes: {}, lookfors: {} };
-                        alert('Changes saved successfully!');
-                    } else {
-                        alert('Error saving changes: ' + response.error);
-                    }
-                })
-                .withFailureHandler(function(error) {
-                    hideLoading();
-                    alert('Error saving changes: ' + error.message);
-                })
-                .saveAllObservationChanges(currentObservationId, pendingChanges);
-        }
-
         function renderComponent(component, domainIndex, componentIndex) {
             let componentHtml = `<div class="component-section">`;
             componentHtml += `
@@ -1103,7 +1096,7 @@
             `;
             componentHtml += `
                 <div class="evidence-section">
-                    <button class="evidence-toggle-btn" onclick="toggleEvidenceSection('evidence-${component.componentId}')">
+                    <button class="evidence-toggle-btn" onclick="toggleEvidenceSection(this)">
                         <span>📝</span> Notes & Evidence
                     </button>
                     <div class="evidence-content" id="evidence-${component.componentId}">
@@ -1116,7 +1109,7 @@
                             <div class="look-fors-grid">
                                 ${component.bestPractices.map((practice, index) => `
                                     <div class="look-for-item">
-                                        <input type="checkbox" id="practice-${component.componentId}-${index}" onchange="handleLookForChange(this, '${component.componentId}', '${practice}')">
+                                        <input type="checkbox" id="practice-${component.componentId}-${index}" onchange="handleLookForChange(this, '${component.componentId}', '${practice.replace(/'/g, "\\'")}')">
                                         <label for="practice-${component.componentId}-${index}">${practice}</label>
                                     </div>
                                 `).join('')}
@@ -1144,7 +1137,6 @@
         function renderRubric(data) {
             const container = document.createElement('div');
             container.className = 'container';
-            container.innerHTML += `<button onclick="saveChanges()" class="filter-btn" style="margin: 10px;">Save Changes</button>`;
             container.innerHTML += renderHeader(data);
             container.innerHTML += renderNavigation(data);
             container.innerHTML += renderDomains(data);
@@ -1217,6 +1209,9 @@
 
         function handleRubricData(data) {
             if (data.rubricData) {
+                if (data.rubricData.observation) {
+                    currentObservationId = data.rubricData.observation.observationId;
+                }
                 renderRubric(data.rubricData);
             } else {
                 // Handle cases where rubric data is not returned, e.g., showing observation selector

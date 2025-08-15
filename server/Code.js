@@ -23,7 +23,17 @@ function doGet(e) {
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
-function getInitialAppData(params) {
+function getInitialAppData(paramString) {
+  const params = {};
+  if (paramString) {
+    paramString.split('&').forEach(part => {
+        const item = part.split('=');
+        if (item[0]) {
+            params[decodeURIComponent(item[0])] = item.length > 1 ? decodeURIComponent(item[1]) : true;
+        }
+    });
+  }
+
   const startTime = Date.now();
   const requestId = generateUniqueId('request');
   
@@ -95,8 +105,7 @@ function getInitialAppData(params) {
     console.error('Fatal error in getInitialAppData:', formatErrorMessage(error, 'getInitialAppData'));
     return {
         error: {
-            message: error.message,
-            stack: error.stack
+            message: error.message
         }
     };
   }
