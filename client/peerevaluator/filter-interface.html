@@ -1325,9 +1325,9 @@
                 cardsHtml += `
                     <div class="observation-card">
                         <div class="obs-card-content">
-                            <div class="obs-card-title">${escapeHtml(obs.observedName)} - ${obs.status}</div>
+                            <div class="obs-card-title">${escapeHtml(obs.observedName)} - ${escapeHtml(obs.status)}</div>
                             <div class="obs-card-desc">Created on ${date}</div>
-                            <div class="status-badge ${obs.status === 'Draft' ? 'status-draft' : 'status-finalized'}">${obs.status}</div>
+                            <div class="status-badge ${obs.status === 'Draft' ? 'status-draft' : 'status-finalized'}">${escapeHtml(obs.status)}</div>
                         </div>
                         ${buttons ? `<div class="obs-card-actions">${buttons}</div>` : ''}
                     </div>`;
