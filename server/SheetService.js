@@ -176,6 +176,8 @@ function getStaffData() {
 
     // Remove header row
     const dataRows = values.slice(1);
+    const lastRow = values.length;
+    const dataChanged = hasSheetDataChanged('Staff', values);
 
     const users = [];
     dataRows.forEach((row, index) => {

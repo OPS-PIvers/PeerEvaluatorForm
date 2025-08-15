@@ -1066,8 +1066,9 @@
                 .saveObservationNotes(currentObservationId, componentId, textarea.value);
         }, 1500);
 
-        function handleLookForChange(checkbox, componentId, lookForText) {
+        function handleLookForChange(checkbox, componentId) {
             const isChecked = checkbox.checked;
+            const lookForText = checkbox.dataset.practiceText;
 
             const revertUI = () => {
                 checkbox.checked = !isChecked;
@@ -1111,12 +1112,15 @@
                         <div class="look-fors-container">
                             <h4>Best Practices (Look-fors)</h4>
                             <div class="look-fors-grid">
-                                ${component.bestPractices.map((practice, index) => `
+                                ${component.bestPractices.map((practice, index) => {
+                                    const escapedPractice = practice.replace(/"/g, '&quot;');
+                                    return `
                                     <div class="look-for-item">
-                                        <input type="checkbox" id="practice-${component.componentId}-${index}" onchange="handleLookForChange(this, '${component.componentId}', '${practice.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}')">
+                                        <input type="checkbox" id="practice-${component.componentId}-${index}" onchange="handleLookForChange(this, '${component.componentId}')" data-practice-text="${escapedPractice}">
                                         <label for="practice-${component.componentId}-${index}">${practice}</label>
                                     </div>
-                                `).join('')}
+                                    `;
+                                }).join('')}
                             </div>
                         </div>
                     </div>
