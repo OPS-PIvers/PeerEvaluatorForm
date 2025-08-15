@@ -765,6 +765,54 @@ function updateObservationPdfUrl(observationId, pdfUrl) {
   }
 }
 
+/**
+ * Updates the script PDF URL for a specific observation.
+ * @param {string} observationId The ID of the observation to update.
+ * @param {string} scriptPdfUrl The URL of the generated script PDF.
+ * @returns {Object} A response object with success status.
+ */
+function updateObservationScriptUrl(observationId, scriptPdfUrl) {
+  if (!observationId || !scriptPdfUrl) {
+    return { success: false, error: 'Observation ID and script PDF URL are required.' };
+  }
+  try {
+    const spreadsheet = openSpreadsheet();
+    const sheet = getSheetByName(spreadsheet, SHEET_NAMES.OBSERVATION_DATA);
+    if (!sheet) {
+      throw new Error(`Sheet "${SHEET_NAMES.OBSERVATION_DATA}" not found.`);
+    }
+    const row = _findObservationRow(sheet, observationId);
+    if (row === -1) {
+      // Log this as a warning instead of returning an error that might break the UI flow.
+      // The calling function might not handle the error gracefully.
+      console.warn(`Observation with ID "${observationId}" not found in sheet. Cannot update script PDF URL.`);
+      return { success: false, error: 'Observation not found.' };
+    }
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const scriptPdfUrlCol = headers.indexOf('scriptPdfUrl') + 1;
+    const lastModifiedCol = headers.indexOf('lastModifiedAt') + 1;
+    if (scriptPdfUrlCol === 0) {
+      // This is a configuration error, so throwing an error is appropriate.
+      throw new Error('The "scriptPdfUrl" column was not found in the Observations sheet.');
+    }
+    // Update the script PDF URL and timestamp
+    sheet.getRange(row, scriptPdfUrlCol).setValue(scriptPdfUrl);
+    if (lastModifiedCol > 0) {
+      sheet.getRange(row, lastModifiedCol).setValue(new Date().toISOString());
+    }
+
+    SpreadsheetApp.flush();
+
+    debugLog('Observation script PDF URL updated', { observationId, scriptPdfUrl });
+    return { success: true };
+
+  } catch (error) {
+    console.error(`Error updating script PDF URL for observation ${observationId}:`, error);
+    // Return a structured error response
+    return { success: false, error: `An unexpected error occurred while updating the script PDF URL: ${error.message}` };
+  }
+}
+
 
 function _saveObservationNotes(observationId, componentId, notesContent) {
   if (!observationId || !componentId) {
