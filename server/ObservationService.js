@@ -4,6 +4,9 @@
  * This service manages observation records, which are stored as rows in the "Observation_Data" Google Sheet.
  */
 
+// JSON serialized fields in the observation database
+const JSON_SERIALIZED_FIELDS = ['observationData', 'evidenceLinks', 'observationNotes', 'scriptContent', 'componentTags'];
+
 
 /**
  * Retrieves the entire observations database from the Google Sheet.
@@ -29,7 +32,7 @@ function _getObservationsDb() {
       headers.forEach((header, index) => {
         let value = row[index];
         // Safely parse JSON fields
-        if ((header === 'observationData' || header === 'evidenceLinks' || header === 'observationNotes' || header === 'scriptContent' || header === 'componentTags') && typeof value === 'string' && value) {
+        if (JSON_SERIALIZED_FIELDS.includes(header) && typeof value === 'string' && value) {
           try {
             value = JSON.parse(value);
           } catch (e) {
@@ -102,7 +105,7 @@ function _appendObservationToSheet(observation) {
     const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
     const rowData = headers.map(header => {
       let value = observation[header];
-      if ((header === 'observationData' || header === 'evidenceLinks' || header === 'observationNotes' || header === 'scriptContent' || header === 'componentTags') && typeof value === 'object') {
+      if (JSON_SERIALIZED_FIELDS.includes(header) && typeof value === 'object') {
         return JSON.stringify(value, null, 2);
       }
       return value;
@@ -825,12 +828,7 @@ function updateObservationInSheet(observation) {
             let value = observation[header];
             
             // Convert objects to JSON strings for storage
-            if ((header === 'observationData' || 
-                 header === 'evidenceLinks' || 
-                 header === 'observationNotes' ||
-                 header === 'scriptContent' ||
-                 header === 'componentTags') &&
-                typeof value === 'object') {
+            if (JSON_SERIALIZED_FIELDS.includes(header) && typeof value === 'object') {
                 return JSON.stringify(value, null, 2);
             }
             
