@@ -1019,6 +1019,13 @@
             const parentRow = element.closest('.performance-levels-content');
             const previouslySelected = parentRow.querySelector('.level-content.selected');
 
+            const revertUI = () => {
+                element.classList.remove('selected');
+                if (previouslySelected) {
+                    previouslySelected.classList.add('selected');
+                }
+            };
+
             // Optimistic UI update
             if (previouslySelected) {
                 previouslySelected.classList.remove('selected');
@@ -1028,20 +1035,12 @@
             google.script.run
                 .withSuccessHandler(function(response) {
                     if (!response.success) {
-                        // Revert UI on failure
-                        element.classList.remove('selected');
-                        if (previouslySelected) {
-                            previouslySelected.classList.add('selected');
-                        }
+                        revertUI();
                         showToast('Error saving selection: ' + response.error);
                     }
                 })
                 .withFailureHandler(function(error) {
-                    // Revert UI on failure
-                    element.classList.remove('selected');
-                    if (previouslySelected) {
-                        previouslySelected.classList.add('selected');
-                    }
+                    revertUI();
                     showToast('Server error: ' + error.message);
                 })
                 .saveProficiencySelection(currentObservationId, componentId, proficiency);
@@ -1069,15 +1068,20 @@
 
         function handleLookForChange(checkbox, componentId, lookForText) {
             const isChecked = checkbox.checked;
+
+            const revertUI = () => {
+                checkbox.checked = !isChecked;
+            };
+
             google.script.run
                 .withSuccessHandler(function(response) {
                     if (!response.success) {
-                        checkbox.checked = !isChecked; // Revert on failure
+                        revertUI();
                         showToast('Error saving look-for: ' + response.error);
                     }
                 })
                 .withFailureHandler(function(error) {
-                    checkbox.checked = !isChecked; // Revert on failure
+                    revertUI();
                     showToast('Server error saving look-for: ' + error.message);
                 })
                 .saveLookForSelection(currentObservationId, componentId, lookForText, isChecked);
@@ -1109,7 +1113,7 @@
                             <div class="look-fors-grid">
                                 ${component.bestPractices.map((practice, index) => `
                                     <div class="look-for-item">
-                                        <input type="checkbox" id="practice-${component.componentId}-${index}" onchange="handleLookForChange(this, '${component.componentId}', '${practice.replace(/'/g, "\\'")}')">
+                                        <input type="checkbox" id="practice-${component.componentId}-${index}" onchange="handleLookForChange(this, '${component.componentId}', '${practice.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}')">
                                         <label for="practice-${component.componentId}-${index}">${practice}</label>
                                     </div>
                                 `).join('')}
