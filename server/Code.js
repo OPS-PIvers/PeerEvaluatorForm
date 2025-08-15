@@ -26,12 +26,16 @@ function doGet(e) {
 function getInitialAppData(paramString) {
   const params = {};
   if (paramString) {
-    paramString.split('&').forEach(part => {
-        const item = part.split('=');
-        if (item[0]) {
-            params[decodeURIComponent(item[0])] = item.length > 1 ? decodeURIComponent(item[1]) : true;
+    for (const part of paramString.split('&')) {
+        const eqIndex = part.indexOf('=');
+        if (eqIndex === -1) {
+            if (part) params[decodeURIComponent(part)] = true;
+        } else {
+            const key = decodeURIComponent(part.substring(0, eqIndex));
+            const value = decodeURIComponent(part.substring(eqIndex + 1));
+            params[key] = value;
         }
-    });
+    }
   }
 
   const startTime = Date.now();
@@ -105,7 +109,7 @@ function getInitialAppData(paramString) {
     console.error('Fatal error in getInitialAppData:', formatErrorMessage(error, 'getInitialAppData'));
     return {
         error: {
-            message: error.message
+            message: 'An unexpected error occurred. Please try again or contact support.'
         }
     };
   }

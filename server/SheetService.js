@@ -177,7 +177,6 @@ function getStaffData() {
     // Remove header row
     const dataRows = values.slice(1);
     const lastRow = values.length;
-    const dataChanged = hasSheetDataChanged('Staff', values);
 
     const users = [];
     dataRows.forEach((row, index) => {
@@ -246,14 +245,12 @@ function getStaffData() {
     const executionTime = Date.now() - startTime;
     logPerformanceMetrics('getStaffData', executionTime, {
       userCount: users.length,
-      rowsProcessed: lastRow - 1,
-      dataChanged: dataChanged
+      rowsProcessed: lastRow - 1
     });
     
     debugLog('Staff data loaded successfully', {
       userCount: users.length,
-      validUsers: users.length,
-      dataChanged: dataChanged
+      validUsers: users.length
     });
     
     return staffData;
@@ -359,7 +356,7 @@ function getSettingsData() {
     debugLog('Settings data loaded successfully', {
       rolesConfigured: Object.keys(roleYearMappings).length
     });
-    
+
     return settingsData;
     
     // Process data from the Settings sheet.
