@@ -2237,6 +2237,9 @@
             const modal = document.getElementById('scriptEditorModal');
             modal.style.display = 'flex';
 
+            // Clear any pending auto-save timer when opening editor
+            clearTimeout(scriptSaveDebounceTimer);
+
             if (!scriptQuill) {
                 // Initialize Quill editor using constants
                 scriptQuill = new Quill('#scriptEditor', {
@@ -2271,6 +2274,8 @@
                     return;
                 }
             }
+            // Clear any pending auto-save timer
+            clearTimeout(scriptSaveDebounceTimer);
             const modal = document.getElementById('scriptEditorModal');
             modal.style.display = 'none';
             isScriptDirty = false;
@@ -2302,10 +2307,12 @@
         function saveScriptContent() {
             return new Promise((resolve, reject) => {
                 if (isSavingScript) {
-                    return reject(new Error('A save operation is already in progress.'));
+                    reject(new Error('A save operation is already in progress.'));
+                    return;
                 }
                 if (!scriptQuill || !currentObservationId) {
-                    return reject(new Error('Quill editor or observation ID is not available.'));
+                    reject(new Error('Quill editor or observation ID is not available.'));
+                    return;
                 }
 
                 isSavingScript = true;
