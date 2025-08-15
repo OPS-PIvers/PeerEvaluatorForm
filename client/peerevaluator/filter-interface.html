@@ -1302,6 +1302,8 @@
                 const date = new Date(obs.createdAt).toLocaleDateString();
                 let buttons = '';
                 const safeObsId = escapeHtml(obs.observationId);
+                const safeObsName = escapeHtml(obs.observedName);
+                const safeStatus = escapeHtml(obs.status);
 
                 if (obs.status === 'Draft') {
                     buttons = `<button class="filter-btn btn-edit" onclick="handleEditObservation('${safeObsId}')">Edit</button>
@@ -1325,9 +1327,9 @@
                 cardsHtml += `
                     <div class="observation-card">
                         <div class="obs-card-content">
-                            <div class="obs-card-title">${escapeHtml(obs.observedName)} - ${escapeHtml(obs.status)}</div>
+                            <div class="obs-card-title">${safeObsName} - ${safeStatus}</div>
                             <div class="obs-card-desc">Created on ${date}</div>
-                            <div class="status-badge ${obs.status === 'Draft' ? 'status-draft' : 'status-finalized'}">${escapeHtml(obs.status)}</div>
+                            <div class="status-badge ${obs.status === 'Draft' ? 'status-draft' : 'status-finalized'}">${safeStatus}</div>
                         </div>
                         ${buttons ? `<div class="obs-card-actions">${buttons}</div>` : ''}
                     </div>`;
