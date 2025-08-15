@@ -979,6 +979,36 @@
             box-shadow: 0 4px 8px rgba(245, 101, 101, 0.3);
         }
 
+        /* Custom Quill Clear All Button Styling */
+        .ql-clear-all {
+            background: linear-gradient(135deg, #f56565 0%, #e53e3e 100%) !important;
+            color: white !important;
+            border: 1px solid #e53e3e !important;
+            border-radius: 4px !important;
+            padding: 6px 12px !important;
+            font-size: 13px !important;
+            font-weight: 500 !important;
+            transition: all 0.2s ease !important;
+            margin-left: 8px !important;
+        }
+
+        .ql-clear-all:hover {
+            background: linear-gradient(135deg, #e53e3e 0%, #c53030 100%) !important;
+            transform: translateY(-1px) !important;
+            box-shadow: 0 2px 8px rgba(245, 101, 101, 0.3) !important;
+            border-color: #c53030 !important;
+        }
+
+        .ql-clear-all:active {
+            transform: translateY(0) !important;
+            box-shadow: 0 1px 4px rgba(245, 101, 101, 0.2) !important;
+        }
+
+        /* Ensure proper spacing in toolbar */
+        .ql-toolbar .ql-formats:last-child .ql-clear-all {
+            margin-left: 8px;
+        }
+
         .tag-status {
             font-size: 12px;
             color: #4a5568;
@@ -1879,6 +1909,26 @@
                     console.log('Auto-save listener attached to existing editor for:', componentId);
                 }
                 
+                // Ensure Clear All handler is set up for existing editors (check if already has handler)
+                if (!existingEditor._hasClearAllHandler) {
+                    const toolbar = existingEditor.getModule('toolbar');
+                    if (toolbar && toolbar.addHandler) {
+                        toolbar.addHandler('clear-all', function() {
+                            if (confirm(`Are you sure you want to clear all notes for this component?\n\nThis action cannot be undone.`)) {
+                                existingEditor.setContents([], 'user');
+                                console.log(`Notes cleared for component: ${componentId}`);
+                                showToast(`Notes cleared for ${componentId}`, true);
+                                
+                                // Immediately save the cleared state
+                                window.globalObservationNotes[componentId] = '';
+                                saveNotes(componentId, '');
+                            }
+                        });
+                        existingEditor._hasClearAllHandler = true;
+                        console.log('Clear All handler attached to existing editor for:', componentId);
+                    }
+                }
+                
                 return true;
             }
             
@@ -1891,18 +1941,58 @@
                     return false;
                 }
                 
+                // Create custom toolbar HTML
+                const toolbarId = `toolbar-${escapedComponentId}`;
+                const customToolbar = document.createElement('div');
+                customToolbar.id = toolbarId;
+                customToolbar.className = 'ql-toolbar ql-snow';
+                customToolbar.innerHTML = `
+                    <span class="ql-formats">
+                        <select class="ql-header">
+                            <option value="1"></option>
+                            <option value="2"></option>
+                            <option selected></option>
+                        </select>
+                    </span>
+                    <span class="ql-formats">
+                        <button class="ql-bold" title="Bold"></button>
+                        <button class="ql-italic" title="Italic"></button>
+                        <button class="ql-underline" title="Underline"></button>
+                    </span>
+                    <span class="ql-formats">
+                        <button class="ql-list" value="ordered" title="Numbered List"></button>
+                        <button class="ql-list" value="bullet" title="Bullet List"></button>
+                    </span>
+                    <span class="ql-formats">
+                        <button class="ql-clean" title="Remove Formatting"></button>
+                        <button class="ql-clear-all" title="Clear all notes for this component">🗑️ Clear All</button>
+                    </span>
+                `;
+                
+                // Insert toolbar before the editor element
+                editorElement.parentNode.insertBefore(customToolbar, editorElement);
+
                 const editor = new Quill(editorElement, {
                     theme: 'snow',
                     modules: {
-                        toolbar: [
-                            [{ 'header': [1, 2, false] }],
-                            ['bold', 'italic', 'underline'],
-                            [{'list': 'ordered'}, {'list': 'bullet'}],
-                            ['clean']
-                        ]
+                        toolbar: `#${toolbarId}`
                     }
                 });
                 console.log('Quill editor created successfully');
+
+                // Add custom Clear All handler
+                const toolbar = editor.getModule('toolbar');
+                toolbar.addHandler('clear-all', function() {
+                    if (confirm(`Are you sure you want to clear all notes for this component?\n\nThis action cannot be undone.`)) {
+                        editor.setContents([], 'user'); // Clear content and trigger change event
+                        console.log(`Notes cleared for component: ${componentId}`);
+                        showToast(`Notes cleared for ${componentId}`, true);
+                        
+                        // Immediately save the cleared state
+                        window.globalObservationNotes[componentId] = '';
+                        saveNotes(componentId, '');
+                    }
+                });
 
                 // Load existing notes 
                 if (window.globalObservationNotes[componentId]) {
@@ -1919,6 +2009,7 @@
                     }, 1500); // Save 1.5 seconds after typing stops
                 });
                 editor._hasAutoSaveListener = true;
+                editor._hasClearAllHandler = true;
 
                 window.globalQuillInstances[componentId] = editor;
                 console.log('Quill editor initialized for component:', componentId);
