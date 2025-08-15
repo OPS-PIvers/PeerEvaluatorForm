@@ -1316,6 +1316,7 @@
                 const date = new Date(obs.createdAt).toLocaleDateString();
                 let buttons = '';
                 const safeObsIdJs = escapeJsString(obs.observationId);
+                const safeObsIdHtml = escapeHtml(obs.observationId);
                 const safeObsNameHtml = escapeHtml(obs.observedName);
                 const safeStatusHtml = escapeHtml(obs.status);
                 const safeObservedNameJs = escapeJsString(observedName); // For passing to finalize/delete handlers
@@ -1329,9 +1330,9 @@
                     if (obs.pdfUrl) {
                         pdfButtonHtml = `<button class="filter-btn btn-export" onclick="window.open('${escapeJsString(obs.pdfUrl)}', '_blank')">View PDF</button>`;
                     } else if (obs.pdfStatus === 'failed') {
-                        pdfButtonHtml = `<button class="filter-btn btn-export btn-pdf-failed" id="pdf-button-${safeObsIdJs}" onclick="handleRetryPdf('${safeObsIdJs}')">Retry PDF</button>`;
+                        pdfButtonHtml = `<button class="filter-btn btn-export btn-pdf-failed" id="pdf-button-${safeObsIdHtml}" onclick="handleRetryPdf('${safeObsIdJs}')">Retry PDF</button>`;
                     } else {
-                        pdfButtonHtml = `<button class="filter-btn btn-export btn-pdf-missing" id="pdf-button-${safeObsIdJs}" disabled>Generating PDF...</button>`;
+                        pdfButtonHtml = `<button class="filter-btn btn-export btn-pdf-missing" id="pdf-button-${safeObsIdHtml}" disabled>Generating PDF...</button>`;
                         setTimeout(() => startPdfPolling(obs.observationId), 100);
                     }
 
