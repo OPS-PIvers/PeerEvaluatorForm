@@ -1169,9 +1169,7 @@
         function renderRubric(data) {
             const container = document.createElement('div');
             container.className = 'container';
-            container.innerHTML += renderHeader(data);
-            container.innerHTML += renderNavigation(data);
-            container.innerHTML += renderDomains(data);
+            container.innerHTML = renderHeader(data) + renderNavigation(data) + renderDomains(data);
 
             const root = document.getElementById('root');
             root.innerHTML = '';

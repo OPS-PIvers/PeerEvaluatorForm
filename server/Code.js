@@ -1286,6 +1286,10 @@ function onEditTrigger(e) {
 
     // Handle Staff sheet edits (existing functionality)
     if (sheetName === SHEET_NAMES.STAFF) {
+      const cache = CacheService.getScriptCache();
+      cache.remove('raw_sheet_Staff');
+      debugLog('Invalidated raw_sheet_Staff cache due to edit.');
+
       // Only process edits to the Role column (Column C = index 3)
       if (editedColumn !== STAFF_COLUMNS.ROLE + 1) { // +1 because columns are 1-indexed in triggers
         debugLog('Edit not in Role column - ignoring', {
@@ -1305,6 +1309,14 @@ function onEditTrigger(e) {
       // Use existing role change processing function
       processRoleChangeFromTrigger(sheet, editedRow, newValue, oldValue, triggerId);
       return;
+    }
+
+    // Handle Settings sheet edits
+    if (sheetName === SHEET_NAMES.SETTINGS) {
+        const cache = CacheService.getScriptCache();
+        cache.remove('raw_sheet_Settings');
+        debugLog('Invalidated raw_sheet_Settings cache due to edit.');
+        return;
     }
 
     // Handle role-specific sheet edits (rubric content changes)

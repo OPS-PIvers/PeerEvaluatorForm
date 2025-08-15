@@ -486,6 +486,7 @@ function getRoleSheetData(roleName) {
     }
 
     // Cache with enhanced system
+    const cacheParams = { role: roleName };
     setCachedDataEnhanced('role_sheet', cacheParams, roleSheetData, CACHE_SETTINGS.SHEET_DATA_TTL);
     
     const executionTime = Date.now() - startTime;
