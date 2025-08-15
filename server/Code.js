@@ -866,7 +866,7 @@ function generateScriptPDF(observationId, scriptHtml = null) {
         const pdfBlob = _createScriptPdfDocument(observation, scriptContent, docName, contentSource);
 
         // --- Save PDF to Drive ---
-        const folder = getOrCreateObservationFolder(observation.observedEmail, observationId);
+        const folder = getOrCreateObservationFolder(observationId);
         const pdfFile = folder.createFile(pdfBlob).setName(`${docName}.pdf`);
         const pdfUrl = pdfFile.getUrl();
 
@@ -936,15 +936,8 @@ function _createScriptPdfDocument(observation, scriptContent, docName, contentSo
     body.appendParagraph('Script Content').setHeading(DocumentApp.ParagraphHeading.HEADING2);
 
     if (contentSource === 'html') {
-        // Basic HTML parsing
-        const paragraphs = scriptContent.split('</p>');
-        paragraphs.forEach(p => {
-            const cleanP = p.replace(/<p>|<\/p>/gi, '').trim();
-            if (cleanP) {
-                const text = cleanP.replace(/<[^>]+>/g, ''); // Strip tags for simplicity
-                body.appendParagraph(text);
-            }
-        });
+        // Use the robust HTML content parser
+        _addHtmlContent(body, scriptContent);
     } else if (contentSource === 'observation' && scriptContent.ops) {
         // Quill Delta parsing
         scriptContent.ops.forEach(op => {
@@ -975,6 +968,117 @@ function _createScriptPdfDocument(observation, scriptContent, docName, contentSo
     docFile.setTrashed(true); // Cleanup temporary file
 
     return pdfBlob;
+}
+
+
+/**
+ * =================================================================
+ * PRIVATE HELPER FUNCTIONS FOR PDF GENERATION (from PdfService.js)
+ * =================================================================
+ */
+
+/**
+ * Adds HTML content to a container, preserving basic formatting.
+ * @param {DocumentApp.ContainerElement} container The container to add the notes to.
+ * @param {string} notesHtml The HTML content of the notes.
+ * @private
+ */
+function _addHtmlContent(container, notesHtml) {
+    try {
+        notesHtml = notesHtml.replace(/<br\s*\/?>/gi, '\n');
+        const blockRegex = /<(\/?)(?:p|h1|h2|ul|ol|li)(?:\s[^>]*)?>|(<\/li>)/gi;
+        let currentText = '';
+        let lastIndex = 0;
+        let match;
+        let inList = false;
+
+        while ((match = blockRegex.exec(notesHtml)) !== null) {
+            const textBefore = notesHtml.slice(lastIndex, match.index);
+            currentText += textBefore;
+
+            const tag = match[0];
+            const tagName = tag.match(/<\/?(\w+)/)?.[1]?.toLowerCase();
+            const isClosing = tag.startsWith('</');
+
+            if (tagName === 'p' && isClosing) {
+                if (currentText.trim()) _addParagraphWithFormatting(container, currentText.trim());
+                currentText = '';
+            } else if ((tagName === 'h1' || tagName === 'h2') && isClosing) {
+                if (currentText.trim()) {
+                    const headerPara = container.appendParagraph(_stripHtml(currentText.trim()));
+                    const headerText = headerPara.getChild(0).asText();
+                    headerText.setBold(true).setFontSize(tagName === 'h1' ? 14 : 12);
+                    _applyInlineFormatting(headerText, currentText.trim());
+                    currentText = '';
+                }
+            } else if (tagName === 'ul' || tagName === 'ol') {
+                if (!isClosing) {
+                    inList = true;
+                    if (currentText.trim()) {
+                        _addParagraphWithFormatting(container, currentText.trim());
+                        currentText = '';
+                    }
+                } else {
+                    inList = false;
+                }
+            } else if (tagName === 'li' && isClosing) {
+                if (currentText.trim()) {
+                    const listItem = container.appendListItem(_stripHtml(currentText.trim()));
+                    _applyInlineFormatting(listItem.getChild(0).asText(), currentText.trim());
+                    currentText = '';
+                }
+            }
+            lastIndex = blockRegex.lastIndex;
+        }
+
+        const remainingText = notesHtml.slice(lastIndex);
+        currentText += remainingText;
+        if (currentText.trim()) {
+            _addParagraphWithFormatting(container, currentText.trim());
+        }
+
+    } catch (e) {
+        container.appendParagraph(_stripHtml(notesHtml));
+    }
+}
+
+function _addParagraphWithFormatting(container, text) {
+    if (!text.trim()) return;
+    const paragraph = container.appendParagraph(_stripHtml(text));
+    paragraph.setSpacingBefore(0).setSpacingAfter(0).setLineSpacing(1);
+    _applyInlineFormatting(paragraph.getChild(0).asText(), text);
+}
+
+function _applyInlineFormatting(textElement, html) {
+    let cleanText = _stripHtml(html);
+    let placeholderCounter = 0;
+
+    const applyStyle = (tag, styleSetter) => {
+        const regex = new RegExp(`<${tag}>(.*?)<\\/${tag}>`, 'gi');
+        const matches = [...html.matchAll(regex)];
+
+        matches.forEach(match => {
+            const styledText = _stripHtml(match[1]);
+            if (styledText) {
+                let searchIndex = 0;
+                let foundIndex;
+                while ((foundIndex = cleanText.indexOf(styledText, searchIndex)) > -1) {
+                    styleSetter(foundIndex, foundIndex + styledText.length - 1, true);
+                    const placeholder = `__PLACEHOLDER_${placeholderCounter++}__`.padEnd(styledText.length, '_');
+                    cleanText = cleanText.substring(0, foundIndex) + placeholder + cleanText.substring(foundIndex + styledText.length);
+                    break;
+                }
+            }
+        });
+    };
+
+    applyStyle('strong', (start, end, value) => textElement.setBold(start, end, value));
+    applyStyle('em', (start, end, value) => textElement.setItalic(start, end, value));
+    applyStyle('u', (start, end, value) => textElement.setUnderline(start, end, value));
+}
+
+function _stripHtml(html) {
+    return html ? html.replace(/<[^>]*>?/gm, '') : '';
 }
 
 
