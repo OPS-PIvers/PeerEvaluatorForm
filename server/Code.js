@@ -919,8 +919,7 @@ function _createScriptPdfDocument(observation, scriptContent, docName, contentSo
     // --- Metadata Table ---
     const metadataTable = body.appendTable([
         ['Observer:', observation.observerEmail],
-        ['Observed Staff:', `${observation.observedName} (${observation.observedEmail})`],
-        ['Observation ID:', observation.observationId]
+        ['Observed Staff:', `${observation.observedName} (${observation.observedEmail})`]
     ]);
     metadataTable.setBorderWidth(0);
 
@@ -933,40 +932,7 @@ function _createScriptPdfDocument(observation, scriptContent, docName, contentSo
     body.appendParagraph('');
 
     // --- Script Content Section ---
-    if (contentSource === 'observation' && observation.componentTags && Object.keys(observation.componentTags).length > 0) {
-        // If there are component tags, group the content by component
-        const componentTags = observation.componentTags;
-
-        // Get all rubric data to look up component titles
-        const rubricData = getAllDomainsData(observation.observedRole, observation.observedYear, 'full');
-
-        // Create a lookup map for component titles for performance
-        const componentMap = new Map();
-        if (rubricData && rubricData.domains) {
-            for (const domain of rubricData.domains) {
-                for (const component of domain.components) {
-                    componentMap.set(component.componentId, component.title);
-                }
-            }
-        }
-
-        Object.keys(componentTags).forEach(componentId => {
-            const tags = componentTags[componentId];
-            if (Array.isArray(tags) && tags.length > 0) {
-                // Find component name from the lookup map
-                const componentName = componentMap.get(componentId) || componentId;
-
-                body.appendParagraph(componentName).setHeading(DocumentApp.ParagraphHeading.HEADING2);
-                const content = tags.map(tag => tag.text).join('\n');
-                body.appendParagraph(content).setSpacingAfter(12);
-            }
-        });
-
-        body.appendParagraph('---').setAlignment(DocumentApp.HorizontalAlignment.CENTER);
-        body.appendParagraph('');
-    }
-
-    // Always include the full script content at the end
+    // Always include the full script content first
     body.appendParagraph('Full Script Content').setHeading(DocumentApp.ParagraphHeading.HEADING2);
 
     if (contentSource === 'html') {
@@ -991,6 +957,41 @@ function _createScriptPdfDocument(observation, scriptContent, docName, contentSo
         });
     } else {
         body.appendParagraph('No script content was provided or content format is invalid.').setItalic(true);
+    }
+
+    // If there are component tags, group the content by component after the full script
+    if (contentSource === 'observation' && observation.componentTags && Object.keys(observation.componentTags).length > 0) {
+        body.appendParagraph('');
+        body.appendParagraph('---').setAlignment(DocumentApp.HorizontalAlignment.CENTER);
+        body.appendParagraph('');
+        body.appendParagraph('Content Organized by Rubric Components').setHeading(DocumentApp.ParagraphHeading.HEADING2);
+
+        const componentTags = observation.componentTags;
+
+        // Get all rubric data to look up component titles
+        const rubricData = getAllDomainsData(observation.observedRole, observation.observedYear, 'full');
+
+        // Create a lookup map for component titles for performance
+        const componentMap = new Map();
+        if (rubricData && rubricData.domains) {
+            for (const domain of rubricData.domains) {
+                for (const component of domain.components) {
+                    componentMap.set(component.componentId, component.title);
+                }
+            }
+        }
+
+        Object.keys(componentTags).forEach(componentId => {
+            const tags = componentTags[componentId];
+            if (Array.isArray(tags) && tags.length > 0) {
+                // Find component name from the lookup map
+                const componentName = componentMap.get(componentId) || componentId;
+
+                body.appendParagraph(componentName).setHeading(DocumentApp.ParagraphHeading.HEADING3);
+                const content = tags.map(tag => tag.text).join('\n');
+                body.appendParagraph(content).setSpacingAfter(12);
+            }
+        });
     }
 
     // --- Save and Cleanup ---
