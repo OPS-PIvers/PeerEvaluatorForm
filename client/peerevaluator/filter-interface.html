@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= userContext.role ?> - Select Rubric View</title>
     
-    <!-- Content Security Policy - Allow framing from any origin -->
-    <meta http-equiv="Content-Security-Policy" content="frame-ancestors *;">
+    <!-- Content Security Policy - Allow framing from same origin and Google domains -->
+    <meta http-equiv="Content-Security-Policy" content="frame-ancestors 'self' https://*.google.com;">
     
     <!-- Quill.js for rich text editing -->
     <link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet">
@@ -1151,7 +1151,8 @@
         let observationViewMode = 'assigned';
         let currentObservedUser = { email: null, name: null };
 
-        function showView(viewId) { 
+        function showView(viewId) {
+            stopAllPollers(); // Stop any running pollers when the view changes
             ['quickActionsView', 'customFiltersView', 'observationSelectorView', 'rubricContainer'].forEach(id => { 
                 document.getElementById(id).style.display = 'none'; 
             }); 
@@ -1283,46 +1284,55 @@
             }
         }
 
+        function stopAllPollers() {
+            Object.keys(activePollers).forEach(observationId => {
+                stopPdfPolling(observationId);
+            });
+        }
+
         function renderObservationCards(result, observedEmail, observedName) {
             hideLoading();
             if (!result.success) return showError(result.error);
             const container = document.getElementById('observationSelectorView');
-            let cardsHtml = `<div class="action-card" onclick="handleNewObservation('${observedEmail}')"><span class="action-icon">➕</span><div class="action-title">Start New Observation</div><div class="action-desc">Begin a new evaluation for this staff member.</div></div>`;
+            const safeObservedName = escapeHtml(observedName);
+            const safeObservedEmail = escapeHtml(observedEmail);
+
+            let cardsHtml = `<div class="action-card" onclick="handleNewObservation('${safeObservedEmail}')"><span class="action-icon">➕</span><div class="action-title">Start New Observation</div><div class="action-desc">Begin a new evaluation for this staff member.</div></div>`;
             result.observations.forEach(obs => {
                 const date = new Date(obs.createdAt).toLocaleDateString();
                 let buttons = '';
+                const safeObsId = escapeHtml(obs.observationId);
+
                 if (obs.status === 'Draft') {
-                    buttons = `<button class="filter-btn btn-edit" onclick="handleEditObservation('${obs.observationId}')">Edit</button>
-                               <button class="filter-btn btn-finalize" onclick="handleFinalizeObservation('${obs.observationId}', '${observedEmail}', '${observedName}')">Finalize</button>
-                               <button class="filter-btn btn-delete" onclick="handleDeleteObservation('${obs.observationId}', '${observedEmail}', '${observedName}')">Delete</button>`;
+                    buttons = `<button class="filter-btn btn-edit" onclick="handleEditObservation('${safeObsId}')">Edit</button>
+                               <button class="filter-btn btn-finalize" onclick="handleFinalizeObservation('${safeObsId}', '${safeObservedEmail}', '${safeObservedName}')">Finalize</button>
+                               <button class="filter-btn btn-delete" onclick="handleDeleteObservation('${safeObsId}', '${safeObservedEmail}', '${safeObservedName}')">Delete</button>`;
                 } else if (obs.status === 'Finalized') {
                     let pdfButtonHtml = '';
                     if (obs.pdfUrl) {
                         pdfButtonHtml = `<button class="filter-btn btn-export" onclick="window.open('${escapeHtml(obs.pdfUrl)}', '_blank')">View PDF</button>`;
                     } else if (obs.pdfStatus === 'failed') {
-                        pdfButtonHtml = `<button class="filter-btn btn-export btn-pdf-failed" id="pdf-button-${escapeHtml(obs.observationId)}" onclick="handleRetryPdf('${escapeHtml(obs.observationId)}')">Retry PDF</button>`;
+                        pdfButtonHtml = `<button class="filter-btn btn-export btn-pdf-failed" id="pdf-button-${safeObsId}" onclick="handleRetryPdf('${safeObsId}')">Retry PDF</button>`;
                     } else {
-                        // PDF is pending generation or status is unknown
-                        pdfButtonHtml = `<button class="filter-btn btn-export btn-pdf-missing" id="pdf-button-${escapeHtml(obs.observationId)}" disabled>Generating PDF...</button>`;
-                        // Automatically start polling if we render a card that's pending
+                        pdfButtonHtml = `<button class="filter-btn btn-export btn-pdf-missing" id="pdf-button-${safeObsId}" disabled>Generating PDF...</button>`;
                         setTimeout(() => startPdfPolling(obs.observationId), 100);
                     }
 
-                    buttons = `<button class="filter-btn btn-view" onclick="handleViewObservation('${escapeHtml(obs.observationId)}')">View</button>
+                    buttons = `<button class="filter-btn btn-view" onclick="handleViewObservation('${safeObsId}')">View</button>
                                ${pdfButtonHtml}
-                               <button class="filter-btn btn-delete" onclick="handleDeleteFinalizedObservation('${escapeHtml(obs.observationId)}', '${escapeHtml(observedEmail)}', '${escapeHtml(observedName)}')">Delete</button>`;
+                               <button class="filter-btn btn-delete" onclick="handleDeleteFinalizedObservation('${safeObsId}', '${safeObservedEmail}', '${safeObservedName}')">Delete</button>`;
                 }
                 cardsHtml += `
                     <div class="observation-card">
                         <div class="obs-card-content">
-                            <div class="obs-card-title">${obs.observedName} - ${obs.status}</div>
+                            <div class="obs-card-title">${escapeHtml(obs.observedName)} - ${obs.status}</div>
                             <div class="obs-card-desc">Created on ${date}</div>
                             <div class="status-badge ${obs.status === 'Draft' ? 'status-draft' : 'status-finalized'}">${obs.status}</div>
                         </div>
                         ${buttons ? `<div class="obs-card-actions">${buttons}</div>` : ''}
                     </div>`;
             });
-            container.innerHTML = `<h2 class="section-title"><span>📝</span> Observations for ${observedName}</h2><div class="actions-grid">${cardsHtml}</div><div style="margin-top: 20px;"><button class="filter-btn btn-secondary" onclick="showView('customFiltersView')">Back to Filters</button></div>`;
+            container.innerHTML = `<h2 class="section-title"><span>📝</span> Observations for ${safeObservedName}</h2><div class="actions-grid">${cardsHtml}</div><div style="margin-top: 20px;"><button class="filter-btn btn-secondary" onclick="showView('customFiltersView')">Back to Filters</button></div>`;
             showView('observationSelectorView');
         }
 
