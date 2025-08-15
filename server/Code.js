@@ -1004,7 +1004,7 @@ function _createScriptPdfDocument(observation, scriptContent, docName, contentSo
 
 
 // This space is intentionally left blank.
-// The helper functions for PDF generation have been moved to server/Utils.js
+// The HTML parsing utility functions have been moved to server/Utils.js
 // to avoid code duplication and improve maintainability.
 
 
