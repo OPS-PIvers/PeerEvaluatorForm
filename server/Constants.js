@@ -157,13 +157,23 @@ const ERROR_MESSAGES = {
 /**
  * Cache settings for performance optimization
  */
-const FOUR_HOURS_IN_SECONDS = 14400; // 4 hours = 4 * 60 * 60 seconds
-
 const CACHE_SETTINGS = {
-  USER_DATA_TTL: FOUR_HOURS_IN_SECONDS,      // 4 hours for user data - improves performance by reducing frequent spreadsheet reads
-  ROLE_CONFIG_TTL: 600,                      // 10 minutes for role configurations
-  SHEET_DATA_TTL: FOUR_HOURS_IN_SECONDS,     // 4 hours for sheet data - improves performance by reducing frequent spreadsheet reads
-  DEFAULT_TTL: 300                           // Default cache time
+  // Static data (e.g., rubric structure, settings) that changes infrequently.
+  // Cached for 6 hours.
+  STATIC_TTL: 21600,
+
+  // Dynamic data (e.g., observation records, staff list) that can change.
+  // Cached for a shorter duration to ensure freshness.
+  // 15 minutes.
+  DYNAMIC_TTL: 900,
+
+  // User-specific session data.
+  // Cached for 30 minutes.
+  SESSION_TTL: 1800,
+
+  // Default TTL for any data not otherwise specified.
+  // 5 minutes.
+  DEFAULT_TTL: 300
 };
 
 /**

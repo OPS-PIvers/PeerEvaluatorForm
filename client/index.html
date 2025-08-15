@@ -1,0 +1,1329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Peer Evaluator</title>
+    <style>
+.loader {
+    border: 16px solid #f3f3f3;
+    border-radius: 50%;
+    border-top: 16px solid #3498db;
+    width: 120px;
+    height: 120px;
+    -webkit-animation: spin 2s linear infinite; /* Safari */
+    animation: spin 2s linear infinite;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    margin-top: -60px;
+    margin-left: -60px;
+    z-index: 9999;
+    display: none; /* Hidden by default */
+}
+
+/* Safari */
+@-webkit-keyframes spin {
+  0% { -webkit-transform: rotate(0deg); }
+  100% { -webkit-transform: rotate(360deg); }
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.toast-notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background-color: #dc3545;
+    color: white;
+    padding: 15px 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    z-index: 10000;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-20px);
+    transition: all 0.3s ease-in-out;
+}
+
+.toast-notification.show {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+:root {
+    --color-white: white;
+    --color-text-default: #333;
+    --color-bg-body: #f5f5f5;
+
+    /* Greens for toggle button and assignments */
+    --color-green-base: #10b981;
+    --color-green-dark: #059669;
+    --color-green-darker: #047857;
+    --color-green-light-bg: #f0fdf4;
+
+    /* Ambers for toggle button (assigned mode) and active filters */
+    --color-amber-base: #f59e0b;
+    --color-amber-dark: #d97706;
+    --color-amber-darker: #b45309;
+    --color-amber-light-bg: #fef3c7;
+    --color-amber-text-dark: #92400e;
+
+    /* Blues for filter status and select focus */
+    --color-blue-base: #3b82f6;
+    --color-blue-light-bg: #dbeafe;
+    --color-blue-text-dark: #1e40af;
+    --color-blue-focus-shadow: rgba(59, 130, 246, 0.1);
+
+    /* Grays for various UI elements */
+    --color-gray-text: #4a5568;
+    --color-gray-text-light: #374151;
+    --color-gray-border-light: #d1d5db;
+    --color-gray-border-medium: #e2e8f0;
+    --color-gray-bg-light: #f8fafc;
+    --color-gray-bg-medium: #6b7280;
+    --color-gray-bg-dark: #4b5563;
+    --color-gray-component-not-assigned-border: #e5e7eb;
+    --color-gray-assignment-indicator-not-assigned-bg: #e5e7eb;
+    --color-text-deemphasized: #718096;
+}
+
+.error-container {
+    padding: 40px;
+    text-align: center;
+    color: #D8000C; /* Standard error text color */
+    background-color: #FFBABA; /* Light red background for errors */
+    border: 1px solid #D8000C; /* Standard error border color */
+    border-radius: 5px;
+    margin: 10px;
+}
+
+.error-title {
+    color: #D8000C; /* Ensure title also uses the error text color */
+    /* Any other h3-specific styles for the error title can go here if needed */
+}
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.6;
+            color: var(--color-text-default);
+            background-color: var(--color-bg-body);
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .header {
+            background: linear-gradient(135deg, #4a5568, #2d3748);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        .navigation {
+            background: #e2e8f0;
+            padding: 15px 20px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+            border-bottom: 1px solid #cbd5e0;
+            // position: sticky;
+            top: 0;
+            z-index: 60;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .nav-button {
+            background: #4a5568;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: background 0.3s ease;
+        }
+
+        .nav-button:hover {
+            background: #2d3748;
+        }
+
+        .nav-button.active {
+            background: #3182ce;
+        }
+
+        .domain-section {
+            border-bottom: 3px solid #e2e8f0;
+        }
+
+        .domain-header {
+            background: linear-gradient(135deg, #7c9ac5, #5a82b8);
+            color: white;
+            padding: 15px 20px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .component-section {
+            border-bottom: 1px solid var(--color-gray-border-medium);
+            position: relative;
+        }
+
+        .performance-levels-header {
+            position: sticky;
+            top: 56px;
+            z-index: 40;
+            background: white;
+            border-bottom: 2px solid #e2e8f0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .performance-levels {
+            display: grid;
+            grid-template-columns: 200px 1fr 1fr 1fr 1fr;
+            min-height: 50px;
+        }
+
+        .performance-levels-content {
+            display: grid;
+            grid-template-columns: 200px 1fr 1fr 1fr 1fr;
+            min-height: 120px;
+        }
+
+        .level-header {
+            background: #e2e8f0;
+            padding: 12px;
+            font-weight: 600;
+            text-align: center;
+            border-bottom: 1px solid #cbd5e0;
+            color: #4a5568;
+            font-size: 0.9rem;
+        }
+
+        .level-content.rating-cell {
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+        }
+
+        .level-content.rating-cell:hover {
+            background-color: #f0f4f8;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+        }
+
+        .level-content.rating-cell.selected {
+            background-color: var(--color-blue-light-bg);
+            border-color: var(--color-blue-base);
+            color: var(--color-blue-text-dark);
+            font-weight: 600;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+            transform: translateY(-2px);
+            border-left: 3px solid var(--color-blue-base);
+        }
+
+        .level-content {
+            padding: 20px;
+            border-right: 1px solid #e2e8f0;
+            border-bottom: 1px solid #e2e8f0;
+            background: white;
+            color: #4a5568;
+            font-size: 0.9rem;
+        }
+
+        .level-content:last-child {
+            border-right: none;
+        }
+
+        .row-label {
+            background: #64748b;
+            padding: 20px;
+            font-weight: 600;
+            color: white;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+            font-size: 0.9rem;
+        }
+
+        .look-fors-section {
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .look-fors-header {
+            background: linear-gradient(135deg, #3182ce, #2b77cb);
+            color: white;
+            padding: 10px 20px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 600;
+            transition: background 0.3s ease;
+            font-size: 0.85rem;
+        }
+
+        .look-fors-header:hover {
+            background: linear-gradient(135deg, #2b77cb, #2c5aa0);
+        }
+
+        .chevron {
+            transition: transform 0.3s ease;
+            font-size: 1rem;
+        }
+
+        .chevron.expanded {
+            transform: rotate(180deg);
+        }
+
+        .look-fors-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+            background: #f8fafc;
+        }
+
+        .look-fors-content.expanded {
+            max-height: 250px;
+        }
+
+        .look-fors-grid {
+            padding: 12px 20px;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 8px;
+        }
+
+        .look-for-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            padding: 8px 12px;
+            background: white;
+            border-radius: 4px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+            border-left: 3px solid #3182ce;
+        }
+
+        .look-for-item input[type="checkbox"] {
+            margin-top: 2px;
+            transform: scale(1.1);
+            accent-color: #3182ce;
+        }
+
+        .look-for-item label {
+            cursor: pointer;
+            color: #4a5568;
+            font-weight: 500;
+            font-size: 0.85rem;
+            line-height: 1.4;
+        }
+
+        .back-to-top {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #3182ce;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            cursor: pointer;
+            font-size: 1.2rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            transition: all 0.3s ease;
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        .back-to-top.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .back-to-top:hover {
+            background: #2c5aa0;
+            transform: translateY(-2px);
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+
+            .navigation {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .nav-button {
+                width: 100%;
+                max-width: 300px;
+                margin-bottom: 5px;
+            }
+
+            .performance-levels, .performance-levels-content {
+                grid-template-columns: 1fr;
+                gap: 1px;
+            }
+
+            .level-header, .row-label, .level-content {
+                border-right: none;
+                padding: 15px;
+            }
+
+            .level-header {
+                font-size: 0.8rem;
+            }
+
+            .row-label {
+                font-size: 0.8rem;
+            }
+
+            .level-content {
+                font-size: 0.8rem;
+            }
+
+            .navigation {
+            //    position: sticky;
+            //    top: 0;
+            //    z-index: 60;
+                  display: none;
+            }
+
+            .domain-header {
+                position: sticky;
+                top: 0;
+                z-index: 50;
+            }
+
+            .performance-levels-header {
+                position: sticky;
+                top: 56px;
+                z-index: 40;
+            }
+        }
+
+        .debug-info {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-family: monospace;
+            z-index: 9999;
+            max-width: 300px;
+            word-break: break-all;
+        }
+
+        .debug-info h4 {
+            margin-bottom: 8px;
+            color: #ffc107;
+        }
+
+        .debug-info div {
+            margin-bottom: 4px;
+        }
+
+        /* Floating Navigation Widget */
+        .floating-nav {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+            pointer-events: none;
+        }
+
+        .floating-nav.visible {
+            opacity: 1;
+            visibility: visible;
+            pointer-events: auto;
+        }
+
+        .floating-nav-button {
+            background: #3182ce;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 10px 15px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+            min-width: 120px;
+        }
+
+        .floating-nav-button:hover {
+            background: #2c5aa0;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(0,0,0,0.2);
+        }
+
+        .nav-icon {
+            font-size: 1.1rem;
+            line-height: 1;
+        }
+
+        .nav-text {
+            font-size: 0.85rem;
+        }
+
+        .floating-nav-menu {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+            margin-top: 8px;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-10px);
+            transition: all 0.3s ease;
+            min-width: 180px;
+            max-height: 60vh;
+            overflow-y: auto;
+        }
+
+        .floating-nav-menu.open {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .floating-nav-item {
+            display: block;
+            width: 100%;
+            background: none;
+            border: none;
+            padding: 12px 16px;
+            text-align: left;
+            cursor: pointer;
+            font-size: 0.9rem;
+            color: #4a5568;
+            transition: background 0.2s ease;
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+        .floating-nav-item:last-child {
+            border-bottom: none;
+        }
+
+        .floating-nav-item:hover {
+            background: #f8fafc;
+            color: #3182ce;
+        }
+
+        .floating-nav-item:first-child {
+            border-top-left-radius: 8px;
+            border-top-right-radius: 8px;
+        }
+
+        .floating-nav-item:last-child {
+            border-bottom-left-radius: 8px;
+            border-bottom-right-radius: 8px;
+        }
+
+        /* Mobile adjustments */
+        @media (max-width: 768px) {
+            .floating-nav {
+                top: 15px;
+                left: 15px;
+            }
+
+            .floating-nav-button {
+                padding: 8px 12px;
+                min-width: 100px;
+                font-size: 0.8rem;
+            }
+
+            .floating-nav-menu {
+                min-width: 160px;
+                max-height: 50vh;
+            }
+
+            .floating-nav-item {
+                padding: 10px 14px;
+                font-size: 0.85rem;
+            }
+        }
+
+        /* View Toggle Button Styles */
+        .view-toggle-container {
+            margin-top: 15px;
+        }
+
+        .view-toggle-btn {
+            background: linear-gradient(135deg, var(--color-green-base), var(--color-green-dark));
+            color: var(--color-white);
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+            transition: background 0.3s ease, transform 0.3s ease, box-shadow 0.3s ease;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .view-toggle-btn:hover {
+            background: linear-gradient(135deg, var(--color-green-dark), var(--color-green-darker));
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+
+        .view-toggle-btn.assigned-mode {
+            background: linear-gradient(135deg, var(--color-amber-base), var(--color-amber-dark));
+        }
+
+        .view-toggle-btn.assigned-mode:hover {
+            background: linear-gradient(135deg, var(--color-amber-dark), var(--color-amber-darker));
+        }
+
+        /* Special Role Filter Styles */
+        .special-filters {
+            background: var(--color-gray-bg-light);
+            border: 2px solid var(--color-gray-border-medium);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+
+        .filter-section {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .filter-label {
+            font-weight: 600;
+            color: var(--color-gray-text);
+            margin-right: 10px;
+        }
+
+        .filter-select {
+            background: var(--color-white);
+            border: 1px solid var(--color-gray-border-light);
+            border-radius: 4px;
+            padding: 8px 12px;
+            font-size: 0.9rem;
+            color: var(--color-gray-text-light);
+            min-width: 150px;
+        }
+
+        .filter-select:focus {
+            outline: none;
+            border-color: var(--color-blue-base);
+            box-shadow: 0 0 0 3px var(--color-blue-focus-shadow);
+        }
+
+        .filter-btn {
+            background: var(--color-gray-bg-medium);
+            color: var(--color-white);
+            border: none;
+            border-radius: 4px;
+            padding: 8px 16px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: background 0.3s ease;
+        }
+
+        .filter-btn:hover {
+            background: var(--color-gray-bg-dark);
+        }
+
+        .domain-nav {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        /* Filter Status Indicator */
+        .filter-status {
+            background: var(--color-blue-light-bg);
+            border: 1px solid var(--color-blue-base);
+            border-radius: 6px;
+            padding: 10px 15px;
+            margin-bottom: 15px;
+            color: var(--color-blue-text-dark);
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .filter-status.active {
+            background: var(--color-amber-light-bg);
+            border-color: var(--color-amber-base);
+            color: var(--color-amber-text-dark);
+        }
+
+        .filter-status-detail {
+            margin-left: 15px;
+            font-size: 0.8rem;
+        }
+
+        /* Component Assignment Indicators */
+        .component-section.component-assigned {
+            border-left: 4px solid var(--color-green-base);
+            background: var(--color-green-light-bg);
+        }
+
+        .component-section.component-not-assigned {
+            background: var(--color-gray-bg-light);
+            border-left: 4px solid var(--color-gray-component-not-assigned-border);
+        }
+
+        .component-section.component-not-assigned .level-content,
+        .component-section.component-not-assigned .look-for-item label {
+            color: var(--color-text-deemphasized);
+        }
+
+        .assignment-indicator {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background: var(--color-green-base);
+            color: var(--color-white);
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            font-weight: bold;
+        }
+
+        .assignment-indicator.not-assigned {
+            background: var(--color-gray-assignment-indicator-not-assigned-bg);
+            color: var(--color-gray-bg-medium);
+        }
+
+        .assigned-badge {
+            background-color: var(--color-blue-light-bg);
+            color: var(--color-blue-text-dark);
+            padding: 0.2em 0.6em;
+            border-radius: 0.25rem;
+            font-size: 0.8em;
+            margin-left: 8px;
+            font-weight: 500;
+            vertical-align: middle;
+            display: inline-block;
+        }
+
+        /* Mobile Responsive Adjustments */
+        @media (max-width: 768px) {
+            .filter-section {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .filter-select {
+                min-width: auto;
+                width: 100%;
+                margin-bottom: 5px;
+            }
+
+            .view-toggle-btn {
+                width: 100%;
+                max-width: 300px;
+                margin: 0 auto;
+            }
+
+            .domain-nav {
+                flex-direction: column;
+            }
+
+            .nav-button {
+                width: 100%;
+                margin-bottom: 5px;
+            }
+        }
+
+        .component-hidden {
+            display: none;
+        }
+
+        .indicator-hidden {
+            display: none;
+        }
+
+        /* Hover effect for assigned components */
+        .component-section[data-assigned="true"]:hover {
+            border-left-color: var(--color-green-dark);
+            background-color: var(--color-green-light-bg);
+        }
+
+        /* Hover effect for not-assigned components */
+        .component-section[data-assigned="false"]:hover,
+        .component-section:not([data-assigned]):hover { /* Handles components not explicitly marked false initially */
+            border-left-color: var(--color-gray-border-light);
+            background-color: var(--color-gray-bg-light);
+        }
+
+        .assignment-counter-styles {
+            font-size: 0.9rem;
+            opacity: 0.8;
+            margin-left: 10px;
+        }
+
+        /* Media Upload Styles */
+        .media-upload-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 20px;
+            background: #f0f4f8;
+            border-top: 1px solid #e2e8f0;
+            margin-top: 10px;
+        }
+
+        .media-upload-input {
+            flex-grow: 1;
+            padding: 8px;
+            border: 1px solid #cbd5e0;
+            border-radius: 4px;
+        }
+
+        .media-upload-button {
+            background: #3182ce;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: background 0.3s ease;
+        }
+
+        .media-upload-button:hover {
+            background: #2c5aa0;
+        }
+
+        .media-links-container {
+            padding: 10px 20px;
+            background: #f8fafc;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .media-link-item {
+            margin-bottom: 5px;
+        }
+
+        .media-link-item a {
+            color: #3182ce;
+            text-decoration: none;
+        }
+
+        .media-link-item a:hover {
+            text-decoration: underline;
+        }
+
+        /* Evidence Section Styles */
+        .evidence-section {
+            border-top: 1px solid #e2e8f0;
+            margin-top: 10px;
+        }
+
+        .evidence-toggle-btn {
+            background: linear-gradient(135deg, #3182ce, #2b77cb);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            width: 100%;
+            text-align: left;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.85rem;
+            transition: background 0.3s ease;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .evidence-toggle-btn:hover {
+            background: linear-gradient(135deg, #2b77cb, #2c5aa0);
+        }
+
+        .evidence-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+            background: #f8fafc;
+        }
+
+        .evidence-content.expanded {
+            max-height: 800px;
+        }
+
+
+        .notes-container {
+            padding: 15px 20px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .notes-container h4 {
+            color: #4a5568;
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        .look-fors-container {
+            padding: 15px 20px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .look-fors-container h4 {
+            color: #4a5568;
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+            font-weight: .ql-toolbar {
+            border-top: 1px solid #d1d5db;
+            border-left: 1px solid #d1d5db;
+            border-right: 1px solid #d1d5db;
+            border-top-left-radius: 4px;
+            border-top-right-radius: 4px;
+        }
+
+        .ql-container {
+            border-bottom: 1px solid #d1d5db;
+            border-left: 1px solid #d1d5db;
+            border-right: 1px solid #d1d5db;
+            border-bottom-left-radius: 4px;
+            border-bottom-right-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div id="loader" class="loader"></div>
+    <div id="root"></div>
+    <script>
+        function showLoading() {
+            document.getElementById('loader').style.display = 'block';
+        }
+
+        function hideLoading() {
+            document.getElementById('loader').style.display = 'none';
+        }
+
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+
+        function renderHeader(data) {
+            return `
+                <div class="header">
+                    <h1>${data.title}</h1>
+                    <p>${data.subtitle}</p>
+                </div>
+            `;
+        }
+
+        function renderNavigation(data) {
+            let navHtml = '<div class="navigation">';
+
+            navHtml += '<div class="domain-nav">';
+            data.domains.forEach((domain, index) => {
+                navHtml += `<button class="nav-button" data-domain="${index}">Domain ${domain.number}</button>`;
+            });
+            navHtml += '</div>';
+
+            navHtml += '</div>';
+            return navHtml;
+        }
+
+        function renderDomains(data) {
+            let domainsHtml = '';
+            data.domains.forEach((domain, index) => {
+                domainsHtml += renderDomain(domain, index);
+            });
+            return domainsHtml;
+        }
+
+        function showToast(message, isSuccess = false) {
+            const toast = document.getElementById('toastNotification');
+            toast.textContent = message;
+            toast.className = 'toast-notification' + (isSuccess ? ' success' : '');
+            toast.classList.add('show');
+            setTimeout(function() {
+                toast.classList.remove('show');
+            }, 4000);
+        }
+
+        function selectProficiency(element, componentId, proficiency) {
+            const parentRow = element.closest('.performance-levels-content');
+            const previouslySelected = parentRow.querySelector('.level-content.selected');
+
+            // Optimistic UI update
+            if (previouslySelected) {
+                previouslySelected.classList.remove('selected');
+            }
+            element.classList.add('selected');
+
+            google.script.run
+                .withSuccessHandler(function(response) {
+                    if (!response.success) {
+                        // Revert UI on failure
+                        element.classList.remove('selected');
+                        if (previouslySelected) {
+                            previouslySelected.classList.add('selected');
+                        }
+                        showToast('Error saving selection: ' + response.error);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    // Revert UI on failure
+                    element.classList.remove('selected');
+                    if (previouslySelected) {
+                        previouslySelected.classList.add('selected');
+                    }
+                    showToast('Server error: ' + error.message);
+                })
+                .saveProficiencySelection(currentObservationId, componentId, proficiency);
+        }
+
+        const handleNotesInput = debounce(function(textarea, componentId) {
+            const statusEl = document.getElementById(`notes-status-${componentId}`);
+            statusEl.textContent = 'Saving...';
+            google.script.run
+                .withSuccessHandler(function(response) {
+                    if (response.success) {
+                        statusEl.textContent = 'Saved!';
+                        setTimeout(() => { statusEl.textContent = ''; }, 2000);
+                    } else {
+                        statusEl.textContent = 'Error!';
+                        showToast('Error saving notes: ' + response.error);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    statusEl.textContent = 'Error!';
+                    showToast('Server error saving notes: ' + error.message);
+                })
+                .saveObservationNotes(currentObservationId, componentId, textarea.value);
+        }, 1500);
+
+        function handleLookForChange(checkbox, componentId, lookForText) {
+            const isChecked = checkbox.checked;
+            google.script.run
+                .withSuccessHandler(function(response) {
+                    if (!response.success) {
+                        checkbox.checked = !isChecked; // Revert on failure
+                        showToast('Error saving look-for: ' + response.error);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    checkbox.checked = !isChecked; // Revert on failure
+                    showToast('Server error saving look-for: ' + error.message);
+                })
+                .saveLookForSelection(currentObservationId, componentId, lookForText, isChecked);
+        }
+
+        function saveChanges() {
+            showLoading('Saving changes...');
+            google.script.run
+                .withSuccessHandler(function(response) {
+                    hideLoading();
+                    if (response.success) {
+                        pendingChanges = { proficiencies: {}, notes: {}, lookfors: {} };
+                        alert('Changes saved successfully!');
+                    } else {
+                        alert('Error saving changes: ' + response.error);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    hideLoading();
+                    alert('Error saving changes: ' + error.message);
+                })
+                .saveAllObservationChanges(currentObservationId, pendingChanges);
+        }
+
+        function renderComponent(component, domainIndex, componentIndex) {
+            let componentHtml = `<div class="component-section">`;
+            componentHtml += `
+                <div class="performance-levels-content">
+                    <div class="row-label">${component.title}</div>
+                    <div class="level-content rating-cell" onclick="selectProficiency(this, '${component.componentId}', 'developing')">${component.developing}</div>
+                    <div class="level-content rating-cell" onclick="selectProficiency(this, '${component.componentId}', 'basic')">${component.basic}</div>
+                    <div class="level-content rating-cell" onclick="selectProficiency(this, '${component.componentId}', 'proficient')">${component.proficient}</div>
+                    <div class="level-content rating-cell" onclick="selectProficiency(this, '${component.componentId}', 'distinguished')">${component.distinguished}</div>
+                </div>
+            `;
+            componentHtml += `
+                <div class="evidence-section">
+                    <button class="evidence-toggle-btn" onclick="toggleEvidenceSection('evidence-${component.componentId}')">
+                        <span>📝</span> Notes & Evidence
+                    </button>
+                    <div class="evidence-content" id="evidence-${component.componentId}">
+                        <div class="notes-container">
+                            <h4>Observation Notes <span id="notes-status-${component.componentId}" style="font-style: italic; color: #666;"></span></h4>
+                            <textarea oninput="handleNotesInput(this, '${component.componentId}')" style="width: 100%; min-height: 100px;"></textarea>
+                        </div>
+                        <div class="look-fors-container">
+                            <h4>Best Practices (Look-fors)</h4>
+                            <div class="look-fors-grid">
+                                ${component.bestPractices.map((practice, index) => `
+                                    <div class="look-for-item">
+                                        <input type="checkbox" id="practice-${component.componentId}-${index}" onchange="handleLookForChange(this, '${component.componentId}', '${practice}')">
+                                        <label for="practice-${component.componentId}-${index}">${practice}</label>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            componentHtml += `</div>`;
+            return componentHtml;
+        }
+
+        function renderDomain(domain, domainIndex) {
+            let domainHtml = `<div class="domain-section" id="domain-${domainIndex}">`;
+            domainHtml += `<div class="domain-header">${domain.name}</div>`;
+
+            domain.components.forEach((component, index) => {
+                domainHtml += renderComponent(component, domainIndex, index);
+            });
+
+            domainHtml += `</div>`;
+            return domainHtml;
+        }
+
+        function renderRubric(data) {
+            const container = document.createElement('div');
+            container.className = 'container';
+            container.innerHTML += `<button onclick="saveChanges()" class="filter-btn" style="margin: 10px;">Save Changes</button>`;
+            container.innerHTML += renderHeader(data);
+            container.innerHTML += renderNavigation(data);
+            container.innerHTML += renderDomains(data);
+
+            const root = document.getElementById('root');
+            root.innerHTML = '';
+            root.appendChild(container);
+        }
+
+        function renderFilterView(data) {
+            const { userContext } = data;
+            let html = `
+                <div class="container">
+                    <div class="header">
+                        <h1>👥 ${userContext.role} Dashboard</h1>
+                        <p>Select how you'd like to view rubric information</p>
+                    </div>
+                    <div class="content">
+                        <div id="quickActionsView">
+                            <div class="quick-actions">
+                                <h2 class="section-title"><span>🎯</span> Quick Actions</h2>
+                                <div class="actions-grid">
+            `;
+
+            if (userContext.specialRoleType === 'peer_evaluator' || userContext.specialRoleType === 'full_access') {
+                html += `
+                    <div class="action-card" onclick="showCustomFilters()">
+                        <span class="action-icon">🔍</span>
+                        <div class="action-title">Find Staff & Start Observation</div>
+                        <div class="action-desc">Filter by role, year, or specific staff member</div>
+                    </div>
+                    <div class="action-card" onclick="loadMyOwnView()">
+                        <span class="action-icon">📋</span>
+                        <div class="action-title">My Own Rubric</div>
+                        <div class="action-desc">View your personal assigned areas</div>
+                    </div>
+                `;
+            }
+
+            html += `
+                                </div>
+                            </div>
+                        </div>
+                        <div class="custom-filters" id="customFiltersView" style="display: none;">
+                            <h2 class="section-title"><span>🔍</span> Find Staff Member</h2>
+                            <div class="filter-row"><select id="roleSelect" class="filter-select" onchange="handleRoleChange()"><option value="">1. Select Role...</option></select></div>
+                            <div class="filter-row"><select id="yearSelect" class="filter-select" style="display: none;" onchange="handleYearChange()"><option value="">2. Select Year...</option><option value="1">Year 1</option><option value="2">Year 2</option><option value="3">Year 3</option><option value="0">Probationary</option></select></div>
+                            <div class="filter-row"><select id="staffSelect" class="filter-select" style="display: none;" onchange="handleStaffChange()"><option value="">3. Select Staff Member...</option></select></div>
+                            <div class="filter-row"><button class="filter-btn" id="loadBtn" onclick="loadSelectedView()" disabled>📖 Select Staff</button><button class="filter-btn btn-secondary" onclick="clearFilters()">🗑️ Clear & Go Back</button></div>
+                        </div>
+                        <div class="observation-selector" id="observationSelectorView" style="display: none;"></div>
+                        <div class="error" id="error" style="display: none;"><div id="errorMessage"></div><button class="filter-btn btn-secondary" onclick="hideError()" style="margin-top: 15px;">Dismiss</button></div>
+                    </div>
+                </div>
+            `;
+
+            const root = document.getElementById('root');
+            root.innerHTML = html;
+        }
+
+        function showCustomFilters() {
+            document.getElementById('quickActionsView').style.display = 'none';
+            document.getElementById('customFiltersView').style.display = 'block';
+        }
+
+        function loadMyOwnView() {
+            showLoading('Loading your assigned rubric...');
+            google.script.run.withSuccessHandler(handleRubricData).withFailureHandler(handleError).loadRubricData({ myOwnView: true });
+        }
+
+        function handleRubricData(data) {
+            if (data.rubricData) {
+                renderRubric(data.rubricData);
+            } else {
+                // Handle cases where rubric data is not returned, e.g., showing observation selector
+                console.log('Received data without rubric:', data);
+            }
+        }
+
+        function handleError(error) {
+            console.error('AJAX Error:', error);
+            const errorDiv = document.getElementById('error');
+            const errorMessage = document.getElementById('errorMessage');
+            errorMessage.textContent = error.message || String(error);
+            errorDiv.style.display = 'block';
+            hideLoading();
+        }
+
+        function clearFilters() {
+            document.getElementById('quickActionsView').style.display = 'block';
+            document.getElementById('customFiltersView').style.display = 'none';
+            document.getElementById('observationSelectorView').style.display = 'none';
+            document.getElementById('error').style.display = 'none';
+        }
+
+        function handleRoleChange() {
+            const roleSelect = document.getElementById('roleSelect');
+            const yearSelect = document.getElementById('yearSelect');
+            yearSelect.style.display = roleSelect.value ? 'block' : 'none';
+            handleYearChange();
+        }
+
+        function handleYearChange() {
+            const yearSelect = document.getElementById('yearSelect');
+            const staffSelect = document.getElementById('staffSelect');
+            staffSelect.style.display = yearSelect.value ? 'block' : 'none';
+            if (yearSelect.value) {
+                loadStaffOptions();
+            } else {
+                handleStaffChange();
+            }
+        }
+
+        function handleStaffChange() {
+            const staffSelect = document.getElementById('staffSelect');
+            document.getElementById('loadBtn').disabled = !staffSelect.value;
+        }
+
+        function loadStaffOptions() {
+            const roleSelect = document.getElementById('roleSelect');
+            const yearSelect = document.getElementById('yearSelect');
+            const staffSelect = document.getElementById('staffSelect');
+            staffSelect.innerHTML = '<option value="">Loading staff...</option>';
+            staffSelect.disabled = true;
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    staffSelect.disabled = false;
+                    if (!result.success) {
+                        staffSelect.innerHTML = `<option value="">Error: ${result.error}</option>`;
+                        return;
+                    }
+                    staffSelect.innerHTML = '<option value="">3. Select Staff Member...</option>';
+                    if (result.staff && result.staff.length) {
+                        result.staff.forEach(staff => staffSelect.appendChild(new Option(staff.displayName, staff.email)));
+                    } else {
+                        staffSelect.appendChild(new Option('No staff found', '', true, true));
+                    }
+                })
+                .withFailureHandler(handleError)
+                .getStaffListForDropdown(roleSelect.value, yearSelect.value);
+        }
+
+        function loadSelectedView() {
+            const staffSelect = document.getElementById('staffSelect');
+            if (!staffSelect.value) return;
+            showLoading('Loading...');
+            google.script.run
+                .withSuccessHandler(handleRubricData)
+                .withFailureHandler(handleError)
+                .loadRubricData({ staff: staffSelect.value });
+        }
+
+
+        document.addEventListener('DOMContentLoaded', function() {
+            showLoading();
+            google.script.run
+                .withSuccessHandler(function(data) {
+                    hideLoading();
+                    console.log('Received initial app data:', data);
+                    const root = document.getElementById('root');
+                    if (data.error) {
+                        root.innerHTML = `<div class="error-container"><h3>Error</h3><p>${data.error.message}</p></div>`;
+                        return;
+                    }
+
+                    if (data.uiMode === 'rubric') {
+                        renderRubric(data.rubricData);
+                    } else {
+                        renderFilterView(data);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    hideLoading();
+                    console.error('Error fetching initial app data:', error);
+                    const root = document.getElementById('root');
+                    root.innerHTML = `<div class="error-container"><h3>Error</h3><p>${error.message}</p></div>`;
+                })
+                .getInitialAppData(new URLSearchParams(window.location.search).toString());
+        });
+    </script>
+</body>
+</html>

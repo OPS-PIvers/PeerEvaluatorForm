@@ -157,6 +157,40 @@ function setCachedDataEnhanced(baseKey, params = {}, data, ttl = CACHE_SETTINGS.
 }
 
 /**
+ * Sets data in the static cache layer.
+ * Use for data that changes infrequently, like rubric structures or system settings.
+ * @param {string} baseKey - The base key for the cache entry.
+ * @param {Object} params - Parameters to make the key unique.
+ * @param {*} data - The data to be cached.
+ */
+function setStaticCache(baseKey, params, data) {
+  setCachedDataEnhanced(baseKey, params, data, CACHE_SETTINGS.STATIC_TTL);
+}
+
+/**
+ * Sets data in the dynamic cache layer.
+ * Use for data that can change but is expensive to fetch, like observation lists.
+ * @param {string} baseKey - The base key for the cache entry.
+ * @param {Object} params - Parameters to make the key unique.
+ * @param {*} data - The data to be cached.
+ */
+function setDynamicCache(baseKey, params, data) {
+  setCachedDataEnhanced(baseKey, params, data, CACHE_SETTINGS.DYNAMIC_TTL);
+}
+
+/**
+ * Sets data in the session cache layer.
+ * Use for user-specific session information.
+ * @param {string} baseKey - The base key for the cache entry.
+ *_
+ * @param {Object} params - Parameters to make the key unique.
+ * @param {*} data - The data to be cached.
+ */
+function setSessionCache(baseKey, params, data) {
+  setCachedDataEnhanced(baseKey, params, data, CACHE_SETTINGS.SESSION_TTL);
+}
+
+/**
  * Clear caches based on dependency map
  * @param {string} changedKey - The base cache key that changed
  */

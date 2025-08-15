@@ -40,6 +40,47 @@ function getSheetByName(spreadsheet, sheetName) {
 }
 
 /**
+ * A generic function to get all data from a sheet and cache it.
+ * This function is the primary interface for reading raw data from Google Sheets.
+ * @param {string} sheetName The name of the sheet to read.
+ * @param {string} cacheType The type of cache to use ('static' or 'dynamic').
+ * @returns {Array<Array>|null} The raw 2D array of data from the sheet, or null on error.
+ */
+function getSheetData(sheetName, cacheType = 'static') {
+  const cacheKey = `raw_sheet_${sheetName}`;
+  const cachedData = getCachedDataEnhanced(cacheKey);
+
+  if (cachedData && cachedData.data) {
+    debugLog(`Raw sheet data for "${sheetName}" retrieved from cache.`);
+    return cachedData.data;
+  }
+
+  try {
+    const spreadsheet = openSpreadsheet();
+    const sheet = getSheetByName(spreadsheet, sheetName);
+
+    if (!sheet) {
+      return null;
+    }
+
+    const data = sheet.getDataRange().getValues();
+    debugLog(`Read ${data.length} rows from sheet "${sheetName}".`);
+
+    // Use the appropriate caching function based on cacheType
+    if (cacheType === 'dynamic') {
+      setDynamicCache(cacheKey, {}, { data: data });
+    } else {
+      setStaticCache(cacheKey, {}, { data: data });
+    }
+
+    return data;
+  } catch (error) {
+    console.error(`Error reading sheet "${sheetName}":`, formatErrorMessage(error, 'getSheetData'));
+    return null;
+  }
+}
+
+/**
  * Opens the main spreadsheet
  * @return {Spreadsheet} The spreadsheet object
  * @throws {Error} If spreadsheet cannot be opened
@@ -125,49 +166,19 @@ function validateSheetExists(sheetName, expectedHeaders = []) {
  */
 function getStaffData() {
   try {
-    // Check enhanced cache first
-    const cachedData = getCachedDataEnhanced('staff_data');
-    if (cachedData && cachedData.data) {
-      debugLog('Staff data retrieved from enhanced cache');
-      return cachedData.data;
-    }
-    
     const startTime = Date.now();
-    const spreadsheet = openSpreadsheet();
-    const sheet = getSheetByName(spreadsheet, SHEET_NAMES.STAFF);
-    
-    if (!sheet) {
+    const values = getSheetData(SHEET_NAMES.STAFF, 'dynamic');
+
+    if (!values) {
       console.warn(ERROR_MESSAGES.STAFF_SHEET_MISSING);
       return null;
     }
-    
-    const lastRow = sheet.getLastRow();
-    if (lastRow < 2) {
-      debugLog('Staff sheet has no data rows');
-      return { users: [], lastUpdated: new Date().toISOString() };
-    }
-    
-    // Read all data
-    const range = sheet.getRange(2, 1, lastRow - 1, 4);
-    const values = range.getValues();
-    
-    // Check if data has changed
-    const dataChanged = hasSheetDataChanged('Staff', values);
-    if (dataChanged) { // Check if dataChanged is true first
-      if (typeof invalidateDependentCaches === 'function') {
-        debugLog('Staff sheet data change detected - invalidating related caches');
-        // staff_data change implies potential user changes.
-        // invalidateDependentCaches will handle its dependencies,
-        // incrementing master version for wildcards like 'user_*'.
-        invalidateDependentCaches('staff_data');
-      } else {
-        console.warn('invalidateDependentCaches is not a function, skipping cache invalidation for Staff data change.');
-        debugLog('invalidateDependentCaches not found, cannot invalidate for Staff data change.');
-      }
-    }
+
+    // Remove header row
+    const dataRows = values.slice(1);
 
     const users = [];
-    values.forEach((row, index) => {
+    dataRows.forEach((row, index) => {
       const rowNumber = index + 2;
       
       // Skip empty rows
@@ -257,46 +268,97 @@ function getStaffData() {
  */
 function getSettingsData() {
   try {
-    // Check enhanced cache first
-    const cachedData = getCachedDataEnhanced('settings_data');
-    if (cachedData && cachedData.data) {
-      debugLog('Settings data retrieved from enhanced cache');
-      return cachedData.data;
-    }
-    
     const startTime = Date.now();
-    const spreadsheet = openSpreadsheet();
-    const sheet = getSheetByName(spreadsheet, SHEET_NAMES.SETTINGS);
-    
-    if (!sheet) {
+    const values = getSheetData(SHEET_NAMES.SETTINGS, 'static');
+
+    if (!values) {
       console.warn(ERROR_MESSAGES.SETTINGS_SHEET_MISSING);
       return null;
     }
-    
-    const lastRow = sheet.getLastRow();
-    if (lastRow < 2) {
-      debugLog('Settings sheet has no data rows');
-      return { roleYearMappings: {}, lastUpdated: new Date().toISOString() };
-    }
-    
-    // Read all data (assuming row 1 has headers)
-    const range = sheet.getRange(2, 1, lastRow - 1, 4); // Rows 2 to end, columns A-D
-    const values = range.getValues();
-    
-    // Check if data has changed
-    const dataChanged = hasSheetDataChanged('Settings', values);
-    if (dataChanged) {
-      if (typeof invalidateDependentCaches === 'function') {
-        debugLog('Settings sheet data change detected - invalidating related caches');
-        // Settings data change may affect various dependent caches
-        invalidateDependentCaches('settings_data');
-      } else {
-        console.warn('invalidateDependentCaches is not a function, skipping cache invalidation for Settings data change.');
-        debugLog('invalidateDependentCaches not found, cannot invalidate for Settings data change.');
-      }
-    }
-    
+
+    // Remove header row
+    const dataRows = values.slice(1);
+
     const roleYearMappings = {};
+    
+    // Process data from the Settings sheet.
+    // The sheet is expected to have a role name in the first column (defined by SETTINGS_COLUMNS.ROLE).
+    // The row containing the role name is the first of 4 consecutive rows used for data; this role row contains data for Domain 1.
+    // The next three rows contain data for Domains 2, 3, and 4, respectively.
+    // Columns B, C, D (defined by SETTINGS_COLUMNS.YEAR_1, YEAR_2, YEAR_3) in these 4 data rows
+    // contain the specific items/subdomains for that Domain for Year 1, Year 2, and Year 3 respectively.
+    // The parser actively looks for role names and processes these 4 rows (the role name row plus the next three).
+    // Blank rows between role definitions are skipped.
+    for (let i = 0; i < dataRows.length; i++) {
+      const row = dataRows[i];
+      // Potential start of a role definition
+      const roleName = sanitizeText(row[SETTINGS_COLUMNS.ROLE]); // Column A
+
+      // Skip empty rows
+      if (!roleName) {
+        continue;
+      }
+
+      // Check if this is a valid role
+      if (!AVAILABLE_ROLES.includes(roleName)) {
+        console.warn(`Unknown role in Settings sheet row ${i + 2}:`, roleName);
+        continue;
+      }
+
+      // Ensure there are enough rows for a complete 4-domain definition for this role.
+      if (i + 3 >= dataRows.length) {
+        console.warn(`Incomplete data for role ${roleName} starting at settings sheet row ${i + 2}. Expected 4 data rows, found fewer.`);
+        continue; // Skip to the next row to find a new role
+      }
+
+      roleYearMappings[roleName] = {
+        year1: [
+          sanitizeText(dataRows[i][SETTINGS_COLUMNS.YEAR_1]),    // Domain 1, Year 1 data from current role row
+          sanitizeText(dataRows[i+1][SETTINGS_COLUMNS.YEAR_1]),  // Domain 2, Year 1 data from next row
+          sanitizeText(dataRows[i+2][SETTINGS_COLUMNS.YEAR_1]),  // Domain 3, Year 1 data from row after next
+          sanitizeText(dataRows[i+3][SETTINGS_COLUMNS.YEAR_1])   // Domain 4, Year 1 data from row 3 after role row
+        ],
+        year2: [
+          sanitizeText(dataRows[i][SETTINGS_COLUMNS.YEAR_2]),    // Domain 1, Year 2
+          sanitizeText(dataRows[i+1][SETTINGS_COLUMNS.YEAR_2]),  // Domain 2, Year 2
+          sanitizeText(dataRows[i+2][SETTINGS_COLUMNS.YEAR_2]),  // Domain 3, Year 2
+          sanitizeText(dataRows[i+3][SETTINGS_COLUMNS.YEAR_2])   // Domain 4, Year 2
+        ],
+        year3: [
+          sanitizeText(dataRows[i][SETTINGS_COLUMNS.YEAR_3]),    // Domain 1, Year 3
+          sanitizeText(dataRows[i+1][SETTINGS_COLUMNS.YEAR_3]),  // Domain 2, Year 3
+          sanitizeText(dataRows[i+2][SETTINGS_COLUMNS.YEAR_3]),  // Domain 3, Year 3
+          sanitizeText(dataRows[i+3][SETTINGS_COLUMNS.YEAR_3])   // Domain 4, Year 3
+        ],
+        startRow: i + 2 // For debugging, refers to the 1-based sheet row number for the roleName
+      };
+
+      debugLog(`Settings loaded for role: ${roleName}`, {
+        year1Domains: roleYearMappings[roleName].year1,
+        year2Domains: roleYearMappings[roleName].year2,
+        year3Domains: roleYearMappings[roleName].year3
+      });
+      // Advance the index by 3 to account for the 3 additional rows just processed for the current role.
+      // The loop's i++ will then move to the next row, effectively skipping the 4 processed data rows.
+      i += 3; // Advance index past the 3 additional data rows just processed. Loop's i++ handles the first.
+    }
+    
+    const settingsData = {
+      roleYearMappings: roleYearMappings,
+      lastUpdated: new Date().toISOString(),
+      rolesConfigured: Object.keys(roleYearMappings).length
+    };
+
+    const executionTime = Date.now() - startTime;
+    logPerformanceMetrics('getSettingsData', executionTime, {
+      rolesConfigured: Object.keys(roleYearMappings).length
+    });
+    
+    debugLog('Settings data loaded successfully', {
+      rolesConfigured: Object.keys(roleYearMappings).length
+    });
+    
+    return settingsData;
     
     // Process data from the Settings sheet.
     // The sheet is expected to have a role name in the first column (defined by SETTINGS_COLUMNS.ROLE).
@@ -433,54 +495,10 @@ function getRoleSheetData(roleName) {
       }
     }
 
-    // Check enhanced cache with role-specific parameters
-    const cacheParams = { role: roleName };
-    const cachedData = getCachedDataEnhanced('role_sheet', cacheParams);
-
-    if (cachedData && cachedData.data) {
-      debugLog(`Role sheet data for ${roleName} retrieved from enhanced cache`, {
-        operationId: operationId
-      });
-
-      // Validate cached data integrity
-      const dataValidation = validateRoleSheetData(cachedData.data);
-      if (dataValidation.isValid) {
-        return cachedData.data;
-      } else {
-        debugLog('Cached data validation failed - reloading', {
-          roleName: roleName,
-          issues: dataValidation.issues,
-          operationId: operationId
-        });
-        // Clear invalid cached data
-        CacheService.getScriptCache().remove(generateCacheKey('role_sheet', cacheParams));
-      }
-    }
-    
     const startTime = Date.now();
+    const values = getSheetData(roleName, 'static');
 
-    // Enhanced spreadsheet access with error handling
-    let spreadsheet, sheet;
-    try {
-      spreadsheet = openSpreadsheet();
-      sheet = getSheetByName(spreadsheet, roleName);
-    } catch (accessError) {
-      console.error('Spreadsheet access error', {
-        error: accessError.message,
-        roleName: roleName,
-        operationId: operationId
-      });
-
-      return createErrorRoleSheetData(roleName, {
-        issues: [{
-          type: VALIDATION_ERROR_TYPES.PERMISSION_ERROR,
-          message: 'Cannot access spreadsheet: ' + accessError.message,
-          severity: VALIDATION_SEVERITY.CRITICAL
-        }]
-      }, operationId);
-    }
-    
-    if (!sheet) {
+    if (!values) {
       console.warn(`Role sheet "${roleName}" not found`, { operationId: operationId });
 
       // Try fallback to Teacher sheet if this isn't already Teacher
@@ -501,8 +519,8 @@ function getRoleSheetData(roleName) {
       }, operationId);
     }
     
-    const lastRow = sheet.getLastRow();
-    const lastColumn = sheet.getLastColumn();
+    const lastRow = values.length;
+    const lastColumn = values.length > 0 ? values[0].length : 0;
     
     if (lastRow < 1 || lastColumn < 1) {
       console.warn(`Role sheet "${roleName}" appears to be empty`, {
@@ -520,48 +538,9 @@ function getRoleSheetData(roleName) {
       }, operationId);
     }
     
-    // Read all sheet data with error handling
-    let values;
-    try {
-      const range = sheet.getRange(1, 1, lastRow, lastColumn);
-      values = range.getValues();
-    } catch (readError) {
-      console.error('Error reading sheet data', {
-        error: readError.message,
-        roleName: roleName,
-        operationId: operationId
-      });
-
-      return createErrorRoleSheetData(roleName, {
-        issues: [{
-          type: VALIDATION_ERROR_TYPES.PERMISSION_ERROR,
-          message: 'Cannot read sheet data: ' + readError.message,
-          severity: VALIDATION_SEVERITY.CRITICAL
-        }]
-      }, operationId);
-    }
-    
-    // Check if data has changed
-    const dataChanged = hasSheetDataChanged(roleName, values);
-    if (dataChanged) {
-      debugLog(`Role sheet data change detected for ${roleName}. Performing direct invalidation and then handling dependencies.`, {
-        operationId: operationId,
-        roleName: roleName
-      });
-      // Directly remove the specific cache for this role sheet first.
-      const specificRoleKey = generateCacheKey('role_sheet', { role: roleName });
-      CacheService.getScriptCache().remove(specificRoleKey);
-      debugLog('Cleared specific cache for changed role sheet', { roleName: roleName, key: specificRoleKey, operationId: operationId });
-
-      // Now, call invalidateDependentCaches for 'role_sheet_*'.
-      // Since CACHE_DEPENDENCIES['role_sheet_*'] is [], this currently does nothing.
-      // If dependencies were added later, it would handle them (likely by incrementing master version).
-      invalidateDependentCaches('role_sheet_*');
-    }
-
     const roleSheetData = {
       roleName: roleName,
-      sheetName: sheet.getName(),
+      sheetName: roleName, // Assuming sheetName is same as roleName
       data: values,
       rowCount: lastRow,
       columnCount: lastColumn,

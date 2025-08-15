@@ -17,6 +17,13 @@
  * Enhanced doGet function with proactive role change detection
  */
 function doGet(e) {
+  // Serve the main HTML shell. The client-side script will handle the rest.
+  return HtmlService.createHtmlOutputFromFile('client/index.html')
+      .setTitle('Peer Evaluator')
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+function getInitialAppData(params) {
   const startTime = Date.now();
   const requestId = generateUniqueId('request');
   
@@ -28,9 +35,6 @@ function doGet(e) {
     if (Math.random() < 0.1) {
       cleanupExpiredSessions();
     }
-
-    // Parse URL parameters for cache control
-    const params = e.parameter || {};
 
     const forceRefresh = params.refresh === 'true' || params.nocache === 'true';
     const debugMode = params.debug === 'true';
@@ -58,10 +62,13 @@ function doGet(e) {
     }
 
     // If the user has special access and no specific staff member is being targeted,
-    // show the filter interface instead of a rubric.
+    // return a marker for the client to show the filter interface.
     if (userContext.hasSpecialAccess && !params.filterStaff) {
         debugLog('Special access user detected - showing filter interface', { role: userContext.role, requestId });
-        return UiService.createFilterSelectionInterface(userContext, requestId);
+        return {
+            userContext: userContext,
+            uiMode: 'filter'
+        };
     }
     
     // For users who land here directly (not through the filter UI) or for non-special roles
@@ -72,31 +79,26 @@ function doGet(e) {
       userContext.assignedSubdomains
     );
     
-    // Attach the full user context to the data payload for the template
+    // Attach the full user context to the data payload
     rubricData.userContext = userContext;
 
-    // Generate response metadata for headers
-    const responseMetadata = generateResponseMetadata(userContext, requestId, debugMode);
-    
-    // Create and configure the HTML template
-    const htmlTemplate = HtmlService.createTemplateFromFile(TEMPLATE_PATHS.STAFF_RUBRIC); // This is now a fallback view
-    htmlTemplate.data = rubricData;
-    
-    // Generate the HTML output
-    const htmlOutput = htmlTemplate.evaluate()
-      .setTitle(UiService.getPageTitle(userContext.role))
-      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-      
-    addCacheBustingHeaders(htmlOutput, responseMetadata);
-
     const executionTime = Date.now() - startTime;
-    logPerformanceMetrics('doGet', executionTime, { role: userContext.role, requestId });
+    logPerformanceMetrics('getInitialAppData', executionTime, { role: userContext.role, requestId });
     
-    return htmlOutput;
+    return {
+        userContext: userContext,
+        rubricData: rubricData,
+        uiMode: 'rubric'
+    };
     
   } catch (error) {
-    console.error('Fatal error in doGet:', formatErrorMessage(error, 'doGet'));
-    return UiService.createEnhancedErrorPage(error, requestId, null, e.userAgent);
+    console.error('Fatal error in getInitialAppData:', formatErrorMessage(error, 'getInitialAppData'));
+    return {
+        error: {
+            message: error.message,
+            stack: error.stack
+        }
+    };
   }
 }
 
