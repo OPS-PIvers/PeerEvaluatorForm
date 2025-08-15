@@ -817,15 +817,28 @@ function uploadGlobalRecording(observationId, base64Data, filename, recordingTyp
 }
 
 /**
+ * Exports a script from the Script editor to a PDF. This is the client-facing function.
+ * @param {string} scriptHtml The HTML content of the script to export.
+ * @param {string} observationId The ID of the observation to associate the PDF with.
+ * @returns {object} The result of the PDF generation and saving process.
+ */
+function exportScriptToPdf(scriptHtml, observationId) {
+    // This function now simply calls the robust, centralized PDF generation function.
+    return generateScriptPDF(observationId, scriptHtml);
+}
+
+/**
  * Generates a separate PDF for the observation script content.
+ * This is the main, robust function for creating the script PDF.
  * @param {string} observationId The ID of the observation to generate script PDF for.
+ * @param {string} [scriptHtml=null] Optional HTML content of the script. If not provided, it's fetched from the observation.
  * @returns {Object} A response object with success status and PDF details.
  */
-function generateScriptPDF(observationId) {
+function generateScriptPDF(observationId, scriptHtml = null) {
     try {
         const userContext = createUserContext();
-        if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
-            return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
+        if (!userContext || !userContext.email) {
+            return { success: false, error: 'Invalid user session.' };
         }
 
         const observation = getObservationById(observationId);
@@ -837,169 +850,162 @@ function generateScriptPDF(observationId) {
             return { success: false, error: 'Permission denied. You did not create this observation.' };
         }
 
-        if (!observation.scriptContent) {
+        // Determine the source of the script content
+        const contentSource = scriptHtml ? 'html' : 'observation';
+        const scriptContent = scriptHtml ? scriptHtml : observation.scriptContent;
+
+        if (!scriptContent) {
             return { success: false, error: 'No script content found for this observation.' };
         }
 
-        debugLog('Starting script PDF generation', { observationId, observedName: observation.observedName });
+        debugLog('Starting script PDF generation', { observationId, contentSource });
 
-        // Create document with proper naming
-        const dateStr = observation.observationDate || new Date().toISOString().slice(0, 10);
-        const docName = `Script - ${observation.observedName} - ${dateStr}`;
-        const doc = DocumentApp.create(docName);
-        const body = doc.getBody();
+        const docName = `Script - ${observation.observedName} - ${new Date().toISOString().slice(0, 10)}`;
 
-        // Clear default content
-        body.clear();
+        // --- Create PDF using robust helper ---
+        const pdfBlob = _createScriptPdfDocument(observation, scriptContent, docName, contentSource);
 
-        // Add title section
-        const title = body.appendParagraph('Observation Script');
-        title.setHeading(DocumentApp.ParagraphHeading.HEADING1);
-        title.setAlignment(DocumentApp.HorizontalAlignment.CENTER);
-
-        // Add metadata section
-        const metadataTable = body.appendTable();
-        metadataTable.appendTableRow().appendTableCell('Observer:').appendTableCell(observation.observerName || userContext.name || 'Unknown');
-        metadataTable.appendTableRow().appendTableCell('Observed Staff:').appendTableCell(observation.observedName || 'Unknown');
-        metadataTable.appendTableRow().appendTableCell('Observation Date:').appendTableCell(observation.observationDate || 'No Date');
-        metadataTable.appendTableRow().appendTableCell('Observation Name:').appendTableCell(observation.observationName || 'Unnamed Observation');
-        
-        // Style the metadata table
-        metadataTable.setBorderWidth(1);
-        metadataTable.setBorderColor('#cccccc');
-
-        body.appendParagraph(''); // Empty line
-
-        // Process script content
-        if (observation.scriptContent && observation.scriptContent.ops) {
-            // Group content by component tags if they exist
-            const componentTags = observation.componentTags || {};
-            const hasComponentTags = Object.keys(componentTags).length > 0;
-
-            if (hasComponentTags) {
-                // Organize content by component tags
-                const contentByComponent = {};
-                const untaggedContent = [];
-
-                // First pass: collect all tagged content
-                Object.keys(componentTags).forEach(componentId => {
-                    const tags = componentTags[componentId];
-                    if (Array.isArray(tags)) {
-                        contentByComponent[componentId] = tags.map(tag => tag.text).join('\n\n');
-                    }
-                });
-
-                // Add component sections
-                Object.keys(contentByComponent).forEach(componentId => {
-                    if (contentByComponent[componentId].trim()) {
-                        // Find component name from rubric data if available
-                        let componentName = componentId;
-                        try {
-                            const rubricData = getAllDomainsData(observation.observedRole, observation.observedYear, 'full');
-                            if (rubricData && rubricData.domains) {
-                                rubricData.domains.forEach(domain => {
-                                    domain.components.forEach(component => {
-                                        if (component.componentId === componentId || component.title.includes(componentId)) {
-                                            componentName = `${componentId}: ${component.title}`;
-                                        }
-                                    });
-                                });
-                            }
-                        } catch (e) {
-                            // Fallback to componentId if rubric data unavailable
-                        }
-
-                        const componentHeader = body.appendParagraph(componentName);
-                        componentHeader.setHeading(DocumentApp.ParagraphHeading.HEADING2);
-                        
-                        const componentContent = body.appendParagraph(contentByComponent[componentId]);
-                        componentContent.setSpacingBefore(6);
-                        componentContent.setSpacingAfter(12);
-
-                        body.appendParagraph(''); // Empty line between components
-                    }
-                });
-            }
-
-            // Add full script section
-            const scriptHeader = body.appendParagraph(hasComponentTags ? 'Complete Script Content' : 'Script Content');
-            scriptHeader.setHeading(DocumentApp.ParagraphHeading.HEADING2);
-
-            // Convert Quill Delta to plain text with basic formatting
-            observation.scriptContent.ops.forEach(op => {
-                if (op.insert && typeof op.insert === 'string') {
-                    const text = op.insert.trim();
-                    if (text) {
-                        const paragraph = body.appendParagraph(text);
-                        
-                        // Apply basic formatting if available
-                        if (op.attributes) {
-                            const style = {};
-                            if (op.attributes.bold) style[DocumentApp.Attribute.BOLD] = true;
-                            if (op.attributes.italic) style[DocumentApp.Attribute.ITALIC] = true;
-                            if (op.attributes.underline) style[DocumentApp.Attribute.UNDERLINE] = true;
-                            
-                            if (Object.keys(style).length > 0) {
-                                paragraph.setAttributes(style);
-                            }
-
-                            // Handle headers
-                            if (op.attributes.header === 1) {
-                                paragraph.setHeading(DocumentApp.ParagraphHeading.HEADING3);
-                            } else if (op.attributes.header === 2) {
-                                paragraph.setHeading(DocumentApp.ParagraphHeading.HEADING4);
-                            }
-                        }
-                    }
-                }
-            });
-        } else {
-            // Fallback for non-Quill content
-            body.appendParagraph('No script content available.');
-        }
-
-        // Save and convert to PDF
-        doc.saveAndClose();
-        const docFile = DriveApp.getFileById(doc.getId());
-        const pdfBlob = docFile.getBlob().getAs('application/pdf');
-
-        // Create PDF file in observation folder
+        // --- Save PDF to Drive ---
         const folder = getOrCreateObservationFolder(observationId);
-        const pdfFileName = `Script-${observation.observedName}-${dateStr}.pdf`;
-        const pdfFile = folder.createFile(pdfBlob.setName(pdfFileName));
+        const pdfFile = folder.createFile(pdfBlob).setName(`${docName}.pdf`);
+        const pdfUrl = pdfFile.getUrl();
 
-        // Set sharing permissions
-        pdfFile.addEditor(observation.observerEmail);
-        if (observation.status === OBSERVATION_STATUS.FINALIZED) {
-            pdfFile.addViewer(observation.observedEmail);
-        }
+        // --- Update Observation Record ---
+        updateObservationScriptUrl(observationId, pdfUrl);
 
-        // Clean up temporary document
-        docFile.setTrashed(true);
+        debugLog('Script PDF generated successfully', { observationId, pdfUrl });
 
-        // Update observation record with script PDF info
-        observation.scriptPdfUrl = pdfFile.getUrl();
-        observation.scriptPdfId = pdfFile.getId();
-        updateObservationInSheet(observation);
-
-        debugLog('Script PDF generated successfully', { 
-            observationId, 
-            pdfUrl: pdfFile.getUrl(),
-            fileName: pdfFileName 
-        });
-
-        return { 
-            success: true, 
-            pdfUrl: pdfFile.getUrl(),
+        return {
+            success: true,
+            url: pdfUrl, // Keep 'url' for backward compatibility with exportScriptToPdf caller
+            pdfUrl: pdfUrl,
             pdfId: pdfFile.getId(),
-            fileName: pdfFileName
+            fileName: `${docName}.pdf`
         };
 
     } catch (error) {
         console.error('Error generating script PDF:', error);
-        return { success: false, error: error.message };
+        debugLog('Failed to generate script PDF', { error: error.message, stack: error.stack });
+        return { success: false, error: 'Error generating script PDF: ' + error.message };
     }
 }
+
+/**
+ * Creates a styled PDF document for the script content using robust methods.
+ * @param {Object} observation The observation data.
+ * @param {string|Object} scriptContent The script content (HTML string or Quill Delta object).
+ * @param {string} docName The name for the document.
+ * @param {string} contentSource The source of the content ('html' or 'observation').
+ * @returns {Blob} A PDF blob.
+ * @private
+ */
+function _createScriptPdfDocument(observation, scriptContent, docName, contentSource) {
+    const doc = DocumentApp.create(docName);
+    const docId = doc.getId();
+    const body = doc.getBody();
+    body.clear();
+
+    // --- Header Section ---
+    const title = body.appendParagraph(`Observation Script: ${observation.observedName}`);
+    title.setHeading(DocumentApp.ParagraphHeading.HEADING1);
+    title.setAlignment(DocumentApp.HorizontalAlignment.CENTER);
+    title.getChild(0).asText().setFontSize(16).setBold(true);
+
+    const subtitle = body.appendParagraph(`Generated on: ${new Date().toLocaleString()}`);
+    subtitle.setAlignment(DocumentApp.HorizontalAlignment.CENTER);
+    subtitle.getChild(0).asText().setFontSize(10).setItalic(true).setForegroundColor('#666666');
+    body.appendParagraph('');
+
+    // --- Metadata Table ---
+    const metadataTable = body.appendTable([
+        ['Observer:', observation.observerEmail],
+        ['Observed Staff:', `${observation.observedName} (${observation.observedEmail})`],
+        ['Observation ID:', observation.observationId]
+    ]);
+    metadataTable.setBorderWidth(0);
+
+    for (let i = 0; i < metadataTable.getNumRows(); i++) {
+        const row = metadataTable.getRow(i);
+        row.getCell(0).getChild(0).asParagraph().setBold(true);
+        row.getCell(0).setWidth(100);
+        row.getCell(1).getChild(0).asParagraph().setItalic(true);
+    }
+    body.appendParagraph('');
+
+    // --- Script Content Section ---
+    if (contentSource === 'observation' && observation.componentTags && Object.keys(observation.componentTags).length > 0) {
+        // If there are component tags, group the content by component
+        const componentTags = observation.componentTags;
+
+        // Get all rubric data to look up component titles
+        const rubricData = getAllDomainsData(observation.observedRole, observation.observedYear, 'full');
+
+        // Create a lookup map for component titles for performance
+        const componentMap = new Map();
+        if (rubricData && rubricData.domains) {
+            for (const domain of rubricData.domains) {
+                for (const component of domain.components) {
+                    componentMap.set(component.componentId, component.title);
+                }
+            }
+        }
+
+        Object.keys(componentTags).forEach(componentId => {
+            const tags = componentTags[componentId];
+            if (Array.isArray(tags) && tags.length > 0) {
+                // Find component name from the lookup map
+                const componentName = componentMap.get(componentId) || componentId;
+
+                body.appendParagraph(componentName).setHeading(DocumentApp.ParagraphHeading.HEADING2);
+                const content = tags.map(tag => tag.text).join('\n');
+                body.appendParagraph(content).setSpacingAfter(12);
+            }
+        });
+
+        body.appendParagraph('---').setAlignment(DocumentApp.HorizontalAlignment.CENTER);
+        body.appendParagraph('');
+    }
+
+    // Always include the full script content at the end
+    body.appendParagraph('Full Script Content').setHeading(DocumentApp.ParagraphHeading.HEADING2);
+
+    if (contentSource === 'html') {
+        addHtmlContentToDoc(body, scriptContent);
+    } else if (contentSource === 'observation' && scriptContent.ops) {
+        scriptContent.ops.forEach(op => {
+            if (op.insert && typeof op.insert === 'string') {
+                const text = op.insert;
+                if (text.trim() || text === '\n') {
+                    const p = body.appendParagraph(text);
+                    if (op.attributes) {
+                        const style = {};
+                        if (op.attributes.bold) style[DocumentApp.Attribute.BOLD] = true;
+                        if (op.attributes.italic) style[DocumentApp.Attribute.ITALIC] = true;
+                        if (op.attributes.underline) style[DocumentApp.Attribute.UNDERLINE] = true;
+                        if (Object.keys(style).length > 0) p.setAttributes(style);
+                        if (op.attributes.header === 1) p.setHeading(DocumentApp.ParagraphHeading.HEADING3);
+                        if (op.attributes.header === 2) p.setHeading(DocumentApp.ParagraphHeading.HEADING4);
+                    }
+                }
+            }
+        });
+    } else {
+        body.appendParagraph('No script content was provided or content format is invalid.').setItalic(true);
+    }
+
+    // --- Save and Cleanup ---
+    doc.saveAndClose();
+    const docFile = DriveApp.getFileById(docId);
+    const pdfBlob = docFile.getBlob().getAs('application/pdf');
+    docFile.setTrashed(true); // Cleanup temporary file
+
+    return pdfBlob;
+}
+
+
+// This space is intentionally left blank.
+// The HTML parsing utility functions have been moved to server/Utils.js
+// to avoid code duplication and improve maintainability.
 
 
 
