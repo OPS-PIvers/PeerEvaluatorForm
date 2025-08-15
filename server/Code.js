@@ -940,19 +940,21 @@ function _createScriptPdfDocument(observation, scriptContent, docName, contentSo
         // Get all rubric data to look up component titles
         const rubricData = getAllDomainsData(observation.observedRole, observation.observedYear, 'full');
 
+        // Create a lookup map for component titles for performance
+        const componentMap = new Map();
+        if (rubricData && rubricData.domains) {
+            for (const domain of rubricData.domains) {
+                for (const component of domain.components) {
+                    componentMap.set(component.componentId, component.title);
+                }
+            }
+        }
+
         Object.keys(componentTags).forEach(componentId => {
             const tags = componentTags[componentId];
             if (Array.isArray(tags) && tags.length > 0) {
-                // Find component name from rubric data
-                let componentName = componentId;
-                if (rubricData && rubricData.domains) {
-                    rubricData.domains.forEach(domain => {
-                        const component = domain.components.find(c => c.componentId === componentId);
-                        if(component) {
-                            componentName = component.title;
-                        }
-                    });
-                }
+                // Find component name from the lookup map
+                const componentName = componentMap.get(componentId) || componentId;
 
                 body.appendParagraph(componentName).setHeading(DocumentApp.ParagraphHeading.HEADING2);
                 const content = tags.map(tag => tag.text).join('\n');
