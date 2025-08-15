@@ -1126,6 +1126,20 @@
             });
         }
 
+        /**
+         * Escapes characters in a string to ensure it's safe to use within a JavaScript
+         * single-quoted string literal, such as in an onclick attribute.
+         * @param {*} unsafe - The input to escape (will be converted to string if not already)
+         * @returns {string} The escaped string, safe for JS string literals.
+         */
+        function escapeJsString(unsafe) {
+            if (unsafe == null) {
+                return '';
+            }
+            const str = String(unsafe);
+            return str.replace(/['\\]/g, match => `\\${match}`);
+        }
+
         function showLoading(message = 'Loading...') { 
             document.getElementById('loading-text').textContent = message; 
             document.getElementById('loading').style.display = 'flex'; 
@@ -1294,47 +1308,48 @@
             hideLoading();
             if (!result.success) return showError(result.error);
             const container = document.getElementById('observationSelectorView');
-            const safeObservedName = escapeHtml(observedName);
-            const safeObservedEmail = escapeHtml(observedEmail);
+            const safeObservedNameHtml = escapeHtml(observedName);
+            const safeObservedEmailJs = escapeJsString(observedEmail);
 
-            let cardsHtml = `<div class="action-card" onclick="handleNewObservation('${safeObservedEmail}')"><span class="action-icon">➕</span><div class="action-title">Start New Observation</div><div class="action-desc">Begin a new evaluation for this staff member.</div></div>`;
+            let cardsHtml = `<div class="action-card" onclick="handleNewObservation('${safeObservedEmailJs}')"><span class="action-icon">➕</span><div class="action-title">Start New Observation</div><div class="action-desc">Begin a new evaluation for this staff member.</div></div>`;
             result.observations.forEach(obs => {
                 const date = new Date(obs.createdAt).toLocaleDateString();
                 let buttons = '';
-                const safeObsId = escapeHtml(obs.observationId);
-                const safeObsName = escapeHtml(obs.observedName);
-                const safeStatus = escapeHtml(obs.status);
+                const safeObsIdJs = escapeJsString(obs.observationId);
+                const safeObsNameHtml = escapeHtml(obs.observedName);
+                const safeStatusHtml = escapeHtml(obs.status);
+                const safeObservedNameJs = escapeJsString(observedName); // For passing to finalize/delete handlers
 
                 if (obs.status === 'Draft') {
-                    buttons = `<button class="filter-btn btn-edit" onclick="handleEditObservation('${safeObsId}')">Edit</button>
-                               <button class="filter-btn btn-finalize" onclick="handleFinalizeObservation('${safeObsId}', '${safeObservedEmail}', '${safeObservedName}')">Finalize</button>
-                               <button class="filter-btn btn-delete" onclick="handleDeleteObservation('${safeObsId}', '${safeObservedEmail}', '${safeObservedName}')">Delete</button>`;
+                    buttons = `<button class="filter-btn btn-edit" onclick="handleEditObservation('${safeObsIdJs}')">Edit</button>
+                               <button class="filter-btn btn-finalize" onclick="handleFinalizeObservation('${safeObsIdJs}', '${safeObservedEmailJs}', '${safeObservedNameJs}')">Finalize</button>
+                               <button class="filter-btn btn-delete" onclick="handleDeleteObservation('${safeObsIdJs}', '${safeObservedEmailJs}', '${safeObservedNameJs}')">Delete</button>`;
                 } else if (obs.status === 'Finalized') {
                     let pdfButtonHtml = '';
                     if (obs.pdfUrl) {
-                        pdfButtonHtml = `<button class="filter-btn btn-export" onclick="window.open('${escapeHtml(obs.pdfUrl)}', '_blank')">View PDF</button>`;
+                        pdfButtonHtml = `<button class="filter-btn btn-export" onclick="window.open('${escapeJsString(obs.pdfUrl)}', '_blank')">View PDF</button>`;
                     } else if (obs.pdfStatus === 'failed') {
-                        pdfButtonHtml = `<button class="filter-btn btn-export btn-pdf-failed" id="pdf-button-${safeObsId}" onclick="handleRetryPdf('${safeObsId}')">Retry PDF</button>`;
+                        pdfButtonHtml = `<button class="filter-btn btn-export btn-pdf-failed" id="pdf-button-${safeObsIdJs}" onclick="handleRetryPdf('${safeObsIdJs}')">Retry PDF</button>`;
                     } else {
-                        pdfButtonHtml = `<button class="filter-btn btn-export btn-pdf-missing" id="pdf-button-${safeObsId}" disabled>Generating PDF...</button>`;
+                        pdfButtonHtml = `<button class="filter-btn btn-export btn-pdf-missing" id="pdf-button-${safeObsIdJs}" disabled>Generating PDF...</button>`;
                         setTimeout(() => startPdfPolling(obs.observationId), 100);
                     }
 
-                    buttons = `<button class="filter-btn btn-view" onclick="handleViewObservation('${safeObsId}')">View</button>
+                    buttons = `<button class="filter-btn btn-view" onclick="handleViewObservation('${safeObsIdJs}')">View</button>
                                ${pdfButtonHtml}
-                               <button class="filter-btn btn-delete" onclick="handleDeleteFinalizedObservation('${safeObsId}', '${safeObservedEmail}', '${safeObservedName}')">Delete</button>`;
+                               <button class="filter-btn btn-delete" onclick="handleDeleteFinalizedObservation('${safeObsIdJs}', '${safeObservedEmailJs}', '${safeObservedNameJs}')">Delete</button>`;
                 }
                 cardsHtml += `
                     <div class="observation-card">
                         <div class="obs-card-content">
-                            <div class="obs-card-title">${safeObsName} - ${safeStatus}</div>
+                            <div class="obs-card-title">${safeObsNameHtml} - ${safeStatusHtml}</div>
                             <div class="obs-card-desc">Created on ${date}</div>
-                            <div class="status-badge ${obs.status === 'Draft' ? 'status-draft' : 'status-finalized'}">${safeStatus}</div>
+                            <div class="status-badge ${obs.status === 'Draft' ? 'status-draft' : 'status-finalized'}">${safeStatusHtml}</div>
                         </div>
                         ${buttons ? `<div class="obs-card-actions">${buttons}</div>` : ''}
                     </div>`;
             });
-            container.innerHTML = `<h2 class="section-title"><span>📝</span> Observations for ${safeObservedName}</h2><div class="actions-grid">${cardsHtml}</div><div style="margin-top: 20px;"><button class="filter-btn btn-secondary" onclick="showView('customFiltersView')">Back to Filters</button></div>`;
+            container.innerHTML = `<h2 class="section-title"><span>📝</span> Observations for ${safeObservedNameHtml}</h2><div class="actions-grid">${cardsHtml}</div><div style="margin-top: 20px;"><button class="filter-btn btn-secondary" onclick="showView('customFiltersView')">Back to Filters</button></div>`;
             showView('observationSelectorView');
         }
 
