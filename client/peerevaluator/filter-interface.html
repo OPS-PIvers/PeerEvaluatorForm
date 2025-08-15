@@ -2510,49 +2510,51 @@
         }
 
         function pushTaggedToNotes() {
-            const componentId = document.getElementById('componentSelector').value;
-            if (!componentId) {
-                showToast('Please select a component', false);
+            const allTags = Object.keys(componentTags);
+            if (allTags.length === 0) {
+                showToast('No tagged evidence to push.', false);
                 return;
             }
-            
-            const tags = componentTags[componentId];
-            if (!tags || tags.length === 0) {
-                showToast('No tagged content for this component', false);
-                return;
-            }
-            
-            // Get the notes editor for this component, auto-expand if needed
-            let notesEditor = window.globalQuillInstances && window.globalQuillInstances[componentId];
-            if (!notesEditor) {
-                // Try to auto-expand the component's notes section
-                const evidenceSectionId = `evidence-${componentId}`;
-                const evidenceSection = document.getElementById(evidenceSectionId);
-                
-                if (evidenceSection) {
-                    // Expand the evidence section (this will initialize the editor)
-                    toggleEvidenceSection(evidenceSectionId);
-                    
-                    // Give it a moment to initialize, then try again
-                    setTimeout(() => {
-                        notesEditor = window.globalQuillInstances && window.globalQuillInstances[componentId];
-                        if (!notesEditor) {
-                            showToast(`Could not initialize notes editor for ${componentId}. Please expand the component manually.`, false);
-                            return;
+
+            let pushedCount = 0;
+            allTags.forEach(componentId => {
+                const tags = componentTags[componentId];
+                if (tags && tags.length > 0) {
+                    let notesEditor = window.globalQuillInstances && window.globalQuillInstances[componentId];
+                    if (!notesEditor) {
+                        const evidenceSectionId = `evidence-${componentId}`;
+                        const evidenceSection = document.getElementById(evidenceSectionId);
+                        if (evidenceSection) {
+                            toggleEvidenceSection(evidenceSectionId);
+                            const attemptPush = (retries = 5) => {
+                                if (retries <= 0) {
+                                    console.warn(`Could not initialize notes editor for ${componentId} after multiple attempts.`);
+                                    return;
+                                }
+                                notesEditor = window.globalQuillInstances && window.globalQuillInstances[componentId];
+                                if (notesEditor) {
+                                    completePushToNotes(componentId, tags, notesEditor);
+                                } else {
+                                    setTimeout(() => attemptPush(retries - 1), 200);
+                                }
+                            };
+                            attemptPush();
+                        } else {
+                            console.warn(`Notes editor not found for ${componentId}.`);
                         }
-                        
-                        // Continue with the push operation
+                    } else {
                         completePushToNotes(componentId, tags, notesEditor);
-                    }, 200);
-                    return;
-                } else {
-                    showToast(`Notes editor not found for ${componentId}. Component may not be visible or available.`, false);
-                    return;
+                    }
+                    pushedCount++;
                 }
+            });
+
+            if (pushedCount > 0) {
+                showToast(`Pushed all tagged evidence to their respective notes sections.`, true);
+                document.getElementById('tagStatus').textContent = `Pushed all tagged evidence to notes.`;
+            } else {
+                showToast('No tagged evidence to push.', false);
             }
-            
-            // Continue with the push operation immediately if editor is already available
-            completePushToNotes(componentId, tags, notesEditor);
         }
         
         function completePushToNotes(componentId, tags, notesEditor) {

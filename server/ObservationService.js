@@ -4,6 +4,7 @@
  * This service manages observation records, which are stored as rows in the "Observation_Data" Google Sheet.
  */
 
+// JSON serialized fields in the observation database
 const JSON_SERIALIZED_FIELDS = ['observationData', 'evidenceLinks', 'observationNotes', 'scriptContent', 'componentTags'];
 
 
