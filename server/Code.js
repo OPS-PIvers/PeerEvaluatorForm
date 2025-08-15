@@ -1024,80 +1024,6 @@ function _createScriptPdfDocument(observation, scriptContent, docName, contentSo
  */
 
 /**
- * Handle AJAX requests for staff data (used by special role filters)
- * @param {Object} e - Event object from doGet
- * @return {Object} JSON response with staff data
- */
-function handleStaffListRequest(e) {
-  try {
-    const params = e.parameter || {};
-    const requestingRole = params.requestingRole;
-    const filterRole = params.filterRole;
-    const filterYear = params.filterYear;
-    let yearArgument = filterYear;
-
-    // Validate requestingRole
-    if (typeof requestingRole !== 'string' || !AVAILABLE_ROLES.includes(requestingRole)) {
-      return {
-        success: false,
-        error: 'Invalid input',
-        message: 'requestingRole must be a string and a valid role.'
-      };
-    }
-
-    // Validate filterRole if provided
-    if (filterRole && (typeof filterRole !== 'string' || !AVAILABLE_ROLES.includes(filterRole))) {
-      return {
-        success: false,
-        error: 'Invalid input',
-        message: 'filterRole must be a string and a valid role.'
-      };
-    }
-
-    // Validate filterYear if provided
-    if (filterYear) {
-      const parsedFilterYear = parseInt(filterYear);
-      if (isNaN(parsedFilterYear) || !OBSERVATION_YEARS.includes(parsedFilterYear)) {
-        return {
-          success: false,
-          error: 'Invalid input',
-          message: 'filterYear must be a number and a valid observation year.'
-        };
-      }
-      yearArgument = parsedFilterYear;
-    }
-
-    // Validate requesting user has permission
-    const accessValidation = validateSpecialRoleAccess(requestingRole, 'view_any');
-    if (!accessValidation.hasAccess) {
-      return {
-        success: false,
-        error: 'Access denied',
-        message: accessValidation.message
-      };
-    }
-
-    // Get filtered staff list
-    const staffList = getStaffByRoleAndYear(filterRole, yearArgument);
-
-    return {
-      success: true,
-      staffList: staffList,
-      filterRole: filterRole,
-      filterYear: filterYear,
-      count: staffList.length
-    };
-
-  } catch (error) {
-    console.error('Error handling staff list request:', error);
-    return {
-      success: false,
-      error: error.message
-    };
-  }
-}
-
-/**
  * Get filtered staff list for special roles
  * @param {string} filterType - Type of filter to apply
  * @param {string} role - Specific role filter (optional)
@@ -1172,14 +1098,6 @@ function getFilteredStaffList(filterType = 'all', role = null, year = null) {
 }
 
 /**
- * Get probationary staff only (for Administrator role)
- * @return {Array} Array of probationary staff
- */
-function getProbationaryStaff() {
-  return getFilteredStaffList('probationary');
-}
-
-/**
  * Get staff by role and year (for Peer Evaluator and Full Access)
  * @param {string} role - Role to filter by
  * @param {string|number} year - Year to filter by
@@ -1187,62 +1105,6 @@ function getProbationaryStaff() {
  */
 function getStaffByRoleAndYear(role, year) {
   return getFilteredStaffList('combined', role, year);
-}
-
-/**
- * Validate special role access permissions
- * @param {string} requestingRole - Role of the person making the request
- * @param {string} requestType - Type of request ('view_probationary', 'view_any', etc.)
- * @return {Object} Validation result
- */
-function validateSpecialRoleAccess(requestingRole, requestType) {
-  const validation = {
-    hasAccess: false,
-    role: requestingRole,
-    requestType: requestType,
-    allowedActions: [],
-    message: 'Access denied'
-  };
-
-  try {
-    switch (requestingRole) {
-      case SPECIAL_ROLES.ADMINISTRATOR:
-        validation.hasAccess = true;
-        validation.allowedActions = [SPECIAL_ACTIONS.VIEW_PROBATIONARY, SPECIAL_ACTIONS.VIEW_OWN_STAFF];
-        validation.message = 'Administrator access granted';
-        break;
-
-      case SPECIAL_ROLES.PEER_EVALUATOR:
-        validation.hasAccess = true;
-        validation.allowedActions = [SPECIAL_ACTIONS.VIEW_ANY, SPECIAL_ACTIONS.FILTER_BY_ROLE, SPECIAL_ACTIONS.FILTER_BY_YEAR, SPECIAL_ACTIONS.FILTER_BY_STAFF, SPECIAL_ACTIONS.GENERAL_ACCESS];
-        validation.message = 'Peer Evaluator access granted';
-        break;
-
-      case SPECIAL_ROLES.FULL_ACCESS:
-        validation.hasAccess = true;
-        validation.allowedActions = [SPECIAL_ACTIONS.VIEW_ANY, SPECIAL_ACTIONS.FILTER_BY_ROLE, SPECIAL_ACTIONS.FILTER_BY_YEAR, SPECIAL_ACTIONS.FILTER_BY_STAFF, SPECIAL_ACTIONS.ADMIN_FUNCTIONS];
-        validation.message = 'Full Access granted';
-        break;
-
-      default:
-        validation.message = `Role "${requestingRole}" does not have special access privileges`;
-        break;
-    }
-
-    // Check if specific request type is allowed
-    if (validation.hasAccess && requestType && !validation.allowedActions.includes(requestType)) {
-      validation.hasAccess = false;
-      validation.message = `Role "${requestingRole}" cannot perform action "${requestType}"`;
-    }
-
-    debugLog('Special role access validation', validation);
-    return validation;
-
-  } catch (error) {
-    console.error('Error validating special role access:', error);
-    validation.message = 'Validation error: ' + error.message;
-    return validation;
-  }
 }
 
 /**
@@ -1625,103 +1487,6 @@ function clearUserCaches(userEmail = null) {
 }
 
 /**
- * Check for role changes across all active users
- */
-function checkAllUsersForRoleChanges() {
-  console.log('=== CHECKING ALL USERS FOR ROLE CHANGES ===');
-
-  try {
-    const startTime = Date.now();
-    const staffData = getStaffData();
-
-    if (!staffData || !staffData.users) {
-      debugLog('No staff data available for role change checking');
-      return { error: 'No staff data available' };
-    }
-
-    const results = {
-      totalUsers: staffData.users.length,
-      usersChecked: 0,
-      changesDetected: 0,
-      roleChanges: [],
-      errors: []
-    };
-
-    staffData.users.forEach(user => {
-      try {
-        if (!user.email || !isValidEmail(user.email)) {
-          return;
-        }
-
-        results.usersChecked++;
-
-        const changeDetection = detectUserStateChanges(user.email, {
-          role: user.role,
-          year: user.year,
-          name: user.name,
-          email: user.email
-        });
-
-        if (changeDetection.hasChanged && !changeDetection.isNewUser) {
-          results.changesDetected++;
-
-          const roleChange = changeDetection.changes.find(change => change.field === 'role');
-          if (roleChange) {
-            results.roleChanges.push({
-              email: user.email,
-              name: user.name,
-              oldRole: roleChange.oldValue,
-              newRole: roleChange.newValue,
-              timestamp: Date.now()
-            });
-
-            // Proactively clear caches for this user
-            clearUserCaches(user.email);
-
-            debugLog('Proactive role change detected and processed', {
-              email: user.email,
-              oldRole: roleChange.oldValue,
-              newRole: roleChange.newValue
-            });
-          }
-        }
-
-      } catch (userError) {
-        results.errors.push({
-          email: user.email,
-          error: userError.message
-        });
-      }
-    });
-
-    const executionTime = Date.now() - startTime;
-
-    logPerformanceMetrics('checkAllUsersForRoleChanges', executionTime, {
-      totalUsers: results.totalUsers,
-      usersChecked: results.usersChecked,
-      changesDetected: results.changesDetected,
-      roleChanges: results.roleChanges.length
-    });
-
-    if (results.roleChanges.length > 0) {
-      console.log(`✅ Detected and processed ${results.roleChanges.length} role changes:`);
-      results.roleChanges.forEach(change => {
-        console.log(`  - ${change.email}: ${change.oldRole} → ${change.newRole}`);
-      });
-    } else {
-      console.log('✅ No role changes detected');
-    }
-
-    debugLog('Role change check completed', results);
-    return results;
-
-  } catch (error) {
-    console.error('Error checking users for role changes:', error);
-    return { error: error.message };
-  }
-}
-
-/**
  * Proactive cache warming for role changes
  */
 function warmCacheForRoleChange(userEmail, newRole) {
@@ -1757,60 +1522,6 @@ function warmCacheForRoleChange(userEmail, newRole) {
 
   } catch (error) {
     console.error('Error warming cache for role change:', error);
-  }
-}
-
-/**
- * Enhanced user validation with state tracking
- */
-function validateUserWithStateTracking(userEmail) {
-  if (!userEmail) {
-    return { valid: false, reason: 'No email provided' };
-  }
-
-  try {
-    debugLog('Validating user with state tracking', { userEmail });
-
-    // Basic validation
-    const basicValidation = validateUserAccess(userEmail);
-
-    // Get session info
-    const session = getUserSession(userEmail);
-
-    // Get stored state
-    const storedState = getStoredUserState(userEmail);
-
-    // Get role change history
-    const roleHistory = getRoleChangeHistory(userEmail);
-
-    const validation = {
-      ...basicValidation,
-      sessionInfo: session,
-      storedState: storedState,
-      roleHistory: roleHistory,
-      lastRoleChange: roleHistory.length > 0 ? roleHistory[0] : null,
-      totalRoleChanges: roleHistory.length,
-      sessionActive: session && session.isActive,
-      sessionExpiry: session ? new Date(session.expiresAt).toISOString() : null
-    };
-
-    debugLog('Enhanced user validation completed', {
-      userEmail: userEmail,
-      valid: validation.hasAccess,
-      role: validation.role,
-      sessionActive: validation.sessionActive,
-      roleChanges: validation.totalRoleChanges
-    });
-
-    return validation;
-
-  } catch (error) {
-    console.error('Error in enhanced user validation:', error);
-    return {
-      valid: false,
-      reason: 'Validation error: ' + error.message,
-      error: error.message
-    };
   }
 }
 
