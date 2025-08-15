@@ -960,6 +960,7 @@
     <div id="root"></div>
     <div id="toastNotification" class="toast-notification"></div>
     <script>
+    (function() {
         function showLoading() {
             document.getElementById('loader').style.display = 'block';
         }
@@ -1336,6 +1337,9 @@
                     }
 
                     if (data.uiMode === 'rubric') {
+                        if (data.rubricData && data.rubricData.observation) {
+                            currentObservationId = data.rubricData.observation.observationId;
+                        }
                         renderRubric(data.rubricData);
                     } else {
                         renderFilterView(data);
@@ -1349,6 +1353,7 @@
                 })
                 .getInitialAppData(new URLSearchParams(window.location.search).toString());
         });
+    })();
     </script>
 </body>
 </html>

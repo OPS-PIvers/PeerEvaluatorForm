@@ -1287,7 +1287,8 @@ function onEditTrigger(e) {
     // Handle Staff sheet edits (existing functionality)
     if (sheetName === SHEET_NAMES.STAFF) {
       const cache = CacheService.getScriptCache();
-      cache.remove('raw_sheet_Staff');
+      const rawSheetKey = generateCacheKey('raw_sheet_Staff');
+      cache.remove(rawSheetKey);
       debugLog('Invalidated raw_sheet_Staff cache due to edit.');
 
       // Only process edits to the Role column (Column C = index 3)
@@ -1314,7 +1315,8 @@ function onEditTrigger(e) {
     // Handle Settings sheet edits
     if (sheetName === SHEET_NAMES.SETTINGS) {
         const cache = CacheService.getScriptCache();
-        cache.remove('raw_sheet_Settings');
+        const rawSheetKey = generateCacheKey('raw_sheet_Settings');
+        cache.remove(rawSheetKey);
         debugLog('Invalidated raw_sheet_Settings cache due to edit.');
         return;
     }
