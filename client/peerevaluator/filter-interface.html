@@ -1396,8 +1396,30 @@
                 .getObservationOptions(observedEmail);
         }
 
-        function handleNewObservation(observedEmail) { showLoading('Creating new observation draft...'); google.script.run.withSuccessHandler(handleRubricData).withFailureHandler(handleError).createNewObservationForPeerEvaluator(observedEmail); }
-        function handleEditObservation(obsId) { showLoading('Loading observation...'); google.script.run.withSuccessHandler(handleRubricData).withFailureHandler(handleError).loadObservationForEditing(obsId); }
+        function handleNewObservation(observedEmail) { 
+            console.log('Starting new observation for:', observedEmail);
+            
+            // Clear all existing observation state before creating new observation
+            clearObservationState();
+            
+            showLoading('Creating new observation draft...'); 
+            google.script.run
+                .withSuccessHandler(handleRubricData)
+                .withFailureHandler(handleError)
+                .createNewObservationForPeerEvaluator(observedEmail); 
+        }
+        function handleEditObservation(obsId) { 
+            console.log('Loading observation for editing:', obsId);
+            
+            // Clear all existing observation state before loading different observation
+            clearObservationState();
+            
+            showLoading('Loading observation...'); 
+            google.script.run
+                .withSuccessHandler(handleRubricData)
+                .withFailureHandler(handleError)
+                .loadObservationForEditing(obsId); 
+        }
         function handleDeleteObservation(obsId, email, name) { if (confirm('Are you sure you want to delete this draft? This cannot be undone.')) { showLoading('Deleting draft...'); google.script.run.withSuccessHandler(res => { if(res.success) { displayObservationOptions(email, name); } else { showError(res.error); } }).withFailureHandler(handleError).deleteObservation(obsId); } }
 
         function handleFinalizeObservation(obsId, email, name) {
@@ -1444,8 +1466,16 @@
         }
 
         function handleViewObservation(obsId) {
+            console.log('Loading finalized observation for viewing:', obsId);
+            
+            // Clear all existing observation state before loading different observation
+            clearObservationState();
+            
             showLoading('Loading observation...');
-            google.script.run.withSuccessHandler(handleRubricData).withFailureHandler(handleError).loadFinalizedObservationForViewing(obsId);
+            google.script.run
+                .withSuccessHandler(handleRubricData)
+                .withFailureHandler(handleError)
+                .loadFinalizedObservationForViewing(obsId);
         }
 
         function handleDeleteFinalizedObservation(obsId, email, name) {
@@ -1553,10 +1583,21 @@
             }
 
             const { observation, rubricData } = result;
+            
+            // Clear previous Quill instances and notes data before loading new observation
+            if (observation) {
+                console.log('Loading new observation data, ensuring clean state...');
+                clearQuillInstances();
+            }
+            
             currentObservationId = observation ? observation.observationId : null;
             if (observation) {
                 currentObservedUser.email = observation.observedEmail;
                 currentObservedUser.name = observation.observedName;
+                console.log('Observation context set:', { 
+                    observationId: currentObservationId, 
+                    observedUser: currentObservedUser 
+                });
             }
             observationViewMode = (rubricData.userContext && rubricData.userContext.viewMode) || 'assigned';
 
@@ -1576,10 +1617,12 @@
             
             // Initialize notes data from observation if available
             if (observation && observation.observationData) {
+                console.log('Loading observation notes data for', Object.keys(observation.observationData).length, 'components');
                 Object.keys(observation.observationData).forEach(componentId => {
                     const componentData = observation.observationData[componentId];
                     if (componentData && componentData.notes) {
                         window.globalObservationNotes[componentId] = componentData.notes;
+                        console.log(`Loaded notes for component ${componentId}`);
                     }
                 });
                 
@@ -1587,6 +1630,8 @@
                 setTimeout(() => {
                     ensureEditorsForNotesData(rubricData.userContext.isEvaluator);
                 }, 500);
+            } else {
+                console.log('No observation data to load');
             }
             
             // Show global tools bar for evaluators after DOM injection
@@ -1836,6 +1881,14 @@
         
         function toggleEvidenceSection(contentId) {
             console.log('toggleEvidenceSection called with:', contentId);
+            
+            // Validate observation context
+            if (!currentObservationId) {
+                console.warn('Cannot toggle evidence section: No active observation');
+                showToast('No active observation - cannot edit evidence', false);
+                return;
+            }
+            
             const content = document.getElementById(contentId);
             if (!content) {
                 console.error('Evidence content element not found:', contentId);
@@ -1856,9 +1909,26 @@
 
             // Initialize Quill on first expansion if not already initialized
             if (isExpanded && !window.globalQuillInstances[componentId]) {
-                initializeQuillEditor(componentId);
+                console.log('Initializing Quill editor for component:', componentId);
+                const success = initializeQuillEditor(componentId);
+                if (!success) {
+                    console.error('Failed to initialize Quill editor for component:', componentId);
+                    showToast(`Failed to initialize text editor for ${componentId}`, false);
+                }
             } else if (isExpanded) {
                 console.log('Quill instance already exists for component:', componentId);
+                
+                // Validate existing instance is functional
+                const existingEditor = window.globalQuillInstances[componentId];
+                if (!existingEditor || !existingEditor.root) {
+                    console.warn('Existing Quill instance appears broken, re-initializing...');
+                    delete window.globalQuillInstances[componentId];
+                    const success = initializeQuillEditor(componentId);
+                    if (!success) {
+                        console.error('Failed to re-initialize Quill editor for component:', componentId);
+                        showToast(`Failed to initialize text editor for ${componentId}`, false);
+                    }
+                }
             }
 
             // Store state in sessionStorage for persistence
@@ -1875,6 +1945,13 @@
         // Consolidated Quill initialization function - make globally available
         window.initializeQuillEditor = function(componentId) {
             console.log('Attempting to initialize Quill editor for:', componentId);
+            
+            // Validate observation context
+            if (!currentObservationId) {
+                console.warn(`Cannot initialize Quill editor for ${componentId}: No active observation`);
+                return false;
+            }
+            
             const sanitizedComponentId = componentId.replace(/[^a-zA-Z0-9]/g, '');
             const editorId = 'notes-editor-' + sanitizedComponentId;
             const editorElement = document.getElementById(editorId);
@@ -1884,33 +1961,62 @@
                 return false;
             }
 
-            // Check if this element already has a Quill instance (prevent duplicates)
+            // Check if this component already has a Quill instance in our global registry
+            if (window.globalQuillInstances[componentId]) {
+                const existingEditor = window.globalQuillInstances[componentId];
+                console.log('Quill instance already exists in global registry for:', componentId);
+                
+                // Verify the existing editor is still valid and attached to the correct element
+                if (existingEditor && existingEditor.root && existingEditor.root.parentNode === editorElement) {
+                    // Load existing notes content if available and not already loaded
+                    if (window.globalObservationNotes[componentId] && 
+                        (!existingEditor.root.innerHTML || existingEditor.root.innerHTML === '<p><br></p>')) {
+                        existingEditor.root.innerHTML = window.globalObservationNotes[componentId];
+                        console.log('Loaded existing notes for component:', componentId);
+                    }
+                    return true;
+                } else {
+                    // Existing editor is invalid, clean it up
+                    console.warn(`Cleaning up invalid Quill instance for ${componentId}`);
+                    delete window.globalQuillInstances[componentId];
+                }
+            }
+
+            // Check if DOM element already has a Quill instance (prevent duplicates)
             if (editorElement.__quill) {
-                console.log('Quill already initialized on this element:', editorId);
+                console.log('Quill already initialized on DOM element:', editorId);
                 const existingEditor = editorElement.__quill;
-                window.globalQuillInstances[componentId] = existingEditor;
                 
-                // Load existing notes content if available and not already loaded
-                if (window.globalObservationNotes[componentId] && 
-                    (!existingEditor.root.innerHTML || existingEditor.root.innerHTML === '<p><br></p>')) {
-                    existingEditor.root.innerHTML = window.globalObservationNotes[componentId];
-                    console.log('Loaded existing notes for component:', componentId);
+                // Verify this editor is functional
+                if (existingEditor && existingEditor.root) {
+                    window.globalQuillInstances[componentId] = existingEditor;
+                    
+                    // Load existing notes content if available and not already loaded
+                    if (window.globalObservationNotes[componentId] && 
+                        (!existingEditor.root.innerHTML || existingEditor.root.innerHTML === '<p><br></p>')) {
+                        existingEditor.root.innerHTML = window.globalObservationNotes[componentId];
+                        console.log('Loaded existing notes for component:', componentId);
+                    }
+                    
+                    // Ensure auto-save is set up (check if already has listeners to avoid duplicates)
+                    if (!existingEditor._hasAutoSaveListener) {
+                        let timeout;
+                        existingEditor.on('text-change', () => {
+                            clearTimeout(timeout);
+                            timeout = setTimeout(() => {
+                                saveNotes(componentId, existingEditor.root.innerHTML);
+                            }, 1500);
+                        });
+                        existingEditor._hasAutoSaveListener = true;
+                        console.log('Auto-save listener attached to existing editor for:', componentId);
+                    }
+                    
+                    return true;
+                } else {
+                    // DOM element has broken Quill instance, clean it up
+                    console.warn(`Cleaning up broken Quill instance on DOM element for ${componentId}`);
+                    delete editorElement.__quill;
                 }
-                
-                // Ensure auto-save is set up (check if already has listeners to avoid duplicates)
-                if (!existingEditor._hasAutoSaveListener) {
-                    let timeout;
-                    existingEditor.on('text-change', () => {
-                        clearTimeout(timeout);
-                        timeout = setTimeout(() => {
-                            saveNotes(componentId, existingEditor.root.innerHTML);
-                        }, 1500);
-                    });
-                    existingEditor._hasAutoSaveListener = true;
-                    console.log('Auto-save listener attached to existing editor for:', componentId);
-                }
-                
-                return true;
             }
             
             console.log('Found editor element:', editorId);
@@ -2341,6 +2447,318 @@
             console.log(`Recording saved: ${type} at ${fileUrl} with name ${filename}`);
         }
 
+        // === Observation State Management Functions ===
+        
+        /**
+         * Clears all observation-related state to prevent cross-contamination between observations
+         */
+        function clearObservationState() {
+            console.log('Clearing all observation state...');
+            
+            // Clear observation context
+            currentObservationId = null;
+            currentObservedUser = { email: null, name: null };
+            
+            // Clear script editor state
+            clearScriptEditor();
+            
+            // Clear Quill editor instances and notes
+            clearQuillInstances();
+            
+            // Clear any UI state
+            resetObservationUI();
+            
+            console.log('Observation state cleared successfully');
+        }
+        
+        /**
+         * Clears script editor state and destroys the Quill instance
+         */
+        function clearScriptEditor() {
+            console.log('Clearing script editor state...');
+            
+            // Clear auto-save timer
+            if (scriptSaveDebounceTimer) {
+                clearTimeout(scriptSaveDebounceTimer);
+                scriptSaveDebounceTimer = null;
+            }
+            
+            // Destroy Quill instance if it exists
+            if (scriptQuill) {
+                try {
+                    // Remove all event listeners
+                    scriptQuill.off('text-change');
+                    // Clear the editor content
+                    scriptQuill.setContents([], 'silent');
+                    // Set to null to force re-initialization
+                    scriptQuill = null;
+                } catch (error) {
+                    console.warn('Error destroying script Quill instance:', error);
+                    scriptQuill = null;
+                }
+            }
+            
+            // Reset script state variables
+            scriptContent = {};
+            isScriptDirty = false;
+            isSavingScript = false;
+            
+            // Reset UI state
+            updateSaveButtonState();
+            
+            console.log('Script editor state cleared');
+        }
+        
+        /**
+         * Destroys all Quill editor instances and clears notes data
+         */
+        function clearQuillInstances() {
+            console.log('Clearing all Quill instances and notes data...');
+            
+            // Destroy all existing Quill instances
+            if (window.globalQuillInstances) {
+                Object.keys(window.globalQuillInstances).forEach(componentId => {
+                    const editor = window.globalQuillInstances[componentId];
+                    if (editor && typeof editor.off === 'function') {
+                        try {
+                            // Remove all event listeners
+                            editor.off('text-change');
+                            // Clear the editor content
+                            editor.setContents([], 'silent');
+                            
+                            // Clear the __quill reference from the DOM element
+                            const editorElement = document.getElementById(`notesEditor-${componentId}`);
+                            if (editorElement && editorElement.__quill) {
+                                delete editorElement.__quill;
+                            }
+                        } catch (error) {
+                            console.warn(`Error destroying Quill instance for ${componentId}:`, error);
+                        }
+                    }
+                });
+            }
+            
+            // Reset global storage objects
+            window.globalQuillInstances = {};
+            window.globalObservationNotes = {};
+            
+            console.log('All Quill instances and notes data cleared');
+        }
+        
+        /**
+         * Resets observation-related UI elements to default state
+         */
+        function resetObservationUI() {
+            console.log('Resetting observation UI...');
+            
+            // Close script editor modal if open
+            const scriptModal = document.getElementById('scriptEditorModal');
+            if (scriptModal) {
+                scriptModal.style.display = 'none';
+            }
+            
+            // Reset any expanded evidence sections
+            const evidenceSections = document.querySelectorAll('[id^="evidence-content-"]');
+            evidenceSections.forEach(section => {
+                section.style.display = 'none';
+            });
+            
+            // Reset chevron indicators
+            const chevrons = document.querySelectorAll('[id^="evidence-chevron-"]');
+            chevrons.forEach(chevron => {
+                chevron.textContent = '▶';
+            });
+            
+            // Clear any temporary UI states from sessionStorage related to evidence
+            try {
+                const storagePrefix = 'evidenceState_';
+                Object.keys(sessionStorage).forEach(key => {
+                    if (key.startsWith(storagePrefix)) {
+                        sessionStorage.removeItem(key);
+                    }
+                });
+            } catch (error) {
+                console.warn('Error clearing evidence state from sessionStorage:', error);
+            }
+            
+            console.log('Observation UI reset completed');
+        }
+        
+        /**
+         * Diagnostic function to detect and fix broken observation state
+         */
+        function diagnoseAndRecoverObservationState() {
+            console.log('Running observation state diagnostics...');
+            
+            const issues = [];
+            const fixes = [];
+            
+            // Check for orphaned currentObservationId without proper context
+            if (currentObservationId && !currentObservedUser.email) {
+                issues.push('currentObservationId set but no observed user context');
+                currentObservationId = null;
+                fixes.push('Cleared orphaned observation ID');
+            }
+            
+            // Check for broken script editor state
+            if (scriptQuill && !currentObservationId) {
+                issues.push('Script editor exists but no observation context');
+                clearScriptEditor();
+                fixes.push('Cleared orphaned script editor');
+            }
+            
+            // Check for broken Quill instances
+            if (window.globalQuillInstances) {
+                Object.keys(window.globalQuillInstances).forEach(componentId => {
+                    const editor = window.globalQuillInstances[componentId];
+                    if (!editor || !editor.root || !editor.root.parentNode) {
+                        issues.push(`Broken Quill instance for component ${componentId}`);
+                        delete window.globalQuillInstances[componentId];
+                        fixes.push(`Removed broken Quill instance for ${componentId}`);
+                    }
+                });
+            }
+            
+            // Check for notes data without observation context
+            if (window.globalObservationNotes && !currentObservationId) {
+                const notesCount = Object.keys(window.globalObservationNotes).length;
+                if (notesCount > 0) {
+                    issues.push(`${notesCount} orphaned notes entries without observation context`);
+                    window.globalObservationNotes = {};
+                    fixes.push('Cleared orphaned notes data');
+                }
+            }
+            
+            // Check for mismatched DOM and JS state
+            const scriptModal = document.getElementById('scriptEditorModal');
+            if (scriptModal && scriptModal.style.display !== 'none' && !scriptQuill) {
+                issues.push('Script modal open but no Quill instance');
+                scriptModal.style.display = 'none';
+                fixes.push('Closed orphaned script modal');
+            }
+            
+            if (issues.length > 0) {
+                console.warn('Observation state issues detected:', issues);
+                console.log('Applied fixes:', fixes);
+                showToast(`Recovered from ${issues.length} state issue(s)`, true);
+            } else {
+                console.log('Observation state is healthy');
+            }
+            
+            return { issues, fixes };
+        }
+        
+        /**
+         * Emergency state reset function for when things go really wrong
+         */
+        function emergencyStateReset() {
+            console.warn('EMERGENCY: Performing complete state reset...');
+            
+            try {
+                // Force clear all state
+                currentObservationId = null;
+                currentObservedUser = { email: null, name: null };
+                
+                // Destroy script editor
+                if (scriptQuill) {
+                    try {
+                        scriptQuill.off('text-change');
+                        scriptQuill = null;
+                    } catch (e) {
+                        console.warn('Error destroying script Quill:', e);
+                        scriptQuill = null;
+                    }
+                }
+                scriptContent = {};
+                isScriptDirty = false;
+                isSavingScript = false;
+                
+                if (scriptSaveDebounceTimer) {
+                    clearTimeout(scriptSaveDebounceTimer);
+                    scriptSaveDebounceTimer = null;
+                }
+                
+                // Destroy all Quill instances
+                if (window.globalQuillInstances) {
+                    Object.keys(window.globalQuillInstances).forEach(componentId => {
+                        try {
+                            const editor = window.globalQuillInstances[componentId];
+                            if (editor && editor.off) {
+                                editor.off('text-change');
+                            }
+                            const element = document.getElementById(`notesEditor-${componentId}`);
+                            if (element && element.__quill) {
+                                delete element.__quill;
+                            }
+                        } catch (e) {
+                            console.warn(`Error cleaning up Quill for ${componentId}:`, e);
+                        }
+                    });
+                }
+                window.globalQuillInstances = {};
+                window.globalObservationNotes = {};
+                
+                // Reset UI
+                const scriptModal = document.getElementById('scriptEditorModal');
+                if (scriptModal) {
+                    scriptModal.style.display = 'none';
+                }
+                
+                console.log('Emergency state reset completed');
+                showToast('Emergency state reset completed', true);
+                
+            } catch (error) {
+                console.error('Error during emergency reset:', error);
+                showToast('Emergency reset encountered errors - please refresh page', false);
+            }
+        }
+        
+        // === Periodic State Monitoring ===
+        
+        let stateMonitorInterval = null;
+        
+        /**
+         * Starts periodic monitoring of observation state
+         */
+        function startStateMonitoring() {
+            if (stateMonitorInterval) {
+                clearInterval(stateMonitorInterval);
+            }
+            
+            stateMonitorInterval = setInterval(() => {
+                try {
+                    diagnoseAndRecoverObservationState();
+                } catch (error) {
+                    console.error('Error during state monitoring:', error);
+                }
+            }, 30000); // Check every 30 seconds
+            
+            console.log('State monitoring started');
+        }
+        
+        /**
+         * Stops periodic state monitoring
+         */
+        function stopStateMonitoring() {
+            if (stateMonitorInterval) {
+                clearInterval(stateMonitorInterval);
+                stateMonitorInterval = null;
+                console.log('State monitoring stopped');
+            }
+        }
+        
+        // Start monitoring when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(() => {
+                startStateMonitoring();
+            }, 5000); // Start monitoring after 5 seconds
+        });
+        
+        // Stop monitoring when page unloads
+        window.addEventListener('beforeunload', function() {
+            stopStateMonitoring();
+        });
+
         // === Script Editor Functions ===
         const SCRIPT_EDITOR_CONSTANTS = <?!= JSON.stringify(scriptEditorSettings) ?>;
         let scriptQuill = null;
@@ -2368,6 +2786,24 @@
         }
 
         function openScriptEditor() {
+            // Validate observation context before opening
+            if (!currentObservationId) {
+                showToast('Cannot open script editor: No active observation', false);
+                console.error('Cannot open script editor: No active observation context');
+                return;
+            }
+            
+            if (!currentObservedUser.email) {
+                showToast('Cannot open script editor: Invalid observation context', false);
+                console.error('Cannot open script editor: Invalid observed user context');
+                return;
+            }
+            
+            console.log('Opening script editor for observation:', currentObservationId);
+            
+            // Run diagnostics to check for any state issues
+            diagnoseAndRecoverObservationState();
+            
             const modal = document.getElementById('scriptEditorModal');
             modal.style.display = 'flex';
 
@@ -2375,29 +2811,43 @@
             clearTimeout(scriptSaveDebounceTimer);
 
             if (!scriptQuill) {
-                // Initialize Quill editor using constants
-                scriptQuill = new Quill('#scriptEditor', {
-                    theme: 'snow',
-                    modules: {
-                        toolbar: SCRIPT_EDITOR_CONSTANTS.TOOLBAR_OPTIONS
-                    }
-                });
+                try {
+                    // Initialize Quill editor using constants
+                    scriptQuill = new Quill('#scriptEditor', {
+                        theme: 'snow',
+                        modules: {
+                            toolbar: SCRIPT_EDITOR_CONSTANTS.TOOLBAR_OPTIONS
+                        }
+                    });
 
-                // Load existing content
+                    console.log('Script Quill editor initialized');
+
+                    // Load existing content for current observation
+                    loadScriptContent();
+
+                    // Auto-save on content change
+                    scriptQuill.on('text-change', function(delta, oldDelta, source) {
+                        if (source === 'user') {
+                            isScriptDirty = true;
+                            updateSaveButtonState();
+                            clearTimeout(scriptSaveDebounceTimer);
+                            scriptSaveDebounceTimer = setTimeout(() => {
+                                silentSaveScriptContent();
+                            }, SILENT_SAVE_DEBOUNCE_MS);
+                        }
+                    });
+                } catch (error) {
+                    console.error('Error initializing script editor:', error);
+                    showToast('Failed to initialize script editor: ' + error.message, false);
+                    modal.style.display = 'none';
+                    return;
+                }
+            } else {
+                // Ensure existing editor has the right content for current observation
+                console.log('Reusing existing script editor, loading content for current observation');
                 loadScriptContent();
-
-                // Auto-save on content change
-                scriptQuill.on('text-change', function(delta, oldDelta, source) {
-                    if (source === 'user') {
-                        isScriptDirty = true;
-                        updateSaveButtonState();
-                        clearTimeout(scriptSaveDebounceTimer);
-                        scriptSaveDebounceTimer = setTimeout(() => {
-                            silentSaveScriptContent();
-                        }, SILENT_SAVE_DEBOUNCE_MS);
-                    }
-                });
             }
+            
             isScriptDirty = false;
             updateSaveButtonState();
         }
@@ -2481,13 +2931,33 @@
                 console.warn('Cannot load script content: currentObservationId is not set');
                 return;
             }
+            
+            // Validate that we have a valid observation context
+            if (!currentObservedUser.email) {
+                console.warn('Cannot load script content: No observed user context');
+                return;
+            }
+            
+            console.log(`Loading script content for observation: ${currentObservationId}`);
+            
             google.script.run
                 .withSuccessHandler(function(content) {
-                    if (!scriptQuill) return;
+                    // Double-check that we still have the same observation ID (prevent race conditions)
+                    if (!scriptQuill || !currentObservationId) {
+                        console.warn('Script editor or observation context lost during load');
+                        return;
+                    }
+                    
+                    console.log('Script content loaded successfully', { 
+                        observationId: currentObservationId,
+                        hasContent: !!(content && typeof content === 'object' && Object.keys(content).length > 0)
+                    });
+                    
                     if (content && typeof content === 'object' && Object.keys(content).length > 0) {
                         scriptQuill.setContents(content, 'silent');
                         scriptContent = content;
                     } else {
+                        // Load empty content for new observations
                         scriptQuill.setContents([], 'silent');
                         scriptContent = {};
                     }
@@ -2497,6 +2967,14 @@
                 .withFailureHandler(function(error) {
                     console.error('Error loading script content:', error);
                     showToast(SCRIPT_EDITOR_CONSTANTS.UI_STRINGS.LOAD_ERROR + error.message, false);
+                    
+                    // Clear script editor on error to prevent showing wrong content
+                    if (scriptQuill) {
+                        scriptQuill.setContents([], 'silent');
+                        scriptContent = {};
+                        isScriptDirty = false;
+                        updateSaveButtonState();
+                    }
                 })
                 .getObservationScript(currentObservationId);
         }
