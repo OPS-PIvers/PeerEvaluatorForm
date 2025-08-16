@@ -581,11 +581,9 @@ function deleteFinalizedObservation(observationId) {
  */
 function loadFinalizedObservationForViewing(observationId) {
     try {
-
         setupObservationSheet(); // Ensure the sheet is ready
 
-
-        const viewingUserContext = createUserContext(); // Get context for the user making the request
+        const viewingUserContext = createUserContext(); // Get context for the currently authenticated user accessing the observation (could be observer, observed staff, or another authorized user)
         const observation = getObservationById(observationId);
 
         if (!observation) {
@@ -605,26 +603,26 @@ function loadFinalizedObservationForViewing(observationId) {
         const rubricData = getAllDomainsData(observation.observedRole, observation.observedYear, 'full', assignedSubdomains);
 
         // The user context on the page should reflect the person being observed.
-        const pageUserContext = createUserContext(observation.observedEmail);
+        const observedStaffContext = createUserContext(observation.observedEmail);
 
         // All finalized views are read-only.
-        pageUserContext.isEvaluator = false;
+        observedStaffContext.isEvaluator = false;
 
         // If the person viewing is the one who was observed, set special flags for the UI.
         if (isObserved) {
-            pageUserContext.isObservedStaff = true;
-            pageUserContext.viewMode = VIEW_MODES.ASSIGNED; // Default to a focused view for the staff member.
+            observedStaffContext.isObservedStaff = true;
+            observedStaffContext.viewMode = 'assigned'; // Default to a focused view for the staff member
 
             debugLog('Finalized observation loaded for the observed staff member.', {
                 observationId: observationId,
                 userEmail: viewingUserContext.email,
-                isObservedStaff: pageUserContext.isObservedStaff,
-                viewMode: pageUserContext.viewMode
+                isObservedStaff: observedStaffContext.isObservedStaff,
+                viewMode: observedStaffContext.viewMode
             });
         }
 
         // Attach the correctly configured context to the rubric data.
-        rubricData.userContext = pageUserContext;
+        rubricData.userContext = observedStaffContext;
 
         return { success: true, observation: observation, rubricData: rubricData };
 
