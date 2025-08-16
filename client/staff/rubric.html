@@ -1110,18 +1110,19 @@
                         isAssigned = assignedList.indexOf(componentId) !== -1;
                     }
 
-                    var shouldShow;
+                    // Always render all components, but conditionally hide them for client-side toggle functionality
+                    var shouldShow = true;
+                    var initiallyHidden = false;
+                    
+                    // Determine if component should be initially hidden based on viewMode
                     if (data.userContext && data.userContext.viewMode === 'assigned') {
-                        // In 'assigned' mode, show only if componentId is valid AND it's assigned.
-                        shouldShow = componentId ? isAssigned : false;
-                    } else {
-                        // In 'full' mode (or if userContext is not fully defined), show all components.
-                        shouldShow = true;
+                        // In 'assigned' mode, hide components that are not assigned
+                        initiallyHidden = componentId ? !isAssigned : true;
                     }
                     ?>
 
                     <? if (shouldShow) { ?>
-                    <div class="component-section <?= isAssigned ? 'component-assigned' : 'component-not-assigned' ?>"
+                    <div class="component-section <?= isAssigned ? 'component-assigned' : 'component-not-assigned' ?><?= initiallyHidden ? ' component-hidden' : '' ?>"
                          data-component-id="<?= componentId ?>"
                          data-assigned="<?= isAssigned ? 'true' : 'false' ?>">
 
