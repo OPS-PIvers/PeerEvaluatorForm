@@ -2486,15 +2486,37 @@
             // Destroy Quill instance if it exists
             if (scriptQuill) {
                 try {
+                    console.log('Destroying existing script Quill instance...');
+                    
                     // Remove all event listeners
                     scriptQuill.off('text-change');
+                    
+                    // Get container element before destroying Quill
+                    const container = document.getElementById('scriptEditor');
+                    
                     // Clear the editor content
                     scriptQuill.setContents([], 'silent');
-                    // Set to null to force re-initialization
+                    
+                    // More thorough destruction of Quill instance
+                    if (typeof scriptQuill.destroy === 'function') {
+                        scriptQuill.destroy();
+                    }
+                    
+                    // Nullify the JavaScript reference
                     scriptQuill = null;
+                    
+                    // CRITICAL: Clean up DOM elements completely
+                    if (container) {
+                        console.log('Cleaning up script editor DOM...');
+                        resetScriptEditorContainer();
+                    }
+                    
                 } catch (error) {
                     console.warn('Error destroying script Quill instance:', error);
+                    
+                    // Emergency cleanup - force reset container even if Quill destruction failed
                     scriptQuill = null;
+                    resetScriptEditorContainer();
                 }
             }
             
@@ -2585,6 +2607,54 @@
         }
         
         /**
+         * Completely resets the script editor container to pristine state
+         * This utility function ensures no leftover Quill DOM elements remain
+         */
+        function resetScriptEditorContainer() {
+            console.log('Resetting script editor container to clean state...');
+            
+            const container = document.getElementById('scriptEditor');
+            if (!container) {
+                console.warn('Script editor container not found');
+                return false;
+            }
+            
+            try {
+                // Remove all Quill-generated content
+                container.innerHTML = '';
+                
+                // Reset all CSS classes (Quill adds classes like 'ql-container')
+                container.className = '';
+                
+                // Remove any Quill-specific data attributes
+                container.removeAttribute('data-quill');
+                container.removeAttribute('contenteditable');
+                
+                // Remove any Quill-added inline styles
+                container.removeAttribute('style');
+                
+                // Clear any remaining Quill references
+                if (container.__quill) {
+                    delete container.__quill;
+                }
+                
+                console.log('Script editor container reset successfully');
+                return true;
+                
+            } catch (error) {
+                console.error('Error resetting script editor container:', error);
+                
+                // Emergency fallback - try to at least clear innerHTML
+                try {
+                    container.innerHTML = '';
+                } catch (e) {
+                    console.error('Emergency container reset also failed:', e);
+                }
+                return false;
+            }
+        }
+        
+        /**
          * Diagnostic function to detect and fix broken observation state
          */
         function diagnoseAndRecoverObservationState() {
@@ -2605,6 +2675,17 @@
                 issues.push('Script editor exists but no observation context');
                 clearScriptEditor();
                 fixes.push('Cleared orphaned script editor');
+            }
+            
+            // Check for leftover Quill DOM elements without corresponding JS instance
+            const scriptContainer = document.getElementById('scriptEditor');
+            if (scriptContainer && !scriptQuill) {
+                const hasQuillElements = scriptContainer.querySelector('.ql-toolbar, .ql-container, .ql-editor');
+                if (hasQuillElements) {
+                    issues.push('Found orphaned Quill DOM elements in script editor');
+                    resetScriptEditorContainer();
+                    fixes.push('Cleaned up orphaned script editor DOM elements');
+                }
             }
             
             // Check for broken Quill instances
@@ -2669,6 +2750,10 @@
                         scriptQuill = null;
                     }
                 }
+                
+                // Force clean script editor container
+                resetScriptEditorContainer();
+                
                 scriptContent = {};
                 isScriptDirty = false;
                 isSavingScript = false;
@@ -2754,6 +2839,68 @@
             }, 5000); // Start monitoring after 5 seconds
         });
         
+        // === Debug and Testing Functions ===
+        
+        /**
+         * Debug function to check script editor state and DOM
+         * Can be called from browser console: window.debugScriptEditor()
+         */
+        window.debugScriptEditor = function() {
+            const container = document.getElementById('scriptEditor');
+            const result = {
+                hasContainer: !!container,
+                hasScriptQuill: !!scriptQuill,
+                containerHTML: container ? container.innerHTML : null,
+                containerClasses: container ? Array.from(container.classList) : null,
+                quillToolbars: document.querySelectorAll('#scriptEditor .ql-toolbar').length,
+                quillContainers: document.querySelectorAll('#scriptEditor .ql-container').length,
+                quillEditors: document.querySelectorAll('#scriptEditor .ql-editor').length,
+                containerAttributes: container ? Array.from(container.attributes).map(attr => `${attr.name}="${attr.value}"`) : null
+            };
+            
+            console.log('Script Editor Debug Info:', result);
+            
+            if (result.quillToolbars > 1) {
+                console.warn(`🚨 TOOLBAR DUPLICATION DETECTED: ${result.quillToolbars} toolbars found!`);
+            } else if (result.quillToolbars === 1) {
+                console.log('✅ Script editor state is clean (1 toolbar)');
+            } else {
+                console.log('ℹ️ No toolbars found (editor not initialized)');
+            }
+            
+            return result;
+        };
+        
+        /**
+         * Test function to simulate opening/closing script editor multiple times
+         * Can be called from browser console: window.testScriptEditorCleanup()
+         */
+        window.testScriptEditorCleanup = function(iterations = 3) {
+            console.log(`🧪 Testing script editor cleanup ${iterations} times...`);
+            
+            if (!currentObservationId) {
+                console.error('Cannot test: No active observation. Please load an observation first.');
+                return;
+            }
+            
+            for (let i = 0; i < iterations; i++) {
+                console.log(`\n--- Test iteration ${i + 1} ---`);
+                
+                // Open script editor
+                openScriptEditor();
+                window.debugScriptEditor();
+                
+                // Close script editor
+                closeScriptEditor();
+                
+                // Force clear to simulate observation switching
+                clearScriptEditor();
+                window.debugScriptEditor();
+            }
+            
+            console.log('\n🏁 Test completed. Check results above.');
+        };
+        
         // Stop monitoring when page unloads
         window.addEventListener('beforeunload', function() {
             stopStateMonitoring();
@@ -2811,7 +2958,31 @@
             clearTimeout(scriptSaveDebounceTimer);
 
             if (!scriptQuill) {
+                // DEFENSIVE CHECK: Ensure container is clean before creating new Quill instance
+                const container = document.getElementById('scriptEditor');
+                if (!container) {
+                    console.error('Script editor container not found');
+                    showToast('Script editor container not found', false);
+                    modal.style.display = 'none';
+                    return;
+                }
+                
+                // Check for leftover Quill elements that might cause toolbar duplication
+                const hasQuillElements = container.querySelector('.ql-toolbar, .ql-container, .ql-editor');
+                if (hasQuillElements) {
+                    console.warn('Found leftover Quill elements in container, cleaning up...');
+                    resetScriptEditorContainer();
+                }
+                
+                // Additional check for any Quill-related classes or attributes
+                if (container.classList.length > 0 || container.hasAttribute('data-quill')) {
+                    console.warn('Container has Quill-related attributes, resetting...');
+                    resetScriptEditorContainer();
+                }
+                
                 try {
+                    console.log('Creating new Quill instance on clean container...');
+                    
                     // Initialize Quill editor using constants
                     scriptQuill = new Quill('#scriptEditor', {
                         theme: 'snow',
@@ -2820,7 +2991,7 @@
                         }
                     });
 
-                    console.log('Script Quill editor initialized');
+                    console.log('Script Quill editor initialized successfully');
 
                     // Load existing content for current observation
                     loadScriptContent();
@@ -2836,11 +3007,42 @@
                             }, SILENT_SAVE_DEBOUNCE_MS);
                         }
                     });
+                    
                 } catch (error) {
                     console.error('Error initializing script editor:', error);
-                    showToast('Failed to initialize script editor: ' + error.message, false);
-                    modal.style.display = 'none';
-                    return;
+                    
+                    // If initialization fails, try emergency reset and retry ONCE
+                    console.log('Attempting emergency reset and retry...');
+                    resetScriptEditorContainer();
+                    
+                    try {
+                        scriptQuill = new Quill('#scriptEditor', {
+                            theme: 'snow',
+                            modules: {
+                                toolbar: SCRIPT_EDITOR_CONSTANTS.TOOLBAR_OPTIONS
+                            }
+                        });
+                        console.log('Script Quill editor initialized on retry');
+                        loadScriptContent();
+                        
+                        // Auto-save on content change
+                        scriptQuill.on('text-change', function(delta, oldDelta, source) {
+                            if (source === 'user') {
+                                isScriptDirty = true;
+                                updateSaveButtonState();
+                                clearTimeout(scriptSaveDebounceTimer);
+                                scriptSaveDebounceTimer = setTimeout(() => {
+                                    silentSaveScriptContent();
+                                }, SILENT_SAVE_DEBOUNCE_MS);
+                            }
+                        });
+                        
+                    } catch (retryError) {
+                        console.error('Script editor initialization failed even after reset:', retryError);
+                        showToast('Failed to initialize script editor: ' + retryError.message, false);
+                        modal.style.display = 'none';
+                        return;
+                    }
                 }
             } else {
                 // Ensure existing editor has the right content for current observation

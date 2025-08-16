@@ -964,12 +964,63 @@
 
         /* Landing Page Styles */
         .landing-page {
-            padding: 40px;
+            padding: 40px 30px;
+        }
+        
+        /* Modern Action Cards Styling */
+        .quick-actions { 
+            margin-bottom: 40px; 
+        }
+        .section-title {
+            color: #374151;
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        .actions-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .action-card {
+            background: #ffffff;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 25px;
             text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
         }
-        .landing-actions {
-            margin-bottom: 40px;
+        .action-card:hover {
+            border-color: #3b82f6;
+            background: #f8fafc;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
         }
+        .action-icon { 
+            font-size: 2.5rem; 
+            margin-bottom: 15px; 
+            display: block; 
+        }
+        .action-title { 
+            font-weight: 600; 
+            color: #1f2937; 
+            font-size: 1.1rem; 
+            margin-bottom: 8px; 
+        }
+        .action-desc { 
+            color: #6b7280; 
+            font-size: 0.95rem; 
+        }
+        
+        /* Legacy button styles (for back button etc.) */
         .landing-btn {
             background: #3182ce;
             color: white;
@@ -1035,6 +1086,26 @@
         .landing-btn.back-btn:hover {
             background: #4a5568;
         }
+        
+        /* Responsive Styles for Action Cards */
+        @media (max-width: 768px) {
+            .landing-page {
+                padding: 20px;
+            }
+            .actions-grid {
+                grid-template-columns: 1fr;
+                gap: 15px;
+            }
+            .action-card {
+                padding: 20px;
+            }
+            .action-icon {
+                font-size: 2rem;
+            }
+            .section-title {
+                font-size: 1.1rem;
+            }
+        }
     </style>
 </head>
 <body>
@@ -1062,9 +1133,20 @@
                 <p>Danielson Framework Rubric</p>
             </div>
             <div class="landing-page">
-                <div class="landing-actions">
-                    <button class="landing-btn" onclick="showRubricView('full')">View Full Rubric</button>
-                    <button class="landing-btn" onclick="showRubricView('assigned')">View Assigned Subdomains</button>
+                <div class="quick-actions">
+                    <h2 class="section-title"><span>📚</span> Rubric Access</h2>
+                    <div class="actions-grid">
+                        <div class="action-card" onclick="showRubricView('full')">
+                            <span class="action-icon">📚</span>
+                            <div class="action-title">View Full Rubric</div>
+                            <div class="action-desc">Access the complete Danielson Framework with all domains and components</div>
+                        </div>
+                        <div class="action-card" onclick="showRubricView('assigned')">
+                            <span class="action-icon">📋</span>
+                            <div class="action-title">View Assigned Areas</div>
+                            <div class="action-desc">Focus on your specific assigned subdomains for this year</div>
+                        </div>
+                    </div>
                 </div>
                 <h2>Finalized Observations</h2>
                 <div id="finalizedObservations" class="observations-container">
@@ -1662,11 +1744,19 @@
         const userAssignedSubdomains = <?= data.userContext?.assignedSubdomains ? JSON.stringify(data.userContext.assignedSubdomains).replace(/</g, '\\u003c') : 'null' ?>;
 
         function toggleViewMode() {
+            console.log('toggleViewMode called. Current mode:', currentViewMode);
+            
             if (currentViewMode === 'full') {
+                console.log('Toggling from full to assigned view');
                 switchToAssignedView();
             } else {
+                console.log('Toggling from assigned to full view');
                 switchToFullView();
             }
+            
+            // Provide user feedback
+            const newMode = currentViewMode === 'full' ? 'Full Rubric' : 'Assigned Areas';
+            showToast(`Switched to ${newMode} view`);
         }
 
         function switchToAssignedView() {
@@ -1680,11 +1770,24 @@
 
         function switchToFullView() {
             currentViewMode = 'full';
+            console.log('switchToFullView: currentViewMode set to:', currentViewMode);
             updateViewToggleButton();
             showAllComponents();
             saveViewModePreference();
 
             console.log('Switched to full view mode');
+            
+            // Extra verification that all components are visible
+            const hiddenComponents = document.querySelectorAll('.component-section.component-hidden');
+            if (hiddenComponents.length > 0) {
+                console.warn(`WARNING: ${hiddenComponents.length} components still hidden after switching to full view!`);
+                
+                // Force show all components by explicitly removing hidden class
+                hiddenComponents.forEach(component => {
+                    console.log('Force showing component:', component);
+                    component.classList.remove('component-hidden');
+                });
+            }
         }
 
         function updateViewToggleButton() {
@@ -1727,21 +1830,38 @@
         }
 
         function showAllComponents() {
+            console.log('showAllComponents called');
             const components = document.querySelectorAll('.component-section');
+            console.log(`Found ${components.length} components to process`);
+            
+            let hiddenCount = 0;
             components.forEach(function(component) {
                 const isAssigned = component.getAttribute('data-assigned') === 'true';
+                const componentId = component.getAttribute('data-component-id') || 'unknown';
+                
+                // Remove any existing hidden class first
+                if (component.classList.contains('component-hidden')) {
+                    hiddenCount++;
+                    console.log(`Unhiding component ${componentId}`);
+                }
+                
                 updateComponentVisualState(component, isAssigned, 'full');
             });
 
             // Show assignment indicators in full mode
-            // This part remains as it's specific to the view mode switch, not general component state
             const indicators = document.querySelectorAll('.assignment-indicator');
             indicators.forEach(function(indicator) {
                 indicator.classList.remove('indicator-hidden');
             });
 
-            console.log('Showing all components using new visual state function.');
+            console.log(`Showed all ${components.length} components (previously ${hiddenCount} were hidden)`);
             updateDomainVisibility();
+            
+            // Final verification
+            const stillHidden = document.querySelectorAll('.component-section.component-hidden');
+            if (stillHidden.length > 0) {
+                console.error(`ERROR: ${stillHidden.length} components are still hidden after showAllComponents!`);
+            }
         }
 
         function updateDomainVisibility() {
@@ -1783,8 +1903,10 @@
                 if (!isAssigned) {
                     componentElement.classList.add('component-hidden');
                 }
+            } else if (currentViewMode === 'full') {
+                // Explicitly ensure component is visible in full mode
+                componentElement.classList.remove('component-hidden');
             }
-            // In 'full' mode, component-hidden is not added here, effectively showing the element.
 
             // Styling Logic (only if not hidden by the above)
             if (!componentElement.classList.contains('component-hidden')) {
@@ -2105,14 +2227,30 @@
         }
 
         function showRubricView(viewMode) {
+            console.log('showRubricView called with mode:', viewMode);
+            
             document.getElementById('landingPage').style.display = 'none';
             document.getElementById('rubricView').style.display = 'block';
 
+            // Force update the global currentViewMode variable
+            currentViewMode = viewMode;
+            console.log('currentViewMode set to:', currentViewMode);
+
             if (viewMode === 'assigned') {
+                console.log('Switching to assigned view...');
                 switchToAssignedView();
             } else {
+                console.log('Switching to full view...');
                 switchToFullView();
             }
+            
+            // Double-check that the view change took effect
+            setTimeout(() => {
+                const hiddenComponents = document.querySelectorAll('.component-section.component-hidden');
+                const totalComponents = document.querySelectorAll('.component-section');
+                console.log(`View mode verification: ${hiddenComponents.length} hidden of ${totalComponents.length} total components`);
+                console.log('Current view mode after switch:', currentViewMode);
+            }, 100);
         }
 
         function showLandingPage() {
