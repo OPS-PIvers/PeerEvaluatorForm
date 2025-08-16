@@ -1011,7 +1011,7 @@
         </div>
         <? } else if (data.userContext && data.userContext.hasSpecialAccess) { ?>
         <div class="filter-status">
-            <strong>🔧 Special Access Mode:</strong> <?= data.userContext.specialRoleType.replace('_', ' ').toUpperCase() ?>
+            <strong>🔧 Special Access Mode:</strong> <?= data.userContext.specialRoleType ? data.userContext.specialRoleType.replace('_', ' ').toUpperCase() : data.userContext.role ?>
             <span class="filter-status-detail">
                 Use filters above to view other staff members' assigned areas
             </span>
