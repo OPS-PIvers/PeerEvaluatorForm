@@ -1154,38 +1154,43 @@
                             </div>
                         </div>
                         
+                        <? if (component.bestPractices && component.bestPractices.length > 0) { ?>
+                        <div class="look-fors-section">
+                            <div class="look-fors-header" onclick="toggleLookFors('lookfors-<?= component.componentId ?>')">
+                                <span>Best Practices aligned with 5D+ and PELSB Standards</span>
+                                <span class="chevron" id="chevron-lookfors-<?= component.componentId ?>">▶</span>
+                            </div>
+                            <div class="look-fors-content" id="lookfors-<?= component.componentId ?>">
+                                <div class="look-fors-grid">
+                                    <? for (var j = 0; j < component.bestPractices.length; j++) { ?>
+                                        <div class="look-for-item">
+                                            <?
+                                                var practiceText = component.bestPractices[j];
+                                                var checkedLookForsForComponent = (data.observation && data.observation.observationData && data.observation.observationData[component.componentId] && data.observation.observationData[component.componentId].lookfors) || [];
+                                                var isChecked = checkedLookForsForComponent.includes(practiceText);
+                                            ?>
+                                            <input type="checkbox" id="practice-<?= component.componentId ?>-<?= j ?>" <?= isChecked ? 'checked' : '' ?> disabled>
+                                            <label for="practice-<?= component.componentId ?>-<?= j ?>"><?= practiceText ?></label>
+                                        </div>
+                                    <? } ?>
+                                </div>
+                            </div>
+                        </div>
+                        <? } ?>
+                        
+                        <? if (data.observation && data.observation.observationNotes && data.observation.observationNotes[component.componentId]) { ?>
                         <div class="evidence-section">
                             <button class="evidence-toggle-btn" onclick="toggleEvidenceSection('evidence-<?= component.componentId ?>')">
                                 <span>📝</span> Notes & Evidence
                             </button>
                             <div class="evidence-content" id="evidence-<?= component.componentId ?>">
-                                <? if (data.observation && data.observation.observationNotes && data.observation.observationNotes[component.componentId]) { ?>
                                 <div class="notes-container">
                                     <h4>Observation Notes</h4>
                                     <div class="notes-display"><?= data.observation.observationNotes[component.componentId] ?></div>
                                 </div>
-                                <? } ?>
-
-                                <? if (component.bestPractices && component.bestPractices.length > 0) { ?>
-                                <div class="look-fors-container">
-                                    <h4>Best Practices (Look-fors)</h4>
-                                    <div class="look-fors-grid">
-                                        <? for (var j = 0; j < component.bestPractices.length; j++) { ?>
-                                            <div class="look-for-item">
-                                                <?
-                                                    var practiceText = component.bestPractices[j];
-                                                    var checkedLookForsForComponent = (data.observation && data.observation.observationData && data.observation.observationData[component.componentId] && data.observation.observationData[component.componentId].lookfors) || [];
-                                                    var isChecked = checkedLookForsForComponent.includes(practiceText);
-                                                ?>
-                                                <input type="checkbox" id="practice-<?= component.componentId ?>-<?= j ?>" <?= isChecked ? 'checked' : '' ?> disabled>
-                                                <label for="practice-<?= component.componentId ?>-<?= j ?>"><?= practiceText ?></label>
-                                            </div>
-                                        <? } ?>
-                                    </div>
-                                </div>
-                                <? } ?>
                             </div>
                         </div>
+                        <? } ?>
                     </div>
                     <? } ?>
                 <? } ?>
@@ -1864,8 +1869,11 @@
         document.addEventListener('DOMContentLoaded', function() {
             console.log('Page loaded:', window.pageLoadInfo);
 
-            // Restore look-fors state
+            // Restore look-fors state (peer evaluator format)
             restoreLookForsState();
+            
+            // Restore look-fors state (staff format)
+            restoreStaffLookForsState();
 
             // Restore evidence section state
             restoreEvidenceState();
@@ -2158,6 +2166,67 @@
             const content = document.getElementById(contentId);
             if (content) {
                 content.classList.toggle('expanded');
+            }
+        }
+
+        // Look-fors toggle function for staff view (read-only)
+        function toggleLookFors(contentId) {
+            const content = document.getElementById(contentId);
+            const chevronId = 'chevron-' + contentId;
+            const chevron = document.getElementById(chevronId);
+            
+            if (content) {
+                const isExpanded = content.classList.contains('expanded');
+                content.classList.toggle('expanded');
+                
+                // Update chevron rotation
+                if (chevron) {
+                    if (isExpanded) {
+                        chevron.textContent = '▶';
+                        chevron.style.transform = 'rotate(0deg)';
+                    } else {
+                        chevron.textContent = '▼';
+                        chevron.style.transform = 'rotate(90deg)';
+                    }
+                }
+                
+                // Save state in sessionStorage for consistency with other sections
+                try {
+                    const storageKey = 'lookForsState_' + (window.pageLoadInfo?.cacheVersion || 'default');
+                    const allStates = JSON.parse(sessionStorage.getItem(storageKey) || '{}');
+                    allStates[contentId] = !isExpanded;
+                    sessionStorage.setItem(storageKey, JSON.stringify(allStates));
+                    console.log('Look-fors state saved:', contentId, !isExpanded);
+                } catch (e) {
+                    console.warn('Could not save look-fors state:', e);
+                }
+            }
+        }
+
+        // Restore look-fors state for staff view format
+        function restoreStaffLookForsState() {
+            try {
+                const storageKey = 'lookForsState_' + (window.pageLoadInfo?.cacheVersion || 'default');
+                const allStates = JSON.parse(sessionStorage.getItem(storageKey) || '{}');
+                
+                Object.keys(allStates).forEach(function(contentId) {
+                    const isExpanded = allStates[contentId];
+                    if (isExpanded) {
+                        const content = document.getElementById(contentId);
+                        const chevronId = 'chevron-' + contentId;
+                        const chevron = document.getElementById(chevronId);
+                        
+                        if (content && chevron) {
+                            content.classList.add('expanded');
+                            chevron.textContent = '▼';
+                            chevron.style.transform = 'rotate(90deg)';
+                        }
+                    }
+                });
+                
+                console.log('Restored staff look-fors state for', Object.keys(allStates).length, 'sections');
+            } catch (e) {
+                console.warn('Could not restore staff look-fors state:', e);
             }
         }
 
