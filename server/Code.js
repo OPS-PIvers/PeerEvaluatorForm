@@ -583,10 +583,16 @@ function loadFinalizedObservationForViewing(observationId) {
     setupObservationSheet(); // Ensure the sheet is ready
     const result = loadObservationForEditing(observationId);
 
-    // After loading, enhance the context for the observed staff member's view
-    if (result.success && result.rubricData && result.rubricData.userContext) {
+    // After loading, enhance the context ONLY if the current user is the observed staff member
+    if (
+        result.success &&
+        result.rubricData &&
+        result.rubricData.userContext &&
+        result.observation &&
+        result.observation.observedEmail &&
+        result.rubricData.userContext.email === result.observation.observedEmail
+    ) {
         const userContext = result.rubricData.userContext;
-        const observation = result.observation;
 
         // The user is viewing their own finalized observation
         userContext.isEvaluator = false; // Ensure they cannot edit
@@ -595,12 +601,15 @@ function loadFinalizedObservationForViewing(observationId) {
         // Set the view mode to 'assigned' by default for the staff member
         userContext.viewMode = VIEW_MODES.ASSIGNED;
 
-        debugLog('Finalized observation loaded for observed staff member', {
+        debugLog('Finalized observation loaded for the observed staff member viewing their own report', {
             observationId: observationId,
             userEmail: userContext.email,
             isObservedStaff: userContext.isObservedStaff,
             viewMode: userContext.viewMode
         });
+    } else if (result.success && result.rubricData && result.rubricData.userContext) {
+        // For anyone else viewing (like an admin), just ensure it's read-only
+        result.rubricData.userContext.isEvaluator = false;
     }
     return result;
 }
