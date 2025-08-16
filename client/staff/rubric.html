@@ -1026,14 +1026,14 @@
             background-color: #f5f5f5;
         }
 
-        .back-btn {
+        .landing-btn.back-btn {
             position: absolute;
             top: 20px;
             left: 20px;
-            background: #64748b !important;
+            background: #64748b;
         }
-        .back-btn:hover {
-            background: #4a5568 !important;
+        .landing-btn.back-btn:hover {
+            background: #4a5568;
         }
     </style>
 </head>
@@ -2050,16 +2050,15 @@
                     }
                 }
 
-                if (componentData.lookfors) {
-                    componentData.lookfors.forEach(lookForText => {
-                        const checkboxes = document.querySelectorAll(`input[type="checkbox"]`);
-                        for(let i=0; i<checkboxes.length; i++){
-                            if(checkboxes[i].nextElementSibling && checkboxes[i].nextElementSibling.textContent === lookForText){
-                                checkboxes[i].checked = true;
-                                break;
-                            }
+                if (componentData.lookfors && componentData.lookfors.length > 0) {
+                    const lookForsSet = new Set(componentData.lookfors);
+                    const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+                    for (const checkbox of checkboxes) {
+                        const labelText = checkbox.nextElementSibling?.textContent;
+                        if (labelText && lookForsSet.has(labelText)) {
+                            checkbox.checked = true;
                         }
-                    });
+                    }
                 }
 
                 const notesContainer = document.querySelector(`#evidence-${componentId} .notes-display`);
