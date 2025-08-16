@@ -78,6 +78,11 @@ function doGet(e) {
     // Generate response metadata for headers
     const responseMetadata = generateResponseMetadata(userContext, requestId, debugMode);
     
+    // Attach responseMetadata to userContext for template access
+    userContext.responseMetadata = responseMetadata;
+    userContext.cacheVersion = responseMetadata.cacheVersion;
+    userContext.requestId = responseMetadata.requestId;
+    
     // Create and configure the HTML template
     const htmlTemplate = HtmlService.createTemplateFromFile(TEMPLATE_PATHS.STAFF_RUBRIC); // This is now a fallback view
     htmlTemplate.data = rubricData;
