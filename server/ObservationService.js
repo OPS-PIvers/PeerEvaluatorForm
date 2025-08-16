@@ -949,3 +949,31 @@ function deleteAllObservations_DANGEROUS() {
         return { success: false, error: error.message };
     }
 }
+
+/**
+ * Retrieves all finalized observations for the currently logged-in staff member.
+ * This function is intended to be called from the client-side for the staff landing page.
+ * @returns {Array<Object>} An array of finalized observation objects.
+ */
+function getFinalizedObservationsForUser() {
+  try {
+    const currentUserEmail = Session.getActiveUser().getEmail();
+    if (!currentUserEmail) {
+      // This case should ideally not be reached if the user is logged in
+      console.warn('Could not retrieve finalized observations: user email is not available.');
+      return [];
+    }
+
+    // Use the existing function to get finalized observations for the current user
+    const finalizedObservations = getObservationsForUser(currentUserEmail, OBSERVATION_STATUS.FINALIZED);
+
+    debugLog(`Retrieved ${finalizedObservations.length} finalized observations for user ${currentUserEmail}.`);
+
+    return finalizedObservations;
+
+  } catch (error) {
+    console.error('Error in getFinalizedObservationsForUser:', error);
+    // In case of an error, return an empty array to prevent breaking the client UI
+    return [];
+  }
+}

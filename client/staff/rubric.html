@@ -961,6 +961,80 @@
             border-bottom-left-radius: 4px;
             border-bottom-right-radius: 4px;
         }
+
+        /* Landing Page Styles */
+        .landing-page {
+            padding: 40px;
+            text-align: center;
+        }
+        .landing-actions {
+            margin-bottom: 40px;
+        }
+        .landing-btn {
+            background: #3182ce;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            margin: 0 10px;
+            transition: background 0.3s ease;
+        }
+        .landing-btn:hover {
+            background: #2c5aa0;
+        }
+        .observations-container {
+            margin-top: 20px;
+        }
+        .observation-card {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 15px;
+            text-align: left;
+            cursor: pointer;
+            transition: box-shadow 0.3s ease, transform 0.3s ease;
+        }
+        .observation-card:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            transform: translateY(-2px);
+        }
+        .observation-card h3 {
+            margin-bottom: 10px;
+            color: #2d3748;
+        }
+        .observation-card p {
+            color: #4a5568;
+            font-size: 0.9rem;
+        }
+
+        /* Read-only mode styles */
+        .read-only .rating-cell,
+        .read-only .look-for-item input,
+        .read-only .media-upload-button,
+        .read-only .filter-select,
+        .read-only .filter-btn {
+            pointer-events: none;
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
+        .read-only .ql-editor {
+            background-color: #f5f5f5;
+        }
+
+        .back-btn {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: #64748b !important;
+        }
+        .back-btn:hover {
+            background: #4a5568 !important;
+        }
     </style>
 </head>
 <body>
@@ -980,241 +1054,265 @@
         <? } ?>
     </div>
     <? } ?>
-    <div class="container">
-        <div class="header">
-            <h1><?= data.title ?></h1>
-            <p><?= data.subtitle ?></p>
-            <!-- View Mode Toggle (for users with assigned subdomains or observed staff) -->
-            <? if (data.userContext && data.userContext.assignedSubdomains && (!data.userContext.hasSpecialAccess || data.userContext.isObservedStaff)) { ?>
-            <div class="view-toggle-container">
-                <button id="viewToggleBtn" class="view-toggle-btn" onclick="toggleViewMode()" aria-pressed="<?= data.userContext.viewMode === 'assigned' ? 'true' : 'false' ?>">
-                    <span id="viewToggleText">
-                        <? if (data.userContext.viewMode === 'assigned') { ?>
-                            📋 View: My Assigned Areas
-                        <? } else { ?>
-                            📚 View: Full Rubric
-                        <? } ?>
-                    </span>
-                </button>
+
+    <div id="landingPage" style="display: none;">
+        <div class="container">
+            <div class="header">
+                <h1>Welcome, <?= data.userContext.name ?></h1>
+                <p>Danielson Framework Rubric</p>
+            </div>
+            <div class="landing-page">
+                <div class="landing-actions">
+                    <button class="landing-btn" onclick="showRubricView('full')">View Full Rubric</button>
+                    <button class="landing-btn" onclick="showRubricView('assigned')">View Assigned Subdomains</button>
+                </div>
+                <h2>Finalized Observations</h2>
+                <div id="finalizedObservations" class="observations-container">
+                    <!-- Observation cards will be inserted here by JavaScript -->
+                    <p>Loading finalized observations...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="rubricView">
+        <div class="container">
+            <div class="header">
+                <h1><?= data.title ?></h1>
+                <p><?= data.subtitle ?></p>
+                <!-- View Mode Toggle (for users with assigned subdomains or observed staff) -->
+                <? if (data.userContext && data.userContext.assignedSubdomains && (!data.userContext.hasSpecialAccess || data.userContext.isObservedStaff)) { ?>
+                <div class="view-toggle-container">
+                    <button id="viewToggleBtn" class="view-toggle-btn" onclick="toggleViewMode()" aria-pressed="<?= data.userContext.viewMode === 'assigned' ? 'true' : 'false' ?>">
+                        <span id="viewToggleText">
+                            <? if (data.userContext.viewMode === 'assigned') { ?>
+                                📋 View: My Assigned Areas
+                            <? } else { ?>
+                                📚 View: Full Rubric
+                            <? } ?>
+                        </span>
+                    </button>
+                </div>
+                <? } ?>
+            </div>
+
+            <!-- Filter Status (for special roles) -->
+            <? if (data.userContext && data.userContext.isFiltered) { ?>
+            <div class="filter-status active">
+                <strong>👁️ Viewing as:</strong> <?= data.userContext.filterInfo.viewingAs ?>
+                (<?= data.userContext.filterInfo.viewingRole ?>, Year <?= data.userContext.filterInfo.viewingYear ?>)
+                <span class="filter-status-detail">
+                    Requested by: <?= data.userContext.filterInfo.requestedBy ?>
+                </span>
+            </div>
+            <? } else if (data.userContext && data.userContext.hasSpecialAccess) { ?>
+            <div class="filter-status">
+                <strong>🔧 Special Access Mode:</strong> <?= data.userContext.specialRoleType ? data.userContext.specialRoleType.replace('_', ' ').toUpperCase() : data.userContext.role ?>
+                <span class="filter-status-detail">
+                    Use filters above to view other staff members' assigned areas
+                </span>
             </div>
             <? } ?>
-        </div>
 
-        <!-- Filter Status (for special roles) -->
-        <? if (data.userContext && data.userContext.isFiltered) { ?>
-        <div class="filter-status active">
-            <strong>👁️ Viewing as:</strong> <?= data.userContext.filterInfo.viewingAs ?>
-            (<?= data.userContext.filterInfo.viewingRole ?>, Year <?= data.userContext.filterInfo.viewingYear ?>)
-            <span class="filter-status-detail">
-                Requested by: <?= data.userContext.filterInfo.requestedBy ?>
-            </span>
-        </div>
-        <? } else if (data.userContext && data.userContext.hasSpecialAccess) { ?>
-        <div class="filter-status">
-            <strong>🔧 Special Access Mode:</strong> <?= data.userContext.specialRoleType ? data.userContext.specialRoleType.replace('_', ' ').toUpperCase() : data.userContext.role ?>
-            <span class="filter-status-detail">
-                Use filters above to view other staff members' assigned areas
-            </span>
-        </div>
-        <? } ?>
+            <div class="navigation">
+                <!-- Special Role Filters -->
+                <? if (data.userContext && data.userContext.hasSpecialAccess) { ?>
+                <div class="special-filters">
+                    <div class="filter-section">
+                        <span class="filter-label">Viewing Options:</span>
 
-        <div class="navigation">
-            <!-- Special Role Filters -->
-            <? if (data.userContext && data.userContext.hasSpecialAccess) { ?>
-            <div class="special-filters">
-                <div class="filter-section">
-                    <span class="filter-label">Viewing Options:</span>
+                        <? if (data.userContext.specialRoleType === 'administrator') { ?>
+                        <!-- Administrator: Probationary filter only -->
+                        <select id="probationaryFilter" class="filter-select" onchange="applyAdminFilter()" aria-label="Filter by Probationary Status">
+                            <option value="all">All Staff</option>
+                            <option value="probationary">Probationary Staff Only</option>
+                        </select>
 
-                    <? if (data.userContext.specialRoleType === 'administrator') { ?>
-                    <!-- Administrator: Probationary filter only -->
-                    <select id="probationaryFilter" class="filter-select" onchange="applyAdminFilter()" aria-label="Filter by Probationary Status">
-                        <option value="all">All Staff</option>
-                        <option value="probationary">Probationary Staff Only</option>
-                    </select>
+                        <? } else if (data.userContext.specialRoleType === 'peer_evaluator' || data.userContext.specialRoleType === 'full_access') { ?>
+                        <!-- Peer Evaluator & Full Access: Full filtering options -->
+                        <select id="roleFilter" class="filter-select" onchange="handleRoleSelection()" aria-label="Filter by Role">
+                            <option value="">Select Role...</option>
+                            <option value="Any">Any Role</option>
+                            <? for (var r = 0; r < data.userContext.availableRoles?.length || 0; r++) { ?>
+                            <option value="<?= data.userContext.availableRoles[r] ?>"><?= data.userContext.availableRoles[r] ?></option>
+                            <? } ?>
+                        </select>
 
-                    <? } else if (data.userContext.specialRoleType === 'peer_evaluator' || data.userContext.specialRoleType === 'full_access') { ?>
-                    <!-- Peer Evaluator & Full Access: Full filtering options -->
-                    <select id="roleFilter" class="filter-select" onchange="handleRoleSelection()" aria-label="Filter by Role">
-                        <option value="">Select Role...</option>
-                        <option value="Any">Any Role</option>
-                        <? for (var r = 0; r < data.userContext.availableRoles?.length || 0; r++) { ?>
-                        <option value="<?= data.userContext.availableRoles[r] ?>"><?= data.userContext.availableRoles[r] ?></option>
+                        <select id="yearFilter" class="filter-select" onchange="updateAvailableStaff()" aria-label="Filter by Year" style="display: none;">
+                            <option value="">Select Year...</option>
+                            <option value="Any">Any Year</option>
+                            <option value="1">Year 1</option>
+                            <option value="2">Year 2</option>
+                            <option value="3">Year 3</option>
+                            <option value="Probationary">Probationary</option>
+                        </select>
+
+                        <select id="staffFilter" class="filter-select" onchange="applyStaffFilter()" aria-label="Filter by Staff Member" style="display: none;">
+                            <option value="">Select Staff Member...</option>
+                            <!-- Options populated by JavaScript -->
+                        </select>
+
+                        <button class="filter-btn" onclick="clearAllFilters()">Clear Filters</button>
                         <? } ?>
-                    </select>
+                    </div>
+                </div>
+                <? } ?>
 
-                    <select id="yearFilter" class="filter-select" onchange="updateAvailableStaff()" aria-label="Filter by Year" style="display: none;">
-                        <option value="">Select Year...</option>
-                        <option value="Any">Any Year</option>
-                        <option value="1">Year 1</option>
-                        <option value="2">Year 2</option>
-                        <option value="3">Year 3</option>
-                        <option value="Probationary">Probationary</option>
-                    </select>
-
-                    <select id="staffFilter" class="filter-select" onchange="applyStaffFilter()" aria-label="Filter by Staff Member" style="display: none;">
-                        <option value="">Select Staff Member...</option>
-                        <!-- Options populated by JavaScript -->
-                    </select>
-
-                    <button class="filter-btn" onclick="clearAllFilters()">Clear Filters</button>
+                <!-- Domain Navigation (always visible) -->
+                <div class="domain-nav">
+                    <? for (var d = 0; d < data.domains.length; d++) { ?>
+                        <button class="nav-button" data-domain="<?= d ?>">
+                            Domain <?= data.domains[d].number ?>
+                        </button>
                     <? } ?>
                 </div>
             </div>
-            <? } ?>
 
-            <!-- Domain Navigation (always visible) -->
-            <div class="domain-nav">
-                <? for (var d = 0; d < data.domains.length; d++) { ?>
-                    <button class="nav-button" data-domain="<?= d ?>">
-                        Domain <?= data.domains[d].number ?>
-                    </button>
-                <? } ?>
-            </div>
-        </div>
-        
-        <? for (var domainIdx = 0; domainIdx < data.domains.length; domainIdx++) { ?>
-            <div class="domain-section" id="domain-<?= domainIdx ?>">
-                <div class="domain-header">
-                    <?= data.domains[domainIdx].name ?>
-                </div>
-                
-                <!-- Sticky column headers for this domain -->
-                <div class="performance-levels-header">
-                    <div class="performance-levels">
-                        <div class="level-header"></div>
-                        <div class="level-header">Developing</div>
-                        <div class="level-header">Basic</div>
-                        <div class="level-header">Proficient</div>
-                        <div class="level-header">Distinguished</div>
+            <? for (var domainIdx = 0; domainIdx < data.domains.length; domainIdx++) { ?>
+                <div class="domain-section" id="domain-<?= domainIdx ?>">
+                    <div class="domain-header">
+                        <?= data.domains[domainIdx].name ?>
                     </div>
-                </div>
-                
-                <? for (var i = 0; i < data.domains[domainIdx].components.length; i++) { ?>
-                    <?
-                    // Determine if this component should be visible
-                    var component = data.domains[domainIdx].components[i];
-                    var componentId = '';
-                    if (component.title) {
-                        // Component titles are expected to start with an ID (e.g., "1a:", "2b:")
-                        // which is used for matching against assigned subdomains.
-                        var match = component.title.match(/^([1-4][a-fA-F]):/);
-                        componentId = match ? match[1] + ':' : '';
-                    }
-
-                    var isAssigned = false;
-                    // Calculate isAssigned if componentId is valid and subdomains are available.
-                    // This is needed for styling in 'full' mode and visibility in 'assigned' mode.
-                    if (componentId && data.userContext && data.userContext.assignedSubdomains) {
-                        var domainKey = 'domain' + (domainIdx + 1);
-                        var assignedList = data.userContext.assignedSubdomains[domainKey] || [];
-                        isAssigned = assignedList.indexOf(componentId) !== -1;
-                    }
-
-                    // Always render all components, but conditionally hide them for client-side toggle functionality
-                    var shouldShow = true;
-                    var initiallyHidden = false;
                     
-                    // Determine if component should be initially hidden based on viewMode
-                    if (data.userContext && data.userContext.viewMode === 'assigned') {
-                        // In 'assigned' mode, hide components that are not assigned
-                        initiallyHidden = componentId ? !isAssigned : true;
-                    }
-                    ?>
-
-                    <? if (shouldShow) { ?>
-                    <div class="component-section <?= isAssigned ? 'component-assigned' : 'component-not-assigned' ?><?= initiallyHidden ? ' component-hidden' : '' ?>"
-                         data-component-id="<?= componentId ?>"
-                         data-assigned="<?= isAssigned ? 'true' : 'false' ?>">
-
-                        <!-- Assignment Indicator -->
-                        <? if (data.userContext && data.userContext.assignedSubdomains && data.userContext.viewMode === 'full') { ?>
-                        <div class="assignment-indicator <?= isAssigned ? 'assigned' : 'not-assigned' ?>" aria-label="<?= isAssigned ? 'Component assigned' : 'Component not assigned' ?>">
-                            <?= isAssigned ? '✓' : '○' ?>
+                    <!-- Sticky column headers for this domain -->
+                    <div class="performance-levels-header">
+                        <div class="performance-levels">
+                            <div class="level-header"></div>
+                            <div class="level-header">Developing</div>
+                            <div class="level-header">Basic</div>
+                            <div class="level-header">Proficient</div>
+                            <div class="level-header">Distinguished</div>
                         </div>
-                        <? } ?>
+                    </div>
 
-                        <div class="performance-levels-content">
-                            <div class="row-label">
-                                <?= component.title ?>
-                                <? if (isAssigned && data.userContext.viewMode === 'assigned') { ?>
-                                <span class="assigned-badge">📋 Assigned</span>
-                                <? } ?>
-                            </div>
-                            <div class="level-content rating-cell" data-component-id="<?= component.componentId ?>" data-rating="developing">
-                                <?= component.developing ?>
-                            </div>
-                            <div class="level-content rating-cell" data-component-id="<?= component.componentId ?>" data-rating="basic">
-                                <?= component.basic ?>
-                            </div>
-                            <div class="level-content rating-cell" data-component-id="<?= component.componentId ?>" data-rating="proficient">
-                                <?= component.proficient ?>
-                            </div>
-                            <div class="level-content rating-cell" data-component-id="<?= component.componentId ?>" data-rating="distinguished">
-                                <?= component.distinguished ?>
-                            </div>
-                        </div>
+                    <? for (var i = 0; i < data.domains[domainIdx].components.length; i++) { ?>
+                        <?
+                        // Determine if this component should be visible
+                        var component = data.domains[domainIdx].components[i];
+                        var componentId = '';
+                        if (component.title) {
+                            // Component titles are expected to start with an ID (e.g., "1a:", "2b:")
+                            // which is used for matching against assigned subdomains.
+                            var match = component.title.match(/^([1-4][a-fA-F]):/);
+                            componentId = match ? match[1] + ':' : '';
+                        }
+
+                        var isAssigned = false;
+                        // Calculate isAssigned if componentId is valid and subdomains are available.
+                        // This is needed for styling in 'full' mode and visibility in 'assigned' mode.
+                        if (componentId && data.userContext && data.userContext.assignedSubdomains) {
+                            var domainKey = 'domain' + (domainIdx + 1);
+                            var assignedList = data.userContext.assignedSubdomains[domainKey] || [];
+                            isAssigned = assignedList.indexOf(componentId) !== -1;
+                        }
+
+                        // Always render all components, but conditionally hide them for client-side toggle functionality
+                        var shouldShow = true;
+                        var initiallyHidden = false;
                         
-                        <? if (component.bestPractices && component.bestPractices.length > 0) { ?>
-                        <div class="look-fors-section">
-                            <div class="look-fors-header" onclick="toggleLookFors('lookfors-<?= component.componentId ?>')">
-                                <span>Best Practices aligned with 5D+ and PELSB Standards</span>
-                                <span class="chevron" id="chevron-lookfors-<?= component.componentId ?>">▶</span>
+                        // Determine if component should be initially hidden based on viewMode
+                        if (data.userContext && data.userContext.viewMode === 'assigned') {
+                            // In 'assigned' mode, hide components that are not assigned
+                            initiallyHidden = componentId ? !isAssigned : true;
+                        }
+                        ?>
+
+                        <? if (shouldShow) { ?>
+                        <div class="component-section <?= isAssigned ? 'component-assigned' : 'component-not-assigned' ?><?= initiallyHidden ? ' component-hidden' : '' ?>"
+                             data-component-id="<?= componentId ?>"
+                             data-assigned="<?= isAssigned ? 'true' : 'false' ?>">
+
+                            <!-- Assignment Indicator -->
+                            <? if (data.userContext && data.userContext.assignedSubdomains && data.userContext.viewMode === 'full') { ?>
+                            <div class="assignment-indicator <?= isAssigned ? 'assigned' : 'not-assigned' ?>" aria-label="<?= isAssigned ? 'Component assigned' : 'Component not assigned' ?>">
+                                <?= isAssigned ? '✓' : '○' ?>
                             </div>
-                            <div class="look-fors-content" id="lookfors-<?= component.componentId ?>">
-                                <div class="look-fors-grid">
-                                    <? for (var j = 0; j < component.bestPractices.length; j++) { ?>
-                                        <div class="look-for-item">
-                                            <?
-                                                var practiceText = component.bestPractices[j];
-                                                var checkedLookForsForComponent = (data.observation && data.observation.observationData && data.observation.observationData[component.componentId] && data.observation.observationData[component.componentId].lookfors) || [];
-                                                var isChecked = checkedLookForsForComponent.includes(practiceText);
-                                            ?>
-                                            <input type="checkbox" id="practice-<?= component.componentId ?>-<?= j ?>" <?= isChecked ? 'checked' : '' ?> disabled>
-                                            <label for="practice-<?= component.componentId ?>-<?= j ?>"><?= practiceText ?></label>
-                                        </div>
+                            <? } ?>
+
+                            <div class="performance-levels-content">
+                                <div class="row-label">
+                                    <?= component.title ?>
+                                    <? if (isAssigned && data.userContext.viewMode === 'assigned') { ?>
+                                    <span class="assigned-badge">📋 Assigned</span>
                                     <? } ?>
                                 </div>
-                            </div>
-                        </div>
-                        <? } ?>
-                        
-                        <? if (data.observation && data.observation.observationNotes && data.observation.observationNotes[component.componentId]) { ?>
-                        <div class="evidence-section">
-                            <button class="evidence-toggle-btn" onclick="toggleEvidenceSection('evidence-<?= component.componentId ?>')">
-                                <span>📝</span> Notes & Evidence
-                            </button>
-                            <div class="evidence-content" id="evidence-<?= component.componentId ?>">
-                                <div class="notes-container">
-                                    <h4>Observation Notes</h4>
-                                    <div class="notes-display"><?= data.observation.observationNotes[component.componentId] ?></div>
+                                <div class="level-content rating-cell" data-component-id="<?= component.componentId ?>" data-rating="developing">
+                                    <?= component.developing ?>
+                                </div>
+                                <div class="level-content rating-cell" data-component-id="<?= component.componentId ?>" data-rating="basic">
+                                    <?= component.basic ?>
+                                </div>
+                                <div class="level-content rating-cell" data-component-id="<?= component.componentId ?>" data-rating="proficient">
+                                    <?= component.proficient ?>
+                                </div>
+                                <div class="level-content rating-cell" data-component-id="<?= component.componentId ?>" data-rating="distinguished">
+                                    <?= component.distinguished ?>
                                 </div>
                             </div>
+
+                            <? if (component.bestPractices && component.bestPractices.length > 0) { ?>
+                            <div class="look-fors-section">
+                                <div class="look-fors-header" onclick="toggleLookFors('lookfors-<?= component.componentId ?>')">
+                                    <span>Best Practices aligned with 5D+ and PELSB Standards</span>
+                                    <span class="chevron" id="chevron-lookfors-<?= component.componentId ?>">▶</span>
+                                </div>
+                                <div class="look-fors-content" id="lookfors-<?= component.componentId ?>">
+                                    <div class="look-fors-grid">
+                                        <? for (var j = 0; j < component.bestPractices.length; j++) { ?>
+                                            <div class="look-for-item">
+                                                <?
+                                                    var practiceText = component.bestPractices[j];
+                                                    var checkedLookForsForComponent = (data.observation && data.observation.observationData && data.observation.observationData[component.componentId] && data.observation.observationData[component.componentId].lookfors) || [];
+                                                    var isChecked = checkedLookForsForComponent.includes(practiceText);
+                                                ?>
+                                                <input type="checkbox" id="practice-<?= component.componentId ?>-<?= j ?>" <?= isChecked ? 'checked' : '' ?> disabled>
+                                                <label for="practice-<?= component.componentId ?>-<?= j ?>"><?= practiceText ?></label>
+                                            </div>
+                                        <? } ?>
+                                    </div>
+                                </div>
+                            </div>
+                            <? } ?>
+
+                            <? if (data.observation && data.observation.observationNotes && data.observation.observationNotes[component.componentId]) { ?>
+                            <div class="evidence-section">
+                                <button class="evidence-toggle-btn" onclick="toggleEvidenceSection('evidence-<?= component.componentId ?>')">
+                                    <span>📝</span> Notes & Evidence
+                                </button>
+                                <div class="evidence-content" id="evidence-<?= component.componentId ?>">
+                                    <div class="notes-container">
+                                        <h4>Observation Notes</h4>
+                                        <div class="notes-display"><?= data.observation.observationNotes[component.componentId] ?></div>
+                                    </div>
+<div class="media-links-container"></div>
+                                </div>
+                            </div>
+                            <? } ?>
                         </div>
                         <? } ?>
+                    <? } ?>
+
+                    <? if (!data.domains[domainIdx].components || data.domains[domainIdx].components.length === 0) { ?>
+                    <div style="padding: 40px; text-align: center; color: #666;">
+                        <h3>No components found for <?= data.domains[domainIdx].name ?></h3>
+                        <p>Please check your Google Sheet data.</p>
                     </div>
                     <? } ?>
-                <? } ?>
-                
-                <? if (!data.domains[domainIdx].components || data.domains[domainIdx].components.length === 0) { ?>
-                <div style="padding: 40px; text-align: center; color: #666;">
-                    <h3>No components found for <?= data.domains[domainIdx].name ?></h3>
-                    <p>Please check your Google Sheet data.</p>
                 </div>
-                <? } ?>
+            <? } ?>
+
+            <? if (data.isError) { ?>
+            <div class="error-container">
+                <h3 class="error-title">Error</h3>
+                <p><?= data.errorMessage ?></p>
             </div>
-        <? } ?>
-        
-        <? if (data.isError) { ?>
-        <div class="error-container">
-            <h3 class="error-title">Error</h3>
-            <p><?= data.errorMessage ?></p>
+            <? } else if (!data.domains || data.domains.length === 0) { ?>
+            <div style="padding: 40px; text-align: center; color: #666;">
+                <h3>No domains found</h3>
+                <p>Please check your Google Sheet data and try refreshing the page.</p>
+            </div>
+            <? } ?>
         </div>
-        <? } else if (!data.domains || data.domains.length === 0) { ?>
-        <div style="padding: 40px; text-align: center; color: #666;">
-            <h3>No domains found</h3>
-            <p>Please check your Google Sheet data and try refreshing the page.</p>
-        </div>
-        <? } ?>
     </div>
 
     <button class="back-to-top" id="backToTop" onclick="scrollToTop()">↑</button>
@@ -1865,8 +1963,168 @@
             window.location.href = url.toString();
         }
 
+        function loadFinalizedObservations() {
+            google.script.run
+                .withSuccessHandler(function(observations) {
+                    const container = document.getElementById('finalizedObservations');
+                    if (!container) return;
+
+                    if (observations && observations.length > 0) {
+                        container.innerHTML = ''; // Clear the loading message
+                        observations.forEach(function(obs) {
+                            const card = document.createElement('div');
+                            card.className = 'observation-card';
+                            card.setAttribute('data-observation-id', obs.observationId);
+                            card.onclick = function() {
+                                viewObservation(obs.observationId);
+                            };
+
+                            const date = new Date(obs.createdAt).toLocaleDateString();
+                            card.innerHTML = `
+                                <h3>Observation from ${date}</h3>
+                                <p>Status: ${obs.status}</p>
+                            `;
+                            container.appendChild(card);
+                        });
+                    } else {
+                        container.innerHTML = '<p>No finalized observations found.</p>';
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    const container = document.getElementById('finalizedObservations');
+                    if (container) {
+                        container.innerHTML = '<p style="color: red;">Error loading observations: ' + error.message + '</p>';
+                    }
+                })
+                .getFinalizedObservationsForUser();
+        }
+
+        function viewObservation(observationId) {
+            console.log('Requesting to view observation:', observationId);
+            showLoadingSpinner();
+
+            google.script.run
+                .withSuccessHandler(function(response) {
+                    hideLoadingSpinner();
+                    if (response.success) {
+                        const observationData = response.observation;
+                        populateRubric(observationData);
+                        showRubricView('full');
+                        document.getElementById('rubricView').classList.add('read-only');
+
+                        const header = document.querySelector('#rubricView .header');
+                        if (header && !header.querySelector('.back-btn')) {
+                            const backButton = document.createElement('button');
+                            backButton.textContent = '← Back to Landing Page';
+                            backButton.className = 'landing-btn back-btn';
+                            backButton.onclick = backToLandingPage;
+                            header.prepend(backButton);
+                        }
+                    } else {
+                        alert('Error loading observation: ' + response.error);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    hideLoadingSpinner();
+                    alert('Error loading observation: ' + error.message);
+                })
+                .loadFinalizedObservationForViewing(observationId);
+        }
+
+        function populateRubric(observation) {
+            if (!observation || !observation.observationData) return;
+
+            // Reset any previous selections
+            document.querySelectorAll('.rating-cell.selected').forEach(cell => cell.classList.remove('selected'));
+            document.querySelectorAll('.look-for-item input[type="checkbox"]').forEach(checkbox => checkbox.checked = false);
+
+            const observationData = observation.observationData;
+
+            for (const componentId in observationData) {
+                const componentData = observationData[componentId];
+
+                if(componentData.proficiency) {
+                    const cell = document.querySelector(`.rating-cell[data-component-id="${componentId}"][data-rating="${componentData.proficiency}"]`);
+                    if (cell) {
+                        cell.classList.add('selected');
+                    }
+                }
+
+                if (componentData.lookfors) {
+                    componentData.lookfors.forEach(lookForText => {
+                        const checkboxes = document.querySelectorAll(`input[type="checkbox"]`);
+                        for(let i=0; i<checkboxes.length; i++){
+                            if(checkboxes[i].nextElementSibling && checkboxes[i].nextElementSibling.textContent === lookForText){
+                                checkboxes[i].checked = true;
+                                break;
+                            }
+                        }
+                    });
+                }
+
+                const notesContainer = document.querySelector(`#evidence-${componentId} .notes-display`);
+                if (notesContainer && componentData.notes) {
+                    notesContainer.innerHTML = componentData.notes;
+                    const evidenceSection = document.getElementById(`evidence-${componentId}`);
+                    if(evidenceSection) evidenceSection.style.display = 'block';
+                } else {
+                    const evidenceSection = document.getElementById(`evidence-${componentId}`);
+                    if(evidenceSection) evidenceSection.style.display = 'none';
+                }
+
+                const evidenceLinks = observation.evidenceLinks && observation.evidenceLinks[componentId];
+                const evidenceContainer = document.querySelector(`#evidence-${componentId} .media-links-container`);
+
+                if (evidenceContainer && evidenceLinks && evidenceLinks.length > 0) {
+                    evidenceContainer.innerHTML = '<h4>Evidence Files:</h4>';
+                    const list = document.createElement('ul');
+                    evidenceLinks.forEach(link => {
+                        const item = document.createElement('li');
+                        item.className = 'media-link-item';
+                        item.innerHTML = `<a href="${link.url}" target="_blank" rel="noopener noreferrer">${link.name}</a>`;
+                        list.appendChild(item);
+                    });
+                    evidenceContainer.appendChild(list);
+                    const evidenceSection = document.getElementById(`evidence-${componentId}`);
+                    if(evidenceSection) evidenceSection.style.display = 'block';
+                } else if (evidenceContainer) {
+                    evidenceContainer.innerHTML = '';
+                }
+            }
+        }
+
+        function showLoadingSpinner() { console.log('Showing spinner...'); }
+        function hideLoadingSpinner() { console.log('Hiding spinner...'); }
+
+        function backToLandingPage() {
+            showLandingPage();
+            document.getElementById('rubricView').classList.remove('read-only');
+            const backButton = document.querySelector('#rubricView .header .back-btn');
+            if (backButton) {
+                backButton.remove();
+            }
+        }
+
+        function showRubricView(viewMode) {
+            document.getElementById('landingPage').style.display = 'none';
+            document.getElementById('rubricView').style.display = 'block';
+
+            if (viewMode === 'assigned') {
+                switchToAssignedView();
+            } else {
+                switchToFullView();
+            }
+        }
+
+        function showLandingPage() {
+            document.getElementById('landingPage').style.display = 'block';
+            document.getElementById('rubricView').style.display = 'none';
+        }
+
         // Enhanced DOMContentLoaded handler
         document.addEventListener('DOMContentLoaded', function() {
+            showLandingPage();
+            loadFinalizedObservations();
             console.log('Page loaded:', window.pageLoadInfo);
 
             // Restore look-fors state (peer evaluator format)
