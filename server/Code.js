@@ -580,38 +580,58 @@ function deleteFinalizedObservation(observationId) {
  * @returns {Object} A response object with the observation and rubric data.
  */
 function loadFinalizedObservationForViewing(observationId) {
-    setupObservationSheet(); // Ensure the sheet is ready
-    const result = loadObservationForEditing(observationId);
+    try {
 
-    // After loading, enhance the context ONLY if the current user is the observed staff member
-    if (
-        result.success &&
-        result.rubricData &&
-        result.rubricData.userContext &&
-        result.observation &&
-        result.observation.observedEmail &&
-        result.rubricData.userContext.email === result.observation.observedEmail
-    ) {
-        const userContext = result.rubricData.userContext;
+        setupObservationSheet(); // Ensure the sheet is ready
 
-        // The user is viewing their own finalized observation
-        userContext.isEvaluator = false; // Ensure they cannot edit
-        userContext.isObservedStaff = true; // Flag for the new UI behavior
 
-        // Set the view mode to 'assigned' by default for the staff member
-        userContext.viewMode = VIEW_MODES.ASSIGNED;
+        const viewingUserContext = createUserContext(); // Get context for the user making the request
+        const observation = getObservationById(observationId);
 
-        debugLog('Finalized observation loaded for the observed staff member viewing their own report', {
-            observationId: observationId,
-            userEmail: userContext.email,
-            isObservedStaff: userContext.isObservedStaff,
-            viewMode: userContext.viewMode
-        });
-    } else if (result.success && result.rubricData && result.rubricData.userContext) {
-        // For anyone else viewing (like an admin), just ensure it's read-only
-        result.rubricData.userContext.isEvaluator = false;
+        if (!observation) {
+            return { success: false, error: 'Observation not found.' };
+        }
+
+        // Permissions: The viewer must be the observer, the observed staff, or have special access rights.
+        const isObserver = viewingUserContext.email === observation.observerEmail;
+        const isObserved = viewingUserContext.email === observation.observedEmail;
+
+        if (!isObserver && !isObserved && !viewingUserContext.hasSpecialAccess) {
+            return { success: false, error: 'You do not have permission to view this observation.' };
+        }
+
+        // Load rubric data based on the *observed* staff's role and year.
+        const assignedSubdomains = getAssignedSubdomainsForRoleYear(observation.observedRole, observation.observedYear);
+        const rubricData = getAllDomainsData(observation.observedRole, observation.observedYear, 'full', assignedSubdomains);
+
+        // The user context on the page should reflect the person being observed.
+        const pageUserContext = createUserContext(observation.observedEmail);
+
+        // All finalized views are read-only.
+        pageUserContext.isEvaluator = false;
+
+        // If the person viewing is the one who was observed, set special flags for the UI.
+        if (isObserved) {
+            pageUserContext.isObservedStaff = true;
+            pageUserContext.viewMode = VIEW_MODES.ASSIGNED; // Default to a focused view for the staff member.
+
+            debugLog('Finalized observation loaded for the observed staff member.', {
+                observationId: observationId,
+                userEmail: viewingUserContext.email,
+                isObservedStaff: pageUserContext.isObservedStaff,
+                viewMode: pageUserContext.viewMode
+            });
+        }
+
+        // Attach the correctly configured context to the rubric data.
+        rubricData.userContext = pageUserContext;
+
+        return { success: true, observation: observation, rubricData: rubricData };
+
+    } catch (error) {
+        console.error('Error in loadFinalizedObservationForViewing:', error);
+        return { success: false, error: 'An unexpected error occurred: ' + error.message };
     }
-    return result;
 }
 
 /**
