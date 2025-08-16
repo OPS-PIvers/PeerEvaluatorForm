@@ -582,8 +582,25 @@ function deleteFinalizedObservation(observationId) {
 function loadFinalizedObservationForViewing(observationId) {
     setupObservationSheet(); // Ensure the sheet is ready
     const result = loadObservationForEditing(observationId);
+
+    // After loading, enhance the context for the observed staff member's view
     if (result.success && result.rubricData && result.rubricData.userContext) {
-        result.rubricData.userContext.isEvaluator = false;
+        const userContext = result.rubricData.userContext;
+        const observation = result.observation;
+
+        // The user is viewing their own finalized observation
+        userContext.isEvaluator = false; // Ensure they cannot edit
+        userContext.isObservedStaff = true; // Flag for the new UI behavior
+
+        // Set the view mode to 'assigned' by default for the staff member
+        userContext.viewMode = VIEW_MODES.ASSIGNED;
+
+        debugLog('Finalized observation loaded for observed staff member', {
+            observationId: observationId,
+            userEmail: userContext.email,
+            isObservedStaff: userContext.isObservedStaff,
+            viewMode: userContext.viewMode
+        });
     }
     return result;
 }

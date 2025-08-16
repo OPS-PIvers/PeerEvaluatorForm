@@ -984,8 +984,8 @@
         <div class="header">
             <h1><?= data.title ?></h1>
             <p><?= data.subtitle ?></p>
-            <!-- View Mode Toggle (only for users with assigned subdomains) -->
-            <? if (data.userContext && data.userContext.assignedSubdomains && !data.userContext.hasSpecialAccess) { ?>
+            <!-- View Mode Toggle (for users with assigned subdomains or observed staff) -->
+            <? if (data.userContext && data.userContext.assignedSubdomains && (!data.userContext.hasSpecialAccess || data.userContext.isObservedStaff)) { ?>
             <div class="view-toggle-container">
                 <button id="viewToggleBtn" class="view-toggle-btn" onclick="toggleViewMode()" aria-pressed="<?= data.userContext.viewMode === 'assigned' ? 'true' : 'false' ?>">
                     <span id="viewToggleText">
