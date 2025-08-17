@@ -701,22 +701,30 @@ function getFinalizedObservationsForStaff(staffEmail = null) {
                 // Get observation folder and list files
                 const files = getObservationFiles(obs.observationId);
                 
-                // Get the folder URL for direct access - use read-only lookup to avoid creating folders
-                let folderUrl = null;
-                try {
-                    // Use getExistingObservationFolder to avoid creating empty folders in staff member's Drive
-                    const folder = getExistingObservationFolder(obs.observationId);
-                    if (folder) {
-                        folderUrl = folder.getUrl();
-                        debugLog(`Found existing observation folder for staff view`, { 
-                            observationId: obs.observationId,
-                            folderId: folder.getId()
-                        });
-                    } else {
-                        console.warn(`No existing observation folder found for ${obs.observationId}. This may indicate the observation has not been properly finalized or the folder is in the peer evaluator's Drive and not accessible.`);
+                // Get the folder URL for direct access - prioritize stored URL over search
+                let folderUrl = obs.folderUrl; // Use stored folder URL if available
+                
+                if (!folderUrl) {
+                    // Fallback: Use read-only lookup for older observations that don't have stored URLs
+                    try {
+                        const folder = getExistingObservationFolder(obs.observationId);
+                        if (folder) {
+                            folderUrl = folder.getUrl();
+                            debugLog(`Found existing observation folder via search for staff view`, { 
+                                observationId: obs.observationId,
+                                folderId: folder.getId()
+                            });
+                        } else {
+                            console.warn(`No folder URL stored and no existing observation folder found for ${obs.observationId}. This may indicate the observation has not been properly finalized or the folder is not accessible.`);
+                        }
+                    } catch (folderError) {
+                        console.warn(`Could not search for folder URL for observation ${obs.observationId}:`, folderError);
                     }
-                } catch (folderError) {
-                    console.warn(`Could not get folder URL for observation ${obs.observationId}:`, folderError);
+                } else {
+                    debugLog(`Using stored folder URL for staff view`, { 
+                        observationId: obs.observationId,
+                        folderUrl: folderUrl
+                    });
                 }
                 
                 return {

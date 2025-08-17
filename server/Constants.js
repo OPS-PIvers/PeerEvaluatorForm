@@ -17,7 +17,8 @@ const SHEET_NAMES = {
 const COLUMN_NAMES = {
     observationId: 'observationId',
     pdfUrl: 'pdfUrl',
-    status: 'status'
+    status: 'status',
+    folderUrl: 'folderUrl'
 };
 
 /**

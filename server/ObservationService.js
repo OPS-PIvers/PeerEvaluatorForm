@@ -229,7 +229,8 @@ function getObservationsForUser(observedEmail, status = null) {
       createdAt: obs.createdAt,
       status: obs.status,
       pdfUrl: obs.pdfUrl || null,
-      pdfStatus: obs.pdfStatus || null
+      pdfStatus: obs.pdfStatus || null,
+      folderUrl: obs.folderUrl || null
     }));
   } catch (error) {
     console.error(`Error in getObservationsForUser for ${observedEmail}:`, error);
@@ -271,6 +272,7 @@ function createNewObservation(observerEmail, observedEmail) {
       finalizedAt: null,
       pdfUrl: null, // To store the link to the generated PDF
       pdfStatus: null, // Track PDF generation status: null, 'generated', 'failed'
+      folderUrl: null, // To store the link to the Google Drive folder
       observationName: null,
       observationDate: null,
       observationData: {}, // e.g., { "1a:": "proficient", "1b:": "basic" }
@@ -459,6 +461,7 @@ function _findExistingObservationFolder(observation) {
  * Shares the entire observation folder with the observed staff member as view-only
  * and ensures the peer evaluator has editor access.
  * @param {Object} observation The finalized observation object.
+ * @returns {string|null} The folder URL if sharing succeeds, null if it fails.
  * @private
  */
 function _shareObservationFolder(observation) {
@@ -501,16 +504,21 @@ function _shareObservationFolder(observation) {
       });
     }
     
+    const folderUrl = obsFolder.getUrl();
     debugLog(`Observation folder sharing completed`, { 
       observationId: observation.observationId,
       folderId: obsFolder.getId(),
+      folderUrl: folderUrl,
       observedEmail: observation.observedEmail,
       observerEmail: observation.observerEmail
     });
 
+    return folderUrl;
+
   } catch (error) {
     console.error(`Failed to share observation folder for ${observation.observationId}:`, error);
     // Do not block the finalization process if folder sharing fails, just log the error
+    return null;
   }
 }
 
@@ -799,8 +807,16 @@ function updateObservationStatus(observationId, newStatus, requestingUserEmail) 
             // Send email notification - get the full observation data for the email
             const updatedObservation = getObservationById(observationId);
             if (updatedObservation) {
-                // Share the observation folder with the observed staff member
-                _shareObservationFolder(updatedObservation);
+                // Share the observation folder with the observed staff member and get the folder URL
+                const folderUrl = _shareObservationFolder(updatedObservation);
+                
+                // Store the folder URL in the observation record
+                if (folderUrl) {
+                    updateObservationFolderUrl(observationId, folderUrl);
+                    debugLog('Folder URL stored in observation record', { observationId, folderUrl });
+                } else {
+                    console.warn(`Failed to get folder URL for observation ${observationId} during finalization`);
+                }
                 
                 // Send email notification
                 _sendFinalizedEmail(updatedObservation);
@@ -871,6 +887,50 @@ function updateObservationPdfUrl(observationId, pdfUrl) {
     console.error(`Error updating PDF URL for observation ${observationId}:`, error);
     // Return a structured error response
     return { success: false, error: `An unexpected error occurred while updating the PDF URL: ${error.message}` };
+  }
+}
+
+/**
+ * Updates the folder URL for a specific observation.
+ * @param {string} observationId The ID of the observation to update.
+ * @param {string} folderUrl The URL of the shared Google Drive folder.
+ * @returns {Object} A response object with success status.
+ */
+function updateObservationFolderUrl(observationId, folderUrl) {
+  if (!observationId || !folderUrl) {
+    return { success: false, error: 'Observation ID and folder URL are required.' };
+  }
+  try {
+    const spreadsheet = openSpreadsheet();
+    const sheet = getSheetByName(spreadsheet, SHEET_NAMES.OBSERVATION_DATA);
+    if (!sheet) {
+      throw new Error(`Sheet "${SHEET_NAMES.OBSERVATION_DATA}" not found.`);
+    }
+    const row = _findObservationRow(sheet, observationId);
+    if (row === -1) {
+      console.warn(`Observation with ID "${observationId}" not found in sheet. Cannot update folder URL.`);
+      return { success: false, error: 'Observation not found.' };
+    }
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const folderUrlCol = headers.indexOf('folderUrl') + 1;
+    const lastModifiedCol = headers.indexOf('lastModifiedAt') + 1;
+    if (folderUrlCol === 0) {
+      throw new Error('The "folderUrl" column was not found in the Observations sheet.');
+    }
+    // Update the folder URL and timestamp
+    sheet.getRange(row, folderUrlCol).setValue(folderUrl);
+    if (lastModifiedCol > 0) {
+      sheet.getRange(row, lastModifiedCol).setValue(new Date().toISOString());
+    }
+
+    SpreadsheetApp.flush();
+
+    debugLog('Observation folder URL updated', { observationId, folderUrl });
+    return { success: true };
+
+  } catch (error) {
+    console.error(`Error updating folder URL for observation ${observationId}:`, error);
+    return { success: false, error: `An unexpected error occurred while updating the folder URL: ${error.message}` };
   }
 }
 
