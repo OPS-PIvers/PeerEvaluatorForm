@@ -2568,11 +2568,28 @@
                 <div class="observation-meta">
                     Created: ${date}
                     ${observation.pdfUrl ? ' • PDF Available' : ''}
+                    ${observation.folderUrl ? ' • 📁 Click to open folder' : ''}
                 </div>
                 <div class="file-grid">
                     ${observation.files.map(file => createFileCard(file)).join('')}
                 </div>
             `;
+            
+            // Add click handler to open Google Drive folder
+            if (observation.folderUrl) {
+                card.addEventListener('click', function() {
+                    window.open(observation.folderUrl, '_blank');
+                    showToast('Opening observation folder...');
+                });
+                
+                // Add visual feedback for clickable state
+                card.style.cursor = 'pointer';
+                card.setAttribute('title', 'Click to open Google Drive folder with all observation materials');
+            } else {
+                // No folder URL available - make it clear it's not clickable
+                card.style.cursor = 'default';
+                card.setAttribute('title', 'Observation folder not available');
+            }
             
             return card;
         }

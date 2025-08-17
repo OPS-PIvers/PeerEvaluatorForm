@@ -696,20 +696,32 @@ function getFinalizedObservationsForStaff(staffEmail = null) {
         // Get finalized observations for this staff member
         const observations = getObservationsForUser(targetEmail, OBSERVATION_STATUS.FINALIZED);
         
-        // Enhanced observations with file listing from Drive folders
+        // Enhanced observations with file listing and folder URL from Drive folders
         const enhancedObservations = observations.map(obs => {
             try {
                 // Get observation folder and list files
                 const files = getObservationFiles(obs.observationId);
+                
+                // Get the folder URL for direct access
+                let folderUrl = null;
+                try {
+                    const folder = getOrCreateObservationFolder(obs.observationId);
+                    folderUrl = folder.getUrl();
+                } catch (folderError) {
+                    console.warn(`Could not get folder URL for observation ${obs.observationId}:`, folderError);
+                }
+                
                 return {
                     ...obs,
-                    files: files || []
+                    files: files || [],
+                    folderUrl: folderUrl
                 };
             } catch (error) {
                 console.warn(`Could not load files for observation ${obs.observationId}:`, error);
                 return {
                     ...obs,
-                    files: []
+                    files: [],
+                    folderUrl: null
                 };
             }
         });
