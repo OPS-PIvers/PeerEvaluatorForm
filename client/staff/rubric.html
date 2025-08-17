@@ -1776,18 +1776,6 @@
             saveViewModePreference();
 
             console.log('Switched to full view mode');
-            
-            // Extra verification that all components are visible
-            const hiddenComponents = document.querySelectorAll('.component-section.component-hidden');
-            if (hiddenComponents.length > 0) {
-                console.warn(`WARNING: ${hiddenComponents.length} components still hidden after switching to full view!`);
-                
-                // Force show all components by explicitly removing hidden class
-                hiddenComponents.forEach(component => {
-                    console.log('Force showing component:', component);
-                    component.classList.remove('component-hidden');
-                });
-            }
         }
 
         function updateViewToggleButton() {
@@ -1834,17 +1822,16 @@
             const components = document.querySelectorAll('.component-section');
             console.log(`Found ${components.length} components to process`);
             
-            let hiddenCount = 0;
+            let unhiddenCount = 0;
             components.forEach(function(component) {
-                const isAssigned = component.getAttribute('data-assigned') === 'true';
-                const componentId = component.getAttribute('data-component-id') || 'unknown';
-                
-                // Remove any existing hidden class first
+                // Directly remove the hidden class, fulfilling the original comment's intent.
                 if (component.classList.contains('component-hidden')) {
-                    hiddenCount++;
-                    console.log(`Unhiding component ${componentId}`);
+                    component.classList.remove('component-hidden');
+                    unhiddenCount++;
                 }
                 
+                // Still update visual state for styling (e.g., borders, backgrounds).
+                const isAssigned = component.getAttribute('data-assigned') === 'true';
                 updateComponentVisualState(component, isAssigned, 'full');
             });
 
@@ -1854,7 +1841,7 @@
                 indicator.classList.remove('indicator-hidden');
             });
 
-            console.log(`Showed all ${components.length} components (previously ${hiddenCount} were hidden)`);
+            console.log(`Showed all components, explicitly un-hiding ${unhiddenCount}.`);
             updateDomainVisibility();
             
             // Final verification
