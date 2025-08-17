@@ -152,50 +152,7 @@ function loadRubricData(filterParams) {
     }
 }
 
-/**
- * Loads rubric data for the current user with specified view mode
- * @param {string} viewMode - 'full' or 'assigned'
- * @returns {Object} - Rubric data object
- */
-function loadRubricDataWithViewMode(viewMode = 'full') {
-    try {
-        const userContext = createUserContext();
-        if (!userContext || !userContext.email || !userContext.role) {
-            return { success: false, error: 'User context not valid' };
-        }
-
-        // Force the requested view mode regardless of user's default
-        const requestedViewMode = viewMode === 'full' ? VIEW_MODES.FULL : VIEW_MODES.ASSIGNED;
-        
-        // For full view, we want ALL components regardless of assignments
-        const assignedSubdomains = requestedViewMode === VIEW_MODES.FULL ? null : userContext.assignedSubdomains;
-        
-        const rubricData = getAllDomainsData(
-            userContext.role,
-            userContext.year,
-            requestedViewMode,
-            assignedSubdomains
-        );
-        
-        // Update the userContext to reflect the requested view mode
-        userContext.viewMode = requestedViewMode;
-        rubricData.userContext = userContext;
-        
-        debugLog('Loaded rubric data with view mode', {
-            viewMode: requestedViewMode,
-            role: userContext.role,
-            year: userContext.year,
-            domainCount: rubricData.domains ? rubricData.domains.length : 0,
-            totalComponents: rubricData.domains ? rubricData.domains.reduce((sum, domain) => sum + (domain.components ? domain.components.length : 0), 0) : 0
-        });
-        
-        return { success: true, rubricData: rubricData };
-        
-    } catch (error) {
-        console.error('Error in loadRubricDataWithViewMode:', error);
-        return { success: false, error: error.message };
-    }
-}
+// loadRubricDataWithViewMode function removed - using client-side toggle approach instead
 
 
 /**

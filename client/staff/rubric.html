@@ -1077,6 +1077,58 @@
             background-color: #f5f5f5;
         }
 
+        /* View Mode Toggle Styles */
+        .view-toggle-container {
+            margin: 20px 0;
+            display: flex;
+            justify-content: center;
+        }
+
+        .view-toggle-switch {
+            position: relative;
+            display: inline-flex;
+            background: #f1f5f9;
+            border-radius: 8px;
+            padding: 4px;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .toggle-option {
+            position: relative;
+            z-index: 2;
+            background: none;
+            border: none;
+            padding: 10px 20px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: #64748b;
+            border-radius: 6px;
+            transition: color 0.3s ease;
+            white-space: nowrap;
+        }
+
+        .toggle-option:hover {
+            color: #334155;
+        }
+
+        .toggle-option.active {
+            color: #1e40af;
+            font-weight: 600;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            top: 4px;
+            left: 4px;
+            height: calc(100% - 8px);
+            background: #ffffff;
+            border-radius: 6px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            transition: transform 0.3s ease, width 0.3s ease;
+            z-index: 1;
+        }
+
         .landing-btn.back-btn {
             position: absolute;
             top: 20px;
@@ -1126,56 +1178,25 @@
     </div>
     <? } ?>
 
-    <div id="landingPage" style="display: none;">
-        <div class="container">
-            <div class="header">
-                <h1>Welcome, <?= data.userContext.name ?></h1>
-                <p>Danielson Framework Rubric</p>
-            </div>
-            <div class="landing-page">
-                <div class="quick-actions">
-                    <h2 class="section-title"><span>📚</span> Rubric Access</h2>
-                    <div class="actions-grid">
-                        <div class="action-card" onclick="showRubricView('full')">
-                            <span class="action-icon">📚</span>
-                            <div class="action-title">View Full Rubric</div>
-                            <div class="action-desc">Access the complete Danielson Framework with all domains and components</div>
-                        </div>
-                        <div class="action-card" onclick="showRubricView('assigned')">
-                            <span class="action-icon">📋</span>
-                            <div class="action-title">View Assigned Areas</div>
-                            <div class="action-desc">Focus on your specific assigned subdomains for this year</div>
-                        </div>
-                    </div>
-                </div>
-                <h2>Finalized Observations</h2>
-                <div id="finalizedObservations" class="observations-container">
-                    <!-- Observation cards will be inserted here by JavaScript -->
-                    <p>Loading finalized observations...</p>
-                </div>
-            </div>
-        </div>
-    </div>
+    <!-- Landing page removed - starting directly in rubric view -->
 
     <div id="rubricView">
         <div class="container">
             <div class="header">
                 <h1><?= data.title ?></h1>
                 <p><?= data.subtitle ?></p>
-                <!-- View Mode Toggle (for users with assigned subdomains or observed staff) -->
-                <? if (data.userContext && data.userContext.assignedSubdomains && (!data.userContext.hasSpecialAccess || data.userContext.isObservedStaff)) { ?>
+                <!-- View Mode Toggle (always available for reference viewing) -->
                 <div class="view-toggle-container">
-                    <button id="viewToggleBtn" class="view-toggle-btn" onclick="toggleViewMode()" aria-pressed="<?= data.userContext.viewMode === 'assigned' ? 'true' : 'false' ?>">
-                        <span id="viewToggleText">
-                            <? if (data.userContext.viewMode === 'assigned') { ?>
-                                📋 View: My Assigned Areas
-                            <? } else { ?>
-                                📚 View: Full Rubric
-                            <? } ?>
-                        </span>
-                    </button>
+                    <div class="view-toggle-switch">
+                        <button id="assignedToggle" class="toggle-option active" onclick="setViewMode('assigned')">
+                            📋 Assigned Areas
+                        </button>
+                        <button id="fullToggle" class="toggle-option" onclick="setViewMode('full')">
+                            📚 Full Rubric
+                        </button>
+                        <div id="toggleSlider" class="toggle-slider"></div>
+                    </div>
                 </div>
-                <? } ?>
             </div>
 
             <!-- Filter Status (for special roles) -->
@@ -2231,45 +2252,7 @@
             }
         }
 
-        function showRubricView(viewMode) {
-            console.log('showRubricView called with mode:', viewMode);
-            
-            // Clear any observation-related state when switching to static rubric view
-            clearObservationState();
-            
-            // Store the view mode preference
-            sessionStorage.setItem('preferredViewMode', viewMode);
-            
-            // Show loading state
-            document.getElementById('landingPage').style.display = 'none';
-            document.getElementById('rubricView').style.display = 'block';
-            document.getElementById('rubricView').innerHTML = '<div style="text-align: center; padding: 40px;"><p>Loading ' + viewMode + ' rubric...</p></div>';
-
-            // Call server to load rubric data with the requested view mode
-            google.script.run
-                .withSuccessHandler(function(response) {
-                    if (response.success && response.rubricData) {
-                        console.log('Successfully loaded rubric data for', viewMode, 'view');
-                        console.log('Total components loaded:', response.rubricData.domains ? 
-                            response.rubricData.domains.reduce((sum, domain) => sum + (domain.components ? domain.components.length : 0), 0) : 0);
-                        
-                        // Reload the page with the view mode parameter
-                        const url = new URL(window.location);
-                        url.searchParams.set('view', viewMode);
-                        window.location.href = url.toString();
-                    } else {
-                        console.error('Failed to load rubric data:', response.error);
-                        document.getElementById('rubricView').innerHTML = '<div style="text-align: center; padding: 40px;"><p>Error loading rubric data. Please try again.</p></div>';
-                        setTimeout(() => showLandingPage(), 3000);
-                    }
-                })
-                .withFailureHandler(function(error) {
-                    console.error('Error calling server:', error);
-                    document.getElementById('rubricView').innerHTML = '<div style="text-align: center; padding: 40px;"><p>Error connecting to server. Please try again.</p></div>';
-                    setTimeout(() => showLandingPage(), 3000);
-                })
-                .loadRubricDataWithViewMode(viewMode);
-        }
+        // showRubricView function removed - using direct toggle approach instead
 
         function clearObservationState() {
             // Clear any selected proficiency rating cells
@@ -2299,56 +2282,95 @@
             document.getElementById('rubricView').classList.remove('read-only');
         }
 
-        function showLandingPage() {
-            document.getElementById('landingPage').style.display = 'block';
-            document.getElementById('rubricView').style.display = 'none';
+        // showLandingPage function removed - no longer using landing page
+
+        // === View Mode Toggle Functions (from peer evaluator pattern) ===
+        let currentViewMode = 'assigned'; // Start with assigned view by default
+
+        function setViewMode(mode) {
+            currentViewMode = mode;
+            updateViewToggle();
+            updateComponentVisibility();
+            
+            // Save preference to sessionStorage
+            try {
+                const storageKey = 'viewMode_' + (window.pageLoadInfo?.cacheVersion || 'default');
+                sessionStorage.setItem(storageKey, mode);
+            } catch (e) {
+                console.warn('Could not save view mode preference:', e);
+            }
+            
+            console.log('View mode set to:', mode);
+        }
+
+        function updateViewToggle() {
+            const assignedToggle = document.getElementById('assignedToggle');
+            const fullToggle = document.getElementById('fullToggle');
+            const slider = document.getElementById('toggleSlider');
+            
+            if (!assignedToggle || !fullToggle || !slider) return;
+            
+            // Update active states
+            assignedToggle.classList.toggle('active', currentViewMode === 'assigned');
+            fullToggle.classList.toggle('active', currentViewMode === 'full');
+            
+            // Animate slider position
+            const toggleWidth = assignedToggle.offsetWidth;
+            if (currentViewMode === 'assigned') {
+                slider.style.width = toggleWidth + 'px';
+                slider.style.transform = 'translateX(0)';
+            } else {
+                slider.style.width = fullToggle.offsetWidth + 'px';
+                slider.style.transform = `translateX(${toggleWidth}px)`;
+            }
+        }
+
+        function updateComponentVisibility() {
+            const components = document.querySelectorAll('.component-section');
+            if (currentViewMode === 'assigned') {
+                components.forEach(comp => {
+                    // Show only components marked as assigned
+                    comp.style.display = comp.dataset.isAssigned === 'true' ? '' : 'none';
+                });
+            } else {
+                // Show all components in full mode
+                components.forEach(comp => {
+                    comp.style.display = '';
+                });
+            }
+            
+            console.log(`Updated component visibility for ${currentViewMode} mode`);
         }
 
         // Enhanced DOMContentLoaded handler
         document.addEventListener('DOMContentLoaded', function() {
-            showLandingPage();
-            loadFinalizedObservations();
+            // Start directly in rubric view - no landing page
             console.log('Page loaded:', window.pageLoadInfo);
 
-            // Restore look-fors state (peer evaluator format)
-            restoreLookForsState();
-            
-            // Restore look-fors state (staff format)
-            restoreStaffLookForsState();
+            // Make rubric read-only for reference viewing
+            document.getElementById('rubricView').classList.add('read-only');
 
-            // Restore evidence section state
-            restoreEvidenceState();
-
-            // Determine and apply currentViewMode based on URL param, then sessionStorage, then server/default
-            const urlParams = new URLSearchParams(window.location.search);
-            const viewFromURL = urlParams.get('view');
-
-            if (viewFromURL === 'assigned' || viewFromURL === 'full') {
-                currentViewMode = viewFromURL;
-                saveViewModePreference(); // Save the URL-derived mode to sessionStorage
-                console.log('View mode set from URL parameter:', currentViewMode);
-            } else {
-                // No valid view param in URL, try to load from sessionStorage
-                try {
-                    const storageKey = 'viewMode_' + (window.pageLoadInfo?.cacheVersion || 'default');
-                    const savedMode = sessionStorage.getItem(storageKey);
-                    if (savedMode === 'assigned' || savedMode === 'full') {
-                        currentViewMode = savedMode;
-                        console.log('View mode restored from sessionStorage:', currentViewMode);
-                    }
-                } catch (e) {
-                    console.warn('Could not access sessionStorage for view mode preference:', e);
-                    // currentViewMode remains as initialized from server or defaults to 'full'
+            // Load view mode preference from sessionStorage
+            try {
+                const storageKey = 'viewMode_' + (window.pageLoadInfo?.cacheVersion || 'default');
+                const savedMode = sessionStorage.getItem(storageKey);
+                if (savedMode === 'assigned' || savedMode === 'full') {
+                    currentViewMode = savedMode;
+                    console.log('View mode restored from sessionStorage:', currentViewMode);
                 }
+            } catch (e) {
+                console.warn('Could not access sessionStorage for view mode preference:', e);
             }
+
+            // Initialize toggle UI and component visibility
+            updateViewToggle();
+            updateComponentVisibility();
 
             // Initialize view mode functionality
             if (userAssignedSubdomains) {
                 // Add visual enhancements for assignments (these are always useful)
                 highlightAssignedComponents();
                 addAssignmentCounters();
-
-                // Initialize with current view mode
                 if (currentViewMode === 'assigned') {
                     hideUnassignedComponents();
                 } else {
