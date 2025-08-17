@@ -3181,118 +3181,6 @@
                 .getObservationScript(currentObservationId);
         }
 
-        function exportScriptPDF() {
-            if (!currentObservationId) {
-                showToast('No observation context found', false);
-                return;
-            }
-
-            // Show loading state
-            const exportBtn = document.querySelector('button[onclick="exportScriptPDF()"]');
-            const originalText = exportBtn ? exportBtn.textContent : 'Export PDF';
-            if (exportBtn) {
-                exportBtn.disabled = true;
-                exportBtn.textContent = 'Saving...';
-            }
-
-            // Save current script content first and wait for completion
-            if (scriptQuill) {
-                const content = scriptQuill.getContents();
-                scriptContent = content; // Keep local copy
-
-                showToast('Saving script content...', true);
-
-                // Save script content and wait for completion before generating PDF
-                google.script.run
-                    .withSuccessHandler(function(saveResult) {
-                        if (saveResult.success) {
-                            // Script saved successfully, now generate PDF
-                            if (exportBtn) {
-                                exportBtn.textContent = 'Generating PDF...';
-                            }
-                            showToast('Generating script PDF...', true);
-                            
-                            // Generate PDF via server
-                            google.script.run
-                                .withSuccessHandler(function(result) {
-                                    if (exportBtn) {
-                                        exportBtn.disabled = false;
-                                        exportBtn.textContent = originalText;
-                                    }
-                                    
-                                    if (result.success) {
-                                        showToast('Script PDF generated successfully!', true);
-                                        // Open PDF in new tab
-                                        if (result.pdfUrl) {
-                                            window.open(result.pdfUrl, '_blank');
-                                        }
-                                    } else {
-                                        showToast('Error generating script PDF: ' + result.error, false);
-                                    }
-                                })
-                                .withFailureHandler(function(error) {
-                                    if (exportBtn) {
-                                        exportBtn.disabled = false;
-                                        exportBtn.textContent = originalText;
-                                    }
-                                    showToast('Failed to generate script PDF: ' + error.message, false);
-                                    console.error('Script PDF generation failed:', error);
-                                })
-                                .generateScriptPDF(currentObservationId);
-                        } else {
-                            // Save failed
-                            if (exportBtn) {
-                                exportBtn.disabled = false;
-                                exportBtn.textContent = originalText;
-                            }
-                            showToast('Failed to save script content: ' + saveResult.error, false);
-                        }
-                    })
-                    .withFailureHandler(function(error) {
-                        if (exportBtn) {
-                            exportBtn.disabled = false;
-                            exportBtn.textContent = originalText;
-                        }
-                        showToast('Error saving script content: ' + error.message, false);
-                        console.error('Script save failed:', error);
-                    })
-                    .updateObservationScript(currentObservationId, content);
-            } else {
-                // No script content to save, directly generate PDF
-                if (exportBtn) {
-                    exportBtn.textContent = 'Generating PDF...';
-                }
-                showToast('Generating script PDF...', true);
-                
-                // Generate PDF via server
-                google.script.run
-                    .withSuccessHandler(function(result) {
-                        if (exportBtn) {
-                            exportBtn.disabled = false;
-                            exportBtn.textContent = originalText;
-                        }
-
-                        if (result.success) {
-                            showToast('Script PDF generated successfully!', true);
-                            // Open PDF in new tab
-                            if (result.pdfUrl) {
-                                window.open(result.pdfUrl, '_blank');
-                            }
-                        } else {
-                            showToast('Error generating script PDF: ' + (result.error || 'Unknown error'), false);
-                        }
-                    })
-                    .withFailureHandler(function(error) {
-                        if (exportBtn) {
-                            exportBtn.disabled = false;
-                            exportBtn.textContent = originalText;
-                        }
-                        showToast('Failed to generate script PDF: ' + error.message, false);
-                        console.error('Script PDF generation failed:', error);
-                    })
-                    .generateScriptPDF(currentObservationId);
-            }
-        }
 
         // === Component Tagging System ===
         let componentTags = {};
@@ -3578,7 +3466,6 @@
                 <div class="script-editor-controls">
                     <button id="saveScriptBtn" class="btn-secondary" onclick="manualSaveScriptContent()" disabled>Saved!</button>
                     <button class="btn-secondary" onclick="closeScriptEditor()">Close</button>
-                    <button class="btn-primary" onclick="exportScriptPDF()">Export PDF</button>
                 </div>
             </div>
             
