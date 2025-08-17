@@ -2625,7 +2625,7 @@
         });
 
         // === View Mode Toggle Functions (from peer evaluator pattern) ===
-        let currentViewMode = 'assigned'; // Start with assigned view by default
+        // Note: currentViewMode is already declared by server template injection
 
         function setViewMode(mode) {
             currentViewMode = mode;
@@ -3006,6 +3006,43 @@
                 } catch (e) {
                     console.warn('Could not save look-fors state:', e);
                 }
+            }
+        }
+
+        // Toggle look-fors section visibility for staff view
+        function toggleLookFors(contentId) {
+            const content = document.getElementById(contentId);
+            const chevronId = 'chevron-' + contentId;
+            const chevron = document.getElementById(chevronId);
+            
+            if (!content || !chevron) {
+                console.warn('toggleLookFors: Could not find elements for', contentId);
+                return;
+            }
+            
+            const isCurrentlyExpanded = content.classList.contains('expanded');
+            
+            if (isCurrentlyExpanded) {
+                // Collapse
+                content.classList.remove('expanded');
+                chevron.textContent = '▶';
+                chevron.style.transform = 'rotate(0deg)';
+            } else {
+                // Expand
+                content.classList.add('expanded');
+                chevron.textContent = '▼';
+                chevron.style.transform = 'rotate(90deg)';
+            }
+            
+            // Save state in sessionStorage for persistence
+            try {
+                const storageKey = 'lookForsState_' + (window.pageLoadInfo?.cacheVersion || 'default');
+                const allStates = JSON.parse(sessionStorage.getItem(storageKey) || '{}');
+                allStates[contentId] = !isCurrentlyExpanded;
+                sessionStorage.setItem(storageKey, JSON.stringify(allStates));
+                console.log('Look-fors state saved:', contentId, !isCurrentlyExpanded);
+            } catch (e) {
+                console.warn('Could not save look-fors state:', e);
             }
         }
 
