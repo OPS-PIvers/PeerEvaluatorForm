@@ -1910,12 +1910,18 @@
 
             // Styling Logic (only if not hidden by the above)
             if (!componentElement.classList.contains('component-hidden')) {
-                if (isAssigned) {
-                    componentElement.classList.add('component-assigned');
-                    addAssignmentTooltip(componentElement, 'This component is assigned to you for evaluation');
-                } else {
-                    componentElement.classList.add('component-not-assigned');
-                    addAssignmentTooltip(componentElement, 'This component is not assigned to you this year');
+                // Only apply assignment styling in 'assigned' mode, not in 'full' mode
+                if (currentViewMode === 'assigned') {
+                    if (isAssigned) {
+                        componentElement.classList.add('component-assigned');
+                        addAssignmentTooltip(componentElement, 'This component is assigned to you for evaluation');
+                    } else {
+                        componentElement.classList.add('component-not-assigned');
+                        addAssignmentTooltip(componentElement, 'This component is not assigned to you this year');
+                    }
+                } else if (currentViewMode === 'full') {
+                    // In full mode, remove any assignment tooltips and show all components neutrally
+                    removeAssignmentTooltip(componentElement);
                 }
             }
         }
@@ -1935,6 +1941,10 @@
 
         function addAssignmentTooltip(element, message) {
             element.title = message;
+        }
+
+        function removeAssignmentTooltip(element) {
+            element.removeAttribute('title');
         }
 
         function createAssignmentSummary() {
@@ -2183,18 +2193,17 @@
                     }
                 }
 
-                const notesContainer = document.querySelector(`#evidence-${componentId} .notes-display`);
+                const evidenceSection = document.getElementById(`evidence-${componentId}`);
+                const notesContainer = evidenceSection?.querySelector('.notes-display');
                 if (notesContainer && componentData.notes) {
                     notesContainer.innerHTML = componentData.notes;
-                    const evidenceSection = document.getElementById(`evidence-${componentId}`);
                     if(evidenceSection) evidenceSection.style.display = 'block';
                 } else {
-                    const evidenceSection = document.getElementById(`evidence-${componentId}`);
                     if(evidenceSection) evidenceSection.style.display = 'none';
                 }
 
                 const evidenceLinks = observation.evidenceLinks && observation.evidenceLinks[componentId];
-                const evidenceContainer = document.querySelector(`#evidence-${componentId} .media-links-container`);
+                const evidenceContainer = evidenceSection?.querySelector('.media-links-container');
 
                 if (evidenceContainer && evidenceLinks && evidenceLinks.length > 0) {
                     evidenceContainer.innerHTML = '<h4>Evidence Files:</h4>';
@@ -2206,7 +2215,6 @@
                         list.appendChild(item);
                     });
                     evidenceContainer.appendChild(list);
-                    const evidenceSection = document.getElementById(`evidence-${componentId}`);
                     if(evidenceSection) evidenceSection.style.display = 'block';
                 } else if (evidenceContainer) {
                     evidenceContainer.innerHTML = '';
@@ -2228,6 +2236,9 @@
 
         function showRubricView(viewMode) {
             console.log('showRubricView called with mode:', viewMode);
+            
+            // Clear any observation-related state when switching to static rubric view
+            clearObservationState();
             
             document.getElementById('landingPage').style.display = 'none';
             document.getElementById('rubricView').style.display = 'block';
@@ -2251,6 +2262,34 @@
                 console.log(`View mode verification: ${hiddenComponents.length} hidden of ${totalComponents.length} total components`);
                 console.log('Current view mode after switch:', currentViewMode);
             }, 100);
+        }
+
+        function clearObservationState() {
+            // Clear any selected proficiency rating cells
+            document.querySelectorAll('.rating-cell.selected').forEach(cell => {
+                cell.classList.remove('selected');
+            });
+            
+            // Clear any checked look-for checkboxes 
+            document.querySelectorAll('.look-for-item input[type="checkbox"]').forEach(checkbox => {
+                checkbox.checked = false;
+            });
+            
+            // Hide all evidence sections and clear their content
+            document.querySelectorAll('[id^="evidence-"]').forEach(evidenceSection => {
+                evidenceSection.style.display = 'none';
+                const notesDisplay = evidenceSection.querySelector('.notes-display');
+                if (notesDisplay) {
+                    notesDisplay.innerHTML = '';
+                }
+                const mediaContainer = evidenceSection.querySelector('.media-links-container');
+                if (mediaContainer) {
+                    mediaContainer.innerHTML = '';
+                }
+            });
+            
+            // Remove read-only class if present
+            document.getElementById('rubricView').classList.remove('read-only');
         }
 
         function showLandingPage() {
