@@ -354,8 +354,8 @@ function getOrCreateObservationFolder(observationId) {
 
 /**
  * Retrieves or creates a folder within a given parent folder.
- * This function is more robust than DriveApp.getFoldersByName() as it handles cases
- * where multiple folders with the same name might exist.
+ * This function encapsulates the logic to retrieve the first folder found with a given name,
+ * or create it if no folder with that name exists. It simplifies the get-or-create pattern.
  * @param {GoogleAppsScript.Drive.Folder} parentFolder The parent folder.
  * @param {string} folderName The name of the folder to get or create.
  * @returns {GoogleAppsScript.Drive.Folder} The folder object.
