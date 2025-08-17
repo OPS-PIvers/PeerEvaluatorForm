@@ -2669,13 +2669,17 @@
             const components = document.querySelectorAll('.component-section');
             if (currentViewMode === 'assigned') {
                 components.forEach(comp => {
-                    // Show only components marked as assigned
-                    comp.style.display = comp.dataset.isAssigned === 'true' ? '' : 'none';
+                    // Hide components that are not assigned using CSS class
+                    if (comp.dataset.assigned !== 'true') {
+                        comp.classList.add('component-hidden');
+                    } else {
+                        comp.classList.remove('component-hidden');
+                    }
                 });
             } else {
-                // Show all components in full mode
+                // Show all components in full mode by removing hidden class
                 components.forEach(comp => {
-                    comp.style.display = '';
+                    comp.classList.remove('component-hidden');
                 });
             }
             
@@ -2690,17 +2694,22 @@
             // Make rubric read-only for reference viewing
             document.getElementById('rubricView').classList.add('read-only');
 
-            // Load view mode preference from sessionStorage
+            // Load view mode preference from sessionStorage (only for special access users)
+            // Regular staff should respect the server-provided viewMode
+            <? if (data.userContext && data.userContext.hasSpecialAccess) { ?>
             try {
                 const storageKey = 'viewMode_' + (window.pageLoadInfo?.cacheVersion || 'default');
                 const savedMode = sessionStorage.getItem(storageKey);
                 if (savedMode === 'assigned' || savedMode === 'full') {
                     currentViewMode = savedMode;
-                    console.log('View mode restored from sessionStorage:', currentViewMode);
+                    console.log('View mode restored from sessionStorage for special access user:', currentViewMode);
                 }
             } catch (e) {
                 console.warn('Could not access sessionStorage for view mode preference:', e);
             }
+            <? } else { ?>
+            console.log('Regular staff user - using server-provided viewMode:', currentViewMode);
+            <? } ?>
 
             // Initialize toggle UI and component visibility
             updateViewToggle();

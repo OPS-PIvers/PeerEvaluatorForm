@@ -2016,11 +2016,9 @@ function enhanceDomainsWithAssignments(domains, assignedSubdomains, viewMode = '
         };
       }) : [];
 
-      // Filter components based on view mode
+      // Always send all components to client for toggle functionality
+      // The client-side will handle visibility based on view mode
       let filteredComponents = enhancedComponents;
-      if (viewMode === 'assigned') {
-        filteredComponents = enhancedComponents.filter(comp => comp.isAssigned);
-      }
 
       const assignedCount = enhancedComponents.filter(comp => comp.isAssigned).length;
 
