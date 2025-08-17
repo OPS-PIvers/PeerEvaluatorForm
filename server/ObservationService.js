@@ -353,6 +353,20 @@ function getOrCreateObservationFolder(observationId) {
 }
 
 /**
+ * Retrieves an existing observation folder WITHOUT creating new folders.
+ * This function searches for existing folders in the peer evaluator's Drive.
+ * @param {string} observationId The observation ID.
+ * @returns {GoogleAppsScript.Drive.Folder|null} The existing folder or null if not found.
+ */
+function getExistingObservationFolder(observationId) {
+  const observation = getObservationById(observationId);
+  if (!observation) {
+    return null;
+  }
+  return _findExistingObservationFolder(observation);
+}
+
+/**
  * Retrieves or creates a folder within a given parent folder.
  * This function encapsulates the logic to retrieve the first folder found with a given name,
  * or create it if no folder with that name exists. It simplifies the get-or-create pattern.
@@ -389,6 +403,56 @@ function _getObservationFolder(observation) {
     const obsFolder = _getOrCreateFolder(userFolder, obsFolderName);
 
     return obsFolder;
+}
+
+/**
+ * Searches for an existing observation folder WITHOUT creating new folders.
+ * This function looks for folders shared with the current user (staff member).
+ * @param {Object} observation The observation object.
+ * @returns {GoogleAppsScript.Drive.Folder|null} The existing folder or null if not found.
+ * @private
+ */
+function _findExistingObservationFolder(observation) {
+    try {
+        // Search through all folders accessible to the current user (including shared folders)
+        const obsFolderName = `Observation - ${observation.observationId}`;
+        const allFolders = DriveApp.getFoldersByName(obsFolderName);
+        
+        while (allFolders.hasNext()) {
+            const folder = allFolders.next();
+            
+            // Verify this folder has the expected parent structure and contains files
+            try {
+                const parentFolders = folder.getParents();
+                if (parentFolders.hasNext()) {
+                    const userFolder = parentFolders.next();
+                    const expectedUserFolderName = `${observation.observedName} (${observation.observedEmail})`;
+                    
+                    if (userFolder.getName() === expectedUserFolderName) {
+                        // Check if this folder has files (not empty)
+                        const files = folder.getFiles();
+                        if (files.hasNext()) {
+                            debugLog(`Found existing observation folder with files`, {
+                                observationId: observation.observationId,
+                                folderId: folder.getId(),
+                                folderName: folder.getName()
+                            });
+                            return folder;
+                        }
+                    }
+                }
+            } catch (parentError) {
+                // Skip folders we can't access parent info for
+                continue;
+            }
+        }
+        
+        return null; // No existing folder with files found
+        
+    } catch (error) {
+        console.warn(`Error searching for existing observation folder for ${observation.observationId}:`, error);
+        return null;
+    }
 }
 
 /**

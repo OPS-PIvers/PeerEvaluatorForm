@@ -701,11 +701,20 @@ function getFinalizedObservationsForStaff(staffEmail = null) {
                 // Get observation folder and list files
                 const files = getObservationFiles(obs.observationId);
                 
-                // Get the folder URL for direct access
+                // Get the folder URL for direct access - use read-only lookup to avoid creating folders
                 let folderUrl = null;
                 try {
-                    const folder = getOrCreateObservationFolder(obs.observationId);
-                    folderUrl = folder.getUrl();
+                    // Use getExistingObservationFolder to avoid creating empty folders in staff member's Drive
+                    const folder = getExistingObservationFolder(obs.observationId);
+                    if (folder) {
+                        folderUrl = folder.getUrl();
+                        debugLog(`Found existing observation folder for staff view`, { 
+                            observationId: obs.observationId,
+                            folderId: folder.getId()
+                        });
+                    } else {
+                        console.warn(`No existing observation folder found for ${obs.observationId}. This may indicate the observation has not been properly finalized or the folder is in the peer evaluator's Drive and not accessible.`);
+                    }
                 } catch (folderError) {
                     console.warn(`Could not get folder URL for observation ${obs.observationId}:`, folderError);
                 }
@@ -936,9 +945,20 @@ function uploadGlobalRecording(observationId, base64Data, filename, recordingTyp
     lock.waitLock(30000); // Wait up to 30 seconds
 
     try {
+        // Verify user context and permissions
+        const userContext = createUserContext();
+        if (!userContext || !userContext.email) {
+            return { success: false, error: 'Invalid user session.' };
+        }
+
         const observation = getObservationById(observationId);
         if (!observation) {
             return { success: false, error: 'Observation not found.' };
+        }
+
+        // Ensure only the observation creator can upload recordings
+        if (observation.observerEmail !== userContext.email) {
+            return { success: false, error: 'Permission denied. You did not create this observation.' };
         }
 
         // Convert base64 to blob with dynamic MIME type
