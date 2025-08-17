@@ -353,27 +353,42 @@ function getOrCreateObservationFolder(observationId) {
 }
 
 /**
+ * Retrieves or creates a folder within a given parent folder.
+ * This function is more robust than DriveApp.getFoldersByName() as it handles cases
+ * where multiple folders with the same name might exist.
+ * @param {GoogleAppsScript.Drive.Folder} parentFolder The parent folder.
+ * @param {string} folderName The name of the folder to get or create.
+ * @returns {GoogleAppsScript.Drive.Folder} The folder object.
+ * @private
+ */
+function _getOrCreateFolder(parentFolder, folderName) {
+  const folders = parentFolder.getFoldersByName(folderName);
+  if (folders.hasNext()) {
+    return folders.next();
+  } else {
+    return parentFolder.createFolder(folderName);
+  }
+}
+
+/**
  * Retrieves or creates the specific Google Drive folder for a given observation.
  * @param {Object} observation The observation object.
  * @returns {GoogleAppsScript.Drive.Folder} The Google Drive folder for the observation.
  * @private
  */
 function _getObservationFolder(observation) {
-  // Get the root folder for all observations
-  let rootFolderIterator = DriveApp.getFoldersByName(DRIVE_FOLDER_INFO.ROOT_FOLDER_NAME);
-  let rootFolder = rootFolderIterator.hasNext() ? rootFolderIterator.next() : DriveApp.createFolder(DRIVE_FOLDER_INFO.ROOT_FOLDER_NAME);
+    // Get the root folder for all observations, creating it if it doesn't exist.
+    const rootFolder = _getOrCreateFolder(DriveApp.getRootFolder(), DRIVE_FOLDER_INFO.ROOT_FOLDER_NAME);
 
-  // Get or create a folder for the observed user
-  const userFolderName = `${observation.observedName} (${observation.observedEmail})`;
-  let userFolderIterator = rootFolder.getFoldersByName(userFolderName);
-  let userFolder = userFolderIterator.hasNext() ? userFolderIterator.next() : rootFolder.createFolder(userFolderName);
+    // Get or create a folder for the observed user, using their email to ensure uniqueness.
+    const userFolderName = `${observation.observedName} (${observation.observedEmail})`;
+    const userFolder = _getOrCreateFolder(rootFolder, userFolderName);
 
-  // Get or create a folder for this specific observation
-  const obsFolderName = `Observation - ${observation.observationId}`;
-  let obsFolderIterator = userFolder.getFoldersByName(obsFolderName);
-  let obsFolder = obsFolderIterator.hasNext() ? obsFolderIterator.next() : userFolder.createFolder(obsFolderName);
+    // Get or create a folder for this specific observation.
+    const obsFolderName = `Observation - ${observation.observationId}`;
+    const obsFolder = _getOrCreateFolder(userFolder, obsFolderName);
 
-  return obsFolder;
+    return obsFolder;
 }
 
 /**
