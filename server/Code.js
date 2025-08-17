@@ -980,7 +980,8 @@ function uploadGlobalRecording(observationId, base64Data, filename, recordingTyp
         // Save file with specific permissions
         const file = folder.createFile(blob);
         file.addEditor(observation.observerEmail);
-        file.addViewer(observation.observedEmail);
+        // Note: File remains private until observation is finalized
+        // Staff member will get access when folder is shared during finalization
 
         // Update observation data
         if (!observation.globalRecordings) {
