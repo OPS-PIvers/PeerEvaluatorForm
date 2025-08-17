@@ -160,7 +160,7 @@ function loadRubricData(filterParams) {
 function loadRubricDataWithViewMode(viewMode = 'full') {
     try {
         const userContext = createUserContext();
-        if (!userContext || !userContext.isValid) {
+        if (!userContext || !userContext.email || !userContext.role) {
             return { success: false, error: 'User context not valid' };
         }
 
