@@ -1129,6 +1129,209 @@
             z-index: 1;
         }
 
+        /* Observations Button */
+        .observations-btn {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 18px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            margin-left: 15px;
+            transition: background 0.3s ease, transform 0.2s ease;
+            box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+        }
+
+        .observations-btn:hover {
+            background: #2563eb;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(59, 130, 246, 0.4);
+        }
+
+        /* Modal Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+            backdrop-filter: blur(4px);
+        }
+
+        .modal-container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+            max-width: 800px;
+            width: 90%;
+            max-height: 80vh;
+            overflow: hidden;
+            animation: modalSlideIn 0.3s ease-out;
+        }
+
+        @keyframes modalSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px) scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .modal-header {
+            background: #f8fafc;
+            padding: 20px 24px;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            color: #1e293b;
+            font-size: 1.25rem;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #64748b;
+            padding: 8px;
+            border-radius: 8px;
+            transition: background 0.2s ease;
+        }
+
+        .modal-close:hover {
+            background: #e2e8f0;
+            color: #334155;
+        }
+
+        .modal-content {
+            padding: 24px;
+            max-height: 60vh;
+            overflow-y: auto;
+        }
+
+        .loading-message, .empty-message {
+            text-align: center;
+            padding: 40px 20px;
+        }
+
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid #e2e8f0;
+            border-top: 3px solid #3b82f6;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 16px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .empty-icon {
+            font-size: 3rem;
+            margin-bottom: 16px;
+        }
+
+        .empty-message h3 {
+            color: #475569;
+            margin-bottom: 8px;
+        }
+
+        .empty-message p {
+            color: #64748b;
+            font-size: 0.95rem;
+        }
+
+        /* Observation Cards */
+        .observation-card {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            transition: box-shadow 0.2s ease, transform 0.2s ease;
+        }
+
+        .observation-card:hover {
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .observation-card h3 {
+            margin: 0 0 12px 0;
+            color: #1e293b;
+            font-size: 1.1rem;
+        }
+
+        .observation-meta {
+            color: #64748b;
+            font-size: 0.9rem;
+            margin-bottom: 16px;
+        }
+
+        .file-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 12px;
+        }
+
+        .file-card {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 12px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .file-card:hover {
+            background: #e2e8f0;
+            border-color: #3b82f6;
+            transform: translateY(-2px);
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .file-icon {
+            font-size: 2rem;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .file-name {
+            font-weight: 500;
+            font-size: 0.9rem;
+            color: #374151;
+            margin-bottom: 4px;
+            word-break: break-word;
+        }
+
+        .file-size {
+            font-size: 0.8rem;
+            color: #6b7280;
+        }
+
         .landing-btn.back-btn {
             position: absolute;
             top: 20px;
@@ -1196,6 +1399,10 @@
                         </button>
                         <div id="toggleSlider" class="toggle-slider"></div>
                     </div>
+                    <!-- My Observations Button -->
+                    <button id="myObservationsBtn" class="observations-btn" onclick="openObservationsModal()" style="display: none;">
+                        📄 My Observations
+                    </button>
                 </div>
             </div>
 
@@ -2284,6 +2491,139 @@
 
         // showLandingPage function removed - no longer using landing page
 
+        // === Observations Modal Functions ===
+        
+        function checkForObservations() {
+            // Check if user has finalized observations and show/hide button accordingly
+            google.script.run
+                .withSuccessHandler(function(response) {
+                    const button = document.getElementById('myObservationsBtn');
+                    if (response.success && response.observations && response.observations.length > 0) {
+                        button.style.display = 'inline-block';
+                    } else {
+                        button.style.display = 'none';
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    console.warn('Could not check for observations:', error);
+                })
+                .getFinalizedObservationsForStaff();
+        }
+
+        function openObservationsModal() {
+            const modal = document.getElementById('observationsModal');
+            const loading = document.getElementById('observationsLoading');
+            const content = document.getElementById('observationsContent');
+            const empty = document.getElementById('observationsEmpty');
+            
+            // Show modal and loading state
+            modal.style.display = 'flex';
+            loading.style.display = 'block';
+            content.style.display = 'none';
+            empty.style.display = 'none';
+            
+            // Load observations
+            google.script.run
+                .withSuccessHandler(function(response) {
+                    loading.style.display = 'none';
+                    
+                    if (response.success && response.observations && response.observations.length > 0) {
+                        populateObservations(response.observations);
+                        content.style.display = 'block';
+                    } else {
+                        empty.style.display = 'block';
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    loading.style.display = 'none';
+                    content.innerHTML = '<div class="error-message">Failed to load observations. Please try again.</div>';
+                    content.style.display = 'block';
+                    console.error('Error loading observations:', error);
+                })
+                .getFinalizedObservationsForStaff();
+        }
+
+        function closeObservationsModal() {
+            document.getElementById('observationsModal').style.display = 'none';
+        }
+
+        function populateObservations(observations) {
+            const container = document.getElementById('observationsContent');
+            container.innerHTML = '';
+            
+            observations.forEach(obs => {
+                const card = createObservationCard(obs);
+                container.appendChild(card);
+            });
+        }
+
+        function createObservationCard(observation) {
+            const card = document.createElement('div');
+            card.className = 'observation-card';
+            
+            const date = new Date(observation.createdAt).toLocaleDateString();
+            
+            card.innerHTML = `
+                <h3>${escapeHtml(observation.observationName || 'Observation')}</h3>
+                <div class="observation-meta">
+                    Created: ${date}
+                    ${observation.pdfUrl ? ' • PDF Available' : ''}
+                </div>
+                <div class="file-grid">
+                    ${observation.files.map(file => createFileCard(file)).join('')}
+                </div>
+            `;
+            
+            return card;
+        }
+
+        function createFileCard(file) {
+            const icon = getFileIcon(file.type);
+            const size = formatFileSize(file.size);
+            
+            return `
+                <a href="${file.url}" target="_blank" class="file-card" title="Open ${escapeHtml(file.name)}">
+                    <span class="file-icon">${icon}</span>
+                    <div class="file-name">${escapeHtml(file.name)}</div>
+                    <div class="file-size">${size}</div>
+                </a>
+            `;
+        }
+
+        function getFileIcon(mimeType) {
+            if (mimeType.includes('pdf')) return '📄';
+            if (mimeType.includes('image')) return '🖼️';
+            if (mimeType.includes('video')) return '🎥';
+            if (mimeType.includes('audio')) return '🎵';
+            if (mimeType.includes('document') || mimeType.includes('word')) return '📝';
+            return '📎';
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        }
+
+        function escapeHtml(unsafe) {
+            return unsafe
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        // Close modal when clicking outside
+        document.addEventListener('click', function(e) {
+            const modal = document.getElementById('observationsModal');
+            if (e.target === modal) {
+                closeObservationsModal();
+            }
+        });
+
         // === View Mode Toggle Functions (from peer evaluator pattern) ===
         let currentViewMode = 'assigned'; // Start with assigned view by default
 
@@ -2365,6 +2705,9 @@
             // Initialize toggle UI and component visibility
             updateViewToggle();
             updateComponentVisibility();
+            
+            // Check for observations and show button if applicable
+            checkForObservations();
 
             // Initialize view mode functionality
             if (userAssignedSubdomains) {
@@ -2694,5 +3037,29 @@
         }
 
     </script>
+
+    <!-- Observations Modal -->
+    <div id="observationsModal" class="modal-overlay" style="display: none;">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h2>📄 My Observation Materials</h2>
+                <button class="modal-close" onclick="closeObservationsModal()">✕</button>
+            </div>
+            <div class="modal-content">
+                <div id="observationsLoading" class="loading-message">
+                    <div class="loading-spinner"></div>
+                    <p>Loading your observations...</p>
+                </div>
+                <div id="observationsContent" style="display: none;">
+                    <!-- Observations will be populated here -->
+                </div>
+                <div id="observationsEmpty" style="display: none;" class="empty-message">
+                    <div class="empty-icon">📋</div>
+                    <h3>No Observations Yet</h3>
+                    <p>You don't have any finalized observations to view at this time.</p>
+                </div>
+            </div>
+        </div>
+    </div>
 </body>
 </html>

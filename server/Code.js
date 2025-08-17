@@ -677,6 +677,105 @@ function getObservationPdfUrl(observationId) {
     }
 }
 
+/**
+ * Retrieves finalized observations for a staff member to view their own observation materials
+ * @param {string} staffEmail Optional email - if not provided, uses current user's email
+ * @returns {Object} Response object with success status and observations array
+ */
+function getFinalizedObservationsForStaff(staffEmail = null) {
+    try {
+        const userContext = createUserContext();
+        
+        // Use provided email or current user's email
+        const targetEmail = staffEmail || userContext.email;
+        
+        if (!targetEmail) {
+            return { success: false, error: 'Unable to determine user email' };
+        }
+        
+        // Get finalized observations for this staff member
+        const observations = getObservationsForUser(targetEmail, OBSERVATION_STATUS.FINALIZED);
+        
+        // Enhanced observations with file listing from Drive folders
+        const enhancedObservations = observations.map(obs => {
+            try {
+                // Get observation folder and list files
+                const files = getObservationFiles(obs.observationId);
+                return {
+                    ...obs,
+                    files: files || []
+                };
+            } catch (error) {
+                console.warn(`Could not load files for observation ${obs.observationId}:`, error);
+                return {
+                    ...obs,
+                    files: []
+                };
+            }
+        });
+        
+        debugLog('Retrieved finalized observations for staff', {
+            email: targetEmail,
+            observationCount: enhancedObservations.length
+        });
+        
+        return { 
+            success: true, 
+            observations: enhancedObservations 
+        };
+        
+    } catch (error) {
+        console.error('Error in getFinalizedObservationsForStaff:', error);
+        return { success: false, error: 'An unexpected error occurred while retrieving observations.' };
+    }
+}
+
+/**
+ * Helper function to get files from an observation's Drive folder
+ * @param {string} observationId The observation ID
+ * @returns {Array} Array of file objects with name, url, and type
+ */
+function getObservationFiles(observationId) {
+    try {
+        const observation = getObservationById(observationId);
+        if (!observation) return [];
+        
+        // Get the observation folder from Drive
+        const folderName = `Observation - ${observationId}`;
+        const userFolderName = observation.observedName || 'Unknown User';
+        
+        // Search for the folder in Drive
+        const folders = DriveApp.searchFolders(`title contains "${userFolderName}"`);
+        while (folders.hasNext()) {
+            const userFolder = folders.next();
+            const obsFolders = userFolder.searchFolders(`title contains "${folderName}"`);
+            if (obsFolders.hasNext()) {
+                const obsFolder = obsFolders.next();
+                const files = obsFolder.getFiles();
+                const fileList = [];
+                
+                while (files.hasNext()) {
+                    const file = files.next();
+                    fileList.push({
+                        name: file.getName(),
+                        url: file.getUrl(),
+                        type: file.getMimeType(),
+                        size: file.getSize(),
+                        lastModified: file.getLastUpdated().toISOString()
+                    });
+                }
+                
+                return fileList.sort((a, b) => new Date(b.lastModified) - new Date(a.lastModified));
+            }
+        }
+        
+        return [];
+    } catch (error) {
+        console.error(`Error getting files for observation ${observationId}:`, error);
+        return [];
+    }
+}
+
 
 /**
  * Retrieves the status and PDF URL for a given observation, optimized for polling.
