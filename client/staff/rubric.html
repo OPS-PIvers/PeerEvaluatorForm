@@ -2237,28 +2237,38 @@
             // Clear any observation-related state when switching to static rubric view
             clearObservationState();
             
+            // Store the view mode preference
+            sessionStorage.setItem('preferredViewMode', viewMode);
+            
+            // Show loading state
             document.getElementById('landingPage').style.display = 'none';
             document.getElementById('rubricView').style.display = 'block';
+            document.getElementById('rubricView').innerHTML = '<div style="text-align: center; padding: 40px;"><p>Loading ' + viewMode + ' rubric...</p></div>';
 
-            // Force update the global currentViewMode variable
-            currentViewMode = viewMode;
-            console.log('currentViewMode set to:', currentViewMode);
-
-            if (viewMode === 'assigned') {
-                console.log('Switching to assigned view...');
-                switchToAssignedView();
-            } else {
-                console.log('Switching to full view...');
-                switchToFullView();
-            }
-            
-            // Double-check that the view change took effect
-            setTimeout(() => {
-                const hiddenComponents = document.querySelectorAll('.component-section.component-hidden');
-                const totalComponents = document.querySelectorAll('.component-section');
-                console.log(`View mode verification: ${hiddenComponents.length} hidden of ${totalComponents.length} total components`);
-                console.log('Current view mode after switch:', currentViewMode);
-            }, 100);
+            // Call server to load rubric data with the requested view mode
+            google.script.run
+                .withSuccessHandler(function(response) {
+                    if (response.success && response.rubricData) {
+                        console.log('Successfully loaded rubric data for', viewMode, 'view');
+                        console.log('Total components loaded:', response.rubricData.domains ? 
+                            response.rubricData.domains.reduce((sum, domain) => sum + (domain.components ? domain.components.length : 0), 0) : 0);
+                        
+                        // Reload the page with the view mode parameter
+                        const url = new URL(window.location);
+                        url.searchParams.set('view', viewMode);
+                        window.location.href = url.toString();
+                    } else {
+                        console.error('Failed to load rubric data:', response.error);
+                        document.getElementById('rubricView').innerHTML = '<div style="text-align: center; padding: 40px;"><p>Error loading rubric data. Please try again.</p></div>';
+                        setTimeout(() => showLandingPage(), 3000);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    console.error('Error calling server:', error);
+                    document.getElementById('rubricView').innerHTML = '<div style="text-align: center; padding: 40px;"><p>Error connecting to server. Please try again.</p></div>';
+                    setTimeout(() => showLandingPage(), 3000);
+                })
+                .loadRubricDataWithViewMode(viewMode);
         }
 
         function clearObservationState() {
