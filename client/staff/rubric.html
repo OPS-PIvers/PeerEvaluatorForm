@@ -1836,15 +1836,12 @@
             
             let hiddenCount = 0;
             components.forEach(function(component) {
-                const isAssigned = component.getAttribute('data-assigned') === 'true';
-                const componentId = component.getAttribute('data-component-id') || 'unknown';
-                
-                // Remove any existing hidden class first
+                // Count hidden components for logging
                 if (component.classList.contains('component-hidden')) {
                     hiddenCount++;
-                    console.log(`Unhiding component ${componentId}`);
                 }
                 
+                const isAssigned = component.getAttribute('data-assigned') === 'true';
                 updateComponentVisualState(component, isAssigned, 'full');
             });
 
