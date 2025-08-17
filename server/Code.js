@@ -506,24 +506,13 @@ function finalizeObservation(observationId) {
             return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
         }
 
-        const statusUpdateResult = updateObservationStatus(observationId, OBSERVATION_STATUS.FINALIZED, userContext.email);
-        if (!statusUpdateResult.success) {
-            return statusUpdateResult;
-        }
-
-        // Generate script PDF first if script content exists
+        // Step 1: Generate script PDF first if script content exists
         let scriptPdfResult = null;
         const observation = getObservationById(observationId);
         if (observation && observation.scriptContent) {
             debugLog('Generating script PDF during finalization', { observationId });
             scriptPdfResult = generateScriptPDF(observationId);
-            
-            if (scriptPdfResult.success) {
-                debugLog('Script PDF generated successfully during finalization', { 
-                    observationId, 
-                    scriptPdfUrl: scriptPdfResult.pdfUrl 
-                });
-            } else {
+            if (!scriptPdfResult.success) {
                 debugLog('Script PDF generation failed during finalization', { 
                     observationId, 
                     error: scriptPdfResult.error 
@@ -532,10 +521,20 @@ function finalizeObservation(observationId) {
             }
         }
 
+        // Step 2: Generate the main observation PDF.
         const pdfProcessingResult = PdfService.processPdfForFinalization(observationId, userContext);
 
+        // Step 3: Now that all files are in place, update the status.
+        // This will trigger folder sharing and email notifications.
+        const statusUpdateResult = updateObservationStatus(observationId, OBSERVATION_STATUS.FINALIZED, userContext.email);
+        if (!statusUpdateResult.success) {
+            // If the final step fails, we return its error, though the PDFs are already created.
+            return statusUpdateResult;
+        }
+
+        // Step 4: Construct the final success response.
         const result = {
-            success: true, // Maintain original behavior
+            success: true,
             observationId: observationId,
             pdfStatus: pdfProcessingResult.pdfStatus,
         };
@@ -558,7 +557,7 @@ function finalizeObservation(observationId) {
 
     } catch (error) {
         console.error('Error in finalizeObservation wrapper:', error);
-        return { success: false, error: error.message };
+        return { success: false, error: 'An unexpected error occurred during finalization: ' + error.message };
     }
 }
 

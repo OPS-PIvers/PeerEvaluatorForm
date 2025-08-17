@@ -172,18 +172,7 @@ const PdfService = (function() {
 
           // Create folder structure
           try {
-              const rootFolderIterator = DriveApp.getFoldersByName(DRIVE_FOLDER_INFO.ROOT_FOLDER_NAME);
-              let rootFolder = rootFolderIterator.hasNext() ? rootFolderIterator.next() : DriveApp.createFolder(DRIVE_FOLDER_INFO.ROOT_FOLDER_NAME);
-              debugLog('Retrieved/created root folder', { observationId, rootFolderId: rootFolder.getId() });
-
-              const userFolderName = `${observation.observedName} (${observation.observedEmail})`;
-              let userFolderIterator = rootFolder.getFoldersByName(userFolderName);
-              let userFolder = userFolderIterator.hasNext() ? userFolderIterator.next() : rootFolder.createFolder(userFolderName);
-              debugLog('Retrieved/created user folder', { observationId, userFolderId: userFolder.getId() });
-
-              const obsFolderName = `Observation - ${observation.observationId}`;
-              let obsFolderIterator = userFolder.getFoldersByName(obsFolderName);
-              let obsFolder = obsFolderIterator.hasNext() ? obsFolderIterator.next() : userFolder.createFolder(obsFolderName);
+              const obsFolder = getOrCreateObservationFolder(observationId);
               debugLog('Retrieved/created observation folder', { observationId, obsFolderId: obsFolder.getId() });
 
               // Use the already created styled PDF blob
