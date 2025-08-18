@@ -3346,6 +3346,12 @@
                     
                     // Hide loading overlay and re-enable editor
                     hideScriptEditorLoading();
+                    
+                    // Load component tags and restore highlighting AFTER content is loaded
+                    // Small delay to ensure Quill content is fully processed
+                    setTimeout(() => {
+                        loadComponentTags();
+                    }, 50);
                 })
                 .withFailureHandler(function(error) {
                     console.error('Error loading script content:', error);
@@ -3629,40 +3635,56 @@
                 return;
             }
 
+            // Ensure Quill is ready and has content
+            if (!scriptQuill.getLength || scriptQuill.getLength() <= 1) {
+                console.log('Script editor has no content, skipping highlight restoration');
+                return;
+            }
+
             console.log('Restoring visual highlighting for tagged components...');
+            const documentLength = scriptQuill.getLength() - 1; // Exclude final newline
+            let restoredCount = 0;
             
             // Iterate through all component tags and restore their visual formatting
             Object.keys(componentTags).forEach(componentId => {
                 const tags = componentTags[componentId];
                 if (tags && Array.isArray(tags)) {
-                    tags.forEach(tag => {
+                    tags.forEach((tag, tagIndex) => {
                         if (tag.start !== undefined && tag.length !== undefined) {
+                            // Validate tag position against document length
+                            if (tag.start < 0 || tag.start >= documentLength || 
+                                tag.start + tag.length > documentLength) {
+                                console.warn(`Skipping invalid tag position for ${componentId}[${tagIndex}]: start=${tag.start}, length=${tag.length}, docLength=${documentLength}`);
+                                return;
+                            }
+                            
                             const tagColor = tag.color || TAG_COLORS[componentId] || '#e3f2fd';
                             try {
                                 // Apply the background color and text color formatting
                                 scriptQuill.formatText(tag.start, tag.length, 'background', tagColor);
                                 scriptQuill.formatText(tag.start, tag.length, 'color', '#1565c0');
-                                console.log(`Restored highlighting for ${componentId} at position ${tag.start}-${tag.start + tag.length}`);
+                                restoredCount++;
+                                console.log(`Restored highlighting for ${componentId}[${tagIndex}] at position ${tag.start}-${tag.start + tag.length}`);
                             } catch (error) {
-                                console.warn(`Failed to restore highlighting for tag at position ${tag.start}:`, error);
+                                console.warn(`Failed to restore highlighting for ${componentId}[${tagIndex}] at position ${tag.start}:`, error);
                             }
+                        } else {
+                            console.warn(`Invalid tag data for ${componentId}[${tagIndex}]:`, tag);
                         }
                     });
                 }
             });
             
-            console.log('Visual highlighting restoration completed');
+            console.log(`Visual highlighting restoration completed: ${restoredCount} tags restored`);
         }
 
         // Extend the openScriptEditor function to initialize component selector
         const originalOpenScriptEditor = openScriptEditor;
         openScriptEditor = function() {
             originalOpenScriptEditor();
-            // Populate component selector when script editor opens
-            setTimeout(() => {
-                populateComponentSelector();
-                loadComponentTags();
-            }, 100);
+            // Populate component selector immediately (no race condition)
+            populateComponentSelector();
+            // loadComponentTags() will be called after content loads to prevent race condition
         };
     </script>
 
