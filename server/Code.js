@@ -606,7 +606,8 @@ function loadFinalizedObservationForViewing(observationId) {
 
         // Load rubric data based on the *observed* staff's role and year.
         const assignedSubdomains = getAssignedSubdomainsForRoleYear(observation.observedRole, observation.observedYear);
-        const rubricData = getAllDomainsData(observation.observedRole, observation.observedYear, 'full', assignedSubdomains);
+        // For finalized observations, default to 'assigned' view mode to show relevant subdomains
+        const rubricData = getAllDomainsData(observation.observedRole, observation.observedYear, 'assigned', assignedSubdomains);
 
         // The user context on the page should reflect the person being observed.
         const observedStaffContext = createUserContext(observation.observedEmail);

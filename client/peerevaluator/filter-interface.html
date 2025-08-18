@@ -296,34 +296,34 @@
 
         /* Finalized Observation Header */
         .finalized-observation-header {
-            padding: 20px;
+            padding: 12px 20px;
             background: linear-gradient(135deg, #10b981, #059669);
             color: white;
             border-bottom: 1px solid #047857;
         }
 
         .finalized-status {
-            margin-bottom: 8px;
+            margin-bottom: 4px;
         }
 
         .status-indicator {
             font-weight: 600;
-            font-size: 0.9rem;
+            font-size: 0.85rem;
         }
 
         .observation-details {
             display: flex;
-            gap: 20px;
+            gap: 16px;
             align-items: center;
         }
 
         .obs-name {
             font-weight: 600;
-            font-size: 1.1rem;
+            font-size: 1.0rem;
         }
 
         .obs-date {
-            font-size: 0.95rem;
+            font-size: 0.9rem;
             opacity: 0.9;
         }
 
@@ -351,13 +351,9 @@
             text-align: center;
         }
 
-        .readonly-evidence .evidence-toggle-btn {
-            background: linear-gradient(135deg, #10b981, #059669);
-            color: white;
-        }
-
-        .readonly-evidence .evidence-toggle-btn:hover {
-            background: linear-gradient(135deg, #059669, #047857);
+        /* Read-only evidence sections use standard toggle styling */
+        .readonly-evidence .evidence-content {
+            border-left: 3px solid #10b981;
         }
 
         .global-tools-bar {
@@ -3612,7 +3608,8 @@
                 .withSuccessHandler(function(tags) {
                     if (tags) {
                         componentTags = tags;
-                        // Could restore visual formatting here if needed
+                        // Restore visual formatting for tagged text
+                        restoreVisualHighlighting();
                         console.log('Component tags loaded:', componentTags);
                     }
                 })
@@ -3620,6 +3617,37 @@
                     console.error('Error loading component tags:', error);
                 })
                 .getComponentTags(currentObservationId);
+        }
+
+        function restoreVisualHighlighting() {
+            if (!scriptQuill || !componentTags) {
+                console.log('Cannot restore highlighting: missing scriptQuill or componentTags');
+                return;
+            }
+
+            console.log('Restoring visual highlighting for tagged components...');
+            
+            // Iterate through all component tags and restore their visual formatting
+            Object.keys(componentTags).forEach(componentId => {
+                const tags = componentTags[componentId];
+                if (tags && Array.isArray(tags)) {
+                    tags.forEach(tag => {
+                        if (tag.start !== undefined && tag.length !== undefined) {
+                            const tagColor = tag.color || TAG_COLORS[componentId] || '#e3f2fd';
+                            try {
+                                // Apply the background color and text color formatting
+                                scriptQuill.formatText(tag.start, tag.length, 'background', tagColor);
+                                scriptQuill.formatText(tag.start, tag.length, 'color', '#1565c0');
+                                console.log(`Restored highlighting for ${componentId} at position ${tag.start}-${tag.start + tag.length}`);
+                            } catch (error) {
+                                console.warn(`Failed to restore highlighting for tag at position ${tag.start}:`, error);
+                            }
+                        }
+                    });
+                }
+            });
+            
+            console.log('Visual highlighting restoration completed');
         }
 
         // Extend the openScriptEditor function to initialize component selector
