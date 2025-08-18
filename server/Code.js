@@ -20,6 +20,15 @@ function doGet(e) {
   const startTime = Date.now();
   const requestId = generateUniqueId('request');
   
+  // Global entry logging - capture ALL doGet() calls
+  console.log('=== doGet() called ===', {
+    timestamp: new Date().toISOString(),
+    requestId: requestId,
+    hasEventParameter: !!e,
+    eventParameter: e ? e.parameter : null,
+    urlParameters: e && e.parameter ? Object.keys(e.parameter) : []
+  });
+  
   try {
     // Ensure the Observation_Data sheet has the correct columns before any other operation.
     setupObservationSheet();
@@ -31,6 +40,14 @@ function doGet(e) {
 
     // Parse URL parameters for cache control
     const params = e.parameter || {};
+    
+    // Log parameter parsing details
+    console.log('URL parameters parsed', {
+      allParams: params,
+      myOwnRubric: params.myOwnRubric,
+      myOwnRubricType: typeof params.myOwnRubric,
+      requestId: requestId
+    });
 
     const forceRefresh = params.refresh === 'true' || params.nocache === 'true';
     const debugMode = params.debug === 'true';
@@ -147,7 +164,15 @@ function doGet(e) {
     return htmlOutput;
     
   } catch (error) {
-    console.error('Fatal error in doGet:', formatErrorMessage(error, 'doGet'));
+    console.error('=== FATAL ERROR in doGet() ===', {
+      timestamp: new Date().toISOString(),
+      requestId: requestId,
+      error: error.message,
+      stack: error.stack,
+      urlParameters: e && e.parameter ? e.parameter : null,
+      myOwnRubric: e && e.parameter ? e.parameter.myOwnRubric : null,
+      formattedError: formatErrorMessage(error, 'doGet')
+    });
     return UiService.createEnhancedErrorPage(error, requestId, null, e.userAgent);
   }
 }
