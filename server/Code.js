@@ -224,6 +224,8 @@ function loadRubricData(filterParams) {
             );
             
             // Create the complete HTML response for My Own Rubric view
+            // Add flag to distinguish from regular special access views
+            userContext.isMyOwnRubricView = true;
             rubricData.userContext = userContext;
             
             // Generate response metadata

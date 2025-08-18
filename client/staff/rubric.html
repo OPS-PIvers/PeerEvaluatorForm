@@ -1678,6 +1678,11 @@
     <div id="rubricView">
         <div class="container">
             <div class="header">
+                <? if (data.userContext && data.userContext.isMyOwnRubricView) { ?>
+                <button class="landing-btn back-btn" onclick="backToLandingPage()" style="margin-bottom: 10px;">
+                    ← Back to Landing Page
+                </button>
+                <? } ?>
                 <h1><?= data.title ?></h1>
                 <p><?= data.subtitle ?></p>
                 <!-- View Mode Toggle (always available for reference viewing) -->
@@ -1707,7 +1712,7 @@
                     Requested by: <?= data.userContext.filterInfo.requestedBy ?>
                 </span>
             </div>
-            <? } else if (data.userContext && data.userContext.hasSpecialAccess) { ?>
+            <? } else if (data.userContext && data.userContext.hasSpecialAccess && !data.userContext.isMyOwnRubricView) { ?>
             <div class="filter-status">
                 <strong>🔧 Special Access Mode:</strong> <?= data.userContext.specialRoleType ? data.userContext.specialRoleType.replace('_', ' ').toUpperCase() : data.userContext.role ?>
                 <span class="filter-status-detail">
@@ -1718,7 +1723,7 @@
 
             <div class="navigation">
                 <!-- Special Role Filters -->
-                <? if (data.userContext && data.userContext.hasSpecialAccess) { ?>
+                <? if (data.userContext && data.userContext.hasSpecialAccess && !data.userContext.isMyOwnRubricView) { ?>
                 <div class="special-filters">
                     <div class="filter-section">
                         <span class="filter-label">Viewing Options:</span>
@@ -2270,7 +2275,8 @@
             userAgent: navigator.userAgent,
             role: <?= JSON.stringify(data.userContext ? data.userContext.role : "unknown").replace(/</g, '\\u003c') ?>,
             cacheVersion: <?= JSON.stringify(data.userContext ? data.userContext.cacheVersion : "unknown").replace(/</g, '\\u003c') ?>,
-            requestId: <?= JSON.stringify(data.userContext ? data.userContext.requestId : "unknown").replace(/</g, '\\u003c') ?>
+            requestId: <?= JSON.stringify(data.userContext ? data.userContext.requestId : "unknown").replace(/</g, '\\u003c') ?>,
+            isMyOwnRubricView: <?= data.userContext?.isMyOwnRubricView ? 'true' : 'false' ?>
         };
 
         function initializeFiltersFromURL() {
@@ -2811,11 +2817,21 @@
         function hideLoadingSpinner() { console.log('Hiding spinner...'); }
 
         function backToLandingPage() {
-            showLandingPage();
-            document.getElementById('rubricView').classList.remove('read-only');
-            const backButton = document.querySelector('#rubricView .header .back-btn');
-            if (backButton) {
-                backButton.remove();
+            // For My Own Rubric view, navigate back to the original web app (filter interface)
+            if (window.pageLoadInfo && window.pageLoadInfo.isMyOwnRubricView) {
+                // Navigate back to the original web app URL (removes any parameters)
+                const baseUrl = window.location.origin + window.location.pathname;
+                window.location.href = baseUrl;
+            } else {
+                // Legacy behavior for other contexts
+                if (typeof showLandingPage === 'function') {
+                    showLandingPage();
+                }
+                document.getElementById('rubricView').classList.remove('read-only');
+                const backButton = document.querySelector('#rubricView .header .back-btn');
+                if (backButton) {
+                    backButton.remove();
+                }
             }
         }
 
