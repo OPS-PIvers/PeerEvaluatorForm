@@ -185,6 +185,10 @@ function loadRubricData(filterParams) {
         
         // Handle loading current user's own rubric
         if (filterParams.myOwnView) {
+            debugLog('Returning redirect response for myOwnView', { 
+                userRole: userContext.role, 
+                userEmail: userContext.email 
+            });
             return { 
                 success: true, 
                 action: 'redirect',

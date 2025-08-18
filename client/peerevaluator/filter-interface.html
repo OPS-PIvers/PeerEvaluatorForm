@@ -1668,7 +1668,14 @@
             }
         }
         function showCustomFilters() { showView('customFiltersView'); }
-        function loadMyOwnView() { showLoading('Loading your assigned rubric...'); google.script.run.withSuccessHandler(handleRubricData).withFailureHandler(handleError).loadRubricData({ myOwnView: true }); }
+        function loadMyOwnView() { 
+            console.log('loadMyOwnView called - making AJAX request');
+            showLoading('Loading your assigned rubric...'); 
+            google.script.run
+                .withSuccessHandler(handleRubricData)
+                .withFailureHandler(handleError)
+                .loadRubricData({ myOwnView: true }); 
+        }
 
         function handleRoleChange() {
             const roleSelect = document.getElementById('roleSelect'); const yearSelect = document.getElementById('yearSelect'); currentFilters.role = roleSelect.value;
@@ -2028,6 +2035,8 @@
 
         function handleRubricData(result) {
             hideLoading();
+            console.log('handleRubricData received:', result);
+            
             if (!result.success) return showError(result.error);
             if (result.action === 'show_observation_selector') {
                 currentObservedUser.email = result.observedEmail;
@@ -2037,10 +2046,12 @@
             }
             
             if (result.action === 'redirect') {
+                console.log('Processing redirect with params:', result.redirectParams);
                 const url = new URL(window.location);
                 Object.keys(result.redirectParams).forEach(key => {
                     url.searchParams.set(key, result.redirectParams[key]);
                 });
+                console.log('Redirecting to:', url.toString());
                 window.location.href = url.toString();
                 return;
             }
