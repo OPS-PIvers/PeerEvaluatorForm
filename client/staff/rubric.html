@@ -2817,11 +2817,10 @@
         function hideLoadingSpinner() { console.log('Hiding spinner...'); }
 
         function backToLandingPage() {
-            // For My Own Rubric view, navigate back to the original web app (filter interface)
+            // For My Own Rubric view, reload the entire web app to return to landing page
             if (window.pageLoadInfo && window.pageLoadInfo.isMyOwnRubricView) {
-                // Navigate back to the original web app URL (removes any parameters)
-                const baseUrl = window.location.origin + window.location.pathname;
-                window.location.href = baseUrl;
+                // Reload the web app entirely (removes any parameters and restarts fresh)
+                window.location.reload(true);
             } else {
                 // Legacy behavior for other contexts
                 if (typeof showLandingPage === 'function') {
