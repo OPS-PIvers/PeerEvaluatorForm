@@ -678,15 +678,13 @@ const PdfService = (function() {
       const lookforsDefaultParagraph = lookforsCell.getChild(0).asParagraph();
 
       if (checkedLookFors.length > 0) {
-          // Use the default paragraph for the first item, then add additional items
-          lookforsDefaultParagraph.setText(`• ${checkedLookFors[0]}`);
-          lookforsDefaultParagraph.setSpacingBefore(0).setSpacingAfter(0).setLineSpacing(1);
-
-          // Add remaining items as new list items with minimal spacing
-          checkedLookFors.slice(1).forEach(lookfor => {
-              const listItem = lookforsCell.appendListItem(lookfor);
-              listItem.setGlyphType(DocumentApp.GlyphType.BULLET);
-              listItem.setSpacingBefore(0).setSpacingAfter(0).setLineSpacing(1);
+          // Remove the default paragraph to avoid mixing paragraph/list formatting
+          lookforsDefaultParagraph.removeFromParent();
+          
+          // Add all look-fors as consistent paragraphs with manual bullets
+          checkedLookFors.forEach(lookfor => {
+              const paragraph = lookforsCell.appendParagraph(`• ${lookfor}`);
+              paragraph.setSpacingBefore(0).setSpacingAfter(0).setLineSpacing(1);
           });
       } else {
           lookforsDefaultParagraph.setText('No best practices selected.');

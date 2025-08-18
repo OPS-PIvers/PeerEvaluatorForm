@@ -65,12 +65,34 @@ function doGet(e) {
     }
     
     // For users who land here directly (not through the filter UI) or for non-special roles
+    if (params.myOwnRubric) {
+        debugLog('My Own Rubric request detected', { 
+            role: userContext.role, 
+            year: userContext.year, 
+            viewMode: userContext.viewMode,
+            requestId 
+        });
+    }
+    
     const rubricData = getAllDomainsData(
       userContext.role, 
       userContext.year, 
       userContext.viewMode, 
       userContext.assignedSubdomains
     );
+    
+    // Debug logging for My Own Rubric requests
+    if (params.myOwnRubric) {
+        debugLog('Rubric data structure returned', {
+            role: userContext.role,
+            hasTitle: !!rubricData.title,
+            hasDomains: !!rubricData.domains,
+            domainCount: rubricData.domains ? rubricData.domains.length : 0,
+            isError: !!rubricData.isError,
+            errorMessage: rubricData.errorMessage,
+            requestId
+        });
+    }
     
     // Attach the full user context to the data payload for the template
     rubricData.userContext = userContext;
@@ -87,10 +109,35 @@ function doGet(e) {
     const htmlTemplate = HtmlService.createTemplateFromFile(TEMPLATE_PATHS.STAFF_RUBRIC); // This is now a fallback view
     htmlTemplate.data = rubricData;
     
-    // Generate the HTML output
-    const htmlOutput = htmlTemplate.evaluate()
-      .setTitle(UiService.getPageTitle(userContext.role))
-      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+    // Generate the HTML output with error handling
+    let htmlOutput;
+    try {
+        htmlOutput = htmlTemplate.evaluate()
+          .setTitle(UiService.getPageTitle(userContext.role))
+          .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+          
+        if (params.myOwnRubric) {
+            debugLog('Template evaluation successful for My Own Rubric', { 
+                role: userContext.role, 
+                requestId 
+            });
+        }
+    } catch (templateError) {
+        console.error('Template evaluation failed', { 
+            error: templateError.message,
+            stack: templateError.stack,
+            role: userContext.role,
+            requestId 
+        });
+        
+        // Return error page instead of blank page
+        return UiService.createEnhancedErrorPage(
+            templateError,
+            userContext,
+            requestId,
+            'Template evaluation failed for My Own Rubric view'
+        );
+    }
       
     addCacheBustingHeaders(htmlOutput, responseMetadata);
 
