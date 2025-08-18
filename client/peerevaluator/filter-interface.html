@@ -294,6 +294,72 @@
             border-bottom: 1px solid #dee2e6;
         }
 
+        /* Finalized Observation Header */
+        .finalized-observation-header {
+            padding: 20px;
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            border-bottom: 1px solid #047857;
+        }
+
+        .finalized-status {
+            margin-bottom: 8px;
+        }
+
+        .status-indicator {
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .observation-details {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .obs-name {
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+
+        .obs-date {
+            font-size: 0.95rem;
+            opacity: 0.9;
+        }
+
+        /* Read-only Evidence Sections */
+        .readonly-evidence .evidence-content {
+            background: #f8fafc;
+        }
+
+        .readonly-notes-content {
+            padding: 15px;
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            line-height: 1.6;
+            color: #374151;
+        }
+
+        .no-notes-message {
+            padding: 15px;
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            color: #6b7280;
+            font-style: italic;
+            text-align: center;
+        }
+
+        .readonly-evidence .evidence-toggle-btn {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+        }
+
+        .readonly-evidence .evidence-toggle-btn:hover {
+            background: linear-gradient(135deg, #059669, #047857);
+        }
+
         .global-tools-bar {
             background: var(--color-white);
             border-bottom: 2px solid var(--color-gray-border-medium);
@@ -527,6 +593,15 @@
         .domain-header { background: linear-gradient(135deg, #7c9ac5, #5a82b8); color: white; padding: 15px 20px; font-size: 1.1rem; font-weight: 600; position: sticky; top: 76px; z-index: 50; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         .component-section { border-bottom: 1px solid var(--color-gray-border-medium); position: relative; transition: background-color 0.2s; }
         .performance-levels-header { position: sticky; top: 132px; z-index: 40; background: white; border-bottom: 2px solid var(--color-gray-border-medium); box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        
+        /* Finalized View - Corrected Sticky Positioning */
+        .finalized-view .domain-header { 
+            top: 56px; /* Adjusted for sticky nav only (no global tools bar) */
+        }
+        
+        .finalized-view .performance-levels-header {
+            top: 112px; /* Domain header height + sticky nav */
+        }
         .performance-levels { display: grid; grid-template-columns: 200px 1fr 1fr 1fr 1fr; min-height: 50px; }
         .performance-levels-content { display: grid; grid-template-columns: 200px 1fr 1fr 1fr 1fr; min-height: 120px; }
         .level-header { background: #e2e8f0; padding: 12px; font-weight: 600; text-align: center; border-bottom: 1px solid #cbd5e0; color: var(--color-gray-text); font-size: 0.9rem; }
@@ -1682,8 +1757,12 @@
 
         function generateInteractiveRubricHtml(data, observation) {
             const isEvaluator = data.userContext && data.userContext.isEvaluator;
-            let html = `<div style="background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">`;
+            const isFinalized = observation && observation.status === 'Finalized';
+            const isReadOnlyView = isFinalized && !isEvaluator;
+            
+            let html = `<div class="${isReadOnlyView ? 'finalized-view' : ''}" style="background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">`;
 
+            // Header section - different for editing vs finalized viewing
             if (isEvaluator) {
                 const today = new Date().toISOString().slice(0, 10);
                 const defaultObsName = `${observation.observedName.split(' ').pop()}, ${observation.observedName.split(' ')[0]}_${today}`;
@@ -1692,6 +1771,18 @@
                     <div class="filter-row">
                         <input type="text" id="observationName" class="filter-select" value="${escapeHtml(observation.observationName || defaultObsName)}" onchange="saveObservationMetadata()">
                         <input type="date" id="observationDate" class="filter-select" value="${escapeHtml(observation.observationDate || today)}" onchange="saveObservationMetadata()">
+                    </div>
+                </div>`;
+            } else if (isReadOnlyView) {
+                // Read-only header for finalized observations
+                html += `
+                <div class="finalized-observation-header">
+                    <div class="finalized-status">
+                        <span class="status-indicator">✅ Finalized Observation</span>
+                    </div>
+                    <div class="observation-details">
+                        <span class="obs-name">${escapeHtml(observation.observationName || 'Observation')}</span>
+                        <span class="obs-date">${escapeHtml(observation.observationDate || '')}</span>
                     </div>
                 </div>`;
             }
@@ -1760,34 +1851,63 @@
                     }
 
                     // Notes & Evidence section (for evaluators only - contains notes editor and media upload)
-                    if (isEvaluator) {
-                        html += `<div class="evidence-section">`;
+                    // Check if we should show Notes & Evidence (for evaluators AND finalized observation viewing)
+                    const hasObservationData = observation?.observationData?.[componentId];
+                    const hasNotes = hasObservationData?.notes && hasObservationData.notes.trim() !== '' && hasObservationData.notes !== '<p><br></p>';
+                    const hasEvidence = evidence && evidence.length > 0;
+                    
+                    if (isEvaluator || (isReadOnlyView && (hasNotes || hasEvidence))) {
+                        html += `<div class="evidence-section ${isReadOnlyView ? 'readonly-evidence' : ''}">`;
                         html += `<div class="evidence-toggle-btn" onclick="toggleEvidenceSection('evidence-${componentId}')">`;
                         html += `<span>📝 Notes & Evidence</span>`;
                         html += `<span class="chevron" id="evidence-chevron-${componentId}">▶</span>`;
                         html += `</div>`;
-                        html += `<div class="evidence-content" id="evidence-${componentId}">`;
+                        html += `<div class="evidence-content ${isReadOnlyView ? 'expanded' : ''}" id="evidence-${componentId}">`;
                         
                         // Notes container
                         const sanitizedComponentId = componentId.replace(/[^a-zA-Z0-9]/g, '');
                         html += `<div class="notes-container">`;
                         html += `<h4>Observation Notes</h4>`;
-                        html += `<div class="notes-header-actions">`;
-                        html += `<button class="clear-notes-btn" onclick="clearNotes('${componentId}')" title="Clear all notes for this component">🗑️ Clear All</button>`;
-                        html += `</div>`;
-                        html += `<div id="notes-editor-${sanitizedComponentId}"></div>`;
+                        
+                        if (isEvaluator) {
+                            // Editable notes for evaluators
+                            html += `<div class="notes-header-actions">`;
+                            html += `<button class="clear-notes-btn" onclick="clearNotes('${componentId}')" title="Clear all notes for this component">🗑️ Clear All</button>`;
+                            html += `</div>`;
+                            html += `<div id="notes-editor-${sanitizedComponentId}"></div>`;
+                        } else if (isReadOnlyView && hasNotes) {
+                            // Read-only notes display for finalized observations
+                            html += `<div class="readonly-notes-content">`;
+                            html += hasObservationData.notes;
+                            html += `</div>`;
+                        } else if (isReadOnlyView) {
+                            // No notes message for finalized observations
+                            html += `<div class="no-notes-message">No observation notes recorded.</div>`;
+                        }
+                        
                         html += `</div>`;
                         
-                        // Media upload section
-                        let evidenceHtml = '';
-                        evidence.forEach(item => { evidenceHtml += `<div class="evidence-item"><a href="${item.url}" target="_blank" rel="noopener noreferrer">${item.name}</a></div>`; });
-                        html += `<div class="media-upload-container">`;
-                        html += `<h4>Upload Evidence</h4>`;
-                        html += `<input type="file" class="media-upload-input" id="media-upload-${componentId}" onchange="uploadSelectedFile('${componentId}')" style="display: none;">`;
-                        html += `<button class="media-upload-button" onclick="triggerFileUpload('${componentId}')">📎 Select & Upload File</button>`;
-                        html += `<div class="media-links-container" data-component-id="${componentId}">`;
-                        html += `<ul>${evidenceHtml}</ul>`;
-                        html += `</div></div>`;
+                        // Evidence section - different for editing vs viewing
+                        if (hasEvidence || isEvaluator) {
+                            let evidenceHtml = '';
+                            evidence.forEach(item => { evidenceHtml += `<div class="evidence-item"><a href="${item.url}" target="_blank" rel="noopener noreferrer">${item.name}</a></div>`; });
+                            
+                            html += `<div class="media-upload-container">`;
+                            
+                            if (isEvaluator) {
+                                // Editable evidence upload for evaluators
+                                html += `<h4>Upload Evidence</h4>`;
+                                html += `<input type="file" class="media-upload-input" id="media-upload-${componentId}" onchange="uploadSelectedFile('${componentId}')" style="display: none;">`;
+                                html += `<button class="media-upload-button" onclick="triggerFileUpload('${componentId}')">📎 Select & Upload File</button>`;
+                            } else {
+                                // Read-only evidence for finalized observations
+                                html += `<h4>Evidence Files</h4>`;
+                            }
+                            
+                            html += `<div class="media-links-container" data-component-id="${componentId}">`;
+                            html += `<ul>${evidenceHtml}</ul>`;
+                            html += `</div></div>`;
+                        }
                         
                         // Close evidence-content and evidence-section
                         html += `</div></div>`;
