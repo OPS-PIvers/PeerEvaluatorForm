@@ -2055,6 +2055,15 @@
                 window.location.href = url.toString();
                 return;
             }
+            
+            if (result.action === 'show_html') {
+                console.log('Processing show_html action - replacing page content');
+                // Replace the entire page content with the generated HTML
+                document.open();
+                document.write(result.htmlContent);
+                document.close();
+                return;
+            }
 
             const { observation, rubricData } = result;
             

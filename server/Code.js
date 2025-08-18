@@ -210,15 +210,61 @@ function loadRubricData(filterParams) {
         
         // Handle loading current user's own rubric
         if (filterParams.myOwnView) {
-            debugLog('Returning redirect response for myOwnView', { 
+            debugLog('Loading own rubric data directly for Peer Evaluator', { 
                 userRole: userContext.role, 
                 userEmail: userContext.email 
             });
-            return { 
-                success: true, 
-                action: 'redirect',
-                redirectParams: { myOwnRubric: 'true' }
-            };
+            
+            // Generate the rubric data directly instead of redirecting
+            const rubricData = getAllDomainsData(
+                userContext.role, 
+                userContext.year, 
+                userContext.viewMode, 
+                userContext.assignedSubdomains
+            );
+            
+            // Create the complete HTML response for My Own Rubric view
+            rubricData.userContext = userContext;
+            
+            // Generate response metadata
+            const responseMetadata = generateResponseMetadata(userContext, generateUniqueId('myownrubric'), false);
+            userContext.responseMetadata = responseMetadata;
+            userContext.cacheVersion = responseMetadata.cacheVersion;
+            userContext.requestId = responseMetadata.requestId;
+            
+            try {
+                const htmlTemplate = HtmlService.createTemplateFromFile(TEMPLATE_PATHS.STAFF_RUBRIC);
+                htmlTemplate.data = rubricData;
+                
+                const htmlOutput = htmlTemplate.evaluate()
+                    .setTitle(UiService.getPageTitle(userContext.role))
+                    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+                
+                const htmlContent = htmlOutput.getContent();
+                
+                debugLog('Successfully generated My Own Rubric HTML', { 
+                    userRole: userContext.role,
+                    htmlLength: htmlContent.length,
+                    hasTitle: !!rubricData.title,
+                    domainCount: rubricData.domains ? rubricData.domains.length : 0
+                });
+                
+                return { 
+                    success: true, 
+                    action: 'show_html',
+                    htmlContent: htmlContent
+                };
+            } catch (templateError) {
+                console.error('Template generation failed for My Own Rubric', {
+                    error: templateError.message,
+                    stack: templateError.stack,
+                    userRole: userContext.role
+                });
+                return { 
+                    success: false, 
+                    error: 'Failed to generate My Own Rubric view: ' + templateError.message 
+                };
+            }
         }
 
         // Default behavior (could be expanded for other roles like Admin)
