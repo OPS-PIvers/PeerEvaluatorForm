@@ -1159,9 +1159,292 @@
                 justify-content: center;
             }
         }
+
+        /* Professional Welcome Modal Styles */
+        .welcome-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.4s ease;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .welcome-modal-overlay.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .welcome-modal {
+            background: var(--color-white);
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 700px;
+            width: 100%;
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transform: translateY(30px) scale(0.9);
+            transition: all 0.4s ease;
+        }
+
+        .welcome-modal-overlay.show .welcome-modal {
+            transform: translateY(0) scale(1);
+        }
+
+        .welcome-modal-header {
+            background: linear-gradient(135deg, var(--color-blue-base), var(--color-blue-dark));
+            color: var(--color-white);
+            padding: 40px 30px 30px;
+            text-align: center;
+            position: relative;
+        }
+
+        .welcome-modal-icon {
+            font-size: 3rem;
+            margin-bottom: 15px;
+            display: block;
+            animation: welcomeIconPulse 2s ease-in-out infinite;
+        }
+
+        @keyframes welcomeIconPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        .welcome-modal-header h1 {
+            font-size: 1.8rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+            line-height: 1.3;
+        }
+
+        .welcome-subtitle {
+            font-size: 1.1rem;
+            opacity: 0.9;
+            font-weight: 400;
+            margin: 0;
+        }
+
+        .welcome-modal-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 30px;
+            line-height: 1.6;
+        }
+
+        .welcome-section {
+            margin-bottom: 30px;
+        }
+
+        .welcome-feature {
+            display: flex;
+            align-items: flex-start;
+            gap: 20px;
+            margin-bottom: 25px;
+            padding: 20px;
+            background: var(--color-gray-bg-light);
+            border-radius: 12px;
+            border-left: 4px solid var(--color-blue-base);
+            transition: all 0.3s ease;
+        }
+
+        .welcome-feature:hover {
+            background: var(--color-blue-light-bg);
+            transform: translateX(5px);
+            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.1);
+        }
+
+        .feature-icon {
+            font-size: 2rem;
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+
+        .feature-content h3 {
+            color: var(--color-gray-text-light);
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .feature-content p {
+            color: var(--color-gray-text);
+            font-size: 0.95rem;
+            margin: 0;
+        }
+
+        .welcome-commitment {
+            background: linear-gradient(135deg, var(--color-green-light-bg), var(--color-blue-light-bg));
+            border: 2px solid var(--color-green-base);
+            border-radius: 12px;
+            padding: 25px;
+            text-align: center;
+        }
+
+        .welcome-commitment h3 {
+            color: var(--color-green-darker);
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+
+        .welcome-commitment p {
+            color: var(--color-gray-text-light);
+            font-size: 1rem;
+            margin: 0;
+            font-style: italic;
+        }
+
+        .welcome-modal-footer {
+            padding: 25px 30px;
+            background: var(--color-gray-bg-light);
+            border-top: 1px solid var(--color-gray-border-light);
+            text-align: center;
+        }
+
+        .welcome-continue-btn {
+            background: linear-gradient(135deg, var(--color-green-base), var(--color-green-dark));
+            color: var(--color-white);
+            border: none;
+            padding: 15px 30px;
+            border-radius: 25px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+            min-width: 280px;
+        }
+
+        .welcome-continue-btn:hover {
+            background: linear-gradient(135deg, var(--color-green-dark), var(--color-green-darker));
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+        }
+
+        .welcome-continue-btn .btn-icon {
+            font-size: 1.2rem;
+        }
+
+        /* Mobile Responsiveness */
+        @media (max-width: 768px) {
+            .welcome-modal-overlay {
+                padding: 15px;
+            }
+            
+            .welcome-modal {
+                max-width: 100%;
+                border-radius: 12px;
+            }
+            
+            .welcome-modal-header {
+                padding: 30px 20px 25px;
+            }
+            
+            .welcome-modal-header h1 {
+                font-size: 1.5rem;
+            }
+            
+            .welcome-subtitle {
+                font-size: 1rem;
+            }
+            
+            .welcome-modal-content {
+                padding: 20px;
+            }
+            
+            .welcome-feature {
+                flex-direction: column;
+                gap: 15px;
+                text-align: center;
+            }
+            
+            .feature-icon {
+                align-self: center;
+            }
+            
+            .welcome-continue-btn {
+                min-width: 250px;
+                font-size: 1rem;
+            }
+        }
     </style>
 </head>
 <body>
+    <!-- Professional Welcome Modal -->
+    <div class="welcome-modal-overlay" id="welcomeModalOverlay">
+        <div class="welcome-modal" id="welcomeModal">
+            <div class="welcome-modal-header">
+                <div class="welcome-modal-icon">🌟</div>
+                <h1>Welcome to the Observation Resources Website</h1>
+                <p class="welcome-subtitle">Your Professional Growth Journey Begins Here</p>
+            </div>
+            
+            <div class="welcome-modal-content">
+                <div class="welcome-section">
+                    <div class="welcome-feature">
+                        <span class="feature-icon">📈</span>
+                        <div class="feature-content">
+                            <h3>Continuous Professional Development</h3>
+                            <p>This platform is designed to support your ongoing professional growth through reflective observation and evidence-based feedback. Every interaction is an opportunity to enhance your teaching practice.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="welcome-feature">
+                        <span class="feature-icon">🤝</span>
+                        <div class="feature-content">
+                            <h3>Collaborative Learning Environment</h3>
+                            <p>Engage in meaningful peer observations and receive constructive feedback that supports your development. Our framework promotes collegiality and shared expertise among educational professionals.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="welcome-feature">
+                        <span class="feature-icon">🎯</span>
+                        <div class="feature-content">
+                            <h3>Evidence-Based Growth</h3>
+                            <p>Utilize comprehensive rubrics and structured observation tools to identify strengths and areas for growth. Transform observations into actionable insights for improved student outcomes.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="welcome-feature">
+                        <span class="feature-icon">✨</span>
+                        <div class="feature-content">
+                            <h3>Inspiring Excellence</h3>
+                            <p>This experience is designed to be supportive, inspiring, and focused on celebrating your professional journey. Every observation is a step toward educational excellence.</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="welcome-commitment">
+                    <h3>Our Commitment to You</h3>
+                    <p>We are dedicated to providing a positive, growth-oriented experience that recognizes your professionalism and supports your continued development as an educator. This tool represents our investment in your success and the success of all learners in our community.</p>
+                </div>
+            </div>
+            
+            <div class="welcome-modal-footer">
+                <button class="welcome-continue-btn" onclick="closeWelcomeModal()">
+                    <span class="btn-icon">🚀</span>
+                    Continue Growing in My Profession
+                </button>
+            </div>
+        </div>
+    </div>
+    
     <div class="container">
         <!-- Sticky Navigation Bar -->
         <nav class="sticky-nav" id="stickyNav">
@@ -1200,7 +1483,7 @@
             </div>
         </nav>
 
-        <div class="header"><h1>👥 <?= userContext.role ?> Dashboard</h1><p>Select how you'd like to view rubric information</p></div>
+        <div class="header"><h1>👥 Observation Dashboard</h1><p>Select how you'd like to view rubric information</p></div>
         <div class="content">
             <div id="quickActionsView">
                 <div class="quick-actions"><h2 class="section-title"><span>🎯</span> Quick Actions</h2>
@@ -1227,6 +1510,74 @@
     </div>
     <div class="toast-notification" id="toastNotification"></div>
     <script>
+        /**
+         * Professional Welcome Modal Functions
+         */
+        
+        // Show the welcome modal on page load (once per session)
+        function showWelcomeModal() {
+            // Check if modal has been shown this session
+            if (sessionStorage.getItem('welcomeModalShown') === 'true') {
+                return; // Don't show again this session
+            }
+            
+            const overlay = document.getElementById('welcomeModalOverlay');
+            if (overlay) {
+                // Small delay to ensure page is fully loaded
+                setTimeout(() => {
+                    overlay.classList.add('show');
+                    document.body.style.overflow = 'hidden'; // Prevent background scrolling
+                }, 300);
+            }
+        }
+        
+        // Close the welcome modal
+        function closeWelcomeModal() {
+            const overlay = document.getElementById('welcomeModalOverlay');
+            if (overlay) {
+                overlay.classList.remove('show');
+                document.body.style.overflow = ''; // Restore scrolling
+                
+                // Mark as shown for this session
+                sessionStorage.setItem('welcomeModalShown', 'true');
+                
+                // Remove from DOM after animation completes
+                setTimeout(() => {
+                    overlay.style.display = 'none';
+                }, 400);
+            }
+        }
+        
+        // Handle keyboard events for accessibility
+        function handleModalKeydown(event) {
+            if (event.key === 'Escape') {
+                const overlay = document.getElementById('welcomeModalOverlay');
+                if (overlay && overlay.classList.contains('show')) {
+                    closeWelcomeModal();
+                }
+            }
+        }
+        
+        // Initialize modal when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            // Add keyboard listener for escape key
+            document.addEventListener('keydown', handleModalKeydown);
+            
+            // Show welcome modal after a brief delay
+            showWelcomeModal();
+            
+            // Optional: Close modal if clicking outside (on overlay)
+            const overlay = document.getElementById('welcomeModalOverlay');
+            if (overlay) {
+                overlay.addEventListener('click', function(event) {
+                    // Only close if clicking directly on the overlay (not the modal content)
+                    if (event.target === overlay) {
+                        closeWelcomeModal();
+                    }
+                });
+            }
+        });
+
         /**
          * Escapes HTML entities in a string to prevent XSS and ensure safe HTML rendering.
          * This implementation matches the server-side Utils.js version for consistency.
