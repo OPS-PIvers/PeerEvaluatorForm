@@ -614,16 +614,25 @@ function loadFinalizedObservationForViewing(observationId) {
 
         // All finalized views are read-only.
         observedStaffContext.isEvaluator = false;
+        
+        // Default to assigned view for all finalized observation viewers
+        observedStaffContext.viewMode = 'assigned';
 
         // If the person viewing is the one who was observed, set special flags for the UI.
         if (isObserved) {
             observedStaffContext.isObservedStaff = true;
-            observedStaffContext.viewMode = 'assigned'; // Default to a focused view for the staff member
+            // viewMode already set to 'assigned' above
 
             debugLog('Finalized observation loaded for the observed staff member.', {
                 observationId: observationId,
                 userEmail: viewingUserContext.email,
                 isObservedStaff: observedStaffContext.isObservedStaff,
+                viewMode: observedStaffContext.viewMode
+            });
+        } else {
+            debugLog('Finalized observation loaded for peer evaluator viewing.', {
+                observationId: observationId,
+                viewerEmail: viewingUserContext.email,
                 viewMode: observedStaffContext.viewMode
             });
         }

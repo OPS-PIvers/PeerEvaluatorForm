@@ -1746,6 +1746,10 @@
                 if (globalToolsBar) {
                     globalToolsBar.style.display = 'block';
                 }
+            } else {
+                // For read-only finalized observations, still need to apply component visibility
+                // based on the assigned view mode
+                updateComponentVisibility();
             }
             restoreLookForsState();
             showView('rubricContainer');
