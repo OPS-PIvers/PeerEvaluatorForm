@@ -609,36 +609,55 @@ function loadFinalizedObservationForViewing(observationId) {
         // For finalized observations, default to 'assigned' view mode to show relevant subdomains
         const rubricData = getAllDomainsData(observation.observedRole, observation.observedYear, 'assigned', assignedSubdomains);
 
-        // The user context on the page should reflect the person being observed.
-        const observedStaffContext = createUserContext(observation.observedEmail);
+        // CRITICAL FIX: Keep the viewer's actual context, don't switch to observed staff context
+        // The main user context should always reflect the person actually viewing the page
+        const actualViewerContext = viewingUserContext;
 
-        // All finalized views are read-only.
-        observedStaffContext.isEvaluator = false;
-        
-        // Default to assigned view for all finalized observation viewers
-        observedStaffContext.viewMode = 'assigned';
+        // Create separate display information for the observed staff member
+        const observedStaffInfo = {
+            email: observation.observedEmail,
+            name: observation.observedName,
+            role: observation.observedRole,
+            year: observation.observedYear
+        };
 
-        // If the person viewing is the one who was observed, set special flags for the UI.
+        // Configure viewer context based on who is viewing
         if (isObserved) {
-            observedStaffContext.isObservedStaff = true;
-            // viewMode already set to 'assigned' above
-
+            // The observed staff member is viewing their own observation
+            actualViewerContext.isObservedStaff = true;
+            actualViewerContext.isEvaluator = false; // Read-only for observed staff
+            actualViewerContext.viewMode = 'assigned'; // Show only relevant subdomains
+            
             debugLog('Finalized observation loaded for the observed staff member.', {
                 observationId: observationId,
                 userEmail: viewingUserContext.email,
-                isObservedStaff: observedStaffContext.isObservedStaff,
-                viewMode: observedStaffContext.viewMode
+                isObservedStaff: actualViewerContext.isObservedStaff,
+                viewMode: actualViewerContext.viewMode
             });
         } else {
+            // Peer Evaluator or other authorized viewer
+            actualViewerContext.isObservedStaff = false;
+            // Maintain the viewer's original evaluator status and permissions
+            if (actualViewerContext.role === SPECIAL_ROLES.PEER_EVALUATOR) {
+                actualViewerContext.isEvaluator = false; // Read-only for finalized observations
+                // Peer evaluators can choose their view mode
+                actualViewerContext.viewMode = actualViewerContext.hasSpecialAccess ? 'full' : 'assigned';
+            } else {
+                actualViewerContext.isEvaluator = false;
+                actualViewerContext.viewMode = 'assigned';
+            }
+            
             debugLog('Finalized observation loaded for peer evaluator viewing.', {
                 observationId: observationId,
                 viewerEmail: viewingUserContext.email,
-                viewMode: observedStaffContext.viewMode
+                viewerRole: actualViewerContext.role,
+                viewMode: actualViewerContext.viewMode
             });
         }
 
-        // Attach the correctly configured context to the rubric data.
-        rubricData.userContext = observedStaffContext;
+        // Attach the viewer's actual context and observed staff info to the rubric data
+        rubricData.userContext = actualViewerContext;
+        rubricData.observedStaffInfo = observedStaffInfo;
 
         return { success: true, observation: observation, rubricData: rubricData };
 
