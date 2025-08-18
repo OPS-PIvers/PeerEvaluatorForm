@@ -58,8 +58,8 @@ function doGet(e) {
     }
 
     // If the user has special access and no specific staff member is being targeted,
-    // show the filter interface instead of a rubric.
-    if (userContext.hasSpecialAccess && !params.filterStaff) {
+    // and they're not requesting their own rubric, show the filter interface.
+    if (userContext.hasSpecialAccess && !params.filterStaff && !params.myOwnRubric) {
         debugLog('Special access user detected - showing filter interface', { role: userContext.role, requestId });
         return UiService.createFilterSelectionInterface(userContext, requestId);
     }
@@ -138,9 +138,11 @@ function loadRubricData(filterParams) {
         
         // Handle loading current user's own rubric
         if (filterParams.myOwnView) {
-            const rubricData = getAllDomainsData(userContext.role, userContext.year, 'assigned', userContext.assignedSubdomains);
-            rubricData.userContext = userContext; // Attach user context
-            return { success: true, rubricData: rubricData };
+            return { 
+                success: true, 
+                action: 'redirect',
+                redirectParams: { myOwnRubric: 'true' }
+            };
         }
 
         // Default behavior (could be expanded for other roles like Admin)

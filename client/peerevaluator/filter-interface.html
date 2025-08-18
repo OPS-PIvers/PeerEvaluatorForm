@@ -2035,6 +2035,15 @@
                 hideStickyNav(); // Hide nav when going back to selector
                 return displayObservationOptions(result.observedEmail, result.observedName);
             }
+            
+            if (result.action === 'redirect') {
+                const url = new URL(window.location);
+                Object.keys(result.redirectParams).forEach(key => {
+                    url.searchParams.set(key, result.redirectParams[key]);
+                });
+                window.location.href = url.toString();
+                return;
+            }
 
             const { observation, rubricData } = result;
             
