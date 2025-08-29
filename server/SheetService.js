@@ -148,7 +148,7 @@ function getStaffData() {
     }
     
     // Read all data
-    const range = sheet.getRange(2, 1, lastRow - 1, 4);
+    const range = sheet.getRange(2, 1, lastRow - 1, 5);
     const values = range.getValues();
     
     // Check if data has changed
@@ -179,6 +179,7 @@ function getStaffData() {
         name: sanitizeText(row[STAFF_COLUMNS.NAME]),
         email: sanitizeText(row[STAFF_COLUMNS.EMAIL]),
         role: sanitizeText(row[STAFF_COLUMNS.ROLE]),
+        building: sanitizeText(row[4]),
         // year is set below
         rowNumber: rowNumber
       };

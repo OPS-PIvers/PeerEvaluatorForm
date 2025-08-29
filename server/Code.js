@@ -195,8 +195,8 @@ function loadRubricData(filterParams) {
         debugLog('Loading rubric data via AJAX', { filterParams });
         const userContext = createUserContext();
 
-        // Handle Peer Evaluator selecting a staff member to observe
-        if (userContext.role === SPECIAL_ROLES.PEER_EVALUATOR && filterParams.staff) {
+        // Handle Peer Evaluator or Admin selecting a staff member to observe
+        if ((userContext.role === SPECIAL_ROLES.PEER_EVALUATOR || userContext.role === SPECIAL_ROLES.ADMINISTRATOR) && filterParams.staff) {
             const staffUser = getUserByEmail(filterParams.staff);
             if (!staffUser) return { success: false, error: `Staff not found: ${filterParams.staff}` };
             
@@ -289,12 +289,52 @@ function loadRubricData(filterParams) {
  */
 function getStaffListForDropdown(role, year) {
   try {
-    const staffList = getStaffByRoleAndYear(role, year);
+    const userContext = createUserContext();
+    let staffList;
+
+    if (userContext.role === SPECIAL_ROLES.ADMINISTRATOR) {
+      staffList = getStaffForAdmin(userContext);
+    } else {
+      staffList = getStaffByRoleAndYear(role, year);
+    }
+
     return { success: true, staff: staffList };
   } catch (error) {
     console.error('Error in getStaffListForDropdown:', error);
     return { success: false, error: error.message, staff: [] };
   }
+}
+
+function getStaffForAdmin(adminUserContext) {
+  if (!adminUserContext || adminUserContext.role !== SPECIAL_ROLES.ADMINISTRATOR) {
+    return [];
+  }
+
+  const adminBuilding = adminUserContext.building;
+  if (!adminBuilding) {
+    return [];
+  }
+
+  const allStaff = getStaffData();
+  if (!allStaff || !allStaff.users) {
+    return [];
+  }
+
+  const filteredStaff = allStaff.users.filter(user => {
+    const isProbationary = user.year === PROBATIONARY_OBSERVATION_YEAR;
+    const isYear3 = user.year === 3;
+    const isInSameBuilding = user.building === adminBuilding;
+
+    return isInSameBuilding && (isProbationary || isYear3);
+  });
+
+  return filteredStaff.map(user => ({
+      name: user.name || 'Unknown Name',
+      email: user.email,
+      role: user.role || 'Unknown Role',
+      year: user.year || null,
+      displayName: `${user.name || 'Unknown'} (${user.role || 'Unknown'}, Year ${user.year ? user.year : 'N/A'})`
+  }));
 }
 
 
@@ -322,10 +362,10 @@ function getObservationOptions(observedEmail) {
  * @param {string} observedEmail The email of the staff member to be observed.
  * @returns {Object} A response object containing the new observation and the rubric data.
  */
-function createNewObservationForPeerEvaluator(observedEmail) {
+function createNewObservationForEvaluator(observedEmail) {
   try {
     const userContext = createUserContext();
-    if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
+    if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR && userContext.role !== SPECIAL_ROLES.ADMINISTRATOR) {
       return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
     }
 
@@ -334,10 +374,11 @@ function createNewObservationForPeerEvaluator(observedEmail) {
       return { success: false, error: 'Failed to create a new observation record.' };
     }
     
-    // Get assigned subdomains for the observed user to enhance the rubric
-    const assignedSubdomains = getAssignedSubdomainsForRoleYear(newObservation.observedRole, newObservation.observedYear);
+    let assignedSubdomains = null;
+    if (userContext.role === SPECIAL_ROLES.PEER_EVALUATOR) {
+        assignedSubdomains = getAssignedSubdomainsForRoleYear(newObservation.observedRole, newObservation.observedYear);
+    }
 
-    // Get the FULL rubric data, but enhance it with assignment flags so the UI can toggle views
     const rubricData = getAllDomainsData(
       newObservation.observedRole,
       newObservation.observedYear,
@@ -345,7 +386,6 @@ function createNewObservationForPeerEvaluator(observedEmail) {
       assignedSubdomains
     );
     
-    // Create a special context for this observation session
     const evaluatorContext = createFilteredUserContext(observedEmail, userContext.role);
     rubricData.userContext = evaluatorContext;
 
@@ -356,7 +396,7 @@ function createNewObservationForPeerEvaluator(observedEmail) {
     };
 
   } catch (error) {
-    console.error('Error in createNewObservationForPeerEvaluator:', error);
+    console.error('Error in createNewObservationForEvaluator:', error);
     return { success: false, error: 'An unexpected error occurred: ' + error.message };
   }
 }
@@ -369,7 +409,7 @@ function createNewObservationForPeerEvaluator(observedEmail) {
 function loadObservationForEditing(observationId) {
     try {
         const userContext = createUserContext();
-        if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
+        if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR && userContext.role !== SPECIAL_ROLES.ADMINISTRATOR) {
             return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
         }
 
@@ -381,7 +421,11 @@ function loadObservationForEditing(observationId) {
             return { success: false, error: 'You do not have permission to edit this observation.' };
         }
         
-        const assignedSubdomains = getAssignedSubdomainsForRoleYear(observation.observedRole, observation.observedYear);
+        let assignedSubdomains = null;
+        if (userContext.role === SPECIAL_ROLES.PEER_EVALUATOR) {
+            assignedSubdomains = getAssignedSubdomainsForRoleYear(observation.observedRole, observation.observedYear);
+        }
+
         const rubricData = getAllDomainsData(observation.observedRole, observation.observedYear, 'full', assignedSubdomains);
         
         const evaluatorContext = createFilteredUserContext(observation.observedEmail, userContext.role);

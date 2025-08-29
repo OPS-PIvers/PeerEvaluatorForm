@@ -396,6 +396,7 @@ function createUserContext(email = null) {
     context.isAuthenticated = true;
     context.role = currentUser.role || 'Teacher';
     context.year = currentUser.year || 1;
+    context.building = currentUser.building || null;
     context.hasStaffRecord = true;
     context.isDefaultUser = false;
     context.permissions.canAccessRubric = true;
