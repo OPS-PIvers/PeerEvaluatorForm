@@ -1488,8 +1488,10 @@
             <div id="quickActionsView">
                 <div class="quick-actions"><h2 class="section-title"><span>🎯</span> Quick Actions</h2>
                     <div class="actions-grid">
-                        <? if (userContext.specialRoleType === 'peer_evaluator' || userContext.specialRoleType === 'full_access') { ?>
+                        <? if (userContext.hasSpecialAccess) { ?>
                         <div class="action-card" onclick="showCustomFilters()"><span class="action-icon">🔍</span><div class="action-title">Find Staff & Start Observation</div><div class="action-desc">Filter by role, year, or specific staff member</div></div>
+                        <? } ?>
+                        <? if (userContext.specialRoleType === 'peer_evaluator' || userContext.specialRoleType === 'full_access') { ?>
                         <div class="action-card" onclick="loadMyOwnView()"><span class="action-icon">📋</span><div class="action-title">My Own Rubric</div><div class="action-desc">View your personal assigned areas</div></div>
                         <? } ?>
                     </div>
@@ -1867,7 +1869,7 @@
             google.script.run
                 .withSuccessHandler(handleRubricData)
                 .withFailureHandler(handleError)
-                .createNewObservationForPeerEvaluator(observedEmail); 
+                .createNewObservationForEvaluator(observedEmail);
         }
         function handleEditObservation(obsId) { 
             console.log('Loading observation for editing:', obsId);

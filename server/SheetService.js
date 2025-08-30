@@ -147,8 +147,10 @@ function getStaffData() {
       return { users: [], lastUpdated: new Date().toISOString() };
     }
     
-    // Read all data
-    const range = sheet.getRange(2, 1, lastRow - 1, 4);
+    // Read all data - check if building column exists for backward compatibility
+    const lastColumn = sheet.getLastColumn();
+    const hasBuilding = lastColumn >= 5;
+    const range = sheet.getRange(2, 1, lastRow - 1, hasBuilding ? 5 : 4);
     const values = range.getValues();
     
     // Check if data has changed
@@ -179,6 +181,7 @@ function getStaffData() {
         name: sanitizeText(row[STAFF_COLUMNS.NAME]),
         email: sanitizeText(row[STAFF_COLUMNS.EMAIL]),
         role: sanitizeText(row[STAFF_COLUMNS.ROLE]),
+        building: hasBuilding ? sanitizeText(row[4]) : null,
         // year is set below
         rowNumber: rowNumber
       };

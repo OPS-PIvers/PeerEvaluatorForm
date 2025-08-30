@@ -28,7 +28,8 @@ const STAFF_COLUMNS = {
   NAME: 0,     // Column A: "Name" [LAST, FIRST]
   EMAIL: 1,    // Column B: "Email" [first.last@orono.k12.mn.us]
   ROLE: 2,     // Column C: "Role" 
-  YEAR: 3      // Column D: "Year"
+  YEAR: 3,      // Column D: "Year"
+  BUILDING: 4 // Column E: "Building"
 };
 
 /**
