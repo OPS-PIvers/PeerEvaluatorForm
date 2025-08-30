@@ -323,7 +323,8 @@ function getStaffForAdmin(adminUserContext) {
     const filteredStaff = allStaff.users.filter(user => {
       const isProbationary = user.year === PROBATIONARY_OBSERVATION_YEAR;
       const isYear3 = user.year === 3;
-      return isProbationary || isYear3;
+      const isNotSelf = user.email !== adminUserContext.email;
+      return isNotSelf && (isProbationary || isYear3);
     });
 
     return filteredStaff.map(user => ({
@@ -340,8 +341,9 @@ function getStaffForAdmin(adminUserContext) {
     const isProbationary = user.year === PROBATIONARY_OBSERVATION_YEAR;
     const isYear3 = user.year === 3;
     const isInSameBuilding = user.building === adminBuilding;
+    const isNotSelf = user.email !== adminUserContext.email;
 
-    return isInSameBuilding && (isProbationary || isYear3);
+    return isNotSelf && isInSameBuilding && (isProbationary || isYear3);
   });
 
   return filteredStaff.map(user => ({

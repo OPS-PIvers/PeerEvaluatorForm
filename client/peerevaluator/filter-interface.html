@@ -1500,7 +1500,7 @@
             <div class="custom-filters" id="customFiltersView">
                 <h2 class="section-title"><span>🔍</span> Find Staff Member</h2>
                 <div class="filter-row"><select id="roleSelect" class="filter-select" onchange="handleRoleChange()"><option value="">1. Select Role...</option><? for (var i = 0; i < availableRoles.length; i++) { ?><option value="<?= availableRoles[i] ?>"><?= availableRoles[i] ?></option><? } ?></select></div>
-                <div class="filter-row"><select id="yearSelect" class="filter-select" style="display: none;" onchange="handleYearChange()"><option value="">2. Select Year...</option><option value="1">Year 1</option><option value="2">Year 2</option><option value="3">Year 3</option><option value="0">Probationary</option></select></div>
+                <div class="filter-row"><select id="yearSelect" class="filter-select" style="display: none;" onchange="handleYearChange()"><option value="">2. Select Year...</option><? if (userContext.role === 'Administrator') { ?><option value="3">Year 3</option><option value="0">Probationary</option><? } else { ?><option value="1">Year 1</option><option value="2">Year 2</option><option value="3">Year 3</option><option value="0">Probationary</option><? } ?></select></div>
                 <div class="filter-row"><select id="staffSelect" class="filter-select" style="display: none;" onchange="handleStaffChange()"><option value="">3. Select Staff Member...</option></select></div>
                 <div class="filter-row"><button class="filter-btn" id="loadBtn" onclick="loadSelectedView()" disabled>📖 Select Staff</button><button class="filter-btn btn-secondary" onclick="clearFilters()">🗑️ Clear & Go Back</button></div>
             </div>
