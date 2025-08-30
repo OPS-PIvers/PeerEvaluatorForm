@@ -310,16 +310,32 @@ function getStaffForAdmin(adminUserContext) {
     return [];
   }
 
-  const adminBuilding = adminUserContext.building;
-  if (!adminBuilding) {
-    return [];
-  }
-
   const allStaff = getStaffData();
   if (!allStaff || !allStaff.users) {
     return [];
   }
 
+  const adminBuilding = adminUserContext.building;
+  
+  // If admin doesn't have building data, fall back to showing probationary and year 3 from all buildings
+  if (!adminBuilding) {
+    console.warn('Admin user missing building data, showing probationary and year 3 staff from all buildings');
+    const filteredStaff = allStaff.users.filter(user => {
+      const isProbationary = user.year === PROBATIONARY_OBSERVATION_YEAR;
+      const isYear3 = user.year === 3;
+      return isProbationary || isYear3;
+    });
+
+    return filteredStaff.map(user => ({
+        name: user.name || 'Unknown Name',
+        email: user.email,
+        role: user.role || 'Unknown Role',
+        year: user.year || null,
+        displayName: `${user.name || 'Unknown'} (${user.role || 'Unknown'}, Year ${user.year ? user.year : 'N/A'})`
+    }));
+  }
+
+  // Filter by building and observation criteria
   const filteredStaff = allStaff.users.filter(user => {
     const isProbationary = user.year === PROBATIONARY_OBSERVATION_YEAR;
     const isYear3 = user.year === 3;
@@ -346,7 +362,7 @@ function getStaffForAdmin(adminUserContext) {
 function getObservationOptions(observedEmail) {
     try {
         const userContext = createUserContext();
-        if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
+        if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR && userContext.role !== SPECIAL_ROLES.ADMINISTRATOR) {
             return { success: false, error: 'Permission denied.' };
         }
         const observations = getObservationsForUser(observedEmail);
