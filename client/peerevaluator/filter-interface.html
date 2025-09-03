@@ -1497,6 +1497,12 @@
                     </div>
                 </div>
             </div>
+            <div class="custom-filters" id="adminStaffListView" style="display: none;">
+                <h2 class="section-title"><span>👥</span> Summative Year Staff</h2>
+                <div class="actions-grid" id="adminStaffGrid">
+                    <!-- Staff list will be populated here -->
+                </div>
+            </div>
             <div class="custom-filters" id="customFiltersView">
                 <h2 class="section-title"><span>🔍</span> Find Staff Member</h2>
                 <div class="filter-row"><select id="roleSelect" class="filter-select" onchange="handleRoleChange()"><option value="">1. Select Role...</option><? for (var i = 0; i < availableRoles.length; i++) { ?><option value="<?= availableRoles[i] ?>"><?= availableRoles[i] ?></option><? } ?></select></div>
@@ -1512,6 +1518,60 @@
     </div>
     <div class="toast-notification" id="toastNotification"></div>
     <script>
+        function initializeApp() {
+            if (userContext.role === 'Administrator') {
+                showView('adminStaffListView');
+                loadAdminStaffList();
+            } else {
+                showView('quickActionsView');
+            }
+        }
+
+        function loadAdminStaffList() {
+            showLoading('Loading staff list...');
+            google.script.run
+                .withSuccessHandler(populateAdminStaffList)
+                .withFailureHandler(handleError)
+                .getStaffListForDropdown(null, null);
+        }
+
+        function populateAdminStaffList(result) {
+            hideLoading();
+            if (!result.success) {
+                showError(result.error);
+                return;
+            }
+
+            const grid = document.getElementById('adminStaffGrid');
+            grid.innerHTML = ''; // Clear existing content
+
+            if (result.staff && result.staff.length > 0) {
+                result.staff.forEach(staff => {
+                    const card = document.createElement('div');
+                    card.className = 'action-card';
+                    card.onclick = () => displayObservationOptions(staff.email, staff.name);
+
+                    const icon = document.createElement('span');
+                    icon.className = 'action-icon';
+                    icon.textContent = '👤';
+
+                    const title = document.createElement('div');
+                    title.className = 'action-title';
+                    title.textContent = staff.name;
+
+                    const desc = document.createElement('div');
+                    desc.className = 'action-desc';
+                    desc.textContent = `${staff.role}, Year ${staff.year}`;
+
+                    card.appendChild(icon);
+                    card.appendChild(title);
+                    card.appendChild(desc);
+                    grid.appendChild(card);
+                });
+            } else {
+                grid.innerHTML = '<p>No staff members are currently in their summative year.</p>';
+            }
+        }
         /**
          * Professional Welcome Modal Functions
          */
@@ -2876,8 +2936,11 @@
             updateViewToggle();
         };
 
+        const userContext = <?!= JSON.stringify(userContext) ?>;
+        const availableRoles = <?!= JSON.stringify(availableRoles) ?>;
+
         document.addEventListener('DOMContentLoaded', () => {
-          showView('quickActionsView');
+          initializeApp();
         });
 
         // Consolidated recording state management

@@ -317,14 +317,13 @@ function getStaffForAdmin(adminUserContext) {
 
   const adminBuilding = adminUserContext.building;
   
-  // If admin doesn't have building data, fall back to showing probationary and year 3 from all buildings
+  // If admin doesn't have building data, fall back to showing summative year staff from all buildings
   if (!adminBuilding) {
-    console.warn('Admin user missing building data, showing probationary and year 3 staff from all buildings');
+    console.warn('Admin user missing building data, showing summative year staff from all buildings');
     const filteredStaff = allStaff.users.filter(user => {
-      const isProbationary = user.year === PROBATIONARY_OBSERVATION_YEAR;
-      const isYear3 = user.year === 3;
+      const isSummative = user.summativeYear === true;
       const isNotSelf = user.email !== adminUserContext.email;
-      return isNotSelf && (isProbationary || isYear3);
+      return isNotSelf && isSummative;
     });
 
     return filteredStaff.map(user => ({
@@ -336,14 +335,13 @@ function getStaffForAdmin(adminUserContext) {
     }));
   }
 
-  // Filter by building and observation criteria
+  // Filter by building and summative year
   const filteredStaff = allStaff.users.filter(user => {
-    const isProbationary = user.year === PROBATIONARY_OBSERVATION_YEAR;
-    const isYear3 = user.year === 3;
+    const isSummative = user.summativeYear === true;
     const isInSameBuilding = user.building === adminBuilding;
     const isNotSelf = user.email !== adminUserContext.email;
 
-    return isNotSelf && isInSameBuilding && (isProbationary || isYear3);
+    return isNotSelf && isInSameBuilding && isSummative;
   });
 
   return filteredStaff.map(user => ({

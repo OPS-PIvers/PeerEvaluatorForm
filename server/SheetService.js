@@ -147,10 +147,11 @@ function getStaffData() {
       return { users: [], lastUpdated: new Date().toISOString() };
     }
     
-    // Read all data - check if building column exists for backward compatibility
+    // Read all data - check if building and summative year columns exist for backward compatibility
     const lastColumn = sheet.getLastColumn();
     const hasBuilding = lastColumn >= 5;
-    const range = sheet.getRange(2, 1, lastRow - 1, hasBuilding ? 5 : 4);
+    const hasSummative = lastColumn >= 6;
+    const range = sheet.getRange(2, 1, lastRow - 1, hasSummative ? 6 : (hasBuilding ? 5 : 4));
     const values = range.getValues();
     
     // Check if data has changed
@@ -182,6 +183,7 @@ function getStaffData() {
         email: sanitizeText(row[STAFF_COLUMNS.EMAIL]),
         role: sanitizeText(row[STAFF_COLUMNS.ROLE]),
         building: hasBuilding ? sanitizeText(row[4]) : null,
+        summativeYear: hasSummative ? row[STAFF_COLUMNS.SUMMATIVE_YEAR] === true : false,
         // year is set below
         rowNumber: rowNumber
       };
