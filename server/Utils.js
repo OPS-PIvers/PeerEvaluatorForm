@@ -828,12 +828,3 @@ function applyInlineFormatting(textElement, html) {
 function stripHtml(html) {
     return html ? html.replace(/<[^>]*>?/gm, '') : '';
 }
-
-/**
- * Checks if a value represents a summative year (handles both boolean and string formats from Google Sheets)
- * @param {boolean|string} value The value to check (can be true, 'TRUE', false, 'FALSE', etc.)
- * @returns {boolean} True if the value represents a summative year
- */
-function isSummativeYear(value) {
-    return value === true || value === 'TRUE';
-}
