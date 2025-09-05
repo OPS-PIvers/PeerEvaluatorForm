@@ -186,7 +186,7 @@ function getStaffData() {
         email: sanitizeText(row[STAFF_COLUMNS.EMAIL]),
         role: sanitizeText(row[STAFF_COLUMNS.ROLE]),
         building: hasBuilding ? sanitizeText(row[STAFF_COLUMNS.BUILDING]) : null,
-        summativeYear: hasSummative ? (row[STAFF_COLUMNS.SUMMATIVE_YEAR] === true || row[STAFF_COLUMNS.SUMMATIVE_YEAR] === 'TRUE') : false,
+        summativeYear: hasSummative ? isSummativeYear(row[STAFF_COLUMNS.SUMMATIVE_YEAR]) : false,
         // year is set below
         rowNumber: rowNumber
       };

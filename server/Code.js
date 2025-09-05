@@ -321,7 +321,7 @@ function getStaffForAdmin(adminUserContext) {
   if (!adminBuilding) {
     console.warn('Admin user missing building data, showing summative year staff from all buildings');
     const filteredStaff = allStaff.users.filter(user => {
-      const isSummative = user.summativeYear === true || user.summativeYear === 'TRUE';
+      const isSummative = isSummativeYear(user.summativeYear);
       const isNotSelf = user.email !== adminUserContext.email;
       return isNotSelf && isSummative;
     });
@@ -337,7 +337,7 @@ function getStaffForAdmin(adminUserContext) {
 
   // Filter by building and summative year
   const filteredStaff = allStaff.users.filter(user => {
-    const isSummative = user.summativeYear === true || user.summativeYear === 'TRUE';
+    const isSummative = isSummativeYear(user.summativeYear);
     const isInSameBuilding = user.building === adminBuilding;
     const isNotSelf = user.email !== adminUserContext.email;
 
