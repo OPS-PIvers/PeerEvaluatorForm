@@ -151,7 +151,10 @@ function getStaffData() {
     const lastColumn = sheet.getLastColumn();
     const hasBuilding = lastColumn >= 5;
     const hasSummative = lastColumn >= 6;
-    const range = sheet.getRange(2, 1, lastRow - 1, hasSummative ? 6 : (hasBuilding ? 5 : 4));
+    let numColumns = 4;
+    if (hasBuilding) numColumns = 5;
+    if (hasSummative) numColumns = 6;
+    const range = sheet.getRange(2, 1, lastRow - 1, numColumns);
     const values = range.getValues();
     
     // Check if data has changed
