@@ -3072,6 +3072,9 @@
         function clearScriptEditor() {
             console.log('Clearing script editor state...');
             
+            // CRITICAL: Clean up speech recognition first
+            cleanupSpeechRecognition();
+            
             // Clear auto-save timer
             if (scriptSaveDebounceTimer) {
                 clearTimeout(scriptSaveDebounceTimer);
@@ -3502,6 +3505,8 @@
         // Stop monitoring when page unloads
         window.addEventListener('beforeunload', function() {
             stopStateMonitoring();
+            // CRITICAL: Clean up speech recognition on page unload
+            cleanupSpeechRecognition();
         });
 
         // === Script Editor Functions ===
@@ -3533,6 +3538,7 @@
         // Encapsulated speech recognition state
         let sttRecognitionInstance = null;
         let sttIsRecording = false;
+        let sttTimeoutId = null;
 
         // Cleanup function to ensure proper speech recognition cleanup
         function cleanupSpeechRecognition() {
@@ -3546,11 +3552,18 @@
             }
             sttIsRecording = false;
             
+            // Clear timeout if it exists
+            if (sttTimeoutId) {
+                clearTimeout(sttTimeoutId);
+                sttTimeoutId = null;
+            }
+            
             // Reset button state if it exists
             const sttButton = document.querySelector('.ql-stt-button');
             if (sttButton) {
                 sttButton.classList.remove('recording');
                 sttButton.innerHTML = '🎤';
+                sttButton.title = 'Start speech-to-text recording';
             }
         }
 
@@ -3576,6 +3589,11 @@
             // Check microphone permissions before starting
             if (navigator.permissions) {
                 navigator.permissions.query({ name: 'microphone' }).then(permissionStatus => {
+                    // Double-check state in case user clicked button multiple times during async operation
+                    if (sttIsRecording) {
+                        return; // Already recording, ignore this request
+                    }
+                    
                     if (permissionStatus.state === 'denied') {
                         showToast('Microphone permission denied. Please allow microphone access and try again.', false);
                         return;
@@ -3583,7 +3601,9 @@
                     startSpeechRecognition(sttButton);
                 }).catch(() => {
                     // Fallback if permissions API not available
-                    startSpeechRecognition(sttButton);
+                    if (!sttIsRecording) { // Check state before starting
+                        startSpeechRecognition(sttButton);
+                    }
                 });
             } else {
                 // Fallback for browsers without permissions API
@@ -3614,12 +3634,19 @@
                     
                     // Only insert non-empty transcripts
                     if (transcript.length > 0) {
-                        const range = scriptQuill.getSelection(true);
-                        if (range) {
-                            scriptQuill.insertText(range.index, transcript + ' ', 'user');
-                            console.log('Transcript inserted:', transcript);
+                        // CRITICAL: Check if scriptQuill still exists before accessing it
+                        if (scriptQuill && typeof scriptQuill.getSelection === 'function') {
+                            const range = scriptQuill.getSelection(true);
+                            if (range) {
+                                scriptQuill.insertText(range.index, transcript + ' ', 'user');
+                                console.log('Transcript inserted:', transcript);
+                            } else {
+                                console.warn('No cursor position found in editor');
+                            }
                         } else {
-                            console.warn('No cursor position found in editor');
+                            console.warn('Script editor no longer available, cannot insert transcript:', transcript);
+                            // Clean up speech recognition since editor is gone
+                            cleanupSpeechRecognition();
                         }
                     }
                 }
@@ -3648,8 +3675,8 @@
                 cleanupSpeechRecognition();
             });
 
-            // Add safety timeout
-            setTimeout(() => {
+            // Add safety timeout with proper cleanup tracking
+            sttTimeoutId = setTimeout(() => {
                 if (sttIsRecording) {
                     console.log('Speech recognition timeout - cleaning up');
                     cleanupSpeechRecognition();
@@ -3812,6 +3839,10 @@
             }
             // Clear any pending auto-save timer
             clearTimeout(scriptSaveDebounceTimer);
+            
+            // CRITICAL: Clean up speech recognition when closing editor
+            cleanupSpeechRecognition();
+            
             const modal = document.getElementById('scriptEditorModal');
             modal.style.display = 'none';
             
