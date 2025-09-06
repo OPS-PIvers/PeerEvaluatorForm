@@ -3539,6 +3539,7 @@
         let sttRecognitionInstance = null;
         let sttIsRecording = false;
         let sttTimeoutId = null;
+        const STT_RECORDING_TIMEOUT_MS = 30000; // 30 second timeout for speech recognition
 
         // Cleanup function to ensure proper speech recognition cleanup
         function cleanupSpeechRecognition() {
@@ -3625,6 +3626,7 @@
                 sttButton.classList.add('recording');
                 sttButton.innerHTML = '🛑';
                 sttButton.title = 'Click to stop recording';
+                sttButton.setAttribute('aria-label', 'Stop speech-to-text recording');
                 console.log('Speech recognition started');
             });
 
@@ -3661,7 +3663,7 @@
                     'network': 'Network error. Please check your internet connection.',
                     'service-not-allowed': 'Speech service not allowed. Please try again later.',
                     'bad-grammar': 'Speech recognition failed. Please try again.',
-                    'language-not-supported': 'Language not supported. Switching to English.'
+                    'language-not-supported': 'Your browser\'s language is not supported for speech recognition. Please try speaking in English.'
                 };
                 
                 const message = errorMessages[event.error] || `Speech recognition error: ${event.error}`;
@@ -3681,7 +3683,7 @@
                     console.log('Speech recognition timeout - cleaning up');
                     cleanupSpeechRecognition();
                 }
-            }, 30000); // 30 second timeout
+            }, STT_RECORDING_TIMEOUT_MS);
 
             try {
                 sttRecognitionInstance.start();
