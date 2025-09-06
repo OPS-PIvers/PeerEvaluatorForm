@@ -3527,6 +3527,43 @@
             }
         }
 
+        function handleSpeechRecognition() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) {
+                showToast('Speech recognition is not supported in this browser.', false);
+                return;
+            }
+
+            const recognition = new SpeechRecognition();
+            recognition.interimResults = true;
+            recognition.lang = 'en-US';
+
+            const sttButton = document.querySelector('.ql-stt-button');
+            if (sttButton.classList.contains('recording')) {
+                recognition.stop();
+                return;
+            }
+
+            recognition.addEventListener('result', e => {
+                const transcript = Array.from(e.results)
+                    .map(result => result[0])
+                    .map(result => result.transcript)
+                    .join('');
+
+                const range = scriptQuill.getSelection(true);
+                scriptQuill.insertText(range.index, transcript + ' ', 'user');
+            });
+
+            recognition.addEventListener('end', () => {
+                sttButton.classList.remove('recording');
+                sttButton.innerHTML = '🎤';
+            });
+
+            recognition.start();
+            sttButton.classList.add('recording');
+            sttButton.innerHTML = '🛑';
+        }
+
         function openScriptEditor() {
             // Validate observation context before opening
             if (!currentObservationId) {
@@ -3586,13 +3623,25 @@
                 try {
                     console.log('Creating new Quill instance on clean container...');
                     
+                    const toolbarOptions = SCRIPT_EDITOR_CONSTANTS.TOOLBAR_OPTIONS;
+                    toolbarOptions.push(['stt-button']);
+
                     // Initialize Quill editor using constants
                     scriptQuill = new Quill('#scriptEditor', {
                         theme: 'snow',
                         modules: {
-                            toolbar: SCRIPT_EDITOR_CONSTANTS.TOOLBAR_OPTIONS
+                            toolbar: {
+                                container: toolbarOptions,
+                                handlers: {
+                                    'stt-button': handleSpeechRecognition
+                                }
+                            }
                         }
                     });
+
+                    // Add our custom button
+                    document.querySelector('.ql-stt-button').innerHTML = '🎤';
+
 
                     console.log('Script Quill editor initialized successfully');
 
@@ -3619,12 +3668,21 @@
                     resetScriptEditorContainer();
                     
                     try {
+                        const toolbarOptions = SCRIPT_EDITOR_CONSTANTS.TOOLBAR_OPTIONS;
+                        toolbarOptions.push(['stt-button']);
                         scriptQuill = new Quill('#scriptEditor', {
                             theme: 'snow',
                             modules: {
-                                toolbar: SCRIPT_EDITOR_CONSTANTS.TOOLBAR_OPTIONS
+                                toolbar: {
+                                    container: toolbarOptions,
+                                    handlers: {
+                                        'stt-button': handleSpeechRecognition
+                                    }
+                                }
                             }
                         });
+                        document.querySelector('.ql-stt-button').innerHTML = '🎤';
+
                         console.log('Script Quill editor initialized on retry');
                         loadScriptContent();
                         
