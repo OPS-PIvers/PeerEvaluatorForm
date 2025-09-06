@@ -3072,6 +3072,9 @@
         function clearScriptEditor() {
             console.log('Clearing script editor state...');
             
+            // CRITICAL: Clean up speech recognition first
+            cleanupSpeechRecognition();
+            
             // Clear auto-save timer
             if (scriptSaveDebounceTimer) {
                 clearTimeout(scriptSaveDebounceTimer);
@@ -3207,6 +3210,9 @@
          */
         function resetScriptEditorContainer() {
             console.log('Resetting script editor container to clean state...');
+            
+            // Clean up speech recognition first
+            cleanupSpeechRecognition();
             
             const container = document.getElementById('scriptEditor');
             if (!container) {
@@ -3499,6 +3505,8 @@
         // Stop monitoring when page unloads
         window.addEventListener('beforeunload', function() {
             stopStateMonitoring();
+            // CRITICAL: Clean up speech recognition on page unload
+            cleanupSpeechRecognition();
         });
 
         // === Script Editor Functions ===
@@ -3524,6 +3532,236 @@
                 saveBtn.disabled = true;
                 saveBtn.classList.remove('btn-primary');
                 saveBtn.classList.add('btn-secondary');
+            }
+        }
+
+        // Encapsulated speech recognition state
+        let sttRecognitionInstance = null;
+        let sttIsRecording = false;
+        let sttTimeoutId = null;
+        const STT_RECORDING_TIMEOUT_MS = 30000; // 30 second timeout for speech recognition
+
+        // Cleanup function to ensure proper speech recognition cleanup
+        function cleanupSpeechRecognition() {
+            if (sttRecognitionInstance) {
+                try {
+                    sttRecognitionInstance.stop();
+                } catch (e) {
+                    console.warn('Error stopping speech recognition:', e);
+                }
+                sttRecognitionInstance = null;
+            }
+            sttIsRecording = false;
+            
+            // Clear timeout if it exists
+            if (sttTimeoutId) {
+                clearTimeout(sttTimeoutId);
+                sttTimeoutId = null;
+            }
+            
+            // Reset button state if it exists
+            const sttButton = document.querySelector('.ql-stt-button');
+            if (sttButton) {
+                sttButton.classList.remove('recording');
+                sttButton.innerHTML = '🎤';
+                sttButton.title = 'Start speech-to-text recording';
+            }
+        }
+
+        function handleSpeechRecognition() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) {
+                showToast('Speech recognition is not supported in this browser.', false);
+                return;
+            }
+
+            const sttButton = document.querySelector('.ql-stt-button');
+            if (!sttButton) {
+                console.error('Speech-to-text button not found in the DOM.');
+                return;
+            }
+
+            // If already recording, stop the recording
+            if (sttIsRecording) {
+                cleanupSpeechRecognition();
+                return;
+            }
+
+            // Check microphone permissions before starting
+            if (navigator.permissions) {
+                navigator.permissions.query({ name: 'microphone' }).then(permissionStatus => {
+                    // Double-check state in case user clicked button multiple times during async operation
+                    if (sttIsRecording) {
+                        return; // Already recording, ignore this request
+                    }
+                    
+                    if (permissionStatus.state === 'denied') {
+                        showToast('Microphone permission denied. Please allow microphone access and try again.', false);
+                        return;
+                    }
+                    startSpeechRecognition(sttButton);
+                }).catch(() => {
+                    // Fallback if permissions API not available
+                    if (!sttIsRecording) { // Check state before starting
+                        startSpeechRecognition(sttButton);
+                    }
+                });
+            } else {
+                // Fallback for browsers without permissions API
+                startSpeechRecognition(sttButton);
+            }
+        }
+
+        function startSpeechRecognition(sttButton) {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            
+            sttRecognitionInstance = new SpeechRecognition();
+            sttRecognitionInstance.interimResults = false;
+            sttRecognitionInstance.lang = navigator.language || 'en-US';
+            sttRecognitionInstance.continuous = false; // Single utterance for better UX
+            sttRecognitionInstance.maxAlternatives = 1;
+
+            sttRecognitionInstance.addEventListener('start', () => {
+                sttIsRecording = true;
+                sttButton.classList.add('recording');
+                sttButton.innerHTML = '🛑';
+                sttButton.title = 'Click to stop recording';
+                sttButton.setAttribute('aria-label', 'Stop speech-to-text recording');
+                console.log('Speech recognition started');
+            });
+
+            sttRecognitionInstance.addEventListener('result', e => {
+                if (e.results && e.results.length > 0 && e.results[0].length > 0) {
+                    const transcript = e.results[0][0].transcript.trim();
+                    
+                    // Only insert non-empty transcripts
+                    if (transcript.length > 0) {
+                        // CRITICAL: Check if scriptQuill still exists before accessing it
+                        if (scriptQuill && typeof scriptQuill.getSelection === 'function') {
+                            const range = scriptQuill.getSelection(true);
+                            if (range) {
+                                scriptQuill.insertText(range.index, transcript + ' ', 'user');
+                                console.log('Transcript inserted:', transcript);
+                            } else {
+                                console.warn('No cursor position found in editor');
+                            }
+                        } else {
+                            console.warn('Script editor no longer available, cannot insert transcript:', transcript);
+                            // Clean up speech recognition since editor is gone
+                            cleanupSpeechRecognition();
+                        }
+                    }
+                }
+            });
+
+            sttRecognitionInstance.addEventListener('error', (event) => {
+                console.error('Speech recognition error:', event.error);
+                const errorMessages = {
+                    'not-allowed': 'Microphone access denied. Please allow microphone permissions.',
+                    'no-speech': 'No speech detected. Please try speaking again.',
+                    'audio-capture': 'No microphone found. Please check your microphone connection.',
+                    'network': 'Network error. Please check your internet connection.',
+                    'service-not-allowed': 'Speech service not allowed. Please try again later.',
+                    'bad-grammar': 'Speech recognition failed. Please try again.',
+                    'language-not-supported': 'Your browser\'s language is not supported for speech recognition. Please try speaking in English.'
+                };
+                
+                const message = errorMessages[event.error] || `Speech recognition error: ${event.error}`;
+                showToast(message, false);
+                
+                cleanupSpeechRecognition();
+            });
+
+            sttRecognitionInstance.addEventListener('end', () => {
+                console.log('Speech recognition ended');
+                cleanupSpeechRecognition();
+            });
+
+            // Add safety timeout with proper cleanup tracking
+            sttTimeoutId = setTimeout(() => {
+                if (sttIsRecording) {
+                    console.log('Speech recognition timeout - cleaning up');
+                    cleanupSpeechRecognition();
+                }
+            }, STT_RECORDING_TIMEOUT_MS);
+
+            try {
+                sttRecognitionInstance.start();
+                // Show processing indicator
+                sttButton.innerHTML = '🎙️';
+                sttButton.title = 'Listening... Click to stop';
+            } catch (error) {
+                console.error('Failed to start speech recognition:', error);
+                showToast('Failed to start speech recognition. Please try again.', false);
+                cleanupSpeechRecognition();
+            }
+        }
+
+        function createQuillEditorWithSpeech() {
+            const toolbarOptions = [...SCRIPT_EDITOR_CONSTANTS.TOOLBAR_OPTIONS, ['stt-button']];
+            
+            // Initialize Quill editor using constants
+            scriptQuill = new Quill('#scriptEditor', {
+                theme: 'snow',
+                modules: {
+                    toolbar: {
+                        container: toolbarOptions,
+                        handlers: {
+                            'stt-button': handleSpeechRecognition
+                        }
+                    }
+                }
+            });
+
+            // Add our custom button with accessibility attributes
+            const sttButton = document.querySelector('.ql-stt-button');
+            if (sttButton) {
+                sttButton.innerHTML = '🎤';
+                sttButton.setAttribute('title', 'Start speech-to-text recording');
+                sttButton.setAttribute('aria-label', 'Speech-to-text recording');
+                sttButton.setAttribute('role', 'button');
+                sttButton.setAttribute('tabindex', '0');
+            }
+
+            console.log('Script Quill editor initialized successfully');
+
+            // Load existing content for current observation
+            loadScriptContent();
+
+            // Auto-save on content change
+            scriptQuill.on('text-change', function(delta, oldDelta, source) {
+                if (source === 'user') {
+                    isScriptDirty = true;
+                    updateSaveButtonState();
+                    clearTimeout(scriptSaveDebounceTimer);
+                    scriptSaveDebounceTimer = setTimeout(() => {
+                        silentSaveScriptContent();
+                    }, SILENT_SAVE_DEBOUNCE_MS);
+                }
+            });
+        }
+
+        function initializeQuillWithSpeech() {
+            try {
+                console.log('Creating new Quill instance on clean container...');
+                createQuillEditorWithSpeech();
+
+            } catch (error) {
+                console.error('Error initializing script editor:', error);
+
+                // If initialization fails, try emergency reset and retry ONCE
+                console.log('Attempting emergency reset and retry...');
+                resetScriptEditorContainer();
+
+                try {
+                    createQuillEditorWithSpeech();
+
+                } catch (retryError) {
+                    console.error('Script editor initialization failed even after reset:', retryError);
+                    showToast('Failed to initialize script editor: ' + retryError.message, false);
+                    modal.style.display = 'none';
+                    return;
+                }
             }
         }
 
@@ -3582,71 +3820,9 @@
                     console.warn('Container has Quill-related attributes, resetting...');
                     resetScriptEditorContainer();
                 }
-                
-                try {
-                    console.log('Creating new Quill instance on clean container...');
-                    
-                    // Initialize Quill editor using constants
-                    scriptQuill = new Quill('#scriptEditor', {
-                        theme: 'snow',
-                        modules: {
-                            toolbar: SCRIPT_EDITOR_CONSTANTS.TOOLBAR_OPTIONS
-                        }
-                    });
 
-                    console.log('Script Quill editor initialized successfully');
+                initializeQuillWithSpeech();
 
-                    // Load existing content for current observation
-                    loadScriptContent();
-
-                    // Auto-save on content change
-                    scriptQuill.on('text-change', function(delta, oldDelta, source) {
-                        if (source === 'user') {
-                            isScriptDirty = true;
-                            updateSaveButtonState();
-                            clearTimeout(scriptSaveDebounceTimer);
-                            scriptSaveDebounceTimer = setTimeout(() => {
-                                silentSaveScriptContent();
-                            }, SILENT_SAVE_DEBOUNCE_MS);
-                        }
-                    });
-                    
-                } catch (error) {
-                    console.error('Error initializing script editor:', error);
-                    
-                    // If initialization fails, try emergency reset and retry ONCE
-                    console.log('Attempting emergency reset and retry...');
-                    resetScriptEditorContainer();
-                    
-                    try {
-                        scriptQuill = new Quill('#scriptEditor', {
-                            theme: 'snow',
-                            modules: {
-                                toolbar: SCRIPT_EDITOR_CONSTANTS.TOOLBAR_OPTIONS
-                            }
-                        });
-                        console.log('Script Quill editor initialized on retry');
-                        loadScriptContent();
-                        
-                        // Auto-save on content change
-                        scriptQuill.on('text-change', function(delta, oldDelta, source) {
-                            if (source === 'user') {
-                                isScriptDirty = true;
-                                updateSaveButtonState();
-                                clearTimeout(scriptSaveDebounceTimer);
-                                scriptSaveDebounceTimer = setTimeout(() => {
-                                    silentSaveScriptContent();
-                                }, SILENT_SAVE_DEBOUNCE_MS);
-                            }
-                        });
-                        
-                    } catch (retryError) {
-                        console.error('Script editor initialization failed even after reset:', retryError);
-                        showToast('Failed to initialize script editor: ' + retryError.message, false);
-                        modal.style.display = 'none';
-                        return;
-                    }
-                }
             } else {
                 // Ensure existing editor has the right content for current observation
                 console.log('Reusing existing script editor, loading content for current observation');
@@ -3665,6 +3841,10 @@
             }
             // Clear any pending auto-save timer
             clearTimeout(scriptSaveDebounceTimer);
+            
+            // CRITICAL: Clean up speech recognition when closing editor
+            cleanupSpeechRecognition();
+            
             const modal = document.getElementById('scriptEditorModal');
             modal.style.display = 'none';
             
