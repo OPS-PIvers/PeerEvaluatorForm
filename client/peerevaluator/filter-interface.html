@@ -3208,6 +3208,9 @@
         function resetScriptEditorContainer() {
             console.log('Resetting script editor container to clean state...');
             
+            // Clean up speech recognition first
+            cleanupSpeechRecognition();
+            
             const container = document.getElementById('scriptEditor');
             if (!container) {
                 console.warn('Script editor container not found');
@@ -3529,6 +3532,27 @@
 
         // Encapsulated speech recognition state
         let sttRecognitionInstance = null;
+        let sttIsRecording = false;
+
+        // Cleanup function to ensure proper speech recognition cleanup
+        function cleanupSpeechRecognition() {
+            if (sttRecognitionInstance) {
+                try {
+                    sttRecognitionInstance.stop();
+                } catch (e) {
+                    console.warn('Error stopping speech recognition:', e);
+                }
+                sttRecognitionInstance = null;
+            }
+            sttIsRecording = false;
+            
+            // Reset button state if it exists
+            const sttButton = document.querySelector('.ql-stt-button');
+            if (sttButton) {
+                sttButton.classList.remove('recording');
+                sttButton.innerHTML = '🎤';
+            }
+        }
 
         function handleSpeechRecognition() {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -3543,40 +3567,105 @@
                 return;
             }
 
-            // Use encapsulated instance to manage the lifecycle across calls
-            if (sttRecognitionInstance) {
-                sttRecognitionInstance.stop();
+            // If already recording, stop the recording
+            if (sttIsRecording) {
+                cleanupSpeechRecognition();
                 return;
             }
 
+            // Check microphone permissions before starting
+            if (navigator.permissions) {
+                navigator.permissions.query({ name: 'microphone' }).then(permissionStatus => {
+                    if (permissionStatus.state === 'denied') {
+                        showToast('Microphone permission denied. Please allow microphone access and try again.', false);
+                        return;
+                    }
+                    startSpeechRecognition(sttButton);
+                }).catch(() => {
+                    // Fallback if permissions API not available
+                    startSpeechRecognition(sttButton);
+                });
+            } else {
+                // Fallback for browsers without permissions API
+                startSpeechRecognition(sttButton);
+            }
+        }
+
+        function startSpeechRecognition(sttButton) {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            
             sttRecognitionInstance = new SpeechRecognition();
-            // Using final results is simpler and avoids duplicated text from interim results.
             sttRecognitionInstance.interimResults = false;
             sttRecognitionInstance.lang = navigator.language || 'en-US';
+            sttRecognitionInstance.continuous = false; // Single utterance for better UX
+            sttRecognitionInstance.maxAlternatives = 1;
+
+            sttRecognitionInstance.addEventListener('start', () => {
+                sttIsRecording = true;
+                sttButton.classList.add('recording');
+                sttButton.innerHTML = '🛑';
+                sttButton.title = 'Click to stop recording';
+                console.log('Speech recognition started');
+            });
 
             sttRecognitionInstance.addEventListener('result', e => {
                 if (e.results && e.results.length > 0 && e.results[0].length > 0) {
-                    const transcript = e.results[0][0].transcript;
-                    const range = scriptQuill.getSelection(true);
-                    if (range) {
-                        scriptQuill.insertText(range.index, transcript + ' ', 'user');
+                    const transcript = e.results[0][0].transcript.trim();
+                    
+                    // Only insert non-empty transcripts
+                    if (transcript.length > 0) {
+                        const range = scriptQuill.getSelection(true);
+                        if (range) {
+                            scriptQuill.insertText(range.index, transcript + ' ', 'user');
+                            console.log('Transcript inserted:', transcript);
+                        } else {
+                            console.warn('No cursor position found in editor');
+                        }
                     }
                 }
             });
 
             sttRecognitionInstance.addEventListener('error', (event) => {
-                showToast(`Speech recognition error: ${event.error}`, false);
+                console.error('Speech recognition error:', event.error);
+                const errorMessages = {
+                    'not-allowed': 'Microphone access denied. Please allow microphone permissions.',
+                    'no-speech': 'No speech detected. Please try speaking again.',
+                    'audio-capture': 'No microphone found. Please check your microphone connection.',
+                    'network': 'Network error. Please check your internet connection.',
+                    'service-not-allowed': 'Speech service not allowed. Please try again later.',
+                    'bad-grammar': 'Speech recognition failed. Please try again.',
+                    'language-not-supported': 'Language not supported. Switching to English.'
+                };
+                
+                const message = errorMessages[event.error] || `Speech recognition error: ${event.error}`;
+                showToast(message, false);
+                
+                cleanupSpeechRecognition();
             });
 
             sttRecognitionInstance.addEventListener('end', () => {
-                sttButton.classList.remove('recording');
-                sttButton.innerHTML = '🎤';
-                sttRecognitionInstance = null; // Clean up the instance
+                console.log('Speech recognition ended');
+                cleanupSpeechRecognition();
             });
 
-            sttRecognitionInstance.start();
-            sttButton.classList.add('recording');
-            sttButton.innerHTML = '🛑';
+            // Add safety timeout
+            setTimeout(() => {
+                if (sttIsRecording) {
+                    console.log('Speech recognition timeout - cleaning up');
+                    cleanupSpeechRecognition();
+                }
+            }, 30000); // 30 second timeout
+
+            try {
+                sttRecognitionInstance.start();
+                // Show processing indicator
+                sttButton.innerHTML = '🎙️';
+                sttButton.title = 'Listening... Click to stop';
+            } catch (error) {
+                console.error('Failed to start speech recognition:', error);
+                showToast('Failed to start speech recognition. Please try again.', false);
+                cleanupSpeechRecognition();
+            }
         }
 
         function createQuillEditorWithSpeech() {
@@ -3595,10 +3684,14 @@
                 }
             });
 
-            // Add our custom button
+            // Add our custom button with accessibility attributes
             const sttButton = document.querySelector('.ql-stt-button');
             if (sttButton) {
                 sttButton.innerHTML = '🎤';
+                sttButton.setAttribute('title', 'Start speech-to-text recording');
+                sttButton.setAttribute('aria-label', 'Speech-to-text recording');
+                sttButton.setAttribute('role', 'button');
+                sttButton.setAttribute('tabindex', '0');
             }
 
             console.log('Script Quill editor initialized successfully');
