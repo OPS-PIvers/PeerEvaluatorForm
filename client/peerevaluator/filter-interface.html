@@ -3527,6 +3527,9 @@
             }
         }
 
+        // Encapsulated speech recognition state
+        let sttRecognitionInstance = null;
+
         function handleSpeechRecognition() {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             if (!SpeechRecognition) {
@@ -3535,80 +3538,91 @@
             }
 
             const sttButton = document.querySelector('.ql-stt-button');
-
-            // Use a window-scoped instance to manage the lifecycle across calls
-            if (window.sttRecognition) {
-                window.sttRecognition.stop();
+            if (!sttButton) {
+                console.error('Speech-to-text button not found in the DOM.');
                 return;
             }
 
-            window.sttRecognition = new SpeechRecognition();
-            // Using final results is simpler and avoids duplicated text from interim results.
-            window.sttRecognition.interimResults = false;
-            window.sttRecognition.lang = 'en-US';
+            // Use encapsulated instance to manage the lifecycle across calls
+            if (sttRecognitionInstance) {
+                sttRecognitionInstance.stop();
+                return;
+            }
 
-            window.sttRecognition.addEventListener('result', e => {
-                const transcript = e.results[0][0].transcript;
-                const range = scriptQuill.getSelection(true);
-                if (range) {
-                    scriptQuill.insertText(range.index, transcript + ' ', 'user');
+            sttRecognitionInstance = new SpeechRecognition();
+            // Using final results is simpler and avoids duplicated text from interim results.
+            sttRecognitionInstance.interimResults = false;
+            sttRecognitionInstance.lang = navigator.language || 'en-US';
+
+            sttRecognitionInstance.addEventListener('result', e => {
+                if (e.results && e.results.length > 0 && e.results[0].length > 0) {
+                    const transcript = e.results[0][0].transcript;
+                    const range = scriptQuill.getSelection(true);
+                    if (range) {
+                        scriptQuill.insertText(range.index, transcript + ' ', 'user');
+                    }
                 }
             });
 
-            window.sttRecognition.addEventListener('error', (event) => {
+            sttRecognitionInstance.addEventListener('error', (event) => {
                 showToast(`Speech recognition error: ${event.error}`, false);
             });
 
-            window.sttRecognition.addEventListener('end', () => {
+            sttRecognitionInstance.addEventListener('end', () => {
                 sttButton.classList.remove('recording');
                 sttButton.innerHTML = '🎤';
-                window.sttRecognition = null; // Clean up the instance
+                sttRecognitionInstance = null; // Clean up the instance
             });
 
-            window.sttRecognition.start();
+            sttRecognitionInstance.start();
             sttButton.classList.add('recording');
             sttButton.innerHTML = '🛑';
+        }
+
+        function createQuillEditorWithSpeech() {
+            const toolbarOptions = [...SCRIPT_EDITOR_CONSTANTS.TOOLBAR_OPTIONS, ['stt-button']];
+            
+            // Initialize Quill editor using constants
+            scriptQuill = new Quill('#scriptEditor', {
+                theme: 'snow',
+                modules: {
+                    toolbar: {
+                        container: toolbarOptions,
+                        handlers: {
+                            'stt-button': handleSpeechRecognition
+                        }
+                    }
+                }
+            });
+
+            // Add our custom button
+            const sttButton = document.querySelector('.ql-stt-button');
+            if (sttButton) {
+                sttButton.innerHTML = '🎤';
+            }
+
+            console.log('Script Quill editor initialized successfully');
+
+            // Load existing content for current observation
+            loadScriptContent();
+
+            // Auto-save on content change
+            scriptQuill.on('text-change', function(delta, oldDelta, source) {
+                if (source === 'user') {
+                    isScriptDirty = true;
+                    updateSaveButtonState();
+                    clearTimeout(scriptSaveDebounceTimer);
+                    scriptSaveDebounceTimer = setTimeout(() => {
+                        silentSaveScriptContent();
+                    }, SILENT_SAVE_DEBOUNCE_MS);
+                }
+            });
         }
 
         function initializeQuillWithSpeech() {
             try {
                 console.log('Creating new Quill instance on clean container...');
-
-                const toolbarOptions = [...SCRIPT_EDITOR_CONSTANTS.TOOLBAR_OPTIONS, ['stt-button']];
-
-                // Initialize Quill editor using constants
-                scriptQuill = new Quill('#scriptEditor', {
-                    theme: 'snow',
-                    modules: {
-                        toolbar: {
-                            container: toolbarOptions,
-                            handlers: {
-                                'stt-button': handleSpeechRecognition
-                            }
-                        }
-                    }
-                });
-
-                // Add our custom button
-                document.querySelector('.ql-stt-button').innerHTML = '🎤';
-
-
-                console.log('Script Quill editor initialized successfully');
-
-                // Load existing content for current observation
-                loadScriptContent();
-
-                // Auto-save on content change
-                scriptQuill.on('text-change', function(delta, oldDelta, source) {
-                    if (source === 'user') {
-                        isScriptDirty = true;
-                        updateSaveButtonState();
-                        clearTimeout(scriptSaveDebounceTimer);
-                        scriptSaveDebounceTimer = setTimeout(() => {
-                            silentSaveScriptContent();
-                        }, SILENT_SAVE_DEBOUNCE_MS);
-                    }
-                });
+                createQuillEditorWithSpeech();
 
             } catch (error) {
                 console.error('Error initializing script editor:', error);
@@ -3618,34 +3632,7 @@
                 resetScriptEditorContainer();
 
                 try {
-                    const toolbarOptions = [...SCRIPT_EDITOR_CONSTANTS.TOOLBAR_OPTIONS, ['stt-button']];
-                    scriptQuill = new Quill('#scriptEditor', {
-                        theme: 'snow',
-                        modules: {
-                            toolbar: {
-                                container: toolbarOptions,
-                                handlers: {
-                                    'stt-button': handleSpeechRecognition
-                                }
-                            }
-                        }
-                    });
-                    document.querySelector('.ql-stt-button').innerHTML = '🎤';
-
-                    console.log('Script Quill editor initialized on retry');
-                    loadScriptContent();
-
-                    // Auto-save on content change
-                    scriptQuill.on('text-change', function(delta, oldDelta, source) {
-                        if (source === 'user') {
-                            isScriptDirty = true;
-                            updateSaveButtonState();
-                            clearTimeout(scriptSaveDebounceTimer);
-                            scriptSaveDebounceTimer = setTimeout(() => {
-                                silentSaveScriptContent();
-                            }, SILENT_SAVE_DEBOUNCE_MS);
-                        }
-                    });
+                    createQuillEditorWithSpeech();
 
                 } catch (retryError) {
                     console.error('Script editor initialization failed even after reset:', retryError);
