@@ -445,7 +445,7 @@ function loadObservationForEditing(observationId) {
         }
         
         let assignedSubdomains = null;
-        if (userContext.role === SPECIAL_ROLES.PEER_EVALUATOR) {
+        if (userContext.role === SPECIAL_ROLES.PEER_EVALUATOR || userContext.role === SPECIAL_ROLES.ADMINISTRATOR) {
             assignedSubdomains = getAssignedSubdomainsForRoleYear(observation.observedRole, observation.observedYear);
         }
 
@@ -510,7 +510,7 @@ function findObservationRow(sheet, observationId) {
 function saveLookForSelection(observationId, componentId, lookForText, isChecked) {
     try {
         const userContext = createUserContext();
-        if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
+        if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR && userContext.role !== SPECIAL_ROLES.ADMINISTRATOR) {
             return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
         }
         
@@ -532,7 +532,7 @@ function saveLookForSelection(observationId, componentId, lookForText, isChecked
 function saveProficiencySelection(observationId, componentId, proficiency) {
     try {
         const userContext = createUserContext();
-        if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
+        if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR && userContext.role !== SPECIAL_ROLES.ADMINISTRATOR) {
             return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
         }
         
@@ -554,7 +554,7 @@ function saveProficiencySelection(observationId, componentId, proficiency) {
 function saveObservationNotes(observationId, componentId, notesContent) {
     try {
         const userContext = createUserContext();
-        if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
+        if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR && userContext.role !== SPECIAL_ROLES.ADMINISTRATOR) {
             return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
         }
         
@@ -575,7 +575,7 @@ function saveObservationNotes(observationId, componentId, notesContent) {
 function updateObservationScript(observationId, scriptContent) {
     try {
         const userContext = createUserContext();
-        if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
+        if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR && userContext.role !== SPECIAL_ROLES.ADMINISTRATOR) {
             return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
         }
 
@@ -605,7 +605,7 @@ function updateObservationScript(observationId, scriptContent) {
 function getObservationScript(observationId) {
     try {
         const userContext = createUserContext();
-        if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
+        if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR && userContext.role !== SPECIAL_ROLES.ADMINISTRATOR) {
             return null; // Return null instead of error object for consistency
         }
 
@@ -629,7 +629,7 @@ function saveComponentTags(observationId, componentTags) {
     try {
         setupObservationSheet();
         const userContext = createUserContext();
-        if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
+        if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR && userContext.role !== SPECIAL_ROLES.ADMINISTRATOR) {
             return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
         }
 
@@ -666,7 +666,7 @@ function getComponentTags(observationId) {
     try {
         setupObservationSheet();
         const userContext = createUserContext();
-        if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
+        if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR && userContext.role !== SPECIAL_ROLES.ADMINISTRATOR) {
             return {};
         }
 
@@ -696,7 +696,7 @@ function getComponentTags(observationId) {
 function finalizeObservation(observationId) {
     try {
         const userContext = createUserContext();
-        if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
+        if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR && userContext.role !== SPECIAL_ROLES.ADMINISTRATOR) {
             return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
         }
 
@@ -764,7 +764,7 @@ function deleteFinalizedObservation(observationId) {
     try {
         setupObservationSheet(); // Ensure the sheet is ready
         const userContext = createUserContext();
-        if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
+        if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR && userContext.role !== SPECIAL_ROLES.ADMINISTRATOR) {
             return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
         }
         return deleteFinalizedObservationRecord(observationId, userContext.email);
@@ -870,7 +870,7 @@ function getObservationPdfUrl(observationId) {
     try {
         setupObservationSheet(); // Ensure the sheet is ready
         const userContext = createUserContext();
-        if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
+        if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR && userContext.role !== SPECIAL_ROLES.ADMINISTRATOR) {
             return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
         }
 
@@ -1036,7 +1036,7 @@ function getObservationFiles(observationId) {
 function getObservationStatusAndPdfUrl(observationId) {
     try {
         const userContext = createUserContext();
-        if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
+        if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR && userContext.role !== SPECIAL_ROLES.ADMINISTRATOR) {
             return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
         }
 
@@ -1087,7 +1087,7 @@ function getObservationStatusAndPdfUrl(observationId) {
 function updateObservationMetadata(observationId, metadata) {
     try {
         const userContext = createUserContext();
-        if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
+        if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR && userContext.role !== SPECIAL_ROLES.ADMINISTRATOR) {
             return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
         }
 
