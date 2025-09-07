@@ -1899,13 +1899,21 @@
                         ${buttons ? `<div class="obs-card-actions">${buttons}</div>` : ''}
                     </div>`;
             });
-            container.innerHTML = `<h2 class="section-title"><span>📝</span> Observations for ${safeObservedNameHtml}</h2><div class="actions-grid">${cardsHtml}</div><div style="margin-top: 20px;"><button class="filter-btn btn-secondary" onclick="showView('customFiltersView')">Back to Filters</button></div>`;
+            const backButtonText = userContext.role === 'Administrator' ? 'Back to Staff List' : 'Back to Filters';
+            const backButtonAction = userContext.role === 'Administrator' ? "showView('adminStaffListView')" : "showView('customFiltersView')";
+            container.innerHTML = `<h2 class="section-title"><span>📝</span> Observations for ${safeObservedNameHtml}</h2><div class="actions-grid">${cardsHtml}</div><div style="margin-top: 20px;"><button class="filter-btn btn-secondary" onclick="${backButtonAction}">${backButtonText}</button></div>`;
             showView('observationSelectorView');
         }
 
         function displayObservationOptions(observedEmail, observedName) {
             currentObservedUser.email = observedEmail;
             currentObservedUser.name = observedName;
+            
+            // Hide admin staff list view when selecting a staff member
+            if (userContext.role === 'Administrator') {
+                hideView('adminStaffListView');
+            }
+            
             showLoading(`Loading options for ${observedName}`);
             google.script.run
                 .withSuccessHandler(result => {
@@ -2087,7 +2095,12 @@
             if (currentObservedUser.email && currentObservedUser.name) {
                 displayObservationOptions(currentObservedUser.email, currentObservedUser.name);
             } else {
-                showView('customFiltersView');
+                // Return to appropriate view based on user role
+                if (userContext.role === 'Administrator') {
+                    showView('adminStaffListView');
+                } else {
+                    showView('customFiltersView');
+                }
             }
         }
 
