@@ -404,6 +404,51 @@
             animation: pulse 1.5s infinite;
         }
 
+        /* Speech-to-Text Button Styling */
+        .ql-stt-button {
+            background: var(--color-blue-base);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 6px 10px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.2s ease;
+            min-width: 32px;
+            height: 32px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .ql-stt-button:hover {
+            background: var(--color-blue-light);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+        }
+
+        .ql-stt-button:active {
+            background: var(--color-blue-dark);
+            transform: translateY(0);
+            box-shadow: 0 2px 8px rgba(37, 99, 235, 0.2);
+        }
+
+        .ql-stt-button.recording {
+            background: var(--color-red-base);
+            animation: pulse 1.5s infinite;
+        }
+
+        .ql-stt-button.recording:hover {
+            background: var(--color-red-light);
+        }
+
+        .ql-stt-button:disabled {
+            background: var(--color-gray-light);
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
         @keyframes pulse {
             0% { opacity: 1; }
             50% { opacity: 0.7; }
@@ -3075,7 +3120,7 @@
          * Clears script editor state and destroys the Quill instance
          */
         function clearScriptEditor() {
-            console.log('Clearing script editor state...');
+            // Clearing script editor state
             
             // CRITICAL: Clean up speech recognition first
             cleanupSpeechRecognition();
@@ -3089,7 +3134,7 @@
             // Destroy Quill instance if it exists
             if (scriptQuill) {
                 try {
-                    console.log('Destroying existing script Quill instance...');
+                    // Destroying existing script Quill instance
                     
                     // Remove all event listeners
                     scriptQuill.off('text-change');
@@ -3110,7 +3155,7 @@
                     
                     // CRITICAL: Clean up DOM elements completely
                     if (container) {
-                        console.log('Cleaning up script editor DOM...');
+                        // Cleaning up script editor DOM
                         resetScriptEditorContainer();
                     }
                     
@@ -3214,7 +3259,7 @@
          * This utility function ensures no leftover Quill DOM elements remain
          */
         function resetScriptEditorContainer() {
-            console.log('Resetting script editor container to clean state...');
+            // Resetting script editor container
             
             // Clean up speech recognition first
             cleanupSpeechRecognition();
@@ -3485,7 +3530,7 @@
          * Can be called from browser console: window.testScriptEditorCleanup()
          */
         window.testScriptEditorCleanup = function(iterations = 3) {
-            console.log(`🧪 Testing script editor cleanup ${iterations} times...`);
+            // Development testing function - remove in production
             
             if (!currentObservationId) {
                 console.error('Cannot test: No active observation. Please load an observation first.');
@@ -3620,7 +3665,34 @@
         function handleSpeechRecognition() {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             if (!SpeechRecognition) {
-                showToast('Speech recognition is not supported in this browser. Please use Chrome, Edge, or Safari.', false);
+                // Enhanced browser detection for better user guidance
+                const userAgent = navigator.userAgent;
+                let browserInfo = 'Please use Chrome, Edge, or Safari';
+                let additionalInfo = '';
+
+                if (userAgent.includes('Firefox')) {
+                    browserInfo = 'Firefox does not support speech recognition';
+                    additionalInfo = ' - please switch to Chrome, Edge, or Safari for this feature';
+                } else if (userAgent.includes('Chrome') && !userAgent.includes('Edge')) {
+                    additionalInfo = ' - ensure you\'re using the latest version of Chrome';
+                } else if (userAgent.includes('Safari') && !userAgent.includes('Chrome')) {
+                    additionalInfo = ' - ensure Safari has microphone permissions enabled';
+                } else if (userAgent.includes('Edge')) {
+                    additionalInfo = ' - ensure you\'re using the latest version of Edge';
+                } else {
+                    additionalInfo = ' - this browser is not supported for speech recognition';
+                }
+
+                showToast(`Speech recognition is not supported. ${browserInfo}${additionalInfo}.`, false);
+                
+                // Disable the button visually if speech recognition is not supported
+                const sttButton = document.querySelector('.ql-stt-button');
+                if (sttButton) {
+                    sttButton.disabled = true;
+                    sttButton.innerHTML = '🎤❌';
+                    sttButton.title = `Speech recognition not supported in this browser. ${browserInfo}.`;
+                    sttButton.style.opacity = '0.5';
+                }
                 return;
             }
 
@@ -3632,7 +3704,7 @@
 
             // Prevent race conditions during initialization
             if (sttIsInitializing) {
-                console.log('Speech recognition already initializing, ignoring click');
+                // Prevent race conditions - ignoring duplicate initialization
                 return;
             }
 
@@ -3701,7 +3773,7 @@
                     sttButton.innerHTML = '🛑';
                     sttButton.title = 'Click to stop recording';
                     sttButton.setAttribute('aria-label', 'Stop speech-to-text recording');
-                    console.log('Speech recognition started successfully');
+                    // Speech recognition started successfully
                 });
             } catch (error) {
                 console.error('Failed to create speech recognition instance:', error);
@@ -3736,7 +3808,7 @@
                                         // Add timestamp for better tracking (commented for optional use)
                                         // const timestamp = new Date().toLocaleTimeString();
                                         scriptQuill.insertText(range.index, transcript + ' ', 'user');
-                                        console.log('Final transcript inserted:', transcript);
+                                        // Final transcript inserted successfully
                                         
                                         // Reset visual indicator
                                         sttButton.innerHTML = '🛑';
@@ -3784,7 +3856,7 @@
                     console.log('Network error detected, attempting auto-recovery in 2 seconds...');
                     setTimeout(() => {
                         if (sttIsRecording && !sttRecognitionInstance) {
-                            console.log('Attempting to restart speech recognition after network error');
+                            // Attempting auto-recovery after network error
                             handleSpeechRecognition();
                         }
                     }, 2000);
@@ -3794,11 +3866,11 @@
             });
 
             sttRecognitionInstance.addEventListener('end', () => {
-                console.log('Speech recognition ended');
+                // Speech recognition session ended
                 
                 // For continuous long sessions, auto-restart unless manually stopped
                 if (sttIsRecording) {
-                    console.log('Auto-restarting speech recognition for continuous session');
+                    // Auto-restarting for continuous session
                     // Small delay before restart to prevent rapid cycling
                     setTimeout(() => {
                         if (sttIsRecording && scriptQuill) {
@@ -3819,7 +3891,7 @@
             // This prevents browser-level timeouts while maintaining continuous recording
             sttAutoRestartTimeoutId = setInterval(() => {
                 if (sttIsRecording && sttRecognitionInstance) {
-                    console.log('Performing scheduled STT restart to maintain continuity');
+                    // Performing scheduled restart to maintain continuity
                     try {
                         sttRecognitionInstance.stop(); // This will trigger 'end' event and auto-restart
                     } catch (error) {
@@ -3920,7 +3992,7 @@
                 return;
             }
             
-            console.log('Opening script editor for observation:', currentObservationId);
+            // Opening script editor
             
             // Run diagnostics to check for any state issues
             diagnoseAndRecoverObservationState();
@@ -3966,7 +4038,7 @@
 
             } else {
                 // Ensure existing editor has the right content for current observation
-                console.log('Reusing existing script editor, loading content for current observation');
+                // Reusing existing script editor
                 loadScriptContent();
             }
             
@@ -3977,7 +4049,7 @@
         async function closeScriptEditor() {
             // CRITICAL: Auto-save content before closing if STT is running or content is dirty
             if (sttIsRecording || isScriptDirty) {
-                console.log('Auto-saving script content before closing (STT running or content dirty)');
+                // Auto-saving content before closing
                 
                 try {
                     // Force save the current content
@@ -4029,7 +4101,7 @@
 
         function silentSaveScriptContent() {
             if (!scriptQuill || !currentObservationId || !isScriptDirty || isSavingScript) return;
-            console.log('Silently saving script content...');
+            // Auto-saving script content
             saveScriptContent().catch(error => {
                 // Silent saves should not bother the user, so just log.
                 console.warn("Could not silently save script:", error.message);
@@ -4088,34 +4160,95 @@
 
         // Clean up old session storage backups to prevent memory bloat
         function cleanupOldSessionBackups() {
+            // Check if sessionStorage is available
+            if (typeof Storage === 'undefined' || !window.sessionStorage) {
+                console.warn('SessionStorage is not available in this browser');
+                return;
+            }
+
             try {
                 const keysToRemove = [];
                 const maxAge = 30 * 60 * 1000; // 30 minutes
                 const now = Date.now();
                 
+                // Get all keys first to avoid issues with changing storage during iteration
+                const allKeys = [];
                 for (let i = 0; i < sessionStorage.length; i++) {
                     const key = sessionStorage.key(i);
                     if (key && key.startsWith('script_backup_')) {
-                        try {
-                            const data = JSON.parse(sessionStorage.getItem(key));
-                            if (data && data.timestamp && (now - data.timestamp) > maxAge) {
-                                keysToRemove.push(key);
-                            }
-                        } catch (e) {
-                            // Invalid backup data, mark for removal
-                            keysToRemove.push(key);
-                        }
+                        allKeys.push(key);
                     }
                 }
                 
-                // Remove old backups
-                keysToRemove.forEach(key => sessionStorage.removeItem(key));
+                // Process each backup key
+                allKeys.forEach(key => {
+                    try {
+                        const item = sessionStorage.getItem(key);
+                        if (!item) {
+                            keysToRemove.push(key);
+                            return;
+                        }
+
+                        const data = JSON.parse(item);
+                        if (!data || !data.timestamp || typeof data.timestamp !== 'number') {
+                            // Invalid backup data structure, mark for removal
+                            keysToRemove.push(key);
+                        } else if ((now - data.timestamp) > maxAge) {
+                            // Expired backup, mark for removal
+                            keysToRemove.push(key);
+                        }
+                    } catch (parseError) {
+                        // JSON parse failed, invalid backup data - mark for removal
+                        console.warn(`Invalid session backup data for key ${key}:`, parseError.message);
+                        keysToRemove.push(key);
+                    }
+                });
+                
+                // Remove old/invalid backups safely
+                keysToRemove.forEach(key => {
+                    try {
+                        sessionStorage.removeItem(key);
+                    } catch (removeError) {
+                        console.warn(`Failed to remove session backup key ${key}:`, removeError.message);
+                    }
+                });
                 
                 if (keysToRemove.length > 0) {
-                    console.log(`Cleaned up ${keysToRemove.length} old session storage backups`);
+                    // Cleaned up session storage backups
                 }
+                
+                // Check for storage quota issues
+                try {
+                    const testKey = 'storage_test_' + Date.now();
+                    sessionStorage.setItem(testKey, 'test');
+                    sessionStorage.removeItem(testKey);
+                } catch (quotaError) {
+                    if (quotaError.name === 'QuotaExceededError' || quotaError.name === 'QUOTA_EXCEEDED_ERR') {
+                        console.warn('SessionStorage quota exceeded - consider clearing more data');
+                    }
+                }
+                
             } catch (error) {
-                console.warn('Error cleaning up old session backups:', error);
+                console.warn('Error during session storage cleanup:', error.message);
+                
+                // If there's a critical error, try a more aggressive cleanup
+                if (error.name === 'SecurityError' || error.name === 'InvalidAccessError') {
+                    console.warn('SessionStorage access denied - backup features may not work');
+                } else {
+                    // Try to clear at least some backup keys if possible
+                    try {
+                        const keys = Object.keys(sessionStorage).filter(key => key.startsWith('script_backup_'));
+                        if (keys.length > 10) { // If too many backups, clear half
+                            keys.slice(0, Math.floor(keys.length / 2)).forEach(key => {
+                                try { sessionStorage.removeItem(key); } catch (e) { /* ignore */ }
+                            });
+                            // Emergency cleanup performed
+                        }
+                    } catch (emergencyError) {
+                        // Complete failure - disable backup features
+                        console.error('Complete session storage failure - backup features disabled');
+                    }
+                }
             }
         }
 
@@ -4133,7 +4266,7 @@
                 return;
             }
             
-            console.log(`Loading script content for observation: ${currentObservationId}`);
+            // Loading script content
             
             google.script.run
                 .withSuccessHandler(function(content) {
@@ -4175,7 +4308,7 @@
                                     isScriptDirty = true; // Mark as dirty so user can save
                                     useBackup = true;
                                     showToast('Restored unsaved script content from previous session', true);
-                                    console.log('Restored script content from sessionStorage backup');
+                                    // Restored from backup
                                 }
                             }
                             
@@ -4488,7 +4621,7 @@
 
         function restoreVisualHighlighting() {
             if (!scriptQuill || !componentTags) {
-                console.log('Cannot restore highlighting: missing scriptQuill or componentTags');
+                // Cannot restore highlighting - missing dependencies
                 return;
             }
 
