@@ -1709,7 +1709,7 @@
 
         function showView(viewId) {
             stopAllPollers(); // Stop any running pollers when the view changes
-            ['quickActionsView', 'customFiltersView', 'observationSelectorView', 'rubricContainer'].forEach(id => { 
+            ['quickActionsView', 'customFiltersView', 'observationSelectorView', 'rubricContainer', 'adminStaffListView'].forEach(id => { 
                 document.getElementById(id).style.display = 'none'; 
             }); 
             document.getElementById(viewId).style.display = 'block'; 
@@ -1909,10 +1909,6 @@
             currentObservedUser.email = observedEmail;
             currentObservedUser.name = observedName;
             
-            // Hide admin staff list view when selecting a staff member
-            if (userContext.role === 'Administrator') {
-                hideView('adminStaffListView');
-            }
             
             showLoading(`Loading options for ${observedName}`);
             google.script.run
