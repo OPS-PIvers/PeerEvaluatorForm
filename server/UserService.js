@@ -772,7 +772,16 @@ function createFilteredUserContext(targetEmail, requestingRole) {
       }
       context.assignedSubdomains = assignedSubdomainsResult;
       context.viewMode = viewModeResult;
-      context.isEvaluator = false; // Ensure this is false for other roles
+      
+      // Set isEvaluator based on whether this is for observation creation/editing
+      // Administrator and Full Access should have evaluator privileges when creating observations
+      if (requestingRole === SPECIAL_ROLES.ADMINISTRATOR || requestingRole === SPECIAL_ROLES.FULL_ACCESS) {
+        context.isEvaluator = true; // Enable editing capabilities for these roles
+        context.isObservationMode = true; // Flag for the UI to enable editing
+        debugLog('Administrator/Full Access observation mode enabled', { requestingRole: requestingRole });
+      } else {
+        context.isEvaluator = false; // Ensure this is false for other roles
+      }
     }
 
     // Add metadata about the filtering
