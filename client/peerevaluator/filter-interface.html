@@ -3656,6 +3656,10 @@
         let sttAutoRestartTimeoutId = null;
         let sttIsInitializing = false; // Prevent race conditions during initialization
         let sttLastTranscriptIndex = 0; // Track processed results to avoid duplicates
+        // Live transcription variables
+        let sttInterimText = '';
+        let sttInterimRange = null;
+        let sttIsDisplayingInterim = false;
         // For long observation sessions (20-40 minutes), we need continuous recognition
         // Chrome has built-in timeouts (~60s), so we auto-restart to maintain continuity
         const STT_AUTO_RESTART_INTERVAL_MS = 50000; // 50 second auto-restart to prevent browser timeout
@@ -3674,6 +3678,11 @@
             sttIsRecording = false;
             sttIsInitializing = false;
             sttLastTranscriptIndex = 0;
+            
+            // Clear interim text tracking
+            sttInterimText = '';
+            sttInterimRange = null;
+            sttIsDisplayingInterim = false;
             
             // Clear timeout if it exists
             if (sttTimeoutId) {
@@ -3787,6 +3796,69 @@
             }
         }
 
+        // Live transcription helper functions
+        function displayInterimTranscript(interimText) {
+            if (!scriptQuill) return;
+            
+            // If we're already displaying interim text, remove it first
+            if (sttIsDisplayingInterim && sttInterimRange) {
+                try {
+                    scriptQuill.deleteText(sttInterimRange.index, sttInterimRange.length, 'api');
+                } catch (e) {
+                    console.warn('Could not remove previous interim text:', e);
+                }
+            }
+            
+            // Get current cursor position
+            const currentRange = scriptQuill.getSelection(true);
+            if (!currentRange) return;
+            
+            // Insert interim text with visual styling (gray, italic)
+            const insertIndex = currentRange.index;
+            scriptQuill.insertText(insertIndex, interimText + ' ', 'api');
+            scriptQuill.formatText(insertIndex, interimText.length, {
+                'color': '#666666',
+                'italic': true
+            }, 'api');
+            
+            // Store interim text info for later removal/replacement
+            sttInterimText = interimText;
+            sttInterimRange = { index: insertIndex, length: interimText.length + 1 };
+            sttIsDisplayingInterim = true;
+            
+            // Position cursor after interim text
+            scriptQuill.setSelection(insertIndex + interimText.length + 1, 0, 'api');
+        }
+
+        function insertFinalTranscript(finalText) {
+            if (!scriptQuill) return;
+            
+            try {
+                if (sttIsDisplayingInterim && sttInterimRange) {
+                    // Replace interim text with final text
+                    scriptQuill.deleteText(sttInterimRange.index, sttInterimRange.length, 'api');
+                    scriptQuill.insertText(sttInterimRange.index, finalText + ' ', 'user');
+                    // Position cursor after final text
+                    scriptQuill.setSelection(sttInterimRange.index + finalText.length + 1, 0, 'user');
+                } else {
+                    // No interim text to replace, insert at current position
+                    const currentRange = scriptQuill.getSelection(true);
+                    if (currentRange) {
+                        scriptQuill.insertText(currentRange.index, finalText + ' ', 'user');
+                        scriptQuill.setSelection(currentRange.index + finalText.length + 1, 0, 'user');
+                    }
+                }
+                
+                // Clear interim text tracking
+                sttInterimText = '';
+                sttInterimRange = null;
+                sttIsDisplayingInterim = false;
+                
+            } catch (e) {
+                console.warn('Error inserting final transcript:', e);
+            }
+        }
+
         function startSpeechRecognition(sttButton) {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             
@@ -3805,10 +3877,10 @@
                     sttIsInitializing = false;
                     sttButton.classList.remove('processing');
                     sttButton.classList.add('recording');
-                    sttButton.innerHTML = '🛑';
-                    sttButton.title = 'Click to stop recording';
+                    sttButton.innerHTML = '🔴';
+                    sttButton.title = 'Recording - Click to stop';
                     sttButton.setAttribute('aria-label', 'Stop speech-to-text recording');
-                    // Speech recognition started successfully
+                    showToast('Speech recognition started - speak now', true);
                 });
             } catch (error) {
                 console.error('Failed to create speech recognition instance:', error);
@@ -3822,40 +3894,32 @@
 
             sttRecognitionInstance.addEventListener('result', e => {
                 if (e.results && e.results.length > 0) {
+                    // CRITICAL: Check if scriptQuill still exists before processing any results
+                    if (!scriptQuill || typeof scriptQuill.getSelection !== 'function') {
+                        console.warn('Script editor no longer available, stopping speech recognition');
+                        cleanupSpeechRecognition();
+                        return;
+                    }
+                    
                     // Process only new results to avoid duplicates in continuous mode
                     for (let i = sttLastTranscriptIndex; i < e.results.length; i++) {
                         if (e.results[i].length > 0) {
                             const transcript = e.results[i][0].transcript.trim();
                             const isFinal = e.results[i].isFinal;
                             
-                            // Show visual feedback for interim results
-                            if (!isFinal && transcript.length > 0) {
-                                sttButton.innerHTML = '🎙️📝'; // Indicate active transcription
-                                sttButton.title = 'Transcribing... Click to stop';
-                            }
-                            
-                            // Only insert final results to avoid duplicates
-                            if (isFinal && transcript.length > 0) {
-                                // CRITICAL: Check if scriptQuill still exists before accessing it
-                                if (scriptQuill && typeof scriptQuill.getSelection === 'function') {
-                                    const range = scriptQuill.getSelection(true);
-                                    if (range) {
-                                        // Add timestamp for better tracking (commented for optional use)
-                                        // const timestamp = new Date().toLocaleTimeString();
-                                        scriptQuill.insertText(range.index, transcript + ' ', 'user');
-                                        // Final transcript inserted successfully
-                                        
-                                        // Reset visual indicator
-                                        sttButton.innerHTML = '🛑';
-                                        sttButton.title = 'Click to stop recording';
-                                    } else {
-                                        console.warn('No cursor position found in editor');
-                                    }
+                            if (transcript.length > 0) {
+                                if (!isFinal) {
+                                    // Live transcription: Display interim results
+                                    displayInterimTranscript(transcript);
+                                    // Update button to show active transcription
+                                    sttButton.innerHTML = '🎙️';
+                                    sttButton.title = 'Transcribing... Click to stop';
                                 } else {
-                                    console.warn('Script editor no longer available, cannot insert transcript:', transcript);
-                                    // Clean up speech recognition since editor is gone
-                                    cleanupSpeechRecognition();
-                                    return;
+                                    // Final result: Replace interim with final text
+                                    insertFinalTranscript(transcript);
+                                    // Reset button to recording state
+                                    sttButton.innerHTML = '🔴';
+                                    sttButton.title = 'Recording - Click to stop';
                                 }
                             }
                         }
@@ -3901,11 +3965,31 @@
             });
 
             sttRecognitionInstance.addEventListener('end', () => {
-                // Speech recognition session ended
+                // Clean up any remaining interim text when session ends
+                if (sttIsDisplayingInterim && sttInterimRange && scriptQuill) {
+                    try {
+                        // Convert interim text to final before ending
+                        scriptQuill.formatText(sttInterimRange.index, sttInterimRange.length - 1, {
+                            'color': '#000000',
+                            'italic': false
+                        }, 'api');
+                        sttIsDisplayingInterim = false;
+                        sttInterimText = '';
+                        sttInterimRange = null;
+                    } catch (e) {
+                        console.warn('Could not finalize interim text on session end:', e);
+                    }
+                }
                 
                 // For continuous long sessions, auto-restart unless manually stopped
                 if (sttIsRecording) {
-                    // Auto-restarting for continuous session
+                    // Update button to show restarting
+                    const sttButton = document.querySelector('.ql-stt-button');
+                    if (sttButton) {
+                        sttButton.innerHTML = '⟳';
+                        sttButton.title = 'Restarting recognition...';
+                    }
+                    
                     // Small delay before restart to prevent rapid cycling
                     setTimeout(() => {
                         if (sttIsRecording && scriptQuill) {
@@ -3913,10 +3997,11 @@
                                 sttRecognitionInstance.start();
                             } catch (error) {
                                 console.error('Failed to restart speech recognition:', error);
+                                showToast('Speech recognition stopped. Click microphone to restart.', false);
                                 cleanupSpeechRecognition();
                             }
                         }
-                    }, 100);
+                    }, 500);
                 } else {
                     cleanupSpeechRecognition();
                 }
@@ -3976,15 +4061,27 @@
             // Load existing content for current observation
             loadScriptContent();
 
-            // Auto-save on content change
+            // Auto-save on content change (STT-aware)
             scriptQuill.on('text-change', function(delta, oldDelta, source) {
                 if (source === 'user') {
                     isScriptDirty = true;
                     updateSaveButtonState();
                     clearTimeout(scriptSaveDebounceTimer);
+                    
+                    // Coordinate with STT: Extend debounce time if actively recording
+                    const debounceTime = sttIsRecording ? SILENT_SAVE_DEBOUNCE_MS * 2 : SILENT_SAVE_DEBOUNCE_MS;
+                    
                     scriptSaveDebounceTimer = setTimeout(() => {
-                        silentSaveScriptContent();
-                    }, SILENT_SAVE_DEBOUNCE_MS);
+                        // Additional check: Don't save during active interim transcription
+                        if (!sttIsDisplayingInterim) {
+                            silentSaveScriptContent();
+                        } else {
+                            // Reschedule save after interim text becomes final
+                            scriptSaveDebounceTimer = setTimeout(() => {
+                                silentSaveScriptContent();
+                            }, 2000);
+                        }
+                    }, debounceTime);
                 }
             });
         }
