@@ -756,8 +756,26 @@ function createFilteredUserContext(targetEmail, requestingRole) {
         viewMode: context.viewMode,
         hasAssignedSubdomains: context.assignedSubdomains ? context.assignedSubdomains.length : 0
       });
+    } else if (requestingRole === SPECIAL_ROLES.ADMINISTRATOR) {
+      // Administrator observation logic - use same pattern as Peer Evaluator for consistency
+      // This ensures the UI components work properly with the subdomain/toggle pattern
+      if (targetUser && targetUser.year === PROBATIONARY_OBSERVATION_YEAR) {
+        context.viewMode = VIEW_MODES.FULL;
+        context.assignedSubdomains = null;
+      } else {
+        context.viewMode = VIEW_MODES.ASSIGNED;
+        context.assignedSubdomains = getAssignedSubdomainsForRoleYear(targetUser.role, targetUser.year);
+      }
+      context.isObservationMode = true; // Flag for the UI to enable editing
+      context.isEvaluator = true; // Explicitly set evaluator status
+      debugLog('Administrator observation mode enabled with assigned view default (matches Peer Evaluator pattern).', {
+        targetEmail: targetEmail,
+        requestingRole: requestingRole,
+        viewMode: context.viewMode,
+        hasAssignedSubdomains: context.assignedSubdomains ? context.assignedSubdomains.length : 0
+      });
     } else {
-      // Original logic for other special roles (e.g., Administrator just viewing)
+      // Logic for other special roles (Full Access, etc.) - keep original behavior
       let assignedSubdomainsResult = null;
       let viewModeResult = VIEW_MODES.FULL; // Default to full view
 
@@ -774,11 +792,10 @@ function createFilteredUserContext(targetEmail, requestingRole) {
       context.viewMode = viewModeResult;
       
       // Set isEvaluator based on whether this is for observation creation/editing
-      // Administrator and Full Access should have evaluator privileges when creating observations
-      if (requestingRole === SPECIAL_ROLES.ADMINISTRATOR || requestingRole === SPECIAL_ROLES.FULL_ACCESS) {
-        context.isEvaluator = true; // Enable editing capabilities for these roles
+      if (requestingRole === SPECIAL_ROLES.FULL_ACCESS) {
+        context.isEvaluator = true; // Enable editing capabilities for Full Access role
         context.isObservationMode = true; // Flag for the UI to enable editing
-        debugLog('Administrator/Full Access observation mode enabled', { requestingRole: requestingRole });
+        debugLog('Full Access observation mode enabled', { requestingRole: requestingRole });
       } else {
         context.isEvaluator = false; // Ensure this is false for other roles
       }

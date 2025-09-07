@@ -380,9 +380,7 @@ function getObservationOptions(observedEmail) {
  */
 function createNewObservationForEvaluator(observedEmail) {
   try {
-    console.log('=== createNewObservationForEvaluator DEBUG START ===');
     const userContext = createUserContext();
-    console.log('User context:', { email: userContext.email, role: userContext.role });
     
     if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR && userContext.role !== SPECIAL_ROLES.ADMINISTRATOR) {
       return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
@@ -392,56 +390,33 @@ function createNewObservationForEvaluator(observedEmail) {
     if (!newObservation) {
       return { success: false, error: 'Failed to create a new observation record.' };
     }
-    console.log('New observation created:', { 
-      id: newObservation.observationId, 
-      observedRole: newObservation.observedRole, 
-      observedYear: newObservation.observedYear 
-    });
     
     let assignedSubdomains = null;
-    if (userContext.role === SPECIAL_ROLES.PEER_EVALUATOR) {
+    // Both Peer Evaluator and Administrator should use assigned subdomains approach  
+    if (userContext.role === SPECIAL_ROLES.PEER_EVALUATOR || userContext.role === SPECIAL_ROLES.ADMINISTRATOR) {
         assignedSubdomains = getAssignedSubdomainsForRoleYear(newObservation.observedRole, newObservation.observedYear);
     }
-    console.log('Assigned subdomains:', assignedSubdomains ? assignedSubdomains.length : 'null');
 
+    // Use 'assigned' view mode for both Peer Evaluator and Administrator to match the UI pattern
+    const viewMode = (userContext.role === SPECIAL_ROLES.PEER_EVALUATOR || userContext.role === SPECIAL_ROLES.ADMINISTRATOR) 
+      ? 'assigned' 
+      : 'full';
+      
     const rubricData = getAllDomainsData(
       newObservation.observedRole,
       newObservation.observedYear,
-      'full',
+      viewMode,
       assignedSubdomains
     );
-    console.log('Rubric data structure:', {
-      hasDomains: !!rubricData.domains,
-      domainCount: rubricData.domains ? rubricData.domains.length : 0,
-      role: rubricData.role,
-      year: rubricData.year,
-      isError: rubricData.isError
-    });
     
     const evaluatorContext = createFilteredUserContext(observedEmail, userContext.role);
-    console.log('Evaluator context:', {
-      isEvaluator: evaluatorContext ? evaluatorContext.isEvaluator : 'null context',
-      viewMode: evaluatorContext ? evaluatorContext.viewMode : 'null context',
-      role: evaluatorContext ? evaluatorContext.role : 'null context'
-    });
     rubricData.userContext = evaluatorContext;
 
-    const result = { 
+    return { 
         success: true, 
         observation: newObservation,
         rubricData: rubricData
     };
-    
-    console.log('Final result structure:', {
-      success: result.success,
-      hasObservation: !!result.observation,
-      hasRubricData: !!result.rubricData,
-      rubricUserContextIsEvaluator: result.rubricData?.userContext?.isEvaluator,
-      rubricDomainCount: result.rubricData?.domains?.length
-    });
-    console.log('=== createNewObservationForEvaluator DEBUG END ===');
-    
-    return result;
 
   } catch (error) {
     console.error('Error in createNewObservationForEvaluator:', error);
@@ -496,7 +471,8 @@ function deleteObservation(observationId) {
     try {
         setupObservationSheet(); // Ensure the sheet is ready
         const userContext = createUserContext();
-        if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
+        // Allow both Peer Evaluator and Administrator to delete observations
+        if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR && userContext.role !== SPECIAL_ROLES.ADMINISTRATOR) {
             return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
         }
         return deleteObservationRecord(observationId, userContext.email);
@@ -2702,20 +2678,6 @@ function getAllDomainsData(role = null, year = null, viewMode = 'full', assigned
     
     const executionTime = Date.now() - startTime;
     
-    // Debug logging for domain data structure
-    console.log('=== getAllDomainsData DEBUG ===');
-    console.log('Input params:', { role: userRole, year: userYear, viewMode: effectiveViewMode });
-    console.log('Result structure:', {
-      title: result.title,
-      hasRoleSheetData: !!roleSheetData,
-      domainCount: result.domains.length,
-      domainsArray: result.domains.map((d, i) => ({
-        index: i,
-        name: d.name,
-        componentCount: d.components ? d.components.length : 0
-      }))
-    });
-    console.log('=== getAllDomainsData DEBUG END ===');
     
     logPerformanceMetrics('getAllDomainsData', executionTime, {
       role: userRole,

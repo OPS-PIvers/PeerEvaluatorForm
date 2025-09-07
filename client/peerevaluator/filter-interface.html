@@ -2093,40 +2093,7 @@
 
         function handleRubricData(result) {
             hideLoading();
-            console.log('=== handleRubricData CLIENT DEBUG START ===');
             console.log('handleRubricData received:', result);
-            
-            // Detailed analysis of received data
-            if (result) {
-                console.log('Result structure analysis:', {
-                    success: result.success,
-                    hasObservation: !!result.observation,
-                    hasRubricData: !!result.rubricData,
-                    action: result.action || 'none'
-                });
-                
-                if (result.rubricData) {
-                    console.log('RubricData detailed analysis:', {
-                        hasDomains: !!result.rubricData.domains,
-                        domainCount: result.rubricData.domains ? result.rubricData.domains.length : 0,
-                        domainsType: typeof result.rubricData.domains,
-                        role: result.rubricData.role,
-                        year: result.rubricData.year,
-                        hasUserContext: !!result.rubricData.userContext,
-                        isEvaluator: result.rubricData.userContext ? result.rubricData.userContext.isEvaluator : 'no userContext'
-                    });
-                    
-                    if (result.rubricData.domains && Array.isArray(result.rubricData.domains)) {
-                        result.rubricData.domains.forEach((domain, index) => {
-                            console.log(`Domain ${index}:`, {
-                                name: domain.name,
-                                hasComponents: !!domain.components,
-                                componentCount: domain.components ? domain.components.length : 0
-                            });
-                        });
-                    }
-                }
-            }
             
             if (!result.success) return showError(result.error);
             if (result.action === 'show_observation_selector') {
@@ -2157,11 +2124,6 @@
             }
 
             const { observation, rubricData } = result;
-            console.log('Extracted data for processing:', {
-                observationId: observation ? observation.observationId : 'none',
-                rubricDataExists: !!rubricData,
-                rubricDataType: typeof rubricData
-            });
             
             // Clear previous Quill instances and notes data before loading new observation
             if (observation) {
@@ -2190,18 +2152,12 @@
                 cacheVersion: rubricData.userContext ? rubricData.userContext.cacheVersion : 'unknown'
             };
             
-            console.log('About to generate rubric HTML...');
             updateFilterStatus(rubricData, observation);
             const rubricHtml = generateInteractiveRubricHtml(rubricData, observation);
-            console.log('Generated rubric HTML:', {
-                htmlLength: rubricHtml ? rubricHtml.length : 0,
-                htmlPreview: rubricHtml ? rubricHtml.substring(0, 200) + '...' : 'null'
-            });
             
             const rubricContainer = document.getElementById('rubricContainer');
             if (rubricContainer) {
                 rubricContainer.innerHTML = rubricHtml;
-                console.log('Rubric HTML injected into container');
             } else {
                 console.error('ERROR: rubricContainer element not found!');
             }
@@ -2226,45 +2182,26 @@
             }
             
             // Show global tools bar for evaluators after DOM injection
-            console.log('Checking if should show global tools bar:', {
-                hasUserContext: !!rubricData.userContext,
-                isEvaluator: rubricData.userContext ? rubricData.userContext.isEvaluator : 'no userContext'
-            });
-            
             if (rubricData.userContext && rubricData.userContext.isEvaluator) {
-                console.log('User is evaluator - showing global tools and updating visibility');
                 updateComponentVisibility();
                 
                 // Show global tools bar after HTML is in the DOM
                 const globalToolsBar = document.getElementById('globalToolsBar');
                 if (globalToolsBar) {
                     globalToolsBar.style.display = 'block';
-                    console.log('Global tools bar made visible');
                 } else {
                     console.error('ERROR: globalToolsBar element not found after HTML injection!');
                 }
             } else {
-                console.log('User is not evaluator - applying component visibility only');
                 // For read-only finalized observations, still need to apply component visibility
                 // based on the assigned view mode
                 updateComponentVisibility();
             }
             restoreLookForsState();
             showView('rubricContainer');
-            console.log('=== handleRubricData CLIENT DEBUG END ===');
         }
 
         function generateInteractiveRubricHtml(data, observation) {
-            console.log('=== generateInteractiveRubricHtml DEBUG START ===');
-            console.log('Input data analysis:', {
-                hasData: !!data,
-                dataType: typeof data,
-                hasDomains: !!(data && data.domains),
-                domainCount: data && data.domains ? data.domains.length : 0,
-                hasUserContext: !!(data && data.userContext),
-                hasObservation: !!observation
-            });
-            
             if (!data) {
                 console.error('ERROR: No data provided to generateInteractiveRubricHtml');
                 return '<div class="error">No rubric data available</div>';
@@ -2278,12 +2215,6 @@
             const isEvaluator = data.userContext && data.userContext.isEvaluator;
             const isFinalized = observation && observation.status === 'Finalized';
             const isReadOnlyView = isFinalized && !isEvaluator;
-            
-            console.log('Processing flags:', {
-                isEvaluator: isEvaluator,
-                isFinalized: isFinalized,
-                isReadOnlyView: isReadOnlyView
-            });
             
             let html = `<div class="${isReadOnlyView ? 'finalized-view' : ''}" style="background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">`;
 
@@ -2331,14 +2262,7 @@
 
             // Old navigation buttons removed - now handled by sticky nav
 
-            console.log('Starting to process domains:', data.domains.length);
             data.domains.forEach((domain, domainIdx) => {
-                console.log(`Processing domain ${domainIdx}:`, {
-                    name: domain.name,
-                    hasComponents: !!domain.components,
-                    componentCount: domain.components ? domain.components.length : 0
-                });
-                
                 html += `<div class="domain-section" id="domain-${domainIdx}"><div class="domain-header">${domain.name}</div>`;
                 html += `<div class="performance-levels-header"><div class="performance-levels"><div class="level-header"></div><div class="level-header">Developing</div><div class="level-header">Basic</div><div class="level-header">Proficient</div><div class="level-header">Distinguished</div></div></div>`;
                 
@@ -2456,14 +2380,6 @@
                 html += `</div>`;
             });
             html += `</div>`;
-            
-            console.log('Completed HTML generation:', {
-                totalHtmlLength: html.length,
-                containsGlobalToolsBar: html.includes('globalToolsBar'),
-                containsDomainSections: html.includes('domain-section'),
-                htmlPreview: html.substring(0, 300) + '...'
-            });
-            console.log('=== generateInteractiveRubricHtml DEBUG END ===');
             
             return html;
         }
