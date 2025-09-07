@@ -3503,8 +3503,34 @@
         };
         
         // Stop monitoring when page unloads
-        window.addEventListener('beforeunload', function() {
+        window.addEventListener('beforeunload', function(e) {
             stopStateMonitoring();
+            
+            // CRITICAL: Auto-save script content if STT is running or content is dirty
+            if ((sttIsRecording || isScriptDirty) && scriptQuill && currentObservationId) {
+                // Attempt synchronous save - this is limited but better than losing data
+                try {
+                    const content = scriptQuill.getContents();
+                    const htmlContent = scriptQuill.root.innerHTML;
+                    
+                    // Store in sessionStorage as backup
+                    sessionStorage.setItem(`script_backup_${currentObservationId}`, JSON.stringify({
+                        content: content,
+                        html: htmlContent,
+                        timestamp: Date.now()
+                    }));
+                    
+                    console.log('Script content backed up to sessionStorage before unload');
+                } catch (error) {
+                    console.error('Error backing up script content:', error);
+                }
+                
+                // Show browser warning
+                e.preventDefault();
+                e.returnValue = 'Speech-to-text is running and script content may not be saved. Are you sure you want to leave?';
+                return 'Speech-to-text is running and script content may not be saved. Are you sure you want to leave?';
+            }
+            
             // CRITICAL: Clean up speech recognition on page unload
             cleanupSpeechRecognition();
         });
@@ -3539,7 +3565,10 @@
         let sttRecognitionInstance = null;
         let sttIsRecording = false;
         let sttTimeoutId = null;
-        const STT_RECORDING_TIMEOUT_MS = 30000; // 30 second timeout for speech recognition
+        let sttAutoRestartTimeoutId = null;
+        // For long observation sessions (20-40 minutes), we need continuous recognition
+        // Chrome has built-in timeouts (~60s), so we auto-restart to maintain continuity
+        const STT_AUTO_RESTART_INTERVAL_MS = 50000; // 50 second auto-restart to prevent browser timeout
 
         // Cleanup function to ensure proper speech recognition cleanup
         function cleanupSpeechRecognition() {
@@ -3557,6 +3586,12 @@
             if (sttTimeoutId) {
                 clearTimeout(sttTimeoutId);
                 sttTimeoutId = null;
+            }
+            
+            // Clear auto-restart interval
+            if (sttAutoRestartTimeoutId) {
+                clearInterval(sttAutoRestartTimeoutId);
+                sttAutoRestartTimeoutId = null;
             }
             
             // Reset button state if it exists
@@ -3616,9 +3651,10 @@
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             
             sttRecognitionInstance = new SpeechRecognition();
-            sttRecognitionInstance.interimResults = false;
+            // interimResults set above with continuous mode
             sttRecognitionInstance.lang = navigator.language || 'en-US';
-            sttRecognitionInstance.continuous = false; // Single utterance for better UX
+            sttRecognitionInstance.continuous = true; // Continuous for long observation sessions (20-40 min)
+            sttRecognitionInstance.interimResults = true; // Get interim results for better UX
             sttRecognitionInstance.maxAlternatives = 1;
 
             sttRecognitionInstance.addEventListener('start', () => {
@@ -3631,24 +3667,31 @@
             });
 
             sttRecognitionInstance.addEventListener('result', e => {
-                if (e.results && e.results.length > 0 && e.results[0].length > 0) {
-                    const transcript = e.results[0][0].transcript.trim();
-                    
-                    // Only insert non-empty transcripts
-                    if (transcript.length > 0) {
-                        // CRITICAL: Check if scriptQuill still exists before accessing it
-                        if (scriptQuill && typeof scriptQuill.getSelection === 'function') {
-                            const range = scriptQuill.getSelection(true);
-                            if (range) {
-                                scriptQuill.insertText(range.index, transcript + ' ', 'user');
-                                console.log('Transcript inserted:', transcript);
-                            } else {
-                                console.warn('No cursor position found in editor');
+                if (e.results && e.results.length > 0) {
+                    // Process both interim and final results for continuous transcription
+                    for (let i = 0; i < e.results.length; i++) {
+                        if (e.results[i].length > 0) {
+                            const transcript = e.results[i][0].transcript.trim();
+                            const isFinal = e.results[i].isFinal;
+                            
+                            // Only insert final results to avoid duplicates
+                            if (isFinal && transcript.length > 0) {
+                                // CRITICAL: Check if scriptQuill still exists before accessing it
+                                if (scriptQuill && typeof scriptQuill.getSelection === 'function') {
+                                    const range = scriptQuill.getSelection(true);
+                                    if (range) {
+                                        scriptQuill.insertText(range.index, transcript + ' ', 'user');
+                                        console.log('Final transcript inserted:', transcript);
+                                    } else {
+                                        console.warn('No cursor position found in editor');
+                                    }
+                                } else {
+                                    console.warn('Script editor no longer available, cannot insert transcript:', transcript);
+                                    // Clean up speech recognition since editor is gone
+                                    cleanupSpeechRecognition();
+                                    return;
+                                }
                             }
-                        } else {
-                            console.warn('Script editor no longer available, cannot insert transcript:', transcript);
-                            // Clean up speech recognition since editor is gone
-                            cleanupSpeechRecognition();
                         }
                     }
                 }
@@ -3674,16 +3717,38 @@
 
             sttRecognitionInstance.addEventListener('end', () => {
                 console.log('Speech recognition ended');
-                cleanupSpeechRecognition();
-            });
-
-            // Add safety timeout with proper cleanup tracking
-            sttTimeoutId = setTimeout(() => {
+                
+                // For continuous long sessions, auto-restart unless manually stopped
                 if (sttIsRecording) {
-                    console.log('Speech recognition timeout - cleaning up');
+                    console.log('Auto-restarting speech recognition for continuous session');
+                    // Small delay before restart to prevent rapid cycling
+                    setTimeout(() => {
+                        if (sttIsRecording && scriptQuill) {
+                            try {
+                                sttRecognitionInstance.start();
+                            } catch (error) {
+                                console.error('Failed to restart speech recognition:', error);
+                                cleanupSpeechRecognition();
+                            }
+                        }
+                    }, 100);
+                } else {
                     cleanupSpeechRecognition();
                 }
-            }, STT_RECORDING_TIMEOUT_MS);
+            });
+
+            // Set up auto-restart interval for long sessions (20-40 minutes)
+            // This prevents browser-level timeouts while maintaining continuous recording
+            sttAutoRestartTimeoutId = setInterval(() => {
+                if (sttIsRecording && sttRecognitionInstance) {
+                    console.log('Performing scheduled STT restart to maintain continuity');
+                    try {
+                        sttRecognitionInstance.stop(); // This will trigger 'end' event and auto-restart
+                    } catch (error) {
+                        console.warn('Error during scheduled STT restart:', error);
+                    }
+                }
+            }, STT_AUTO_RESTART_INTERVAL_MS);
 
             try {
                 sttRecognitionInstance.start();
@@ -3833,12 +3898,30 @@
             updateSaveButtonState();
         }
 
-        function closeScriptEditor() {
-            if (isScriptDirty) {
-                if (!confirm('You have unsaved changes that will be lost. Are you sure you want to close?')) {
-                    return;
+        async function closeScriptEditor() {
+            // CRITICAL: Auto-save content before closing if STT is running or content is dirty
+            if (sttIsRecording || isScriptDirty) {
+                console.log('Auto-saving script content before closing (STT running or content dirty)');
+                
+                try {
+                    // Force save the current content
+                    const success = await saveScriptContent();
+                    if (success) {
+                        showToast('Script content auto-saved before closing', true);
+                    } else {
+                        console.warn('Auto-save failed, prompting user');
+                        if (!confirm('Failed to auto-save changes. Close anyway and lose changes?')) {
+                            return;
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error during auto-save:', error);
+                    if (!confirm('Error saving changes. Close anyway and lose changes?')) {
+                        return;
+                    }
                 }
             }
+            
             // Clear any pending auto-save timer
             clearTimeout(scriptSaveDebounceTimer);
             
@@ -3956,13 +4039,52 @@
                         hasContent: !!(content && typeof content === 'object' && Object.keys(content).length > 0)
                     });
                     
-                    if (content && typeof content === 'object' && Object.keys(content).length > 0) {
-                        scriptQuill.setContents(content, 'silent');
-                        scriptContent = content;
-                    } else {
-                        // Load empty content for new observations
-                        scriptQuill.setContents([], 'silent');
-                        scriptContent = {};
+                    // Check for sessionStorage backup first (in case of unexpected closure)
+                    const backupKey = `script_backup_${currentObservationId}`;
+                    const backup = sessionStorage.getItem(backupKey);
+                    let useBackup = false;
+                    
+                    if (backup) {
+                        try {
+                            const backupData = JSON.parse(backup);
+                            const backupAge = Date.now() - backupData.timestamp;
+                            const maxAge = 30 * 60 * 1000; // 30 minutes
+                            
+                            if (backupAge < maxAge) {
+                                const useBackupResponse = confirm(
+                                    'Found unsaved script content from a previous session. ' +
+                                    'This might contain speech-to-text data that wasn\'t saved. ' +
+                                    'Do you want to restore it?'
+                                );
+                                
+                                if (useBackupResponse) {
+                                    scriptQuill.setContents(backupData.content, 'silent');
+                                    scriptContent = backupData.content;
+                                    isScriptDirty = true; // Mark as dirty so user can save
+                                    useBackup = true;
+                                    showToast('Restored unsaved script content from previous session', true);
+                                    console.log('Restored script content from sessionStorage backup');
+                                }
+                            }
+                            
+                            // Clean up old backup
+                            sessionStorage.removeItem(backupKey);
+                            
+                        } catch (error) {
+                            console.error('Error processing sessionStorage backup:', error);
+                            sessionStorage.removeItem(backupKey);
+                        }
+                    }
+                    
+                    if (!useBackup) {
+                        if (content && typeof content === 'object' && Object.keys(content).length > 0) {
+                            scriptQuill.setContents(content, 'silent');
+                            scriptContent = content;
+                        } else {
+                            // Load empty content for new observations
+                            scriptQuill.setContents([], 'silent');
+                            scriptContent = {};
+                        }
                     }
                     isScriptDirty = false;
                     updateSaveButtonState();
