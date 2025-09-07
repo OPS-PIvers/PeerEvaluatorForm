@@ -399,6 +399,11 @@
             animation: pulse 1.5s infinite;
         }
 
+        .global-tool-btn.processing, .ql-stt-button.processing {
+            background: var(--color-orange-base);
+            animation: pulse 1.5s infinite;
+        }
+
         @keyframes pulse {
             0% { opacity: 1; }
             50% { opacity: 0.7; }
@@ -3435,6 +3440,9 @@
         
         // Start monitoring when page loads
         document.addEventListener('DOMContentLoaded', function() {
+            // Clean up old session storage backups on page load
+            cleanupOldSessionBackups();
+            
             setTimeout(() => {
                 startStateMonitoring();
             }, 5000); // Start monitoring after 5 seconds
@@ -3566,9 +3574,12 @@
         let sttIsRecording = false;
         let sttTimeoutId = null;
         let sttAutoRestartTimeoutId = null;
+        let sttIsInitializing = false; // Prevent race conditions during initialization
+        let sttLastTranscriptIndex = 0; // Track processed results to avoid duplicates
         // For long observation sessions (20-40 minutes), we need continuous recognition
         // Chrome has built-in timeouts (~60s), so we auto-restart to maintain continuity
         const STT_AUTO_RESTART_INTERVAL_MS = 50000; // 50 second auto-restart to prevent browser timeout
+        const STT_SESSION_CLEANUP_INTERVAL_MS = 5 * 60 * 1000; // Clean up old session storage every 5 minutes
 
         // Cleanup function to ensure proper speech recognition cleanup
         function cleanupSpeechRecognition() {
@@ -3581,6 +3592,8 @@
                 sttRecognitionInstance = null;
             }
             sttIsRecording = false;
+            sttIsInitializing = false;
+            sttLastTranscriptIndex = 0;
             
             // Clear timeout if it exists
             if (sttTimeoutId) {
@@ -3597,16 +3610,17 @@
             // Reset button state if it exists
             const sttButton = document.querySelector('.ql-stt-button');
             if (sttButton) {
-                sttButton.classList.remove('recording');
+                sttButton.classList.remove('recording', 'processing');
                 sttButton.innerHTML = '🎤';
                 sttButton.title = 'Start speech-to-text recording';
+                sttButton.setAttribute('aria-label', 'Start speech-to-text recording');
             }
         }
 
         function handleSpeechRecognition() {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             if (!SpeechRecognition) {
-                showToast('Speech recognition is not supported in this browser.', false);
+                showToast('Speech recognition is not supported in this browser. Please use Chrome, Edge, or Safari.', false);
                 return;
             }
 
@@ -3616,63 +3630,102 @@
                 return;
             }
 
+            // Prevent race conditions during initialization
+            if (sttIsInitializing) {
+                console.log('Speech recognition already initializing, ignoring click');
+                return;
+            }
+
             // If already recording, stop the recording
             if (sttIsRecording) {
                 cleanupSpeechRecognition();
                 return;
             }
 
+            // Set initializing state to prevent race conditions
+            sttIsInitializing = true;
+            sttButton.classList.add('processing');
+            sttButton.innerHTML = '⏳';
+            sttButton.title = 'Initializing speech recognition...';
+
             // Check microphone permissions before starting
             if (navigator.permissions) {
                 navigator.permissions.query({ name: 'microphone' }).then(permissionStatus => {
                     // Double-check state in case user clicked button multiple times during async operation
-                    if (sttIsRecording) {
-                        return; // Already recording, ignore this request
+                    if (sttIsRecording || !sttIsInitializing) {
+                        sttIsInitializing = false;
+                        return; // Already recording or canceled, ignore this request
                     }
                     
                     if (permissionStatus.state === 'denied') {
                         showToast('Microphone permission denied. Please allow microphone access and try again.', false);
+                        sttIsInitializing = false;
+                        sttButton.classList.remove('processing');
+                        sttButton.innerHTML = '🎤';
+                        sttButton.title = 'Start speech-to-text recording';
                         return;
                     }
                     startSpeechRecognition(sttButton);
                 }).catch(() => {
                     // Fallback if permissions API not available
-                    if (!sttIsRecording) { // Check state before starting
+                    if (sttIsInitializing && !sttIsRecording) {
                         startSpeechRecognition(sttButton);
                     }
                 });
             } else {
                 // Fallback for browsers without permissions API
-                startSpeechRecognition(sttButton);
+                if (sttIsInitializing && !sttIsRecording) {
+                    startSpeechRecognition(sttButton);
+                }
             }
         }
 
         function startSpeechRecognition(sttButton) {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             
-            sttRecognitionInstance = new SpeechRecognition();
-            // interimResults set above with continuous mode
-            sttRecognitionInstance.lang = navigator.language || 'en-US';
-            sttRecognitionInstance.continuous = true; // Continuous for long observation sessions (20-40 min)
-            sttRecognitionInstance.interimResults = true; // Get interim results for better UX
-            sttRecognitionInstance.maxAlternatives = 1;
+            try {
+                sttRecognitionInstance = new SpeechRecognition();
+                sttRecognitionInstance.lang = navigator.language || 'en-US';
+                sttRecognitionInstance.continuous = true; // Continuous for long observation sessions (20-40 min)
+                sttRecognitionInstance.interimResults = true; // Get interim results for better UX
+                sttRecognitionInstance.maxAlternatives = 1;
+                
+                // Reset transcript index for new session
+                sttLastTranscriptIndex = 0;
 
-            sttRecognitionInstance.addEventListener('start', () => {
-                sttIsRecording = true;
-                sttButton.classList.add('recording');
-                sttButton.innerHTML = '🛑';
-                sttButton.title = 'Click to stop recording';
-                sttButton.setAttribute('aria-label', 'Stop speech-to-text recording');
-                console.log('Speech recognition started');
-            });
+                sttRecognitionInstance.addEventListener('start', () => {
+                    sttIsRecording = true;
+                    sttIsInitializing = false;
+                    sttButton.classList.remove('processing');
+                    sttButton.classList.add('recording');
+                    sttButton.innerHTML = '🛑';
+                    sttButton.title = 'Click to stop recording';
+                    sttButton.setAttribute('aria-label', 'Stop speech-to-text recording');
+                    console.log('Speech recognition started successfully');
+                });
+            } catch (error) {
+                console.error('Failed to create speech recognition instance:', error);
+                showToast('Failed to initialize speech recognition. Please try again.', false);
+                sttIsInitializing = false;
+                sttButton.classList.remove('processing');
+                sttButton.innerHTML = '🎤';
+                sttButton.title = 'Start speech-to-text recording';
+                return;
+            }
 
             sttRecognitionInstance.addEventListener('result', e => {
                 if (e.results && e.results.length > 0) {
-                    // Process both interim and final results for continuous transcription
-                    for (let i = 0; i < e.results.length; i++) {
+                    // Process only new results to avoid duplicates in continuous mode
+                    for (let i = sttLastTranscriptIndex; i < e.results.length; i++) {
                         if (e.results[i].length > 0) {
                             const transcript = e.results[i][0].transcript.trim();
                             const isFinal = e.results[i].isFinal;
+                            
+                            // Show visual feedback for interim results
+                            if (!isFinal && transcript.length > 0) {
+                                sttButton.innerHTML = '🎙️📝'; // Indicate active transcription
+                                sttButton.title = 'Transcribing... Click to stop';
+                            }
                             
                             // Only insert final results to avoid duplicates
                             if (isFinal && transcript.length > 0) {
@@ -3680,8 +3733,14 @@
                                 if (scriptQuill && typeof scriptQuill.getSelection === 'function') {
                                     const range = scriptQuill.getSelection(true);
                                     if (range) {
+                                        // Add timestamp for better tracking (commented for optional use)
+                                        // const timestamp = new Date().toLocaleTimeString();
                                         scriptQuill.insertText(range.index, transcript + ' ', 'user');
                                         console.log('Final transcript inserted:', transcript);
+                                        
+                                        // Reset visual indicator
+                                        sttButton.innerHTML = '🛑';
+                                        sttButton.title = 'Click to stop recording';
                                     } else {
                                         console.warn('No cursor position found in editor');
                                     }
@@ -3694,25 +3753,44 @@
                             }
                         }
                     }
+                    // Update the index to track processed results
+                    sttLastTranscriptIndex = e.results.length;
                 }
             });
 
             sttRecognitionInstance.addEventListener('error', (event) => {
-                console.error('Speech recognition error:', event.error);
+                console.error('Speech recognition error:', event.error, event);
                 const errorMessages = {
-                    'not-allowed': 'Microphone access denied. Please allow microphone permissions.',
-                    'no-speech': 'No speech detected. Please try speaking again.',
-                    'audio-capture': 'No microphone found. Please check your microphone connection.',
-                    'network': 'Network error. Please check your internet connection.',
-                    'service-not-allowed': 'Speech service not allowed. Please try again later.',
-                    'bad-grammar': 'Speech recognition failed. Please try again.',
-                    'language-not-supported': 'Your browser\'s language is not supported for speech recognition. Please try speaking in English.'
+                    'not-allowed': 'Microphone access denied. Please allow microphone permissions and refresh the page.',
+                    'no-speech': 'No speech detected. Speech recognition will continue automatically.',
+                    'audio-capture': 'No microphone found. Please check your microphone connection and try again.',
+                    'network': 'Network error occurred. Check your internet connection. Speech recognition will attempt to restart.',
+                    'service-not-allowed': 'Speech service not allowed. This may be due to browser security settings.',
+                    'bad-grammar': 'Speech recognition failed. This is usually temporary - please continue speaking.',
+                    'language-not-supported': 'Your browser language is not supported. Try speaking in English or change your browser language.',
+                    'aborted': 'Speech recognition was stopped.'
                 };
                 
-                const message = errorMessages[event.error] || `Speech recognition error: ${event.error}`;
-                showToast(message, false);
+                const message = errorMessages[event.error] || `Speech recognition error: ${event.error}. Please try again.`;
                 
-                cleanupSpeechRecognition();
+                // Don't show toast for common recoverable errors in continuous mode
+                const recoverableErrors = ['no-speech', 'bad-grammar'];
+                if (!recoverableErrors.includes(event.error)) {
+                    showToast(message, false);
+                }
+                
+                // Auto-retry for network errors in continuous mode
+                if (event.error === 'network' && sttIsRecording) {
+                    console.log('Network error detected, attempting auto-recovery in 2 seconds...');
+                    setTimeout(() => {
+                        if (sttIsRecording && !sttRecognitionInstance) {
+                            console.log('Attempting to restart speech recognition after network error');
+                            handleSpeechRecognition();
+                        }
+                    }, 2000);
+                } else {
+                    cleanupSpeechRecognition();
+                }
             });
 
             sttRecognitionInstance.addEventListener('end', () => {
@@ -3752,9 +3830,7 @@
 
             try {
                 sttRecognitionInstance.start();
-                // Show processing indicator
-                sttButton.innerHTML = '🎙️';
-                sttButton.title = 'Listening... Click to stop';
+                // Processing indicator is already set, will be updated on start event
             } catch (error) {
                 console.error('Failed to start speech recognition:', error);
                 showToast('Failed to start speech recognition. Please try again.', false);
@@ -4010,6 +4086,39 @@
             }
         }
 
+        // Clean up old session storage backups to prevent memory bloat
+        function cleanupOldSessionBackups() {
+            try {
+                const keysToRemove = [];
+                const maxAge = 30 * 60 * 1000; // 30 minutes
+                const now = Date.now();
+                
+                for (let i = 0; i < sessionStorage.length; i++) {
+                    const key = sessionStorage.key(i);
+                    if (key && key.startsWith('script_backup_')) {
+                        try {
+                            const data = JSON.parse(sessionStorage.getItem(key));
+                            if (data && data.timestamp && (now - data.timestamp) > maxAge) {
+                                keysToRemove.push(key);
+                            }
+                        } catch (e) {
+                            // Invalid backup data, mark for removal
+                            keysToRemove.push(key);
+                        }
+                    }
+                }
+                
+                // Remove old backups
+                keysToRemove.forEach(key => sessionStorage.removeItem(key));
+                
+                if (keysToRemove.length > 0) {
+                    console.log(`Cleaned up ${keysToRemove.length} old session storage backups`);
+                }
+            } catch (error) {
+                console.warn('Error cleaning up old session backups:', error);
+            }
+        }
+
         function loadScriptContent() {
             if (!currentObservationId) {
                 console.warn('Cannot load script content: currentObservationId is not set');
@@ -4038,6 +4147,9 @@
                         observationId: currentObservationId,
                         hasContent: !!(content && typeof content === 'object' && Object.keys(content).length > 0)
                     });
+                    
+                    // Clean up old session storage backups
+                    cleanupOldSessionBackups();
                     
                     // Check for sessionStorage backup first (in case of unexpected closure)
                     const backupKey = `script_backup_${currentObservationId}`;
