@@ -3660,6 +3660,7 @@
         let sttInterimText = '';
         let sttInterimRange = null;
         let sttIsDisplayingInterim = false;
+        let sttFinalTextEndPosition = null; // Track where final text ends for live captions
         // For long observation sessions (20-40 minutes), we need continuous recognition
         // Chrome has built-in timeouts (~60s), so we auto-restart to maintain continuity
         const STT_AUTO_RESTART_INTERVAL_MS = 50000; // 50 second auto-restart to prevent browser timeout
@@ -3683,6 +3684,7 @@
             sttInterimText = '';
             sttInterimRange = null;
             sttIsDisplayingInterim = false;
+            sttFinalTextEndPosition = null;
             
             // Clear timeout if it exists
             if (sttTimeoutId) {
@@ -3809,12 +3811,18 @@
                 }
             }
             
-            // Get current cursor position
-            const currentRange = scriptQuill.getSelection(true);
-            if (!currentRange) return;
+            // Determine where to insert interim text (for live captions)
+            let insertIndex;
+            if (sttFinalTextEndPosition !== null) {
+                // Insert interim text after final text
+                insertIndex = sttFinalTextEndPosition;
+            } else {
+                // No final text yet, use current cursor position
+                const currentRange = scriptQuill.getSelection(true);
+                insertIndex = currentRange ? currentRange.index : 0;
+            }
             
             // Insert interim text with visual styling (gray, italic)
-            const insertIndex = currentRange.index;
             scriptQuill.insertText(insertIndex, interimText + ' ', 'api');
             scriptQuill.formatText(insertIndex, interimText.length, {
                 'color': '#666666',
@@ -3834,25 +3842,34 @@
             if (!scriptQuill) return;
             
             try {
+                // Remove any currently displayed interim text first
                 if (sttIsDisplayingInterim && sttInterimRange) {
-                    // Replace interim text with final text
                     scriptQuill.deleteText(sttInterimRange.index, sttInterimRange.length, 'api');
-                    scriptQuill.insertText(sttInterimRange.index, finalText + ' ', 'user');
-                    // Position cursor after final text
-                    scriptQuill.setSelection(sttInterimRange.index + finalText.length + 1, 0, 'user');
-                } else {
-                    // No interim text to replace, insert at current position
-                    const currentRange = scriptQuill.getSelection(true);
-                    if (currentRange) {
-                        scriptQuill.insertText(currentRange.index, finalText + ' ', 'user');
-                        scriptQuill.setSelection(currentRange.index + finalText.length + 1, 0, 'user');
-                    }
+                    sttIsDisplayingInterim = false;
+                    sttInterimRange = null;
+                    sttInterimText = '';
                 }
                 
-                // Clear interim text tracking
-                sttInterimText = '';
-                sttInterimRange = null;
-                sttIsDisplayingInterim = false;
+                // Determine where to insert final text (for live captions accumulation)
+                let insertPosition;
+                if (sttFinalTextEndPosition !== null) {
+                    // Continue appending after previous final text
+                    insertPosition = sttFinalTextEndPosition;
+                } else {
+                    // First final text - use current cursor position
+                    const currentRange = scriptQuill.getSelection(true);
+                    insertPosition = currentRange ? currentRange.index : 0;
+                }
+                
+                // Insert final text with space
+                const textToInsert = finalText + ' ';
+                scriptQuill.insertText(insertPosition, textToInsert, 'user');
+                
+                // Update the final text end position for next insertion
+                sttFinalTextEndPosition = insertPosition + textToInsert.length;
+                
+                // Position cursor after the new final text
+                scriptQuill.setSelection(sttFinalTextEndPosition, 0, 'user');
                 
             } catch (e) {
                 console.warn('Error inserting final transcript:', e);
@@ -3871,6 +3888,10 @@
                 
                 // Reset transcript index for new session
                 sttLastTranscriptIndex = 0;
+                
+                // Initialize final text position for live captions
+                const currentRange = scriptQuill.getSelection(true);
+                sttFinalTextEndPosition = currentRange ? currentRange.index : 0;
 
                 sttRecognitionInstance.addEventListener('start', () => {
                     sttIsRecording = true;
@@ -3901,39 +3922,47 @@
                         return;
                     }
                     
-                    // Process only new results to avoid duplicates in continuous mode
+                    // Process results for live captions - accumulate ALL final text
+                    let hasNewFinalResults = false;
                     let latestInterimTranscript = '';
-                    let hasLatestInterim = false;
+                    let hasInterimResult = false;
                     
+                    // First pass: Process all NEW final results (avoid duplicates)
                     for (let i = sttLastTranscriptIndex; i < e.results.length; i++) {
-                        if (e.results[i].length > 0) {
+                        if (e.results[i].length > 0 && e.results[i].isFinal) {
                             const transcript = e.results[i][0].transcript.trim();
-                            const isFinal = e.results[i].isFinal;
-                            
                             if (transcript.length > 0) {
-                                if (!isFinal) {
-                                    // Store the latest interim result, don't display yet
-                                    latestInterimTranscript = transcript;
-                                    hasLatestInterim = true;
-                                } else {
-                                    // Final result: Replace interim with final text
-                                    insertFinalTranscript(transcript);
-                                    // Reset button to recording state
-                                    sttButton.innerHTML = '🔴';
-                                    sttButton.title = 'Recording - Click to stop';
-                                }
+                                insertFinalTranscript(transcript);
+                                hasNewFinalResults = true;
                             }
                         }
                     }
                     
-                    // Display only the latest interim result (if any) to prevent word replacement
-                    if (hasLatestInterim) {
+                    // Second pass: Find the most recent interim result (if any)
+                    for (let i = e.results.length - 1; i >= 0; i--) {
+                        if (e.results[i].length > 0 && !e.results[i].isFinal) {
+                            const transcript = e.results[i][0].transcript.trim();
+                            if (transcript.length > 0) {
+                                latestInterimTranscript = transcript;
+                                hasInterimResult = true;
+                                break; // Only need the most recent interim result
+                            }
+                        }
+                    }
+                    
+                    // Update UI based on results
+                    if (hasInterimResult) {
+                        // Show interim text (live captions)
                         displayInterimTranscript(latestInterimTranscript);
-                        // Update button to show active transcription
                         sttButton.innerHTML = '🎙️';
                         sttButton.title = 'Transcribing... Click to stop';
+                    } else if (hasNewFinalResults) {
+                        // Just finalized some text, update button
+                        sttButton.innerHTML = '🔴';
+                        sttButton.title = 'Recording - Click to stop';
                     }
-                    // Update the index to track processed results
+                    
+                    // Track processed final results to avoid duplicates
                     sttLastTranscriptIndex = e.results.length;
                 }
             });
@@ -3975,16 +4004,10 @@
 
             sttRecognitionInstance.addEventListener('end', () => {
                 // Clean up any remaining interim text when session ends
-                if (sttIsDisplayingInterim && sttInterimRange && scriptQuill) {
+                if (sttIsDisplayingInterim && sttInterimText && scriptQuill) {
                     try {
-                        // Convert interim text to final before ending
-                        scriptQuill.formatText(sttInterimRange.index, sttInterimRange.length - 1, {
-                            'color': '#000000',
-                            'italic': false
-                        }, 'api');
-                        sttIsDisplayingInterim = false;
-                        sttInterimText = '';
-                        sttInterimRange = null;
+                        // Convert remaining interim text to final text (for live captions)
+                        insertFinalTranscript(sttInterimText);
                     } catch (e) {
                         console.warn('Could not finalize interim text on session end:', e);
                     }
