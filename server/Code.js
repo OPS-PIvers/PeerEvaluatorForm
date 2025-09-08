@@ -1144,7 +1144,7 @@ function updateObservationMetadata(observationId, metadata) {
                 const rootFolderIterator = DriveApp.getFoldersByName(DRIVE_FOLDER_INFO.ROOT_FOLDER_NAME);
                 if (rootFolderIterator.hasNext()) {
                     const rootFolder = rootFolderIterator.next();
-                    const userFolderName = `${observation.observedName} (${observation.observedEmail}`;
+                    const userFolderName = `${observation.observedName} (${observation.observedEmail})`;
                     const userFolderIterator = rootFolder.getFoldersByName(userFolderName);
                     if (userFolderIterator.hasNext()) {
                         const userFolder = userFolderIterator.next();
