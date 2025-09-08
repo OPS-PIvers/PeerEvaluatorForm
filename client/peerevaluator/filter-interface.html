@@ -3656,11 +3656,7 @@
         let sttAutoRestartTimeoutId = null;
         let sttIsInitializing = false; // Prevent race conditions during initialization
         let sttLastTranscriptIndex = 0; // Track processed results to avoid duplicates
-        // Live transcription variables
-        let sttInterimText = '';
-        let sttInterimRange = null;
-        let sttIsDisplayingInterim = false;
-        let sttFinalTextEndPosition = null; // Track where final text ends for live captions
+        let sttFinalTextEndPosition = null; // Track where final text ends for final-only transcription
         // For long observation sessions (20-40 minutes), we need continuous recognition
         // Chrome has built-in timeouts (~60s), so we auto-restart to maintain continuity
         const STT_AUTO_RESTART_INTERVAL_MS = 50000; // 50 second auto-restart to prevent browser timeout
@@ -3680,10 +3676,7 @@
             sttIsInitializing = false;
             sttLastTranscriptIndex = 0;
             
-            // Clear interim text tracking
-            sttInterimText = '';
-            sttInterimRange = null;
-            sttIsDisplayingInterim = false;
+            // Reset final text position
             sttFinalTextEndPosition = null;
             
             // Clear timeout if it exists
@@ -3798,59 +3791,13 @@
             }
         }
 
-        // Live transcription helper functions
-        function displayInterimTranscript(interimText) {
-            if (!scriptQuill) return;
-            
-            // If we're already displaying interim text, remove it first
-            if (sttIsDisplayingInterim && sttInterimRange) {
-                try {
-                    scriptQuill.deleteText(sttInterimRange.index, sttInterimRange.length, 'api');
-                } catch (e) {
-                    console.warn('Could not remove previous interim text:', e);
-                }
-            }
-            
-            // Determine where to insert interim text (for live captions)
-            let insertIndex;
-            if (sttFinalTextEndPosition !== null) {
-                // Insert interim text after final text
-                insertIndex = sttFinalTextEndPosition;
-            } else {
-                // No final text yet, use current cursor position
-                const currentRange = scriptQuill.getSelection(true);
-                insertIndex = currentRange ? currentRange.index : 0;
-            }
-            
-            // Insert interim text with visual styling (gray, italic)
-            scriptQuill.insertText(insertIndex, interimText + ' ', 'api');
-            scriptQuill.formatText(insertIndex, interimText.length, {
-                'color': '#666666',
-                'italic': true
-            }, 'api');
-            
-            // Store interim text info for later removal/replacement
-            sttInterimText = interimText;
-            sttInterimRange = { index: insertIndex, length: interimText.length + 1 };
-            sttIsDisplayingInterim = true;
-            
-            // Position cursor after interim text
-            scriptQuill.setSelection(insertIndex + interimText.length + 1, 0, 'api');
-        }
+        // Final-only transcription helper function
 
         function insertFinalTranscript(finalText) {
             if (!scriptQuill) return;
             
             try {
-                // Remove any currently displayed interim text first
-                if (sttIsDisplayingInterim && sttInterimRange) {
-                    scriptQuill.deleteText(sttInterimRange.index, sttInterimRange.length, 'api');
-                    sttIsDisplayingInterim = false;
-                    sttInterimRange = null;
-                    sttInterimText = '';
-                }
-                
-                // Determine where to insert final text (for live captions accumulation)
+                // Determine where to insert final text (accumulative transcription)
                 let insertPosition;
                 if (sttFinalTextEndPosition !== null) {
                     // Continue appending after previous final text
@@ -3883,7 +3830,7 @@
                 sttRecognitionInstance = new SpeechRecognition();
                 sttRecognitionInstance.lang = navigator.language || 'en-US';
                 sttRecognitionInstance.continuous = true; // Continuous for long observation sessions (20-40 min)
-                sttRecognitionInstance.interimResults = true; // Get interim results for better UX
+                sttRecognitionInstance.interimResults = false; // Final results only for reliable transcription
                 sttRecognitionInstance.maxAlternatives = 1;
                 
                 // Reset transcript index for new session
@@ -3922,12 +3869,10 @@
                         return;
                     }
                     
-                    // Process results for live captions - accumulate ALL final text
+                    // Process final results only - much simpler!
                     let hasNewFinalResults = false;
-                    let latestInterimTranscript = '';
-                    let hasInterimResult = false;
                     
-                    // First pass: Process all NEW final results (avoid duplicates)
+                    // Process all NEW final results (avoid duplicates)
                     for (let i = sttLastTranscriptIndex; i < e.results.length; i++) {
                         if (e.results[i].length > 0 && e.results[i].isFinal) {
                             const transcript = e.results[i][0].transcript.trim();
@@ -3938,31 +3883,13 @@
                         }
                     }
                     
-                    // Second pass: Find the most recent interim result (if any)
-                    for (let i = e.results.length - 1; i >= 0; i--) {
-                        if (e.results[i].length > 0 && !e.results[i].isFinal) {
-                            const transcript = e.results[i][0].transcript.trim();
-                            if (transcript.length > 0) {
-                                latestInterimTranscript = transcript;
-                                hasInterimResult = true;
-                                break; // Only need the most recent interim result
-                            }
-                        }
-                    }
-                    
-                    // Update UI based on results
-                    if (hasInterimResult) {
-                        // Show interim text (live captions)
-                        displayInterimTranscript(latestInterimTranscript);
-                        sttButton.innerHTML = '🎙️';
-                        sttButton.title = 'Transcribing... Click to stop';
-                    } else if (hasNewFinalResults) {
-                        // Just finalized some text, update button
+                    // Update button if we processed new results
+                    if (hasNewFinalResults) {
                         sttButton.innerHTML = '🔴';
                         sttButton.title = 'Recording - Click to stop';
                     }
                     
-                    // Track processed final results to avoid duplicates
+                    // Track processed results to avoid duplicates
                     sttLastTranscriptIndex = e.results.length;
                 }
             });
@@ -4003,15 +3930,7 @@
             });
 
             sttRecognitionInstance.addEventListener('end', () => {
-                // Clean up any remaining interim text when session ends
-                if (sttIsDisplayingInterim && sttInterimText && scriptQuill) {
-                    try {
-                        // Convert remaining interim text to final text (for live captions)
-                        insertFinalTranscript(sttInterimText);
-                    } catch (e) {
-                        console.warn('Could not finalize interim text on session end:', e);
-                    }
-                }
+                // No interim text to clean up - final results only!
                 
                 // For continuous long sessions, auto-restart unless manually stopped
                 if (sttIsRecording) {
@@ -4104,15 +4023,8 @@
                     const debounceTime = sttIsRecording ? SILENT_SAVE_DEBOUNCE_MS * 2 : SILENT_SAVE_DEBOUNCE_MS;
                     
                     scriptSaveDebounceTimer = setTimeout(() => {
-                        // Additional check: Don't save during active interim transcription
-                        if (!sttIsDisplayingInterim) {
-                            silentSaveScriptContent();
-                        } else {
-                            // Reschedule save after interim text becomes final
-                            scriptSaveDebounceTimer = setTimeout(() => {
-                                silentSaveScriptContent();
-                            }, 2000);
-                        }
+                        // No interim text to worry about - just save!
+                        silentSaveScriptContent();
                     }, debounceTime);
                 }
             });
