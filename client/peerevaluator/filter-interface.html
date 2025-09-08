@@ -3902,6 +3902,9 @@
                     }
                     
                     // Process only new results to avoid duplicates in continuous mode
+                    let latestInterimTranscript = '';
+                    let hasLatestInterim = false;
+                    
                     for (let i = sttLastTranscriptIndex; i < e.results.length; i++) {
                         if (e.results[i].length > 0) {
                             const transcript = e.results[i][0].transcript.trim();
@@ -3909,11 +3912,9 @@
                             
                             if (transcript.length > 0) {
                                 if (!isFinal) {
-                                    // Live transcription: Display interim results
-                                    displayInterimTranscript(transcript);
-                                    // Update button to show active transcription
-                                    sttButton.innerHTML = '🎙️';
-                                    sttButton.title = 'Transcribing... Click to stop';
+                                    // Store the latest interim result, don't display yet
+                                    latestInterimTranscript = transcript;
+                                    hasLatestInterim = true;
                                 } else {
                                     // Final result: Replace interim with final text
                                     insertFinalTranscript(transcript);
@@ -3923,6 +3924,14 @@
                                 }
                             }
                         }
+                    }
+                    
+                    // Display only the latest interim result (if any) to prevent word replacement
+                    if (hasLatestInterim) {
+                        displayInterimTranscript(latestInterimTranscript);
+                        // Update button to show active transcription
+                        sttButton.innerHTML = '🎙️';
+                        sttButton.title = 'Transcribing... Click to stop';
                     }
                     // Update the index to track processed results
                     sttLastTranscriptIndex = e.results.length;
