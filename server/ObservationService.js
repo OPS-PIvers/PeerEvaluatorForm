@@ -710,7 +710,7 @@ function _deleteRecordAndFolder(observationId, requestingUserEmail, allowedStatu
                 observedName: rowData[observedNameCol],
                 observedEmail: rowData[observedEmailCol]
             };
-            const obsFolder = _getObservationFolder(observationForFolder);
+            const obsFolder = getExistingObservationFolder(observationForFolder);
             if (obsFolder) {
                 obsFolder.setTrashed(true);
                 debugLog('Observation Drive folder moved to trash', { observationId: observationId, folderId: obsFolder.getId() });

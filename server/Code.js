@@ -2844,3 +2844,109 @@ function applyYearFiltering(domains, role, year) {
   return domains;
 }
 
+/**
+ * Test function to verify the fix for the orphaned folder bug.
+ * To run this test, you must first create a copy of the production spreadsheet for testing.
+ *
+ * INSTRUCTIONS:
+ * 1. Create a copy of the spreadsheet.
+ * 2. In the script editor, go to File > Project Properties > Script Properties.
+ * 3. Add/update a script property named 'TEST_SHEET_ID' with the ID of your test spreadsheet.
+ * 4. Run this function from the Apps Script Editor.
+ * 5. Check the logs for PASS/FAIL results.
+ */
+function test_OrphanedFolderBugFix() {
+    const originalSheetId = PropertiesService.getScriptProperties().getProperty('SHEET_ID');
+    const testSheetId = PropertiesService.getScriptProperties().getProperty('TEST_SHEET_ID');
+
+    if (!testSheetId) {
+        Logger.log('TEST SKIPPED: Script property "TEST_SHEET_ID" is not set. Cannot run test.');
+        return;
+    }
+
+    Logger.log('--- Starting Test: Orphaned Folder Bug Fix ---');
+
+    // Temporarily switch to the test spreadsheet
+    PropertiesService.getScriptProperties().setProperty('SHEET_ID', testSheetId);
+    Logger.log(`Switched to TEST spreadsheet (ID: ${testSheetId})`);
+
+    try {
+        // --- 1. SETUP ---
+        const obsSheet = openSpreadsheet().getSheetByName('Observation_Data');
+        if (!obsSheet) {
+            throw new Error('Test setup failed: "Observation_Data" sheet not found in the test spreadsheet.');
+        }
+
+        const testObsId = 'test-orphan-bug-' + new Date().getTime();
+        const observerEmail = Session.getActiveUser().getEmail();
+        const FOLDER_NAME = `Observation - ${testObsId}`;
+
+        // Clear any previous test data
+        const range = obsSheet.getRange("A:A").createTextFinder(testObsId).findNext();
+        if (range) {
+            obsSheet.deleteRow(range.getRow());
+        }
+        Logger.log('Setup: Cleaned up any previous test data.');
+
+        // Add a dummy observation record (simplified)
+        const headers = obsSheet.getRange(1, 1, 1, obsSheet.getLastColumn()).getValues()[0];
+        const rowData = new Array(headers.length).fill('');
+        rowData[headers.indexOf('observationId')] = testObsId;
+        rowData[headers.indexOf('observerEmail')] = observerEmail;
+        rowData[headers.indexOf('observedName')] = 'Test User';
+        rowData[headers.indexOf('observedEmail')] = 'test.user@example.com';
+        rowData[headers.indexOf('status')] = 'Draft';
+        rowData[headers.indexOf('createdAt')] = new Date().toISOString();
+        obsSheet.appendRow(rowData);
+        Logger.log(`Setup: Created dummy observation record with ID: ${testObsId}`);
+
+        // Verify no folder exists yet
+        const folders = DriveApp.getFoldersByName(FOLDER_NAME);
+        if (folders.hasNext()) {
+            Logger.log('WARNING: A folder for this test observation already exists. Deleting it to ensure a clean test.');
+            folders.next().setTrashed(true);
+        }
+        Logger.log('Setup: Confirmed no pre-existing Drive folder for this observation.');
+
+        // --- 2. EXECUTION ---
+        Logger.log('Execution: Calling deleteObservationRecord...');
+        const result = deleteObservationRecord(testObsId, observerEmail);
+        Logger.log(`Execution: deleteObservationRecord returned: ${JSON.stringify(result)}`);
+        if (!result.success) {
+            throw new Error(`Deletion failed: ${result.error}`);
+        }
+
+        // --- 3. VERIFICATION ---
+        Logger.log('Verification: Checking for orphaned folders...');
+        const foldersAfter = DriveApp.getFoldersByName(FOLDER_NAME);
+        if (foldersAfter.hasNext()) {
+            const createdFolder = foldersAfter.next();
+            createdFolder.setTrashed(true); // Clean up
+            throw new Error(`!!! TEST FAILED !!! A folder was created during deletion. Folder ID: ${createdFolder.getId()}`);
+        }
+
+        const rangeAfter = obsSheet.getRange("A:A").createTextFinder(testObsId).findNext();
+        if (rangeAfter) {
+            throw new Error('!!! TEST FAILED !!! The observation row was not deleted from the sheet.');
+        }
+
+        Logger.log('--- TEST PASSED ---');
+        Logger.log('Verification successful: No orphaned folder created, and sheet record was deleted.');
+
+    } catch (e) {
+        Logger.log(e.message);
+        Logger.log('--- TEST FAILED ---');
+    } finally {
+        // --- 4. TEARDOWN ---
+        // Restore the original spreadsheet ID
+        if (originalSheetId) {
+            PropertiesService.getScriptProperties().setProperty('SHEET_ID', originalSheetId);
+            Logger.log(`Teardown: Restored original spreadsheet ID.`);
+        } else {
+            // If there was no ID before, delete the one we set for the test.
+            PropertiesService.getScriptProperties().deleteProperty('SHEET_ID');
+            Logger.log(`Teardown: Cleared temporary spreadsheet ID property.`);
+        }
+        Logger.log('--- Test Finished ---');
+    }
+}
