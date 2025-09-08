@@ -2576,30 +2576,6 @@
             });
         }
 
-        // Enhanced toggle function with state persistence
-        function toggleLookFors(componentId) {
-            const parts = componentId.split('-');
-            const domainIdx = parts[1];
-            const componentIdx = parts[3];
-            
-            const content = document.getElementById('lookForsContent-' + domainIdx + '-' + componentIdx);
-            const chevron = document.getElementById('chevron-' + domainIdx + '-' + componentIdx);
-            
-            if (content && chevron) {
-                content.classList.toggle('expanded');
-                chevron.classList.toggle('expanded');
-
-                // Store state in sessionStorage for this session
-                try {
-                    const storageKey = 'lookFors_' + componentId + '_' + window.pageLoadInfo.cacheVersion;
-                    const isExpanded = content.classList.contains('expanded');
-                    sessionStorage.setItem(storageKey, isExpanded.toString());
-                } catch (e) {
-                    console.log('SessionStorage not available:', e);
-                }
-            }
-        }
-
         // Restore evidence section state on page load
         function restoreEvidenceState() {
             try {
@@ -2623,42 +2599,6 @@
                 }
             } catch (e) {
                 console.warn('Could not restore evidence section state:', e);
-            }
-        }
-
-        // Restore look-fors state on page load
-        function restoreLookForsState() {
-            try {
-                let expandedSections = [];
-                for (let i = 0; i < sessionStorage.length; i++) {
-                    const key = sessionStorage.key(i);
-                    if (key && key.startsWith('lookFors_') && key.endsWith('_' + window.pageLoadInfo.cacheVersion)) {
-                        const isExpanded = sessionStorage.getItem(key) === 'true';
-                        if (isExpanded) {
-                            const componentId = key.replace('lookFors_', '').replace('_' + window.pageLoadInfo.cacheVersion, '');
-                            expandedSections.push(componentId);
-                        }
-                    }
-                }
-
-                // Restore expanded state
-                expandedSections.forEach(function(componentId) {
-                    const parts = componentId.split('-');
-                    const domainIdx = parts[1];
-                    const componentIdx = parts[3];
-
-                    const content = document.getElementById('lookForsContent-' + domainIdx + '-' + componentIdx);
-                    const chevron = document.getElementById('chevron-' + domainIdx + '-' + componentIdx);
-
-                    if (content && chevron) {
-                        content.classList.add('expanded');
-                        chevron.classList.add('expanded');
-                    }
-                });
-
-                console.log('Restored state for', expandedSections.length, 'expanded sections');
-            } catch (e) {
-                console.log('Error restoring look-fors state:', e);
             }
         }
         
@@ -3106,6 +3046,7 @@
             // Initialize toggle UI and component visibility
             updateViewToggle();
             updateComponentVisibility();
+            restoreLookForsState(); // Restore the state of look-fors sections
             
             // Check for observations and show button if applicable
             checkForObservations();
@@ -3376,86 +3317,55 @@
             }
         }
 
-        // Look-fors toggle function for staff view (read-only)
+        // Consolidated toggle function for "look-fors" sections.
+        // This function handles all cases for toggling visibility, updating icons,
+        // and persisting state, removing the need for duplicate implementations.
         function toggleLookFors(contentId) {
             const content = document.getElementById(contentId);
-            const chevronId = 'chevron-' + contentId;
-            const chevron = document.getElementById(chevronId);
-            
-            if (content) {
-                const isExpanded = content.classList.contains('expanded');
-                content.classList.toggle('expanded');
-                
-                // Update chevron rotation
-                if (chevron) {
-                    if (isExpanded) {
-                        chevron.textContent = '▶';
-                        chevron.style.transform = 'rotate(0deg)';
-                    } else {
-                        chevron.textContent = '▼';
-                        chevron.style.transform = 'rotate(90deg)';
-                    }
-                }
-                
-                // Save state in sessionStorage for consistency with other sections
-                try {
-                    const storageKey = 'lookForsState_' + (window.pageLoadInfo?.cacheVersion || 'default');
-                    const allStates = JSON.parse(sessionStorage.getItem(storageKey) || '{}');
-                    allStates[contentId] = !isExpanded;
-                    sessionStorage.setItem(storageKey, JSON.stringify(allStates));
-                    console.log('Look-fors state saved:', contentId, !isExpanded);
-                } catch (e) {
-                    console.warn('Could not save look-fors state:', e);
-                }
-            }
-        }
-
-        // Toggle look-fors section visibility for staff view
-        function toggleLookFors(contentId) {
-            const content = document.getElementById(contentId);
-            const chevronId = 'chevron-' + contentId;
-            const chevron = document.getElementById(chevronId);
-            
-            if (!content || !chevron) {
-                console.warn('toggleLookFors: Could not find elements for', contentId);
+            if (!content) {
+                console.warn('toggleLookFors: Could not find content element for', contentId);
                 return;
             }
+
+            const chevronId = 'chevron-' + contentId;
+            const chevron = document.getElementById(chevronId);
             
             const isCurrentlyExpanded = content.classList.contains('expanded');
-            
-            if (isCurrentlyExpanded) {
-                // Collapse
-                content.classList.remove('expanded');
-                chevron.textContent = '▶';
-                chevron.style.transform = 'rotate(0deg)';
-            } else {
-                // Expand
-                content.classList.add('expanded');
-                chevron.textContent = '▼';
-                chevron.style.transform = 'rotate(90deg)';
+            content.classList.toggle('expanded');
+
+            // Update chevron icon based on the new state
+            if (chevron) {
+                if (isCurrentlyExpanded) {
+                    // If it was expanded, it's now collapsed
+                    chevron.textContent = '▶';
+                    chevron.style.transform = 'rotate(0deg)';
+                } else {
+                    // If it was collapsed, it's now expanded
+                    chevron.textContent = '▼';
+                    chevron.style.transform = 'rotate(90deg)';
+                }
             }
-            
-            // Save state in sessionStorage for persistence
+
+            // Save the new state to sessionStorage for persistence during the user's session
             try {
                 const storageKey = 'lookForsState_' + (window.pageLoadInfo?.cacheVersion || 'default');
                 const allStates = JSON.parse(sessionStorage.getItem(storageKey) || '{}');
                 allStates[contentId] = !isCurrentlyExpanded;
                 sessionStorage.setItem(storageKey, JSON.stringify(allStates));
-                console.log('Look-fors state saved:', contentId, !isCurrentlyExpanded);
+                console.log('Look-fors state saved:', { contentId: contentId, isExpanded: !isCurrentlyExpanded });
             } catch (e) {
                 console.warn('Could not save look-fors state:', e);
             }
         }
 
-        // Restore look-fors state for staff view format
-        function restoreStaffLookForsState() {
+        // Consolidated function to restore the state of all "look-fors" sections on page load.
+        function restoreLookForsState() {
             try {
                 const storageKey = 'lookForsState_' + (window.pageLoadInfo?.cacheVersion || 'default');
                 const allStates = JSON.parse(sessionStorage.getItem(storageKey) || '{}');
                 
                 Object.keys(allStates).forEach(function(contentId) {
-                    const isExpanded = allStates[contentId];
-                    if (isExpanded) {
+                    if (allStates[contentId]) { // If the saved state is "expanded"
                         const content = document.getElementById(contentId);
                         const chevronId = 'chevron-' + contentId;
                         const chevron = document.getElementById(chevronId);
@@ -3468,9 +3378,9 @@
                     }
                 });
                 
-                console.log('Restored staff look-fors state for', Object.keys(allStates).length, 'sections');
+                console.log('Restored look-fors state for', Object.keys(allStates).length, 'sections');
             } catch (e) {
-                console.warn('Could not restore staff look-fors state:', e);
+                console.warn('Could not restore look-fors state:', e);
             }
         }
 
