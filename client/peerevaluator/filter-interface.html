@@ -11,6 +11,8 @@
     <!-- Quill.js for rich text editing -->
     <link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.js"></script>
+    <!-- Lame.js for MP3 encoding -->
+    <script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js"></script>
     <style>
 :root {
     --color-white: white;
@@ -3058,15 +3060,35 @@
             if (!state.isRecording) {
                 try {
                     state.stream = await navigator.mediaDevices.getUserMedia(config.constraints);
-                    state.recorder = new MediaRecorder(state.stream);
+
+                    let options = {};
+                    if (type === 'audio') {
+                        // Request a specific mimeType that is likely to be uncompressed, like WAV
+                        // This provides a better source for MP3 encoding.
+                        options = { mimeType: 'audio/wav' };
+                        if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                            options = { mimeType: 'audio/webm' }; // Fallback
+                        }
+                    } else if (type === 'video') {
+                        options = { mimeType: 'video/mp4' };
+                        if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                            console.warn('video/mp4 not supported, falling back to video/webm');
+                            options = { mimeType: 'video/webm' };
+                        }
+                    }
+
+                    state.recorder = new MediaRecorder(state.stream, options);
 
                     const chunks = [];
                     state.recorder.ondataavailable = event => chunks.push(event.data);
 
                     state.recorder.onstop = () => {
-                        const mimeType = type === 'audio' ? 'audio/webm' : 'video/webm';
-                        const blob = new Blob(chunks, { type: mimeType });
-                        uploadRecording(blob, type);
+                        const blob = new Blob(chunks, { type: state.recorder.mimeType });
+                        if (type === 'audio') {
+                            encodeAudioToMp3(blob);
+                        } else {
+                            uploadRecording(blob, 'video');
+                        }
                     };
 
                     state.recorder.start();
@@ -3095,9 +3117,53 @@
             await toggleRecording('video');
         }
 
+        function encodeAudioToMp3(audioBlob) {
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const arrayBuffer = event.target.result;
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                audioContext.decodeAudioData(arrayBuffer, (audioBuffer) => {
+                    const mp3encoder = new lamejs.Mp3Encoder(1, audioBuffer.sampleRate, 128);
+                    const samples = audioBuffer.getChannelData(0);
+                    const mp3Data = [];
+
+                    const sampleBlockSize = 1152;
+                    for (let i = 0; i < samples.length; i += sampleBlockSize) {
+                        const sampleChunk = samples.subarray(i, i + sampleBlockSize);
+                        const mp3buf = mp3encoder.encodeBuffer(sampleChunk);
+                        if (mp3buf.length > 0) {
+                            mp3Data.push(new Int8Array(mp3buf));
+                        }
+                    }
+                    const mp3buf = mp3encoder.flush();
+                    if (mp3buf.length > 0) {
+                        mp3Data.push(new Int8Array(mp3buf));
+                    }
+
+                    const mp3Blob = new Blob(mp3Data, { type: 'audio/mp3' });
+                    uploadRecording(mp3Blob, 'audio');
+                }, (error) => {
+                    showToast('Failed to decode audio: ' + error.message, false);
+                });
+            };
+            reader.readAsArrayBuffer(audioBlob);
+        }
+
         function uploadRecording(blob, type) {
             const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-            const filename = `${type}-recording-${timestamp}.webm`;
+            let extension;
+            if (type === 'audio') {
+                extension = 'mp3';
+            } else if (type === 'video') {
+                if (blob.type.includes('mp4')) {
+                    extension = 'mp4';
+                } else {
+                    extension = 'webm';
+                }
+            } else {
+                extension = 'bin'; // fallback for unknown type
+            }
+            const filename = `${type}-recording-${timestamp}.${extension}`;
 
             // Convert blob to base64
             const reader = new FileReader();
