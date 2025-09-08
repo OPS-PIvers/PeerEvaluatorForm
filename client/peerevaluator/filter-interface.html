@@ -3290,6 +3290,58 @@
         }
         
         /**
+         * Removes all orphaned Quill elements globally from the document
+         * This prevents toolbar duplication issues when recreating editors
+         */
+        function removeOrphanedQuillElements() {
+            let removedCount = 0;
+            
+            try {
+                // Find all Quill toolbars globally (not just in script editor)
+                const orphanedToolbars = document.querySelectorAll('.ql-toolbar');
+                orphanedToolbars.forEach(toolbar => {
+                    console.log('Removing orphaned Quill toolbar:', toolbar);
+                    toolbar.remove();
+                    removedCount++;
+                });
+                
+                // Find all Quill containers globally
+                const orphanedContainers = document.querySelectorAll('.ql-container');
+                orphanedContainers.forEach(container => {
+                    // Only remove if not inside our target script editor
+                    const scriptEditor = document.getElementById('scriptEditor');
+                    if (!scriptEditor || !scriptEditor.contains(container)) {
+                        console.log('Removing orphaned Quill container:', container);
+                        container.remove();
+                        removedCount++;
+                    }
+                });
+                
+                // Find all Quill editors globally
+                const orphanedEditors = document.querySelectorAll('.ql-editor');
+                orphanedEditors.forEach(editor => {
+                    // Only remove if not inside our target script editor
+                    const scriptEditor = document.getElementById('scriptEditor');
+                    if (!scriptEditor || !scriptEditor.contains(editor)) {
+                        console.log('Removing orphaned Quill editor:', editor);
+                        editor.remove();
+                        removedCount++;
+                    }
+                });
+                
+                if (removedCount > 0) {
+                    console.log(`Removed ${removedCount} orphaned Quill elements globally`);
+                }
+                
+                return removedCount;
+                
+            } catch (error) {
+                console.error('Error removing orphaned Quill elements:', error);
+                return 0;
+            }
+        }
+
+        /**
          * Completely resets the script editor container to pristine state
          * This utility function ensures no leftover Quill DOM elements remain
          */
@@ -3299,6 +3351,12 @@
             // Clean up speech recognition first
             cleanupSpeechRecognition();
             
+            // FIRST: Remove any orphaned Quill elements globally (fixes toolbar duplication)
+            const orphanedCount = removeOrphanedQuillElements();
+            if (orphanedCount > 0) {
+                console.log(`Fixed toolbar duplication: removed ${orphanedCount} orphaned elements`);
+            }
+            
             const container = document.getElementById('scriptEditor');
             if (!container) {
                 console.warn('Script editor container not found');
@@ -3306,6 +3364,12 @@
             }
             
             try {
+                // Count existing toolbars for diagnostics
+                const existingToolbars = document.querySelectorAll('#scriptEditor .ql-toolbar').length;
+                if (existingToolbars > 0) {
+                    console.log(`Found ${existingToolbars} existing toolbars in container before cleanup`);
+                }
+                
                 // Remove all Quill-generated content
                 container.innerHTML = '';
                 
@@ -3322,6 +3386,12 @@
                 // Clear any remaining Quill references
                 if (container.__quill) {
                     delete container.__quill;
+                }
+                
+                // Final verification: ensure no toolbars remain
+                const remainingToolbars = document.querySelectorAll('#scriptEditor .ql-toolbar').length;
+                if (remainingToolbars > 0) {
+                    console.warn(`Warning: ${remainingToolbars} toolbars still remain after cleanup`);
                 }
                 
                 console.log('Script editor container reset successfully');
@@ -4008,6 +4078,27 @@
             }
 
             console.log('Script Quill editor initialized successfully');
+            
+            // DIAGNOSTIC: Check toolbar count after initialization
+            const postInitToolbars = document.querySelectorAll('.ql-toolbar').length;
+            const scriptEditorToolbars = document.querySelectorAll('#scriptEditor .ql-toolbar').length;
+            console.log(`Post-initialization toolbar count: ${postInitToolbars} total, ${scriptEditorToolbars} in script editor`);
+            
+            if (postInitToolbars > 1) {
+                console.warn(`WARNING: Found ${postInitToolbars} toolbars after initialization - toolbar duplication detected!`);
+                // Log details of each toolbar for debugging
+                document.querySelectorAll('.ql-toolbar').forEach((toolbar, index) => {
+                    console.warn(`Toolbar ${index + 1}:`, {
+                        parent: toolbar.parentElement?.id || 'unknown',
+                        classes: Array.from(toolbar.classList),
+                        location: toolbar.parentElement?.outerHTML?.substring(0, 100) || 'unknown'
+                    });
+                });
+            } else if (postInitToolbars === 1) {
+                console.log('✓ Toolbar duplication fix successful: exactly 1 toolbar found');
+            } else {
+                console.error('ERROR: No toolbars found after initialization - this should not happen');
+            }
 
             // Load existing content for current observation
             loadScriptContent();
@@ -4097,17 +4188,34 @@
                     return;
                 }
                 
-                // Check for leftover Quill elements that might cause toolbar duplication
+                // ENHANCED CLEANUP: Check for toolbar duplication issues before initialization
+                
+                // 1. Check for leftover Quill elements in container
                 const hasQuillElements = container.querySelector('.ql-toolbar, .ql-container, .ql-editor');
                 if (hasQuillElements) {
                     console.warn('Found leftover Quill elements in container, cleaning up...');
                     resetScriptEditorContainer();
                 }
                 
-                // Additional check for any Quill-related classes or attributes
+                // 2. Check for orphaned toolbars globally (main fix for toolbar duplication)
+                const globalToolbars = document.querySelectorAll('.ql-toolbar').length;
+                if (globalToolbars > 0) {
+                    console.warn(`Found ${globalToolbars} orphaned toolbars globally, performing global cleanup...`);
+                    removeOrphanedQuillElements();
+                }
+                
+                // 3. Check for any Quill-related classes or attributes on container
                 if (container.classList.length > 0 || container.hasAttribute('data-quill')) {
                     console.warn('Container has Quill-related attributes, resetting...');
                     resetScriptEditorContainer();
+                }
+                
+                // 4. Final diagnostic before initialization
+                const finalToolbarCount = document.querySelectorAll('.ql-toolbar').length;
+                if (finalToolbarCount > 0) {
+                    console.warn(`Warning: Still found ${finalToolbarCount} toolbars after cleanup - this may cause duplication`);
+                } else {
+                    console.log('Pre-initialization cleanup complete - no existing toolbars found');
                 }
 
                 initializeQuillWithSpeech();
@@ -4231,6 +4339,22 @@
             // Re-enable the Quill editor
             if (scriptQuill) {
                 scriptQuill.enable();
+            }
+            
+            // FINAL DIAGNOSTIC: Verify toolbar duplication fix after editor is fully loaded
+            const finalToolbarCount = document.querySelectorAll('.ql-toolbar').length;
+            const sttButtonCount = document.querySelectorAll('.ql-stt-button').length;
+            
+            console.log(`Script editor fully loaded - Final toolbar check: ${finalToolbarCount} toolbars, ${sttButtonCount} STT buttons`);
+            
+            if (finalToolbarCount > 1) {
+                console.error(`TOOLBAR DUPLICATION DETECTED: ${finalToolbarCount} toolbars found after editor load`);
+            } else if (sttButtonCount === 0) {
+                console.warn('Warning: STT button not found - microphone functionality may be missing from toolbar');
+            } else if (sttButtonCount > 1) {
+                console.warn(`Warning: Multiple STT buttons found (${sttButtonCount}) - duplicate functionality detected`);
+            } else {
+                console.log('✓ Script editor loaded successfully with single toolbar and STT button');
             }
         }
 
