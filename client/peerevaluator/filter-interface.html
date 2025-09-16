@@ -539,6 +539,54 @@
             animation: pulse 1.5s infinite;
         }
 
+        /* Recording Timer Display Styling */
+        .timer-display {
+            margin: 8px 0;
+            font-size: 0.9rem;
+        }
+
+        .recording-timer {
+            background: var(--color-gray-bg-light);
+            border: 1px solid var(--color-gray-border-light);
+            border-radius: 6px;
+            padding: 12px;
+            text-align: center;
+            min-width: 200px;
+        }
+
+        .timer-info {
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--color-text-main);
+        }
+
+        .timer-progress {
+            background: var(--color-gray-bg-medium);
+            border-radius: 3px;
+            height: 6px;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            background: var(--color-green-base);
+            height: 100%;
+            transition: width 0.3s ease;
+            border-radius: 3px;
+        }
+
+        .timer-warning .recording-timer {
+            background: #fff3cd;
+            border-color: #ffc107;
+        }
+
+        .timer-warning .timer-info {
+            color: #856404;
+        }
+
+        .timer-warning .progress-bar {
+            background: var(--color-red-base);
+        }
+
         /* Speech-to-Text Button Styling */
         .ql-stt-button {
             background: var(--color-blue-base);
@@ -1853,14 +1901,14 @@
         function hideError() { document.getElementById('error').style.display = 'none'; }
         function handleError(error) { console.error('AJAX Error:', error); showError(error); }
 
-        function showToast(message, isSuccess = false) {
+        function showToast(message, isSuccess = false, duration = 4000) {
             const toast = document.getElementById('toastNotification');
             toast.textContent = message;
             toast.className = 'toast-notification' + (isSuccess ? ' success' : '');
             toast.classList.add('show');
             setTimeout(function() {
                 toast.classList.remove('show');
-            }, 4000);
+            }, duration);
         }
 
         let currentFilters = { role: null, year: null, staff: null };
@@ -2421,9 +2469,11 @@
                     <button class="global-tool-btn" id="recordAudioBtn" onclick="toggleAudioRecording()">
                         🎤 Record Audio
                     </button>
+                    <div id="audioTimerDisplay" class="timer-display"></div>
                     <button class="global-tool-btn" id="recordVideoBtn" onclick="toggleVideoRecording()">
                         📹 Record Video
                     </button>
+                    <div id="videoTimerDisplay" class="timer-display"></div>
                     <button class="global-tool-btn" id="scriptEditorBtn" onclick="openScriptEditor()">
                         📝 Script Editor
                     </button>
@@ -3252,9 +3302,29 @@
 
         // Consolidated recording state management
         const recordingState = {
-            audio: { recorder: null, stream: null, isRecording: false },
-            video: { recorder: null, stream: null, isRecording: false }
+            audio: { 
+                recorder: null, 
+                stream: null, 
+                isRecording: false,
+                timer: null,
+                startTime: null,
+                sessionCount: 0,
+                totalSessionTime: 0
+            },
+            video: { 
+                recorder: null, 
+                stream: null, 
+                isRecording: false,
+                timer: null,
+                startTime: null,
+                sessionCount: 0,
+                totalSessionTime: 0
+            }
         };
+
+        // Recording constants
+        const RECORDING_MAX_DURATION_MS = 10 * 60 * 1000; // 10 minutes
+        const WARNING_TIMES = [30000, 10000]; // 30 seconds, 10 seconds
 
         // Global AudioContext for reuse across recordings (performance optimization)
         let globalAudioContext = null;
@@ -3274,6 +3344,263 @@
                 int16Array[i] = Math.round(clampedValue * 32767);
             }
             return int16Array;
+        }
+
+        // Recording timer functions
+        function startRecordingTimer(type) {
+            const state = recordingState[type];
+            state.startTime = Date.now();
+            state.sessionCount++;
+            
+            updateTimerDisplay(type);
+            
+            state.timer = setInterval(() => {
+                updateTimerDisplay(type);
+                checkRecordingWarnings(type);
+            }, 1000);
+        }
+
+        function stopRecordingTimer(type) {
+            const state = recordingState[type];
+            if (state.timer) {
+                clearInterval(state.timer);
+                state.timer = null;
+            }
+            
+            if (state.startTime) {
+                const sessionDuration = Date.now() - state.startTime;
+                state.totalSessionTime += sessionDuration;
+                state.startTime = null;
+            }
+            
+            hideTimerDisplay(type);
+        }
+
+        function updateTimerDisplay(type) {
+            const state = recordingState[type];
+            if (!state.startTime) return;
+            
+            const elapsed = Date.now() - state.startTime;
+            const remaining = Math.max(0, RECORDING_MAX_DURATION_MS - elapsed);
+            const remainingSeconds = Math.ceil(remaining / 1000);
+            const minutes = Math.floor(remainingSeconds / 60);
+            const seconds = remainingSeconds % 60;
+            
+            const displayElement = document.getElementById(`${type}TimerDisplay`);
+            if (displayElement) {
+                const formattedTime = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                const percentage = ((RECORDING_MAX_DURATION_MS - remaining) / RECORDING_MAX_DURATION_MS) * 100;
+                
+                displayElement.innerHTML = `
+                    <div class="recording-timer">
+                        <div class="timer-info">
+                            🔴 Recording ${state.sessionCount} (${formattedTime} remaining)
+                        </div>
+                        <div class="timer-progress">
+                            <div class="progress-bar" style="width: ${percentage}%"></div>
+                        </div>
+                    </div>
+                `;
+                
+                // Add warning styling for last 30 seconds
+                if (remaining <= 30000) {
+                    displayElement.classList.add('timer-warning');
+                } else {
+                    displayElement.classList.remove('timer-warning');
+                }
+            }
+            
+            // Auto-stop when time limit reached
+            if (remaining <= 0) {
+                autoStopRecording(type);
+            }
+        }
+
+        function hideTimerDisplay(type) {
+            const displayElement = document.getElementById(`${type}TimerDisplay`);
+            if (displayElement) {
+                displayElement.innerHTML = '';
+                displayElement.classList.remove('timer-warning');
+            }
+        }
+
+        function checkRecordingWarnings(type) {
+            const state = recordingState[type];
+            if (!state.startTime) return;
+            
+            const elapsed = Date.now() - state.startTime;
+            const remaining = RECORDING_MAX_DURATION_MS - elapsed;
+            
+            for (const warningTime of WARNING_TIMES) {
+                if (remaining <= warningTime && remaining > warningTime - 1000) {
+                    const seconds = Math.ceil(warningTime / 1000);
+                    showToast(`Recording will stop in ${seconds} seconds`, false, 3000);
+                    break;
+                }
+            }
+        }
+
+        function autoStopRecording(type) {
+            const state = recordingState[type];
+            const config = recordingConfig[type];
+            
+            if (state.isRecording) {
+                // Stop the recording
+                state.recorder.stop();
+                state.stream.getTracks().forEach(track => track.stop());
+                state.isRecording = false;
+                
+                // Update button
+                const btn = document.getElementById(config.buttonId);
+                btn.textContent = config.stopText;
+                btn.classList.remove('recording');
+                
+                stopRecordingTimer(type);
+                
+                // Show auto-stop notification and restart option
+                showRecordingStoppedNotification(type);
+            }
+        }
+
+        function showRecordingStoppedNotification(type) {
+            const typeText = type === 'audio' ? 'Audio' : 'Video';
+            const totalMinutes = Math.floor(recordingState[type].totalSessionTime / 60000);
+            const totalSeconds = Math.floor((recordingState[type].totalSessionTime % 60000) / 1000);
+            
+            const message = `${typeText} recording stopped (10-minute limit reached). 
+                            Session ${recordingState[type].sessionCount} saved. 
+                            Total recorded: ${totalMinutes}:${totalSeconds.toString().padStart(2, '0')}`;
+            
+            showToast(message, true, 5000);
+            
+            // Show restart button
+            showRestartRecordingOption(type);
+        }
+
+        function showRestartRecordingOption(type) {
+            const config = recordingConfig[type];
+            const btn = document.getElementById(config.buttonId);
+            const typeText = type === 'audio' ? 'Audio' : 'Video';
+            
+            // Temporarily change button to show restart option
+            const originalText = btn.textContent;
+            btn.textContent = `▶️ Continue ${typeText} Recording`;
+            btn.style.backgroundColor = '#4CAF50';
+            
+            // Reset button styling after 10 seconds
+            setTimeout(() => {
+                btn.textContent = originalText;
+                btn.style.backgroundColor = '';
+            }, 10000);
+        }
+
+        // Session overview functions
+        function getSessionSummary(type) {
+            const state = recordingState[type];
+            const totalMinutes = Math.floor(state.totalSessionTime / 60000);
+            const totalSeconds = Math.floor((state.totalSessionTime % 60000) / 1000);
+            const formattedTime = `${totalMinutes}:${totalSeconds.toString().padStart(2, '0')}`;
+            
+            return {
+                sessionCount: state.sessionCount,
+                totalTime: formattedTime,
+                totalTimeMs: state.totalSessionTime
+            };
+        }
+
+        function logSessionSummary() {
+            const audioSummary = getSessionSummary('audio');
+            const videoSummary = getSessionSummary('video');
+            
+            console.log('Recording Session Summary:', {
+                audio: audioSummary,
+                video: videoSummary
+            });
+            
+            if (audioSummary.sessionCount > 0 || videoSummary.sessionCount > 0) {
+                let message = 'Recording Session Summary:\n';
+                if (audioSummary.sessionCount > 0) {
+                    message += `Audio: ${audioSummary.sessionCount} recordings, ${audioSummary.totalTime} total\n`;
+                }
+                if (videoSummary.sessionCount > 0) {
+                    message += `Video: ${videoSummary.sessionCount} recordings, ${videoSummary.totalTime} total`;
+                }
+                showToast(message, true, 8000);
+            }
+        }
+
+        // Function to reset recording session data (useful when starting a new observation)
+        function resetRecordingSessions() {
+            for (const type of ['audio', 'video']) {
+                const state = recordingState[type];
+                
+                // Stop any active recordings first
+                if (state.isRecording) {
+                    try {
+                        state.recorder.stop();
+                        state.stream.getTracks().forEach(track => track.stop());
+                    } catch (e) {
+                        console.warn(`Error stopping ${type} recording:`, e);
+                    }
+                }
+                
+                // Clear timers
+                if (state.timer) {
+                    clearInterval(state.timer);
+                    state.timer = null;
+                }
+                
+                // Reset state
+                state.recorder = null;
+                state.stream = null;
+                state.isRecording = false;
+                state.startTime = null;
+                state.sessionCount = 0;
+                state.totalSessionTime = 0;
+                
+                // Reset UI
+                const config = recordingConfig[type];
+                const btn = document.getElementById(config.buttonId);
+                if (btn) {
+                    btn.textContent = config.stopText;
+                    btn.classList.remove('recording');
+                    btn.style.backgroundColor = '';
+                }
+                
+                hideTimerDisplay(type);
+            }
+            
+            console.log('Recording sessions reset');
+        }
+
+        // Development helper function for testing (can be removed in production)
+        function testRecordingSystem() {
+            console.log('Testing 10-minute recording system...');
+            
+            // Test timer display updates
+            console.log('Audio session summary:', getSessionSummary('audio'));
+            console.log('Video session summary:', getSessionSummary('video'));
+            
+            // Test UI elements exist
+            const audioBtn = document.getElementById('recordAudioBtn');
+            const videoBtn = document.getElementById('recordVideoBtn');
+            const audioTimer = document.getElementById('audioTimerDisplay');
+            const videoTimer = document.getElementById('videoTimerDisplay');
+            
+            console.log('UI Elements Check:', {
+                audioBtn: !!audioBtn,
+                videoBtn: !!videoBtn,
+                audioTimer: !!audioTimer,
+                videoTimer: !!videoTimer
+            });
+            
+            if (audioBtn && videoBtn && audioTimer && videoTimer) {
+                console.log('✅ All recording system components properly initialized');
+                return true;
+            } else {
+                console.error('❌ Missing recording system components');
+                return false;
+            }
         }
 
         // Recording configuration
@@ -3321,6 +3648,16 @@
                     const chunks = [];
                     state.recorder.ondataavailable = event => chunks.push(event.data);
 
+                    state.recorder.onerror = (event) => {
+                        console.error('Recording error:', event);
+                        showToast(`Recording failed: ${event.error || 'Unknown error'}. Try shorter recordings.`, false);
+                        // Reset recording state
+                        state.isRecording = false;
+                        btn.textContent = config.stopText;
+                        btn.classList.remove('recording');
+                        stopRecordingTimer(type);
+                    };
+
                     state.recorder.onstop = () => {
                         const blob = new Blob(chunks, { type: state.recorder.mimeType });
                         if (type === 'audio') {
@@ -3334,6 +3671,9 @@
                     state.isRecording = true;
                     btn.textContent = config.startText;
                     btn.classList.add('recording');
+                    
+                    // Start the recording timer
+                    startRecordingTimer(type);
 
                 } catch (error) {
                     showToast(config.errorMessage + error.message, false);
@@ -3344,6 +3684,9 @@
                 state.isRecording = false;
                 btn.textContent = config.stopText;
                 btn.classList.remove('recording');
+                
+                // Stop the recording timer
+                stopRecordingTimer(type);
             }
         }
 
@@ -3504,6 +3847,7 @@
 
         function uploadRecording(blob, type) {
             const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            const sessionNumber = recordingState[type].sessionCount;
             let extension;
             
             if (type === 'audio') {
@@ -3523,7 +3867,7 @@
             } else {
                 extension = 'bin'; // fallback for unknown type
             }
-            const filename = `${type}-recording-${timestamp}.${extension}`;
+            const filename = `${type}-recording-${sessionNumber}-${timestamp}.${extension}`;
             
             console.log('Uploading recording:', { 
                 type, 
