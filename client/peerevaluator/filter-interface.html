@@ -140,6 +140,139 @@
         .action-title { font-weight: 600; color: var(--color-gray-text-light); font-size: 1.1rem; margin-bottom: 8px; }
         .action-desc { color: var(--color-text-deemphasized); font-size: 0.95rem; }
 
+        /* Staff List Styles */
+        .staff-filter-container {
+            margin-bottom: 25px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .filter-toggle-group {
+            display: flex;
+            background: var(--color-white);
+            border: 2px solid var(--color-gray-border-medium);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .filter-toggle-btn {
+            padding: 12px 24px;
+            background: var(--color-white);
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.95rem;
+            color: var(--color-gray-text-light);
+            transition: all 0.2s ease;
+            border-right: 1px solid var(--color-gray-border-medium);
+        }
+
+        .filter-toggle-btn:last-child {
+            border-right: none;
+        }
+
+        .filter-toggle-btn:hover {
+            background: var(--color-gray-bg-light);
+            color: var(--color-blue-base);
+        }
+
+        .filter-toggle-btn.active {
+            background: var(--color-blue-base);
+            color: var(--color-white);
+        }
+
+        .staff-list-container {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .staff-list-item {
+            background: var(--color-white);
+            border: 2px solid var(--color-gray-border-medium);
+            border-radius: 8px;
+            padding: 20px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .staff-list-item:hover {
+            border-color: var(--color-blue-base);
+            background: var(--color-gray-bg-light);
+            transform: translateX(4px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .staff-item-main {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .staff-item-icon {
+            font-size: 1.8rem;
+            color: var(--color-blue-base);
+        }
+
+        .staff-item-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .staff-item-name {
+            font-weight: 600;
+            font-size: 1.1rem;
+            color: var(--color-gray-text-light);
+            margin-bottom: 4px;
+        }
+
+        .staff-item-details {
+            font-size: 0.9rem;
+            color: var(--color-text-deemphasized);
+        }
+
+        .staff-item-year-badge {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .staff-item-year-badge.tenured {
+            background: var(--color-green-light);
+            color: var(--color-green-dark);
+            border: 1px solid var(--color-green-base);
+        }
+
+        .staff-item-year-badge.probationary {
+            background: var(--color-orange-light);
+            color: var(--color-orange-dark);
+            border: 1px solid var(--color-orange-base);
+        }
+
+        /* Responsive adjustments for staff list */
+        @media (max-width: 768px) {
+            .staff-list-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 12px;
+            }
+
+            .staff-item-main {
+                width: 100%;
+            }
+
+            .filter-toggle-btn {
+                padding: 10px 16px;
+                font-size: 0.9rem;
+            }
+        }
+
         /* Filter controls */
         .custom-filters, .observation-selector {
             background: var(--color-gray-bg-light);
@@ -1551,7 +1684,18 @@
             </div>
             <div class="custom-filters" id="adminStaffListView" style="display: none;">
                 <h2 class="section-title"><span>👥</span> Summative Year Staff</h2>
-                <div class="actions-grid" id="adminStaffGrid">
+                
+                <!-- Filter Toggle Buttons -->
+                <div class="staff-filter-container">
+                    <div class="filter-toggle-group">
+                        <button class="filter-toggle-btn active" data-filter="all" onclick="filterStaffList('all')">All</button>
+                        <button class="filter-toggle-btn" data-filter="tenured" onclick="filterStaffList('tenured')">Tenured</button>
+                        <button class="filter-toggle-btn" data-filter="probationary" onclick="filterStaffList('probationary')">Probationary</button>
+                    </div>
+                </div>
+                
+                <!-- Staff List Container -->
+                <div class="staff-list-container" id="adminStaffList">
                     <!-- Staff list will be populated here -->
                 </div>
             </div>
@@ -3003,6 +3147,9 @@
                 .getStaffListForDropdown(null, null);
         }
 
+        // Store staff data globally for filtering
+        let allStaffData = [];
+
         function populateAdminStaffList(result) {
             hideLoading();
             if (!result.success) {
@@ -3010,37 +3157,97 @@
                 return;
             }
 
-            const grid = document.getElementById('adminStaffGrid');
-            grid.innerHTML = ''; // Clear existing content
+            // Store the staff data for filtering
+            allStaffData = result.staff || [];
+            
+            // Initially show all staff (default filter)
+            renderStaffList(allStaffData);
+        }
 
-            if (result.staff && result.staff.length > 0) {
-                result.staff.forEach(staff => {
-                    const card = document.createElement('div');
-                    card.className = 'action-card';
-                    card.onclick = () => displayObservationOptions(staff.email, staff.name);
+        function renderStaffList(staffToShow) {
+            const container = document.getElementById('adminStaffList');
+            container.innerHTML = ''; // Clear existing content
+
+            if (staffToShow && staffToShow.length > 0) {
+                staffToShow.forEach(staff => {
+                    const listItem = document.createElement('div');
+                    listItem.className = 'staff-list-item';
+                    listItem.onclick = () => displayObservationOptions(staff.email, staff.name);
+
+                    // Determine if probationary (year 0) or tenured (year > 0)
+                    const isProbationary = staff.year === 0 || staff.year === 'Probationary';
+                    
+                    // Set data attribute for filtering
+                    listItem.setAttribute('data-staff-type', isProbationary ? 'probationary' : 'tenured');
+
+                    const mainSection = document.createElement('div');
+                    mainSection.className = 'staff-item-main';
 
                     const icon = document.createElement('span');
-                    icon.className = 'action-icon';
+                    icon.className = 'staff-item-icon';
                     icon.textContent = '👤';
 
-                    const title = document.createElement('div');
-                    title.className = 'action-title';
-                    title.textContent = staff.name;
+                    const infoSection = document.createElement('div');
+                    infoSection.className = 'staff-item-info';
 
-                    const desc = document.createElement('div');
-                    desc.className = 'action-desc';
-                    desc.textContent = `${staff.role}, Year ${formatYearDisplay(staff.year)}`;
+                    const name = document.createElement('div');
+                    name.className = 'staff-item-name';
+                    name.textContent = staff.name;
 
-                    card.appendChild(icon);
-                    card.appendChild(title);
-                    card.appendChild(desc);
-                    grid.appendChild(card);
+                    const details = document.createElement('div');
+                    details.className = 'staff-item-details';
+                    details.textContent = `${staff.role}`;
+
+                    const yearBadge = document.createElement('div');
+                    yearBadge.className = `staff-item-year-badge ${isProbationary ? 'probationary' : 'tenured'}`;
+                    yearBadge.textContent = formatYearDisplay(staff.year);
+
+                    infoSection.appendChild(name);
+                    infoSection.appendChild(details);
+                    mainSection.appendChild(icon);
+                    mainSection.appendChild(infoSection);
+                    
+                    listItem.appendChild(mainSection);
+                    listItem.appendChild(yearBadge);
+                    container.appendChild(listItem);
                 });
             } else {
-                const noStaffMessage = document.createElement('p');
-                noStaffMessage.textContent = 'No staff members are currently in their summative year.';
-                grid.appendChild(noStaffMessage);
+                const noStaffMessage = document.createElement('div');
+                noStaffMessage.style.textAlign = 'center';
+                noStaffMessage.style.padding = '40px 20px';
+                noStaffMessage.style.color = 'var(--color-text-deemphasized)';
+                noStaffMessage.style.fontSize = '1.1rem';
+                noStaffMessage.textContent = 'No staff members found for the selected filter.';
+                container.appendChild(noStaffMessage);
             }
+        }
+
+        function filterStaffList(filterType) {
+            // Update active button
+            document.querySelectorAll('.filter-toggle-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.querySelector(`[data-filter="${filterType}"]`).classList.add('active');
+
+            // Filter the staff data
+            let filteredStaff = allStaffData;
+
+            switch (filterType) {
+                case 'all':
+                    filteredStaff = allStaffData;
+                    break;
+                case 'tenured':
+                    filteredStaff = allStaffData.filter(staff => staff.year !== 0 && staff.year !== 'Probationary');
+                    break;
+                case 'probationary':
+                    filteredStaff = allStaffData.filter(staff => staff.year === 0 || staff.year === 'Probationary');
+                    break;
+                default:
+                    filteredStaff = allStaffData;
+            }
+
+            // Re-render the list with filtered data
+            renderStaffList(filteredStaff);
         }
 
         // Consolidated recording state management
