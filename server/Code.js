@@ -330,8 +330,8 @@ function getStaffForAdmin(adminUserContext) {
         name: user.name || 'Unknown Name',
         email: user.email,
         role: user.role || 'Unknown Role',
-        year: user.year || null,
-        displayName: `${user.name || 'Unknown'} (${user.role || 'Unknown'}, Year ${user.year ? user.year : 'N/A'})`
+        year: (user.year !== null && user.year !== undefined) ? user.year : null,
+        displayName: `${user.name || 'Unknown'} (${user.role || 'Unknown'}, Year ${formatYearDisplay(user.year)})`
     }));
   }
 
@@ -348,8 +348,8 @@ function getStaffForAdmin(adminUserContext) {
       name: user.name || 'Unknown Name',
       email: user.email,
       role: user.role || 'Unknown Role',
-      year: user.year || null,
-      displayName: `${user.name || 'Unknown'} (${user.role || 'Unknown'}, Year ${user.year ? user.year : 'N/A'})`
+      year: (user.year !== null && user.year !== undefined) ? user.year : null,
+      displayName: `${user.name || 'Unknown'} (${user.role || 'Unknown'}, Year ${formatYearDisplay(user.year)})`
   }));
 }
 
@@ -1564,8 +1564,8 @@ function getFilteredStaffList(filterType = 'all', role = null, year = null) {
       name: user.name || 'Unknown Name',
       email: user.email,
       role: user.role || 'Unknown Role',
-      year: user.year || null,
-      displayName: `${user.name || 'Unknown'} (${user.role || 'Unknown'}, Year ${user.year ? user.year : 'N/A'})`
+      year: (user.year !== null && user.year !== undefined) ? user.year : null,
+      displayName: `${user.name || 'Unknown'} (${user.role || 'Unknown'}, Year ${formatYearDisplay(user.year)})`
     }));
 
     debugLog('Staff list filtered', {

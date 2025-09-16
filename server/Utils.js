@@ -405,6 +405,26 @@ function parseYearValue(yearValue) {
 }
 
 /**
+ * Format year value for display purposes, handling the special case of Probationary (0)
+ * @param {number|string|null|undefined} year - Year value to format
+ * @return {string} Formatted year display text
+ */
+function formatYearDisplay(year) {
+  // Handle Probationary year (0 or 'Probationary')
+  if (year === 0 || year === 'Probationary') {
+    return 'Probationary';
+  }
+  
+  // Handle null, undefined, or empty values
+  if (year === null || year === undefined || year === '') {
+    return 'N/A';
+  }
+  
+  // Return the year as-is for valid numeric years (1, 2, 3)
+  return year.toString();
+}
+
+/**
  * Safely accesses nested object properties without throwing errors
  * @param {Object} obj - Object to access
  * @param {string} path - Dot-notation path (e.g., "user.profile.name")

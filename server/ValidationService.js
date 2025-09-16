@@ -232,7 +232,7 @@ function validateUserData(user) {
       name: sanitizeText(user.name),
       email: sanitizeText(user.email),
       role: sanitizeText(user.role),
-      year: parseInt(user.year) || 1,
+      year: (user.year !== null && user.year !== undefined) ? (isNaN(parseInt(user.year)) ? 1 : parseInt(user.year)) : 1,
       rowNumber: user.rowNumber
     };
 

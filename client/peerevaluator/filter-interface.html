@@ -1684,6 +1684,21 @@
                       .replace(/\r/g, '\\r');
         }
 
+        function formatYearDisplay(year) {
+            // Handle Probationary year (0 or 'Probationary')
+            if (year === 0 || year === 'Probationary') {
+                return 'Probationary';
+            }
+            
+            // Handle null, undefined, or empty values
+            if (year === null || year === undefined || year === '') {
+                return 'N/A';
+            }
+            
+            // Return the year as-is for valid numeric years (1, 2, 3)
+            return year.toString();
+        }
+
         function showLoading(message = 'Loading...') { 
             document.getElementById('loading-text').textContent = message; 
             document.getElementById('loading').style.display = 'flex'; 
@@ -3014,7 +3029,7 @@
 
                     const desc = document.createElement('div');
                     desc.className = 'action-desc';
-                    desc.textContent = `${staff.role}, Year ${staff.year}`;
+                    desc.textContent = `${staff.role}, Year ${formatYearDisplay(staff.year)}`;
 
                     card.appendChild(icon);
                     card.appendChild(title);

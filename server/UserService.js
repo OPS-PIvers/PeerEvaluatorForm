@@ -226,7 +226,7 @@ function validateUserAccess(email) {
       result.year = userData.year;
     } else {
       result.role = user.role || 'Teacher';
-      result.year = user.year || 1;
+      result.year = (user.year !== null && user.year !== undefined) ? user.year : 1;
     }
 
     result.validation.roleValid = AVAILABLE_ROLES.includes(result.role);
@@ -395,7 +395,7 @@ function createUserContext(email = null) {
     // Set user data
     context.isAuthenticated = true;
     context.role = currentUser.role || 'Teacher';
-    context.year = currentUser.year || 1;
+    context.year = (currentUser.year !== null && currentUser.year !== undefined) ? currentUser.year : 1;
     context.building = currentUser.building || null;
     context.hasStaffRecord = true;
     context.isDefaultUser = false;

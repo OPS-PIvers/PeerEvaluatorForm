@@ -1939,6 +1939,24 @@
 
     <script>
         /**
+         * Utility Functions
+         */
+        function formatYearDisplay(year) {
+            // Handle Probationary year (0 or 'Probationary')
+            if (year === 0 || year === 'Probationary') {
+                return 'Probationary';
+            }
+            
+            // Handle null, undefined, or empty values
+            if (year === null || year === undefined || year === '') {
+                return 'N/A';
+            }
+            
+            // Return the year as-is for valid numeric years (1, 2, 3)
+            return year.toString();
+        }
+
+        /**
          * Professional Welcome Modal Functions
          */
         
@@ -2219,7 +2237,7 @@
                             if (staff.displayText) {
                                 option.textContent = staff.displayText;
                             } else {
-                                option.textContent = `${staff.name} (${staff.role || 'Unknown'}, Year ${staff.year || 'N/A'})`;
+                                option.textContent = `${staff.name} (${staff.role || 'Unknown'}, Year ${formatYearDisplay(staff.year)})`;
                             }
                             
                             staffFilter.appendChild(option);
