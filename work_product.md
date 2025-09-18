@@ -48,7 +48,7 @@ To support this in a scalable way, two new sheets will be created: one for the q
 - **New Sheet 2: `WorkProductAnswers`**
   - **Purpose:** Stores the staff members' answers.
   - **Columns:**
-    - `AnswerID` (Primary Key, e.g., a UUID)
+    - `AnswerID` (Primary Key, generated using `Utilities.getUuid()` in Google Apps Script)
     - `ObservationID` (Foreign Key to the `Observations` sheet)
     - `QuestionID` (Foreign Key to the `WorkProductQuestions` sheet)
     - `AnswerText` (The staff member's response)
