@@ -18,7 +18,10 @@ The primary goals are:
   - When viewing a "Work Product" observation draft, the Peer Evaluator can see the staff member's answers to the questions dynamically load into the script editor.
 - **For Staff Members:**
   - When a staff member opens the web app, the rubric loads as normal. If a peer evaluator has created a work product observation for this staff member, they see a "Work Product Questions" button.
-  - This button is not present if a work product observation has not been created for the staff member by a Peer Evaluator (`SPECIAL_ROLES.PEER_EVALUATOR`).
+  - The "Work Product Questions" button should appear next to the conditionally appearing "My Observations" button for staff members.
+  - If staff member has no finalized observations, the work product button appears next to the assigned areas/full rubric toggle.  If a staff member has finalized observations, the work product button should appear to the right of the "My Observations" button.
+  - The "Work Product Button" needs to indicate different states -- "Not started", "In progress", and "Submitted".  
+  - This button is not present if a work product observation has not yet been created for the staff member by a Peer Evaluator (`SPECIAL_ROLES.PEER_EVALUATOR`).
   - Clicking the button opens a modal with a dynamic list of questions loaded from the `WorkProductQuestions` sheet.
   - Text entered into the fields is auto-saved.
   - The staff member can open and close the modal to see their previously saved answers.
@@ -207,6 +210,53 @@ The primary goals are:
   }
   ```
 
+- [ ] **Create `getStaffObservationSummary(userEmail)` after `checkUserHasWorkProductObservation()`:**
+  ```javascript
+  function getStaffObservationSummary(userEmail) {
+    try {
+      const observations = _getObservationsDb();
+      const userObservations = observations.filter(obs =>
+        obs.observedEmail === userEmail && obs.status === 'Finalized'
+      );
+
+      return {
+        hasFinalized: userObservations.length > 0,
+        count: userObservations.length
+      };
+    } catch (error) {
+      console.error('Error getting staff observation summary:', error);
+      return { hasFinalized: false, count: 0 };
+    }
+  }
+  ```
+
+- [ ] **Create `getWorkProductProgressState(userEmail)` after `getStaffObservationSummary()`:**
+  ```javascript
+  function getWorkProductProgressState(userEmail) {
+    try {
+      const observations = _getObservationsDb();
+      const workProductObs = observations.find(obs =>
+        obs.observedEmail === userEmail && obs.Type === 'Work Product'
+      );
+
+      if (!workProductObs) return 'not-started';
+
+      // Check if any answers exist
+      const answers = getWorkProductAnswers(workProductObs.observationId);
+      const hasAnswers = answers && answers.some(answer =>
+        answer.answerText && answer.answerText.trim().length > 0
+      );
+
+      if (workProductObs.status === 'Finalized') return 'submitted';
+      if (hasAnswers) return 'in-progress';
+      return 'not-started';
+    } catch (error) {
+      console.error('Error getting work product progress state:', error);
+      return 'not-started';
+    }
+  }
+  ```
+
 ### 4.2. Code.js Updates - Add 4 New Endpoint Functions
 
 - [ ] **Add `createWorkProductObservationForEvaluator(observedEmail)` after existing `createNewObservationForEvaluator()`:**
@@ -319,6 +369,17 @@ The primary goals are:
     hasWorkProduct = checkUserHasWorkProductObservation(userContext.email);
   }
   templateData.showWorkProductQuestionsButton = hasWorkProduct;
+
+  // Determine if staff member has finalized observations (for button positioning)
+  const hasMyObservations = userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR ?
+    getStaffObservationSummary(userContext.email).hasFinalized : false;
+
+  // Get work product progress state
+  const workProductState = hasWorkProduct ?
+    getWorkProductProgressState(userContext.email) : 'not-started';
+
+  templateData.hasMyObservations = hasMyObservations;
+  templateData.workProductState = workProductState;
   ```
 
 ## 5. Frontend Implementation - Specific To-Do List
@@ -462,16 +523,47 @@ The primary goals are:
 
 ### 5.2. rubric.html Updates
 
-#### Add Work Product Questions Button
+#### Add Work Product Questions Button with Conditional Positioning
 - [ ] **Find the main content area around line 100-200 (after page title, before rubric content)**
-- [ ] **Add conditional button:**
+- [ ] **Add conditional button with proper positioning logic:**
   ```html
+  <!-- Conditional Work Product Questions Button Positioning -->
   <? if (showWorkProductQuestionsButton) { ?>
   <div style="margin: 20px 0; text-align: center;">
-    <button id="workProductQuestionsBtn" onclick="openWorkProductModal()"
-            class="filter-btn" style="background: linear-gradient(135deg, #059669, #10b981); color: white; padding: 12px 24px; font-size: 1.1rem;">
-      📋 Work Product Questions
-    </button>
+    <? if (hasMyObservations) { ?>
+      <!-- Position next to My Observations button -->
+      <div style="display: inline-flex; gap: 15px; align-items: center; justify-content: center;">
+        <button onclick="showMyObservations()" class="filter-btn">📊 My Observations</button>
+        <button id="workProductQuestionsBtn" onclick="openWorkProductModal()"
+                class="filter-btn wp-<?= workProductState ?>"
+                style="padding: 12px 24px; font-size: 1.1rem;">
+          📋 Work Product Questions
+          <span class="wp-state-text">
+            <? if (workProductState === 'not-started') { ?>(Not Started)<? } ?>
+            <? if (workProductState === 'in-progress') { ?>(In Progress)<? } ?>
+            <? if (workProductState === 'submitted') { ?>(Submitted)<? } ?>
+          </span>
+        </button>
+      </div>
+    <? } else { ?>
+      <!-- Position next to assigned areas/full rubric toggle -->
+      <div style="display: inline-flex; gap: 15px; align-items: center; justify-content: center;">
+        <div class="toggle-group">
+          <button id="assignedAreasBtn" onclick="showAssignedAreas()" class="filter-btn active">Assigned Areas</button>
+          <button id="fullRubricBtn" onclick="showFullRubric()" class="filter-btn">Full Rubric</button>
+        </div>
+        <button id="workProductQuestionsBtn" onclick="openWorkProductModal()"
+                class="filter-btn wp-<?= workProductState ?>"
+                style="padding: 12px 24px; font-size: 1.1rem;">
+          📋 Work Product Questions
+          <span class="wp-state-text">
+            <? if (workProductState === 'not-started') { ?>(Not Started)<? } ?>
+            <? if (workProductState === 'in-progress') { ?>(In Progress)<? } ?>
+            <? if (workProductState === 'submitted') { ?>(Submitted)<? } ?>
+          </span>
+        </button>
+      </div>
+    <? } ?>
   </div>
   <? } ?>
   ```
@@ -547,6 +639,35 @@ The primary goals are:
 
   .save-status.error {
     color: #ef4444;
+  }
+
+  /* Work Product Button State Styles */
+  .wp-not-started {
+    background: linear-gradient(135deg, #6b7280, #9ca3af) !important;
+    color: white !important;
+  }
+
+  .wp-in-progress {
+    background: linear-gradient(135deg, #f59e0b, #fbbf24) !important;
+    color: white !important;
+    animation: pulse-progress 2s infinite;
+  }
+
+  .wp-submitted {
+    background: linear-gradient(135deg, #059669, #10b981) !important;
+    color: white !important;
+  }
+
+  .wp-state-text {
+    font-size: 0.85rem;
+    font-weight: normal;
+    margin-left: 8px;
+    opacity: 0.9;
+  }
+
+  @keyframes pulse-progress {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.8; }
   }
   ```
 
