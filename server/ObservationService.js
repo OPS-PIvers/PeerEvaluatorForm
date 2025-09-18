@@ -1125,7 +1125,11 @@ function getFinalizedObservationsForUser() {
  * @returns {Object|null} The newly created work product observation object or null on error.
  */
 function createWorkProductObservation(observerEmail, observedEmail) {
-  return createNewObservation(observerEmail, observedEmail, 'Work Product');
+  const result = createNewObservation(observerEmail, observedEmail, 'Work Product');
+  if (result) {
+    incrementMasterCacheVersion();
+  }
+  return result;
 }
 
 /**
