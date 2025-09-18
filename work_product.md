@@ -19,7 +19,7 @@ The primary goals are:
 - **For Staff Members:**
   - When a staff member opens a rubric that is part of a "Work Product" observation, they see a "Work Product Questions" button.
   - This button is not present for standard observations.
-  - Clicking the button opens a modal with 5 questions and text input fields.
+  - Clicking the button opens a modal with a dynamic list of questions loaded from the `WorkProductQuestions` sheet.
   - Text entered into the fields is auto-saved.
   - The staff member can open and close the modal to see their previously saved answers.
 - **System Stability:**
@@ -83,7 +83,7 @@ To support this in a scalable way, two new sheets will be created: one for the q
 - **Modify `getRubricViewForStaff()` (or equivalent):**
   - When a staff member loads their rubric, this service will call `ObservationService.getObservationType()`.
   - It will pass a flag to the `rubric.html` template indicating whether the "Work Product Questions" button should be displayed.
-- **Expose new server-side functions:** The new functions in `ObservationService` (`saveWorkProductAnswers`, `getWorkProductAnswers`) need to be exposed as endpoints that can be called from the client-side Javascript (e.g., using `google.script.run`).
+- **Expose new server-side functions:** The new functions in `ObservationService` (`getWorkProductQuestions`, `saveWorkProductAnswer`, `getWorkProductAnswers`) need to be exposed as endpoints that can be called from the client-side Javascript (e.g., using `google.script.run`).
 
 ## 5. Frontend Implementation (Client-side)
 
@@ -109,13 +109,7 @@ To support this in a scalable way, two new sheets will be created: one for the q
   - A modal dialog will be created, initially hidden.
   - The modal will contain:
     - A title: "Work Product Reflection Questions"
-    - 5 questions (using placeholders for now):
-      - `[Placeholder for Question 1]`
-      - `[Placeholder for Question 2]`
-      - `[Placeholder for Question 3]`
-      - `[Placeholder for Question 4]`
-      - `[Placeholder for Question 5]`
-    - A multi-line text input field (`<textarea>`) for each question.
+    - A dynamically generated list of questions loaded from the `WorkProductQuestions` sheet. For each question retrieved, the UI will display the question text and a corresponding multi-line text input field (`<textarea>`).
     - A "Close" button.
 - **Auto-save Functionality:**
   - To prevent an excessive number of server calls on each keystroke, the auto-save function will be "debounced".
@@ -126,4 +120,4 @@ To support this in a scalable way, two new sheets will be created: one for the q
     2. Call `google.script.run.saveWorkProductAnswer(observationId, questionId, answerText)`.
     3. A small visual indicator (e.g., "Saving..." -> "Saved") will provide feedback to the user.
 - **Loading Existing Answers:**
-  - When the rubric page loads and the observation is a "Work Product" type, the client-side Javascript will call `google.script.run.getWorkProductAnswers()` and populate the textareas with the returned data.
+  - When the rubric page loads and the observation is a "Work Product" type, the client-side Javascript will call `google.script.run.getWorkProductAnswers(observationId)`, passing the ID of the current observation. It will then use the returned data to populate the appropriate textareas.
