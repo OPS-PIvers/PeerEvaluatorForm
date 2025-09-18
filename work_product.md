@@ -36,16 +36,22 @@ To differentiate between a standard observation and a work product observation, 
   - `Standard` (for existing observations, this can be the default).
   - `Work Product` (for the new observation type).
 
-A new sheet will also be created to store the answers to the work product questions.
+To support this in a scalable way, two new sheets will be created: one for the questions and one for the answers. This normalized approach allows for adding, removing, or reordering questions without code changes.
 
-- **New Sheet:** `WorkProductAnswers`
-- **Columns:**
-  - `ObservationID`: Foreign key linking to the `Observations` sheet.
-  - `Question1_Answer`
-  - `Question2_Answer`
-  - `Question3_Answer`
-  - `Question4_Answer`
-  - `Question5_Answer`
+- **New Sheet 1: `WorkProductQuestions`**
+  - **Purpose:** Stores the questions themselves.
+  - **Columns:**
+    - `QuestionID` (Primary Key, e.g., `WPQ1`)
+    - `QuestionText` (e.g., "What was the goal of the work product?")
+    - `Order` (A number to determine the display order, e.g., `1`)
+
+- **New Sheet 2: `WorkProductAnswers`**
+  - **Purpose:** Stores the staff members' answers.
+  - **Columns:**
+    - `AnswerID` (Primary Key, e.g., a UUID)
+    - `ObservationID` (Foreign Key to the `Observations` sheet)
+    - `QuestionID` (Foreign Key to the `WorkProductQuestions` sheet)
+    - `AnswerText` (The staff member's response)
 
 ## 4. Backend Implementation (Server-side)
 
@@ -62,11 +68,13 @@ A new sheet will also be created to store the answers to the work product questi
   - This new function will call `createObservation()` with `observationType` set to `Work Product`.
 - **Create `getObservationType(observationId)`:**
   - This function will retrieve the `Type` of an observation from the sheet.
-- **Create `saveWorkProductAnswers(observationId, answers)`:**
-  - This function will receive an object containing the answers to the 5 questions.
-  - It will use `upsert` logic to save or update the answers in the `WorkProductAnswers` sheet for the given `observationId`.
+- **Create `getWorkProductQuestions()`:**
+  - This new function will retrieve all questions from the `WorkProductQuestions` sheet, ordered by the `Order` column.
+- **Create `saveWorkProductAnswer(observationId, questionId, answerText)`:**
+  - This function will receive the text for a single answer.
+  - It will use `upsert` logic to find a row where `ObservationID` and `QuestionID` match, and update the `AnswerText`. If no match is found, it will create a new row.
 - **Create `getWorkProductAnswers(observationId)`:**
-  - This function will retrieve the answers for a given `observationId` from the `WorkProductAnswers` sheet.
+  - This function will retrieve all answers for a given `observationId` from the `WorkProductAnswers` sheet. It will return a list of objects, each containing `QuestionID` and `AnswerText`.
 
 ### 4.3. `UiService.js` or `Code.js` (Entry Points)
 
@@ -86,9 +94,11 @@ A new sheet will also be created to store the answers to the work product questi
   - It will be conditionally rendered based on the flag passed from `UiService.js`.
   - `onclick`, this button will call a new server-side function, e.g., `google.script.run.createWorkProductObservation(...)`.
 - **Dynamic Loading of Answers:**
-  - The Javascript in the observation/scripting view will be modified.
-  - A function will be added that periodically calls `google.script.run.getWorkProductAnswers()`.
-  - The retrieved answers will be formatted and displayed in a designated, non-editable area within the script editor. This provides the peer evaluator with the content to tag and analyze.
+  - To avoid excessive server calls and potential quota issues with Google Apps Script, a manual refresh approach is recommended.
+  - A "Refresh Answers" button will be added to the Peer Evaluator's observation view.
+  - Clicking this button will call `google.script.run.getWorkProductAnswers()` to fetch the latest answers.
+  - The retrieved answers will be formatted and displayed in a designated, non-editable area within the script editor.
+  - *Alternative:* If polling is a requirement, it should use a long interval (e.g., 30-60 seconds) to minimize load.
 
 ### 5.2. `client/staff/rubric.html`
 
@@ -108,10 +118,12 @@ A new sheet will also be created to store the answers to the work product questi
     - A multi-line text input field (`<textarea>`) for each question.
     - A "Close" button.
 - **Auto-save Functionality:**
-  - An `onkeyup` or `onblur` event listener will be attached to each textarea.
-  - On event trigger, a Javascript function will be called that:
-    1. Collects the current text from all 5 textareas into a Javascript object.
-    2. Calls `google.script.run.saveWorkProductAnswers(observationId, answersObject)`.
+  - To prevent an excessive number of server calls on each keystroke, the auto-save function will be "debounced".
+  - An `oninput` event listener will be attached to each textarea.
+  - This listener will trigger a debounced function that waits for the user to stop typing for a short period (e.g., 1.5 seconds) before executing.
+  - Once executed, the function will:
+    1. Collect the current text from the textarea that triggered the event.
+    2. Call `google.script.run.saveWorkProductAnswer(observationId, questionId, answerText)`.
     3. A small visual indicator (e.g., "Saving..." -> "Saved") will provide feedback to the user.
 - **Loading Existing Answers:**
   - When the rubric page loads and the observation is a "Work Product" type, the client-side Javascript will call `google.script.run.getWorkProductAnswers()` and populate the textareas with the returned data.
