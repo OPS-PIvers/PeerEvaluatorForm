@@ -17,14 +17,17 @@ The primary goals are:
   - Clicking "Create Work Product" initiates the standard observation creation flow.
   - When viewing a "Work Product" observation draft, the Peer Evaluator can see the staff member's answers to the questions dynamically load into the script editor.
 - **For Staff Members:**
-  - When a staff member opens a rubric that is part of a "Work Product" observation, they see a "Work Product Questions" button.
-  - This button is not present for standard observations.
+  - When a staff member opens the web app, the rubric loads as normal.  If a peer evaluator has created a work product observation for this staff member,they see a "Work Product Questions" button.
+  - This button is not present if a work product observation has not been created for the staff member by a peer evaluator.
   - Clicking the button opens a modal with a dynamic list of questions loaded from the `WorkProductQuestions` sheet.
   - Text entered into the fields is auto-saved.
   - The staff member can open and close the modal to see their previously saved answers.
 - **System Stability:**
   - The existing observation creation and viewing process is unaffected.
   - No data loss or corruption occurs.
+  - zero change for administrator users
+  - zero change for rubric rendering for staff members aside from conditionally displayed Work Product Questions button.
+  - zero change for standard ovservation creation, editing, or finalization for peer evaluators.
 
 ## 3. Data Model Changes
 
