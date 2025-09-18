@@ -1,5 +1,7 @@
 # Peer Evaluator Form - Google Apps Script Project
 
+**GitHub Copilot Agent Instructions**
+
 **ALWAYS follow these instructions first. Only search or gather additional context if the information here is incomplete or found to be in error.**
 
 ## Project Overview
@@ -19,9 +21,9 @@ This is a Google Apps Script (GAS) web application that implements a multi-role 
 - Check project status: `clasp status` (takes ~1 second)
 
 ### Code Validation and Testing
-- Validate JavaScript syntax: `for file in *.js; do node -c "$file" && echo "✓ $file OK" || echo "✗ $file error"; done` (takes ~0.4 seconds)
-- Run the test suite: `node -e "const fs=require('fs'); const vm=require('vm'); const ctx=vm.createContext({console}); vm.runInContext(fs.readFileSync('Constants.js','utf8'),ctx); vm.runInContext(fs.readFileSync('Utils.js','utf8'),ctx); vm.runInContext(fs.readFileSync('Tests.js','utf8'),ctx); vm.runInContext('runAllTests();',ctx);"` (takes ~0.05 seconds)
-- **Expected test result**: 2 failing tests for email validation edge cases - this is NORMAL behavior
+- Validate JavaScript syntax: `for file in server/*.js; do node -c "$file" && echo "✓ $file OK" || echo "✗ $file error"; done` (takes ~0.4 seconds)
+- **No test suite configured** - use syntax validation and manual testing only
+- **Manual testing**: Deploy as web app through Google Apps Script editor and test functionality
 
 ### Development Workflow
 - **NEVER try to run `npm start` or `npm run dev`** - GAS apps don't have local servers
@@ -70,18 +72,11 @@ Configuration:
 for file in *.js; do node -c "$file" && echo "✓ $file syntax OK" || echo "✗ $file has syntax errors"; done
 ```
 
-### 2. Test Execution  
+### 2. Code Validation  
 ```bash
-# Run the complete test suite (required - takes ~0.05 seconds)
-node -e "
-const fs=require('fs'), vm=require('vm'), ctx=vm.createContext({console});
-vm.runInContext(fs.readFileSync('Constants.js','utf8'),ctx);
-vm.runInContext(fs.readFileSync('Utils.js','utf8'),ctx);  
-vm.runInContext(fs.readFileSync('Tests.js','utf8'),ctx);
-vm.runInContext('runAllTests();',ctx);
-"
+# Validate all JavaScript files (required - takes ~0.4 seconds)
+for file in server/*.js; do node -c "$file" && echo "✓ $file syntax OK" || echo "✗ $file has syntax errors"; done
 ```
-**Expected output**: Tests run with 2 failing assertions (normal behavior for edge cases)
 
 ### 3. Project Structure Verification
 ```bash
@@ -138,10 +133,9 @@ cat appsscript.json | jq . > /dev/null && echo "✓ appsscript.json valid" || ec
 
 ### Before Committing
 - **ALWAYS** run the complete validation workflow (takes ~1.5 seconds total):
-  1. Syntax validation: `for file in *.js; do node -c "$file"; done`
-  2. Test suite: Use the test execution command above
-  3. Project verification: `clasp status`
-  4. Config validation: `jq . .clasp.json && jq . appsscript.json`
+  1. Syntax validation: `for file in server/*.js; do node -c "$file"; done`
+  2. Project verification: `clasp status`
+  3. Config validation: `jq . .clasp.json && jq . appsscript.json`
 - **NO LINTING TOOLS** configured - rely on syntax validation only
 
 ## Troubleshooting
@@ -162,8 +156,8 @@ validateUserAccess('email');  // Test user permissions
 ```
 
 ### Project Stats
-- **10 JavaScript files** (6,926 total lines)
-- **5 HTML files** (3,249 total lines)  
+- **11 JavaScript files** (server/*.js files)
+- **4 HTML files** (client/ directory)  
 - **16 files tracked by clasp**
 - **V8 JavaScript runtime**
 - **No external dependencies** (pure GAS)
@@ -184,3 +178,82 @@ validateUserAccess('email');  // Test user permissions
 - `ValidationService`: Data validation and error handling
 
 **Test execution reminder**: Always run the complete validation sequence above before considering your changes ready for commit.
+
+## GitHub Copilot-Specific Guidelines
+
+### Using GitHub Copilot Chat Effectively
+
+When working with this Google Apps Script project, use these specific prompts for best results:
+
+**Architecture Questions:**
+- "Explain the service pattern used in this GAS project"
+- "How does caching work in this application?"
+- "What's the role of the doGet() function in Code.js?"
+
+**Code Analysis:**
+- "Analyze the user role system in this project"
+- "Show me how observations are stored and retrieved"
+- "Explain the Google Drive integration for PDF storage"
+
+**Implementation Help:**
+- "Help me add a new function to UserService.js following the existing pattern"
+- "How should I modify the caching system when adding new data?"
+- "Show me the correct way to add a new HTML template"
+
+### Code Completion Best Practices
+
+**Function Naming Conventions:**
+- Server functions: `camelCase` (e.g., `getUserRole`, `createObservation`)
+- HTML/CSS: `kebab-case` for classes (e.g., `rubric-section`, `filter-panel`)
+- Constants: `UPPER_SNAKE_CASE` (e.g., `SHEET_NAMES`, `CACHE_DURATION`)
+
+**Common Patterns to Follow:**
+```javascript
+// Service function pattern
+function serviceFunctionName(parameters) {
+  try {
+    // Implementation
+    return result;
+  } catch (error) {
+    console.error('ServiceName.functionName Error:', error);
+    throw error;
+  }
+}
+
+// Cache-first data access pattern
+function getCachedData(key) {
+  const cached = CacheManager.get(key);
+  if (cached) return cached;
+  
+  const data = fetchFromSheet();
+  CacheManager.set(key, data);
+  return data;
+}
+```
+
+### Workspace Understanding
+
+**Key Directories:**
+- `/server/` - All Google Apps Script (.js) files
+- `/client/` - All HTML templates and client-side code
+- `/.github/` - CI/CD and documentation
+
+**Important Files for Reference:**
+- `server/Constants.js` - All configuration and constants
+- `server/Code.js` - Main entry point and request router  
+- `client/staff/rubric.html` - Primary user interface
+- `appsscript.json` - Google Apps Script manifest
+
+**When Suggesting Changes:**
+1. Always check existing patterns in similar files first
+2. Consider cache invalidation impact
+3. Verify role-based access permissions
+4. Test with different user roles in mind
+
+### Code Review Assistance
+
+Use these prompts for code review:
+- "Review this function for Google Apps Script best practices"
+- "Check if this change requires cache invalidation"
+- "Verify this follows the service pattern used in the project"
+- "Ensure this handles all user roles correctly"
