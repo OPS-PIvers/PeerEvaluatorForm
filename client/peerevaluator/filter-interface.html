@@ -2070,6 +2070,9 @@
             const safeObservedEmailJs = escapeJsString(observedEmail);
 
             let cardsHtml = `<div class="action-card" onclick="handleNewObservation('${safeObservedEmailJs}')"><span class="action-icon">➕</span><div class="action-title">Start New Observation</div><div class="action-desc">Begin a new evaluation for this staff member.</div></div>`;
+            <? if (showWorkProductButton) { ?>
+            cardsHtml += `<div class="action-card" onclick="handleNewWorkProductObservation('${safeObservedEmailJs}')"><span class="action-icon">📋</span><div class="action-title">Create Work Product</div><div class="action-desc">Request reflective responses from this staff member.</div></div>`;
+            <? } ?>
             result.observations.forEach(obs => {
                 const date = new Date(obs.createdAt).toLocaleDateString();
                 let buttons = '';
@@ -2128,17 +2131,27 @@
                 .getObservationOptions(observedEmail);
         }
 
-        function handleNewObservation(observedEmail) { 
+        function handleNewObservation(observedEmail) {
             console.log('Starting new observation for:', observedEmail);
-            
+
             // Clear all existing observation state before creating new observation
             clearObservationState();
-            
-            showLoading('Creating new observation draft...'); 
+
+            showLoading('Creating new observation draft...');
             google.script.run
                 .withSuccessHandler(handleRubricData)
                 .withFailureHandler(handleError)
                 .createNewObservationForEvaluator(observedEmail);
+        }
+
+        function handleNewWorkProductObservation(observedEmail) {
+            console.log('Starting new work product observation for:', observedEmail);
+            clearObservationState();
+            showLoading('Creating work product observation...');
+            google.script.run
+              .withSuccessHandler(handleRubricData)
+              .withFailureHandler(handleError)
+              .createWorkProductObservationForEvaluator(observedEmail);
         }
         function handleEditObservation(obsId) { 
             console.log('Loading observation for editing:', obsId);
@@ -2353,12 +2366,21 @@
             if (observation) {
                 currentObservedUser.email = observation.observedEmail;
                 currentObservedUser.name = observation.observedName;
-                console.log('Observation context set:', { 
-                    observationId: currentObservationId, 
-                    observedUser: currentObservedUser 
+                console.log('Observation context set:', {
+                    observationId: currentObservationId,
+                    observedUser: currentObservedUser
                 });
             }
             observationViewMode = (rubricData.userContext && rubricData.userContext.viewMode) || 'assigned';
+
+            // Store observation type and show work product section if needed
+            window.currentObservationType = result.observation?.Type || 'Standard';
+            toggleWorkProductAnswersSection(window.currentObservationType === 'Work Product');
+
+            // Auto-load answers for work product observations
+            if (window.currentObservationType === 'Work Product') {
+                setTimeout(refreshWorkProductAnswers, 1000);
+            }
 
             // Store rubricData globally for nav functions
             window.rubricData = rubricData;
@@ -4437,7 +4459,84 @@
             
             console.log('\n🏁 Test completed. Check results above.');
         };
-        
+
+        // === Work Product Answer Functions ===
+
+        function refreshWorkProductAnswers() {
+            if (!currentObservationId) {
+                showToast('No observation selected');
+                return;
+            }
+
+            // Check if this is a work product observation
+            if (!window.currentObservationType || window.currentObservationType !== 'Work Product') {
+                return;
+            }
+
+            showLoading('Loading staff responses...');
+            google.script.run
+                .withSuccessHandler(displayWorkProductAnswers)
+                .withFailureHandler(function(error) {
+                    hideLoading();
+                    console.error('Failed to load answers:', error);
+                    showToast('Failed to load staff responses');
+                })
+                .getWorkProductAnswersForClient(currentObservationId);
+        }
+
+        function displayWorkProductAnswers(result) {
+            hideLoading();
+            const container = document.getElementById('workProductAnswersDisplay');
+            if (!container) return;
+
+            if (!result.success) {
+                container.innerHTML = '<p style="color: #dc2626;">Error loading answers: ' + result.error + '</p>';
+                return;
+            }
+
+            if (!result.answers || result.answers.length === 0) {
+                container.innerHTML = '<p style="color: #6b7280; font-style: italic;">No staff responses yet.</p>';
+                return;
+            }
+
+            // Load questions to match with answers
+            google.script.run
+                .withSuccessHandler(function(questionsResult) {
+                    if (questionsResult.success) {
+                        displayAnswersWithQuestions(result.answers, questionsResult.questions);
+                    }
+                })
+                .getWorkProductQuestionsForClient();
+        }
+
+        function displayAnswersWithQuestions(answers, questions) {
+            const container = document.getElementById('workProductAnswersDisplay');
+            if (!container) return;
+
+            let html = '';
+            questions.forEach(question => {
+                const answer = answers.find(a => a.questionId === question.questionId);
+                const answerText = answer ? answer.answerText : 'No response yet';
+
+                html += `
+                    <div style="margin-bottom: 15px; padding: 10px; background: white; border-radius: 4px; border-left: 3px solid #10b981;">
+                        <strong style="color: #374151;">${question.questionText}</strong>
+                        <div style="margin-top: 5px; color: #6b7280; white-space: pre-wrap;">${answerText}</div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+
+        // Show/hide work product answers section based on observation type
+        function toggleWorkProductAnswersSection(show) {
+            const section = document.getElementById('workProductAnswersSection');
+            if (section) {
+                section.style.display = show ? 'block' : 'none';
+            }
+        }
+
         // Stop monitoring when page unloads
         window.addEventListener('beforeunload', function(e) {
             stopStateMonitoring();
@@ -5697,6 +5796,15 @@
             </div>
             
             <div class="script-editor-content">
+                <div id="workProductAnswersSection" style="display: none; margin-bottom: 15px;">
+                    <div style="background: #f0fdf4; border: 1px solid #86efac; border-radius: 6px; padding: 12px;">
+                        <h4 style="margin: 0 0 10px 0; color: #166534;">Staff Work Product Responses</h4>
+                        <button onclick="refreshWorkProductAnswers()" class="filter-btn" style="margin-bottom: 10px;">
+                            🔄 Refresh Staff Answers
+                        </button>
+                        <div id="workProductAnswersDisplay" style="font-size: 0.9rem; line-height: 1.4;"></div>
+                    </div>
+                </div>
                 <div id="scriptEditor"></div>
             </div>
         </div>
