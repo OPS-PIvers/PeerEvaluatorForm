@@ -125,6 +125,24 @@ function doGet(e) {
     // Create and configure the HTML template
     const htmlTemplate = HtmlService.createTemplateFromFile(TEMPLATE_PATHS.STAFF_RUBRIC); // This is now a fallback view
     htmlTemplate.data = rubricData;
+
+    // Check if user has any Work Product observations
+    let hasWorkProduct = false;
+    if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
+      hasWorkProduct = checkUserHasWorkProductObservation(userContext.email);
+    }
+    htmlTemplate.showWorkProductQuestionsButton = hasWorkProduct;
+
+    // Determine if staff member has finalized observations (for button positioning)
+    const hasMyObservations = userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR ?
+      getStaffObservationSummary(userContext.email).hasFinalized : false;
+
+    // Get work product progress state
+    const workProductState = hasWorkProduct ?
+      getWorkProductProgressState(userContext.email) : 'not-started';
+
+    htmlTemplate.hasMyObservations = hasMyObservations;
+    htmlTemplate.workProductState = workProductState;
     
     // Generate the HTML output with error handling
     let htmlOutput;
@@ -421,6 +439,151 @@ function createNewObservationForEvaluator(observedEmail) {
   } catch (error) {
     console.error('Error in createNewObservationForEvaluator:', error);
     return { success: false, error: 'An unexpected error occurred: ' + error.message };
+  }
+}
+
+/**
+ * Creates a new Work Product observation for an evaluator.
+ * @param {string} observedEmail The email of the staff member to be observed.
+ * @returns {Object} A response object containing the new observation and the rubric data.
+ */
+function createWorkProductObservationForEvaluator(observedEmail) {
+  try {
+    const userContext = createUserContext();
+
+    if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
+      return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
+    }
+
+    const newObservation = createWorkProductObservation(userContext.email, observedEmail);
+    if (!newObservation) {
+      return { success: false, error: 'Failed to create work product observation.' };
+    }
+
+    let assignedSubdomains = null;
+    // Peer Evaluator should use assigned subdomains approach
+    if (userContext.role === SPECIAL_ROLES.PEER_EVALUATOR) {
+        assignedSubdomains = getAssignedSubdomainsForRoleYear(newObservation.observedRole, newObservation.observedYear);
+    }
+
+    // Use 'assigned' view mode for Peer Evaluator to match the UI pattern
+    const viewMode = (userContext.role === SPECIAL_ROLES.PEER_EVALUATOR)
+      ? 'assigned'
+      : 'full';
+
+    const rubricData = getAllDomainsData(
+      newObservation.observedRole,
+      newObservation.observedYear,
+      viewMode,
+      assignedSubdomains
+    );
+
+    const evaluatorContext = createFilteredUserContext(observedEmail, userContext.role);
+    rubricData.userContext = evaluatorContext;
+
+    return {
+      success: true,
+      observation: newObservation,
+      rubricData: rubricData,
+      userContext: userContext
+    };
+  } catch (error) {
+    console.error('Error in createWorkProductObservationForEvaluator:', error);
+    return { success: false, error: 'An unexpected error occurred: ' + error.message };
+  }
+}
+
+/**
+ * Gets work product questions for client-side use.
+ * @returns {Object} A response object containing the questions array.
+ */
+function getWorkProductQuestionsForClient() {
+  try {
+    const questions = getWorkProductQuestions();
+    return { success: true, questions: questions };
+  } catch (error) {
+    console.error('Error in getWorkProductQuestionsForClient:', error);
+    return { success: false, error: 'Failed to load questions: ' + error.message };
+  }
+}
+
+/**
+ * Saves a work product answer from client-side.
+ * @param {string} observationId The ID of the observation.
+ * @param {string} questionId The ID of the question.
+ * @param {string} answerText The answer text.
+ * @returns {Object} A response object with success status.
+ */
+function saveWorkProductAnswerFromClient(observationId, questionId, answerText) {
+  try {
+    const userContext = createUserContext();
+
+    // Verify user has access to this observation
+    const observation = getObservationById(observationId);
+    if (!observation || observation.observedEmail !== userContext.email) {
+      return { success: false, error: 'Access denied to this observation.' };
+    }
+
+    const saved = saveWorkProductAnswer(observationId, questionId, answerText);
+    return { success: saved };
+  } catch (error) {
+    console.error('Error in saveWorkProductAnswerFromClient:', error);
+    return { success: false, error: 'Failed to save answer: ' + error.message };
+  }
+}
+
+/**
+ * Gets work product answers for client-side use.
+ * @param {string} observationId The ID of the observation.
+ * @returns {Object} A response object containing the answers array.
+ */
+function getWorkProductAnswersForClient(observationId) {
+  try {
+    const userContext = createUserContext();
+
+    // Verify user has access to this observation
+    const observation = getObservationById(observationId);
+    if (!observation) {
+      return { success: false, error: 'Observation not found.' };
+    }
+
+    // Allow access for observed staff or peer evaluators
+    if (observation.observedEmail !== userContext.email &&
+        userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
+      return { success: false, error: 'Access denied to this observation.' };
+    }
+
+    const answers = getWorkProductAnswers(observationId);
+    return { success: true, answers: answers };
+  } catch (error) {
+    console.error('Error in getWorkProductAnswersForClient:', error);
+    return { success: false, error: 'Failed to load answers: ' + error.message };
+  }
+}
+
+/**
+ * Gets the current user's work product observation ID.
+ * @returns {Object} A response object containing the observation ID.
+ */
+function getCurrentUserWorkProductObservationId() {
+  try {
+    const userContext = createUserContext();
+    const observations = _getObservationsDb();
+
+    const userWorkProductObs = observations.find(obs =>
+      obs.observedEmail === userContext.email &&
+      obs.Type === 'Work Product' &&
+      obs.status === 'Draft'
+    );
+
+    if (userWorkProductObs) {
+      return { success: true, observationId: userWorkProductObs.observationId };
+    } else {
+      return { success: false, error: 'No work product observation found' };
+    }
+  } catch (error) {
+    console.error('Error getting current user work product observation:', error);
+    return { success: false, error: 'Failed to get observation ID: ' + error.message };
   }
 }
 

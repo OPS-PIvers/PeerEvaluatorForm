@@ -22,6 +22,7 @@ const UiService = (function() {
       htmlTemplate.availableYears = OBSERVATION_YEARS;
       htmlTemplate.requestId = requestId;
       htmlTemplate.scriptEditorSettings = SCRIPT_EDITOR_SETTINGS;
+      htmlTemplate.showWorkProductButton = (userContext.role === SPECIAL_ROLES.PEER_EVALUATOR);
 
       const htmlOutput = htmlTemplate.evaluate()
         .setTitle(`${userContext.role} - Filter View`)

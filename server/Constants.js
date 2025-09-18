@@ -10,8 +10,10 @@ const SHEET_NAMES = {
   STAFF: 'Staff',
   SETTINGS: 'Settings',
   TEACHER: 'Teacher',
-  OBSERVATIONS: 'Observations',
-  OBSERVATION_DATA: 'Observation_Data' // Added for consistency
+  OBSERVATIONS: 'Observations', // This doesn't exist.  Ensure it is unused, then remove.
+  OBSERVATION_DATA: 'Observation_Data', // Added for consistency
+  WORK_PRODUCT_QUESTIONS: 'WorkProductQuestions',
+  WORK_PRODUCT_ANSWERS: 'WorkProductAnswers'
 };
 
 const COLUMN_NAMES = {
@@ -322,7 +324,7 @@ const UI_STRINGS = {
  * Contact settings
  */
 const CONTACT_SETTINGS = {
-  SUPPORT_EMAIL: 'admin@example.com'
+  SUPPORT_EMAIL: 'paul.ivers@orono.k12.mn.us'
 };
 
 /**

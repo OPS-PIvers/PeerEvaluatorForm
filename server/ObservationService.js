@@ -244,7 +244,7 @@ function getObservationsForUser(observedEmail, status = null) {
  * @param {string} observedEmail The email of the staff member being observed.
  * @returns {Object|null} The newly created observation object or null on error.
  */
-function createNewObservation(observerEmail, observedEmail) {
+function createNewObservation(observerEmail, observedEmail, observationType = 'Standard') {
   if (!observerEmail || !observedEmail) {
     console.error('Observer and Observed emails are required to create an observation.');
     return null;
@@ -277,7 +277,8 @@ function createNewObservation(observerEmail, observedEmail) {
       observationDate: null,
       observationData: {}, // e.g., { "1a:": "proficient", "1b:": "basic" }
       evidenceLinks: {}, // e.g., { "1a:": [{url: "...", name: "...", uploadedAt: "..."}, ...] }
-      observationNotes: {}
+      observationNotes: {},
+      Type: observationType
     };
 
     _appendObservationToSheet(newObservation);
@@ -1114,5 +1115,205 @@ function getFinalizedObservationsForUser() {
     console.error('Error in getFinalizedObservationsForUser:', error);
     // In case of an error, return an empty array to prevent breaking the client UI
     return [];
+  }
+}
+
+/**
+ * Creates a new Work Product observation.
+ * @param {string} observerEmail The email of the Peer Evaluator creating the observation.
+ * @param {string} observedEmail The email of the staff member being observed.
+ * @returns {Object|null} The newly created work product observation object or null on error.
+ */
+function createWorkProductObservation(observerEmail, observedEmail) {
+  return createNewObservation(observerEmail, observedEmail, 'Work Product');
+}
+
+/**
+ * Gets the observation type for a specific observation.
+ * @param {string} observationId The ID of the observation.
+ * @returns {string} The observation type ('Standard' or 'Work Product').
+ */
+function getObservationType(observationId) {
+  try {
+    const observations = _getObservationsDb();
+    const observation = observations.find(obs => obs.observationId === observationId);
+    return observation ? (observation.Type || 'Standard') : 'Standard';
+  } catch (error) {
+    console.error('Error getting observation type:', error);
+    return 'Standard';
+  }
+}
+
+/**
+ * Gets all work product questions from the WorkProductQuestions sheet.
+ * @returns {Array<Object>} Array of question objects with questionId, questionText, and order.
+ */
+function getWorkProductQuestions() {
+  try {
+    const cacheKey = 'work_product_questions';
+    const cached = getCachedDataEnhanced(cacheKey);
+    if (cached) return cached;
+
+    const spreadsheet = openSpreadsheet();
+    const sheet = getSheetByName(spreadsheet, SHEET_NAMES.WORK_PRODUCT_QUESTIONS);
+    if (!sheet || sheet.getLastRow() < 2) return [];
+
+    const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, 3).getValues();
+    const questions = values
+      .filter(row => row[0]) // Filter out empty rows
+      .map(row => ({
+        questionId: row[0],
+        questionText: row[1],
+        order: row[2] || 0
+      }))
+      .sort((a, b) => a.order - b.order);
+
+    setCachedDataEnhanced(cacheKey, questions);
+    return questions;
+  } catch (error) {
+    console.error('Error getting work product questions:', error);
+    return [];
+  }
+}
+
+/**
+ * Saves or updates a work product answer.
+ * @param {string} observationId The ID of the observation.
+ * @param {string} questionId The ID of the question.
+ * @param {string} answerText The answer text.
+ * @returns {boolean} True if saved successfully, false otherwise.
+ */
+function saveWorkProductAnswer(observationId, questionId, answerText) {
+  try {
+    const spreadsheet = openSpreadsheet();
+    const sheet = getSheetByName(spreadsheet, SHEET_NAMES.WORK_PRODUCT_ANSWERS);
+    if (!sheet) {
+      console.error('WorkProductAnswers sheet not found');
+      return false;
+    }
+
+    // Find existing answer
+    const values = sheet.getDataRange().getValues();
+    const headers = values[0];
+    const dataRows = values.slice(1);
+
+    const existingRowIndex = dataRows.findIndex(row =>
+      row[1] === observationId && row[2] === questionId
+    );
+
+    if (existingRowIndex !== -1) {
+      // Update existing answer
+      sheet.getRange(existingRowIndex + 2, 4).setValue(answerText);
+    } else {
+      // Create new answer
+      const newRow = [
+        Utilities.getUuid(),
+        observationId,
+        questionId,
+        answerText
+      ];
+      sheet.appendRow(newRow);
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error saving work product answer:', error);
+    return false;
+  }
+}
+
+/**
+ * Gets work product answers for a specific observation.
+ * @param {string} observationId The ID of the observation.
+ * @returns {Array<Object>} Array of answer objects with questionId and answerText.
+ */
+function getWorkProductAnswers(observationId) {
+  try {
+    const spreadsheet = openSpreadsheet();
+    const sheet = getSheetByName(spreadsheet, SHEET_NAMES.WORK_PRODUCT_ANSWERS);
+    if (!sheet || sheet.getLastRow() < 2) return [];
+
+    const values = sheet.getDataRange().getValues();
+    const dataRows = values.slice(1);
+
+    return dataRows
+      .filter(row => row[1] === observationId) // Filter by ObservationID
+      .map(row => ({
+        questionId: row[2],
+        answerText: row[3] || ''
+      }));
+  } catch (error) {
+    console.error('Error getting work product answers:', error);
+    return [];
+  }
+}
+
+/**
+ * Checks if a user has a work product observation.
+ * @param {string} userEmail The email of the user.
+ * @returns {boolean} True if user has a work product observation, false otherwise.
+ */
+function checkUserHasWorkProductObservation(userEmail) {
+  try {
+    const observations = _getObservationsDb();
+    return observations.some(obs =>
+      obs.observedEmail === userEmail &&
+      obs.Type === 'Work Product' &&
+      obs.status === 'Draft'
+    );
+  } catch (error) {
+    console.error('Error checking work product observation:', error);
+    return false;
+  }
+}
+
+/**
+ * Gets a summary of staff observations.
+ * @param {string} userEmail The email of the user.
+ * @returns {Object} Object with hasFinalized and count properties.
+ */
+function getStaffObservationSummary(userEmail) {
+  try {
+    const observations = _getObservationsDb();
+    const userObservations = observations.filter(obs =>
+      obs.observedEmail === userEmail && obs.status === 'Finalized'
+    );
+
+    return {
+      hasFinalized: userObservations.length > 0,
+      count: userObservations.length
+    };
+  } catch (error) {
+    console.error('Error getting staff observation summary:', error);
+    return { hasFinalized: false, count: 0 };
+  }
+}
+
+/**
+ * Gets the work product progress state for a user.
+ * @param {string} userEmail The email of the user.
+ * @returns {string} Progress state: 'not-started', 'in-progress', or 'submitted'.
+ */
+function getWorkProductProgressState(userEmail) {
+  try {
+    const observations = _getObservationsDb();
+    const workProductObs = observations.find(obs =>
+      obs.observedEmail === userEmail && obs.Type === 'Work Product'
+    );
+
+    if (!workProductObs) return 'not-started';
+
+    // Check if any answers exist
+    const answers = getWorkProductAnswers(workProductObs.observationId);
+    const hasAnswers = answers && answers.some(answer =>
+      answer.answerText && answer.answerText.trim().length > 0
+    );
+
+    if (workProductObs.status === 'Finalized') return 'submitted';
+    if (hasAnswers) return 'in-progress';
+    return 'not-started';
+  } catch (error) {
+    console.error('Error getting work product progress state:', error);
+    return 'not-started';
   }
 }
