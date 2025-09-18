@@ -34,12 +34,15 @@ This is a Google Apps Script (GAS) web application called "Peer Evaluator Form" 
 │   ├── UserService.js               # User authentication and context creation
 │   ├── Utils.js                     # Utility functions and constants
 │   └── ValidationService.js         # Data validation and error handling
+├── .github/
+│   └── copilot-instructions.md      # GitHub Copilot configuration
+├── .claude/
+│   └── settings.local.json          # Claude Code local settings
+├── .clasp.json                      # Google Apps Script CLI configuration
 ├── AGENTS.md                        # AI agent comprehensive guide
-├── CLAUDE.md                        # This file - Claude AI instructions
 ├── GEMINI.md                        # Gemini AI instructions
 ├── appsscript.json                  # Google Apps Script manifest
-├── global-tools-implementation-plan.md # Development planning document
-└── performance-todo.md              # Performance optimization notes
+└── work_product.md                  # Development work log
 ```
 
 ### Main Components

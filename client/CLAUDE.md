@@ -1,4 +1,4 @@
-# Claude.md - Client Directory
+# CLAUDE.md - Client Directory
 
 This document provides guidance for AI assistants working with the `client` directory of the Peer Evaluator Form application.
 
@@ -6,9 +6,23 @@ This document provides guidance for AI assistants working with the `client` dire
 
 The `client` directory contains all the HTML templates that are served to the user's browser. These files represent the user interface (UI) of the application and are processed by Google Apps Script's `HtmlService`. They include a mix of HTML, CSS (within `<style>` tags), and client-side JavaScript (within `<script>` tags), along with Apps Script scriptlets (`<?= ... ?>`) for server-side data injection.
 
+### Directory Structure
+
+```
+client/
+├── CLAUDE.md                        # This file - client-specific guidance
+├── peerevaluator/
+│   └── filter-interface.html        # Main dashboard for special access roles
+├── shared/
+│   ├── error-page.html              # Error display template with debugging info
+│   └── finalized-observation-email.html # Email template for finalized observations
+└── staff/
+    └── rubric.html                  # Read-only rubric view for standard users
+```
+
 ### Key Characteristics
 
--   **Templated HTML:** Files use scriptlets to dynamically insert data from the server (`Code.js`).
+-   **Templated HTML:** Files use scriptlets to dynamically insert data from the server (Code.js).
 -   **Single-Page Application (SPA) feel:** `filter-interface.html` acts as the main entry point for authenticated users, dynamically showing and hiding different views (e.g., filters, observation lists, rubric editor) without full page reloads.
 -   **Client-Side Logic:** Significant JavaScript logic within `<script>` tags handles user interactions, makes asynchronous calls to the server using `google.script.run`, and manipulates the DOM.
 -   **Shared CSS:** A comprehensive set of CSS rules is defined within `filter-interface.html` and `rubric.html` to maintain a consistent visual style across the application.

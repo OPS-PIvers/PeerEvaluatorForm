@@ -1,10 +1,28 @@
-# Claude.md - Server Directory
+# CLAUDE.md - Server Directory
 
 This document provides guidance for AI assistants working with the `server` directory of the Peer Evaluator Form application.
 
 ## Directory Overview
 
 The `server` directory contains all the server-side Google Apps Script (`.js`) files. This code runs on Google's servers and is responsible for all business logic, data access, and authentication. The files are organized into a modular, service-oriented architecture.
+
+### Directory Structure
+
+```
+server/
+├── CLAUDE.md                        # This file - server-specific guidance
+├── CacheManager.js                  # Advanced caching system with versioning
+├── Code.js                          # Main orchestrator and entry point
+├── Constants.js                     # Global constants and configuration
+├── ObservationService.js            # Manages peer evaluation observations
+├── PdfService.js                    # PDF generation, styling, and Drive integration
+├── SessionManager.js                # User sessions and state persistence
+├── SheetService.js                  # Data access layer for Google Sheets
+├── UiService.js                     # Server-side UI component generation and pages
+├── UserService.js                   # User authentication and context creation
+├── Utils.js                         # Utility functions and constants
+└── ValidationService.js             # Data validation and error handling
+```
 
 ## File Breakdown
 
