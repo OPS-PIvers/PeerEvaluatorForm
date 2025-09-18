@@ -87,7 +87,7 @@ To support this in a scalable way, two new sheets will be created: one for the q
 
 ## 5. Frontend Implementation (Client-side)
 
-### 5.1. `client/peerevaluator/filter-interface.html`
+### 5.1. `filter-interface.html`
 
 - **Add "Create Work Product" Button:**
   - A new button will be added next to the "Create Observation" button.
@@ -100,7 +100,7 @@ To support this in a scalable way, two new sheets will be created: one for the q
   - The retrieved answers will be formatted and displayed in a designated, non-editable area within the script editor.
   - *Alternative:* If polling is a requirement, it should use a long interval (e.g., 30-60 seconds) to minimize load.
 
-### 5.2. `client/staff/rubric.html`
+### 5.2. `rubric.html`
 
 - **Add "Work Product Questions" Button:**
   - A new button will be added to the top of the rubric page.
