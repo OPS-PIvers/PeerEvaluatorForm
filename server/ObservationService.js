@@ -228,6 +228,9 @@ function getObservationsForUser(observedEmail, status = null) {
       observedName: obs.observedName,
       createdAt: obs.createdAt,
       status: obs.status,
+      type: obs.Type || 'Standard',
+      observationName: obs.observationName || null,
+      observationDate: obs.observationDate || null,
       pdfUrl: obs.pdfUrl || null,
       pdfStatus: obs.pdfStatus || null,
       folderUrl: obs.folderUrl || null

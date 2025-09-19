@@ -115,11 +115,6 @@
             align-items: center;
             gap: 10px;
         }
-        .actions-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 20px;
-        }
         .action-card {
             background: var(--color-white);
             border: 2px solid var(--color-gray-border-medium);
@@ -392,26 +387,10 @@
         .error { text-align: center; padding: 40px; margin: 20px 0; border-radius: 12px; display: none; background: #fef2f2; color: #dc2626; border: 2px solid #fecaca; }
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* Observation cards */
-        .observation-card {
-            background: var(--color-white);
-            border: 1px solid var(--color-gray-border-medium);
-            border-radius: 12px;
-            padding: 0;
-            text-align: left;
-            transition: all 0.3s ease;
-            display: flex;
-            flex-direction: column;
-        }
-        .observation-card:hover { box-shadow: 0 8px 25px rgba(0,0,0,0.08); transform: translateY(-2px); }
-        .obs-card-content { padding: 20px; flex-grow: 1; }
-        .obs-card-title { font-weight: 600; color: var(--color-gray-text-light); font-size: 1.1rem; margin-bottom: 4px; }
-        .obs-card-desc { color: var(--color-text-deemphasized); font-size: 0.9rem; margin-bottom: 12px; }
+        /* Status badges and action buttons */
         .status-badge { display: inline-block; padding: 4px 10px; font-size: 0.8rem; font-weight: 600; border-radius: 9999px; }
         .status-draft { background-color: var(--color-amber-light-bg); color: var(--color-amber-text-dark); }
         .status-finalized { background-color: var(--color-green-light-bg); color: var(--color-green-darker); }
-        .obs-card-actions { background: var(--color-gray-bg-light); border-top: 1px solid var(--color-gray-border-medium); padding: 15px 20px; display: flex; gap: 10px; }
-        .obs-card-actions .filter-btn { flex: 1; text-align: center; padding: 8px 16px; font-size: 0.9rem; min-width: auto; }
         .btn-edit { background: #3b82f6; border-color: #3b82f6; }
         .btn-edit:hover { background: #2563eb; border-color: #2563eb; }
         .btn-finalize { background: var(--color-green-base); border-color: var(--color-green-base); }
@@ -422,6 +401,133 @@
         .btn-view:hover { background: #2563eb; border-color: #2563eb; }
         .btn-export { background: var(--color-green-base); border-color: var(--color-green-base); }
         .btn-export:hover { background: var(--color-green-dark); border-color: var(--color-green-dark); }
+
+        /* NEW LIST VIEW STYLES */
+        .action-buttons-section {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 25px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .observation-filter-section {
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .observation-filter-toggle {
+            display: flex;
+            background: var(--color-white);
+            border: 2px solid var(--color-gray-border-medium);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .observation-filter-btn {
+            padding: 10px 20px;
+            background: var(--color-white);
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: var(--color-gray-text-light);
+            transition: all 0.2s ease;
+            border-right: 1px solid var(--color-gray-border-medium);
+        }
+
+        .observation-filter-btn:last-child {
+            border-right: none;
+        }
+
+        .observation-filter-btn.active {
+            background: var(--color-blue-base);
+            color: white;
+        }
+
+        .observation-filter-btn:hover:not(.active) {
+            background: var(--color-gray-bg-light);
+        }
+
+        .observations-list-container {
+            background: var(--color-white);
+            border: 1px solid var(--color-gray-border-medium);
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+
+        .observations-list-header {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 1fr 2fr;
+            gap: 20px;
+            align-items: center;
+            padding: 16px 20px;
+            background: var(--color-gray-bg-light);
+            border-bottom: 1px solid var(--color-gray-border-medium);
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: var(--color-gray-text-light);
+        }
+
+        .observations-list-item {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 1fr 2fr;
+            gap: 20px;
+            align-items: center;
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--color-gray-border-light);
+            transition: all 0.2s ease;
+        }
+
+        .observations-list-item:last-child {
+            border-bottom: none;
+        }
+
+        .observations-list-item:hover {
+            background: var(--color-gray-bg-light);
+        }
+
+        .obs-list-title {
+            font-weight: 600;
+            color: var(--color-gray-text-light);
+            font-size: 1rem;
+        }
+
+        .obs-list-date {
+            color: var(--color-text-deemphasized);
+            font-size: 0.9rem;
+        }
+
+        .obs-list-type {
+            color: var(--color-gray-text-light);
+            font-size: 0.9rem;
+        }
+
+        .obs-list-status {
+            display: flex;
+            align-items: center;
+        }
+
+        .obs-list-actions {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+        }
+
+        .obs-list-actions .filter-btn {
+            padding: 6px 12px;
+            font-size: 0.85rem;
+            min-width: auto;
+        }
+
+        .empty-observations-message {
+            padding: 40px 20px;
+            text-align: center;
+            color: var(--color-text-deemphasized);
+            font-style: italic;
+        }
 
         .observation-metadata-editor {
             padding: 20px;
@@ -2144,30 +2250,112 @@
             });
         }
 
+        // Global variable to store current observations data for filtering
+        let currentObservationsData = [];
+        let currentObservationFilter = 'all';
+
         function renderObservationCards(result, observedEmail, observedName) {
             hideLoading();
             if (!result.success) return showError(result.error);
+
+            // Store the observations data globally for filtering
+            currentObservationsData = result.observations;
+
             const container = document.getElementById('observationSelectorView');
             const safeObservedNameHtml = escapeHtml(observedName);
             const safeObservedEmailJs = escapeJsString(observedEmail);
 
-            let cardsHtml = `<div class="action-card" onclick="handleNewObservation('${safeObservedEmailJs}')"><span class="action-icon">➕</span><div class="action-title">Start New Observation</div><div class="action-desc">Begin a new evaluation for this staff member.</div></div>`;
+            // Action buttons section
+            let actionButtonsHtml = `
+                <div class="action-buttons-section">
+                    <div class="action-card" onclick="handleNewObservation('${safeObservedEmailJs}')">
+                        <span class="action-icon">➕</span>
+                        <div class="action-title">Start New Observation</div>
+                        <div class="action-desc">Begin a new evaluation for this staff member.</div>
+                    </div>`;
+
             <? if (showWorkProductButton) { ?>
-            cardsHtml += `<div class="action-card" onclick="handleNewWorkProductObservation('${safeObservedEmailJs}')"><span class="action-icon">📋</span><div class="action-title">Create Work Product</div><div class="action-desc">Request reflective responses from this staff member.</div></div>`;
+            actionButtonsHtml += `
+                    <div class="action-card" onclick="handleNewWorkProductObservation('${safeObservedEmailJs}')">
+                        <span class="action-icon">📋</span>
+                        <div class="action-title">Create Work Product</div>
+                        <div class="action-desc">Request reflective responses from this staff member.</div>
+                    </div>`;
             <? } ?>
-            result.observations.forEach(obs => {
+
+            actionButtonsHtml += `</div>`;
+
+            // Filter toggle section
+            const filterHtml = `
+                <div class="observation-filter-section">
+                    <div class="observation-filter-toggle">
+                        <button class="observation-filter-btn active" data-filter="all" onclick="filterObservations('all')">All</button>
+                        <button class="observation-filter-btn" data-filter="draft" onclick="filterObservations('draft')">Draft</button>
+                        <button class="observation-filter-btn" data-filter="finalized" onclick="filterObservations('finalized')">Finalized</button>
+                    </div>
+                </div>`;
+
+            // Generate the observations list
+            const observationsListHtml = generateObservationsList(result.observations, observedEmail, observedName);
+
+            // Back button
+            const backButtonText = userContext.role === 'Administrator' ? 'Back to Staff List' : 'Back to Filters';
+            const backButtonAction = userContext.role === 'Administrator' ? "showView('adminStaffListView')" : "showView('customFiltersView')";
+            const backButtonHtml = `
+                <div style="margin-top: 20px;">
+                    <button class="filter-btn btn-secondary" onclick="${backButtonAction}">${backButtonText}</button>
+                </div>`;
+
+            container.innerHTML = `
+                <h2 class="section-title"><span>📝</span> Observations for ${safeObservedNameHtml}</h2>
+                ${actionButtonsHtml}
+                ${filterHtml}
+                <div id="observations-list-display">
+                    ${observationsListHtml}
+                </div>
+                ${backButtonHtml}`;
+
+            showView('observationSelectorView');
+        }
+
+        function generateObservationsList(observations, observedEmail, observedName) {
+            const safeObservedEmailJs = escapeJsString(observedEmail);
+            const safeObservedNameJs = escapeJsString(observedName);
+
+            if (!observations || observations.length === 0) {
+                return `<div class="observations-list-container">
+                    <div class="empty-observations-message">No observations found for this staff member.</div>
+                </div>`;
+            }
+
+            let listHtml = `
+                <div class="observations-list-container">
+                    <div class="observations-list-header">
+                        <div>Title</div>
+                        <div>Date</div>
+                        <div>Type</div>
+                        <div>Status</div>
+                        <div>Actions</div>
+                    </div>`;
+
+            observations.forEach(obs => {
                 const date = new Date(obs.createdAt).toLocaleDateString();
-                let buttons = '';
                 const safeObsIdJs = escapeJsString(obs.observationId);
                 const safeObsIdHtml = escapeHtml(obs.observationId);
-                const safeObsNameHtml = escapeHtml(obs.observedName);
                 const safeStatusHtml = escapeHtml(obs.status);
-                const safeObservedNameJs = escapeJsString(observedName); // For passing to finalize/delete handlers
+                const safeTypeHtml = escapeHtml(obs.type || 'Standard');
 
+                // Generate observation title
+                let title = obs.observationName || `${obs.observedName} Observation`;
+                const safeTitleHtml = escapeHtml(title);
+
+                // Generate action buttons based on status
+                let buttonsHtml = '';
                 if (obs.status === 'Draft') {
-                    buttons = `<button class="filter-btn btn-edit" onclick="handleEditObservation('${safeObsIdJs}')">Edit</button>
-                               <button class="filter-btn btn-finalize" onclick="handleFinalizeObservation('${safeObsIdJs}', '${safeObservedEmailJs}', '${safeObservedNameJs}')">Finalize</button>
-                               <button class="filter-btn btn-delete" onclick="handleDeleteObservation('${safeObsIdJs}', '${safeObservedEmailJs}', '${safeObservedNameJs}')">Delete</button>`;
+                    buttonsHtml = `
+                        <button class="filter-btn btn-edit" onclick="handleEditObservation('${safeObsIdJs}')">Edit</button>
+                        <button class="filter-btn btn-finalize" onclick="handleFinalizeObservation('${safeObsIdJs}', '${safeObservedEmailJs}', '${safeObservedNameJs}')">Finalize</button>
+                        <button class="filter-btn btn-delete" onclick="handleDeleteObservation('${safeObsIdJs}', '${safeObservedEmailJs}', '${safeObservedNameJs}')">Delete</button>`;
                 } else if (obs.status === 'Finalized') {
                     let pdfButtonHtml = '';
                     if (obs.pdfUrl) {
@@ -2179,24 +2367,51 @@
                         setTimeout(() => startPdfPolling(obs.observationId), 100);
                     }
 
-                    buttons = `<button class="filter-btn btn-view" onclick="handleViewObservation('${safeObsIdJs}')">View</button>
-                               ${pdfButtonHtml}
-                               <button class="filter-btn btn-delete" onclick="handleDeleteFinalizedObservation('${safeObsIdJs}', '${safeObservedEmailJs}', '${safeObservedNameJs}')">Delete</button>`;
+                    buttonsHtml = `
+                        <button class="filter-btn btn-view" onclick="handleViewObservation('${safeObsIdJs}')">View</button>
+                        ${pdfButtonHtml}
+                        <button class="filter-btn btn-delete" onclick="handleDeleteFinalizedObservation('${safeObsIdJs}', '${safeObservedEmailJs}', '${safeObservedNameJs}')">Delete</button>`;
                 }
-                cardsHtml += `
-                    <div class="observation-card">
-                        <div class="obs-card-content">
-                            <div class="obs-card-title">${safeObsNameHtml} - ${safeStatusHtml}</div>
-                            <div class="obs-card-desc">Created on ${date}</div>
+
+                listHtml += `
+                    <div class="observations-list-item" data-status="${obs.status.toLowerCase()}">
+                        <div class="obs-list-title">${safeTitleHtml}</div>
+                        <div class="obs-list-date">${date}</div>
+                        <div class="obs-list-type">${safeTypeHtml}</div>
+                        <div class="obs-list-status">
                             <div class="status-badge ${obs.status === 'Draft' ? 'status-draft' : 'status-finalized'}">${safeStatusHtml}</div>
                         </div>
-                        ${buttons ? `<div class="obs-card-actions">${buttons}</div>` : ''}
+                        <div class="obs-list-actions">
+                            ${buttonsHtml}
+                        </div>
                     </div>`;
             });
-            const backButtonText = userContext.role === 'Administrator' ? 'Back to Staff List' : 'Back to Filters';
-            const backButtonAction = userContext.role === 'Administrator' ? "showView('adminStaffListView')" : "showView('customFiltersView')";
-            container.innerHTML = `<h2 class="section-title"><span>📝</span> Observations for ${safeObservedNameHtml}</h2><div class="actions-grid">${cardsHtml}</div><div style="margin-top: 20px;"><button class="filter-btn btn-secondary" onclick="${backButtonAction}">${backButtonText}</button></div>`;
-            showView('observationSelectorView');
+
+            listHtml += `</div>`;
+            return listHtml;
+        }
+
+        function filterObservations(filter) {
+            currentObservationFilter = filter;
+
+            // Update active button state
+            document.querySelectorAll('.observation-filter-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.getAttribute('data-filter') === filter);
+            });
+
+            // Filter observations
+            let filteredObservations = currentObservationsData;
+            if (filter === 'draft') {
+                filteredObservations = currentObservationsData.filter(obs => obs.status === 'Draft');
+            } else if (filter === 'finalized') {
+                filteredObservations = currentObservationsData.filter(obs => obs.status === 'Finalized');
+            }
+
+            // Re-render the observations list
+            const listDisplay = document.getElementById('observations-list-display');
+            if (listDisplay) {
+                listDisplay.innerHTML = generateObservationsList(filteredObservations, currentObservedUser.email, currentObservedUser.name);
+            }
         }
 
         function displayObservationOptions(observedEmail, observedName) {
