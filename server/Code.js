@@ -3108,9 +3108,10 @@ function test_OrphanedFolderBugFix() {
             Logger.log(`Test 2 Setup: Created observation record ${testObsId2}`);
 
             // Create the folder structure that would exist for a real observation
-            const rootFolder = DriveApp.getFoldersByName('Peer Evaluator Form Data').hasNext()
-                ? DriveApp.getFoldersByName('Peer Evaluator Form Data').next()
-                : DriveApp.createFolder('Peer Evaluator Form Data');
+const rootFolderIterator = DriveApp.getFoldersByName('Peer Evaluator Form Data');
+const rootFolder = rootFolderIterator.hasNext()
+    ? rootFolderIterator.next()
+    : DriveApp.createFolder('Peer Evaluator Form Data');
 
             const userFolderName = 'Test User 2 (test.user2@example.com)';
             const userFolder = rootFolder.getFoldersByName(userFolderName).hasNext()
