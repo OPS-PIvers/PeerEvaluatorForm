@@ -1301,29 +1301,9 @@ function updateObservationMetadata(observationId, metadata) {
 
         SpreadsheetApp.flush();
         
-        // Update the observation folder name if the observationName has changed
-        if (metadata.observationName && metadata.observationName !== observation.observationName) {
-            try {
-                const rootFolderIterator = DriveApp.getFoldersByName(DRIVE_FOLDER_INFO.ROOT_FOLDER_NAME);
-                if (rootFolderIterator.hasNext()) {
-                    const rootFolder = rootFolderIterator.next();
-                    const userFolderName = `${observation.observedName} (${observation.observedEmail})`;
-                    const userFolderIterator = rootFolder.getFoldersByName(userFolderName);
-                    if (userFolderIterator.hasNext()) {
-                        const userFolder = userFolderIterator.next();
-                        const oldFolderName = `Observation - ${observation.observationId}`;
-                        const obsFolderIterator = userFolder.getFoldersByName(oldFolderName);
-                        if (obsFolderIterator.hasNext()) {
-                            const obsFolder = obsFolderIterator.next();
-                            obsFolder.setName(metadata.observationName);
-                        }
-                    }
-                }
-            } catch (driveError) {
-                // Log the error, but don't fail the whole operation
-                console.error(`Failed to rename observation folder for ${observationId}:`, driveError);
-            }
-        }
+        // The observationName is metadata only and should not affect the folder name,
+        // which is based on the immutable observationId.
+        // The logic to rename the folder has been removed to fix the bug.
 
 
         return { success: true };
@@ -3128,15 +3108,17 @@ function test_OrphanedFolderBugFix() {
             Logger.log(`Test 2 Setup: Created observation record ${testObsId2}`);
 
             // Create the folder structure that would exist for a real observation
-            const rootFolder = DriveApp.getFoldersByName('Peer Evaluator Form Data').hasNext() 
-                ? DriveApp.getFoldersByName('Peer Evaluator Form Data').next()
-                : DriveApp.createFolder('Peer Evaluator Form Data');
-            
+const rootFolderIterator = DriveApp.getFoldersByName('Peer Evaluator Form Data');
+const rootFolder = rootFolderIterator.hasNext()
+    ? rootFolderIterator.next()
+    : DriveApp.createFolder('Peer Evaluator Form Data');
+
             const userFolderName = 'Test User 2 (test.user2@example.com)';
-            const userFolder = rootFolder.getFoldersByName(userFolderName).hasNext()
-                ? rootFolder.getFoldersByName(userFolderName).next()
+            const userFolderIterator = rootFolder.getFoldersByName(userFolderName);
+            const userFolder = userFolderIterator.hasNext()
+                ? userFolderIterator.next()
                 : rootFolder.createFolder(userFolderName);
-            
+
             const obsFolder = userFolder.createFolder(FOLDER_NAME_2);
             const testFile = obsFolder.createFile(Utilities.newBlob('test content', 'text/plain', 'test.txt'));
             Logger.log(`Test 2 Setup: Created folder structure with test file. Folder ID: ${obsFolder.getId()}`);
