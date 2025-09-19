@@ -1239,7 +1239,8 @@
             padding: 0 24px 24px 24px;
             display: flex;
             flex-direction: column;
-            overflow: hidden;
+            overflow-y: auto; /* Enable vertical scrolling within modal */
+            overflow-x: hidden;
         }
 
         #scriptEditor {
@@ -1247,6 +1248,20 @@
             border: 1px solid var(--color-gray-border-light);
             border-radius: 6px;
             background-color: var(--color-white);
+        }
+
+        /* Work Product Answers Section Styling */
+        #workProductAnswersSection {
+            max-height: 300px; /* Limit height to prevent modal overflow */
+        }
+
+        #workProductAnswersDisplay {
+            max-height: 200px; /* Limit answers display height */
+            overflow-y: auto; /* Enable scrolling for long answers */
+            padding: 8px;
+            border: 1px solid #e5e7eb;
+            border-radius: 4px;
+            background: white;
         }
 
         /* Quill toolbar customization */
@@ -1916,6 +1931,15 @@
         let observationViewMode = 'assigned';
         let currentObservedUser = { email: null, name: null };
 
+        // Client-side cache for work product answers
+        let workProductAnswersCache = new Map();
+
+        // Helper function to clear work product answers cache
+        function clearWorkProductAnswersCache() {
+            workProductAnswersCache.clear();
+            console.log('Work product answers cache cleared');
+        }
+
         function showView(viewId) {
             stopAllPollers(); // Stop any running pollers when the view changes
             ['quickActionsView', 'customFiltersView', 'observationSelectorView', 'rubricContainer', 'adminStaffListView'].forEach(id => { 
@@ -2363,6 +2387,7 @@
             }
             
             currentObservationId = observation ? observation.observationId : null;
+            clearWorkProductAnswersCache(); // Clear cache when switching observations
             if (observation) {
                 currentObservedUser.email = observation.observedEmail;
                 currentObservedUser.name = observation.observedName;
@@ -2379,7 +2404,7 @@
 
             // Auto-load answers for work product observations
             if (window.currentObservationType === 'Work Product') {
-                setTimeout(refreshWorkProductAnswers, 1000);
+                refreshWorkProductAnswers();
             }
 
             // Store rubricData globally for nav functions
@@ -3937,8 +3962,9 @@
             
             // Clear observation context
             currentObservationId = null;
+            clearWorkProductAnswersCache(); // Clear cache when clearing observation
             currentObservedUser = { email: null, name: null };
-            
+
             // Clear script editor state
             clearScriptEditor();
             
@@ -4294,8 +4320,9 @@
             try {
                 // Force clear all state
                 currentObservationId = null;
+                clearWorkProductAnswersCache(); // Clear cache when clearing observation
                 currentObservedUser = { email: null, name: null };
-                
+
                 // Destroy script editor
                 if (scriptQuill) {
                     try {
@@ -4462,7 +4489,7 @@
 
         // === Work Product Answer Functions ===
 
-        function refreshWorkProductAnswers() {
+        function refreshWorkProductAnswers(forceRefresh = false) {
             if (!currentObservationId) {
                 showToast('No observation selected');
                 return;
@@ -4473,9 +4500,29 @@
                 return;
             }
 
+            // Check client-side cache first (unless force refresh is requested)
+            if (!forceRefresh) {
+                const cachedAnswers = workProductAnswersCache.get(currentObservationId);
+                if (cachedAnswers) {
+                    console.log('Using cached work product answers for observation:', currentObservationId);
+                    displayWorkProductAnswers(cachedAnswers);
+                    return;
+                }
+            } else {
+                // Clear specific cache entry for force refresh
+                workProductAnswersCache.delete(currentObservationId);
+                console.log('Force refresh requested - cleared cache for observation:', currentObservationId);
+            }
+
             showLoading('Loading staff responses...');
             google.script.run
-                .withSuccessHandler(displayWorkProductAnswers)
+                .withSuccessHandler(function(result) {
+                    // Cache the result if successful
+                    if (result.success) {
+                        workProductAnswersCache.set(currentObservationId, result);
+                    }
+                    displayWorkProductAnswers(result);
+                })
                 .withFailureHandler(function(error) {
                     hideLoading();
                     console.error('Failed to load answers:', error);
@@ -5043,9 +5090,10 @@
             
             const modal = document.getElementById('scriptEditorModal');
             const loadingOverlay = document.getElementById('scriptEditorLoadingOverlay');
-            
+
             modal.style.display = 'flex';
             loadingOverlay.style.display = 'flex'; // Show loading overlay immediately
+            document.body.style.overflow = 'hidden'; // Prevent background scrolling
 
             // Disable existing Quill editor if it exists to prevent interaction during loading
             if (scriptQuill) {
@@ -5139,7 +5187,8 @@
             
             const modal = document.getElementById('scriptEditorModal');
             modal.style.display = 'none';
-            
+            document.body.style.overflow = ''; // Restore background scrolling
+
             // Hide loading overlay if still visible
             hideScriptEditorLoading();
             
@@ -5799,7 +5848,7 @@
                 <div id="workProductAnswersSection" style="display: none; margin-bottom: 15px;">
                     <div style="background: #f0fdf4; border: 1px solid #86efac; border-radius: 6px; padding: 12px;">
                         <h4 style="margin: 0 0 10px 0; color: #166534;">Staff Work Product Responses</h4>
-                        <button onclick="refreshWorkProductAnswers()" class="filter-btn" style="margin-bottom: 10px;">
+                        <button onclick="refreshWorkProductAnswers(true)" class="filter-btn" style="margin-bottom: 10px;">
                             🔄 Refresh Staff Answers
                         </button>
                         <div id="workProductAnswersDisplay" style="font-size: 0.9rem; line-height: 1.4;"></div>

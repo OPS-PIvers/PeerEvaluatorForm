@@ -1219,6 +1219,10 @@ function saveWorkProductAnswer(observationId, questionId, answerText) {
       sheet.appendRow(newRow);
     }
 
+    // Invalidate the cache for this observation's answers
+    const cacheParams = { observationId: observationId };
+    setCachedDataEnhanced('workProductAnswers', cacheParams, null, 0); // Setting TTL to 0 invalidates the cache
+
     return true;
   } catch (error) {
     console.error('Error saving work product answer:', error);
@@ -1233,6 +1237,17 @@ function saveWorkProductAnswer(observationId, questionId, answerText) {
  */
 function getWorkProductAnswers(observationId) {
   try {
+    // Use enhanced cache with observation-specific key
+    const cacheParams = { observationId: observationId };
+    const cachedAnswers = getCachedDataEnhanced('workProductAnswers', cacheParams);
+
+    if (cachedAnswers && cachedAnswers.data) {
+      debugLog('Work product answers retrieved from cache', { observationId: observationId });
+      return cachedAnswers.data;
+    }
+
+    debugLog('Loading fresh work product answers', { observationId: observationId });
+
     const spreadsheet = openSpreadsheet();
     const sheet = getSheetByName(spreadsheet, SHEET_NAMES.WORK_PRODUCT_ANSWERS);
     if (!sheet || sheet.getLastRow() < 2) return [];
@@ -1240,12 +1255,17 @@ function getWorkProductAnswers(observationId) {
     const values = sheet.getDataRange().getValues();
     const dataRows = values.slice(1);
 
-    return dataRows
+    const answers = dataRows
       .filter(row => row[1] === observationId) // Filter by ObservationID
       .map(row => ({
         questionId: row[2],
         answerText: row[3] || ''
       }));
+
+    // Cache the results with shorter TTL since answers may change frequently
+    setCachedDataEnhanced('workProductAnswers', cacheParams, answers, CACHE_SETTINGS.ROLE_CONFIG_TTL);
+
+    return answers;
   } catch (error) {
     console.error('Error getting work product answers:', error);
     return [];
