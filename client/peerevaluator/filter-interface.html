@@ -1250,18 +1250,76 @@
             background-color: var(--color-white);
         }
 
-        /* Work Product Answers Section Styling */
-        #workProductAnswersSection {
-            max-height: 300px; /* Limit height to prevent modal overflow */
+
+        /* Script Editor Mode Toggle Styling */
+        .script-editor-mode-toggle {
+            display: flex;
+            gap: 8px;
+            margin: 12px 0;
+            padding: 4px;
+            background: #f3f4f6;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
         }
 
-        #workProductAnswersDisplay {
-            max-height: 200px; /* Limit answers display height */
-            overflow-y: auto; /* Enable scrolling for long answers */
-            padding: 8px;
-            border: 1px solid #e5e7eb;
-            border-radius: 4px;
+        .mode-toggle-btn {
+            flex: 1;
+            padding: 8px 16px;
+            background: transparent;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            color: #6b7280;
+            transition: all 0.2s ease;
+        }
+
+        .mode-toggle-btn:hover {
+            background: #e5e7eb;
+            color: #374151;
+        }
+
+        .mode-toggle-btn.active {
             background: white;
+            color: #1f2937;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+            border: 1px solid #d1d5db;
+        }
+
+        /* View-Only Mode Styling */
+        .staff-responses-view-only {
+            height: 100%;
+            overflow-y: auto;
+            padding: 16px;
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+        }
+
+        .response-item {
+            margin-bottom: 24px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #f3f4f6;
+        }
+
+        .response-item:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+        }
+
+        .response-question {
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 8px;
+            font-size: 15px;
+        }
+
+        .response-answer {
+            color: #4b5563;
+            line-height: 1.6;
+            font-size: 14px;
+            white-space: pre-wrap;
         }
 
         /* Quill toolbar customization */
@@ -4584,6 +4642,200 @@
             }
         }
 
+        // === Script Editor Mode Switching Functions ===
+
+        // Global state for script editor mode
+        let scriptEditorMode = 'view'; // 'view' or 'edit'
+        let cachedStaffResponses = null; // Cache staff responses for mode switching
+
+        function switchToViewMode() {
+            console.log('Switching to View-Only mode');
+            scriptEditorMode = 'view';
+
+            // Update button states
+            document.getElementById('viewModeBtn').classList.add('active');
+            document.getElementById('editModeBtn').classList.remove('active');
+
+            // Hide Quill editor and component tagging toolbar
+            document.getElementById('scriptEditor').style.display = 'none';
+            document.querySelector('.script-tagging-toolbar').style.display = 'none';
+
+            // Show staff responses in view-only format
+            showStaffResponsesViewOnly();
+        }
+
+        function switchToEditMode() {
+            console.log('Switching to Edit & Tag mode');
+            scriptEditorMode = 'edit';
+
+            // Update button states
+            document.getElementById('editModeBtn').classList.add('active');
+            document.getElementById('viewModeBtn').classList.remove('active');
+
+            // Show Quill editor and component tagging toolbar
+            document.getElementById('scriptEditor').style.display = 'block';
+            document.querySelector('.script-tagging-toolbar').style.display = 'block';
+
+            // Hide view-only display and populate Quill editor
+            hideStaffResponsesViewOnly();
+            populateQuillWithStaffResponses();
+        }
+
+        function showStaffResponsesViewOnly() {
+            // Create or show the view-only container
+            let viewContainer = document.getElementById('staffResponsesViewOnly');
+            if (!viewContainer) {
+                viewContainer = document.createElement('div');
+                viewContainer.id = 'staffResponsesViewOnly';
+                viewContainer.className = 'staff-responses-view-only';
+
+                // Insert before the script editor
+                const scriptEditor = document.getElementById('scriptEditor');
+                scriptEditor.parentNode.insertBefore(viewContainer, scriptEditor);
+            }
+
+            viewContainer.style.display = 'block';
+
+            // Load and display staff responses if we have them
+            if (cachedStaffResponses) {
+                displayStaffResponsesInViewMode(cachedStaffResponses);
+            } else {
+                // Load staff responses
+                loadStaffResponsesForView();
+            }
+        }
+
+        function hideStaffResponsesViewOnly() {
+            const viewContainer = document.getElementById('staffResponsesViewOnly');
+            if (viewContainer) {
+                viewContainer.style.display = 'none';
+            }
+        }
+
+        function loadStaffResponsesForView() {
+            if (!currentObservationId || !window.currentObservationType || window.currentObservationType !== 'Work Product') {
+                return;
+            }
+
+            const viewContainer = document.getElementById('staffResponsesViewOnly');
+            if (viewContainer) {
+                viewContainer.innerHTML = '<div style="text-align: center; padding: 40px; color: #6b7280;">Loading staff responses...</div>';
+            }
+
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    if (result.success) {
+                        cachedStaffResponses = result;
+                        displayStaffResponsesInViewMode(result);
+                    } else {
+                        if (viewContainer) {
+                            viewContainer.innerHTML = '<div style="text-align: center; padding: 40px; color: #dc2626;">Error loading responses: ' + result.error + '</div>';
+                        }
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    console.error('Failed to load staff responses:', error);
+                    if (viewContainer) {
+                        viewContainer.innerHTML = '<div style="text-align: center; padding: 40px; color: #dc2626;">Failed to load staff responses</div>';
+                    }
+                })
+                .getWorkProductAnswersForClient(currentObservationId);
+        }
+
+        function displayStaffResponsesInViewMode(result) {
+            const viewContainer = document.getElementById('staffResponsesViewOnly');
+            if (!viewContainer) return;
+
+            if (!result.answers || result.answers.length === 0) {
+                viewContainer.innerHTML = '<div style="text-align: center; padding: 40px; color: #6b7280;">No staff responses available yet.</div>';
+                return;
+            }
+
+            // Load questions for display
+            google.script.run
+                .withSuccessHandler(function(questionsResult) {
+                    if (questionsResult.success) {
+                        const questionsMap = {};
+                        questionsResult.questions.forEach(q => {
+                            questionsMap[q.questionId] = q.questionText;
+                        });
+
+                        let html = '';
+                        result.answers.forEach(answer => {
+                            const questionText = questionsMap[answer.questionId] || `Question ${answer.questionId}`;
+                            html += `
+                                <div class="response-item">
+                                    <div class="response-question">${questionText}</div>
+                                    <div class="response-answer">${answer.answerText || '<em style="color: #9ca3af;">No response provided</em>'}</div>
+                                </div>
+                            `;
+                        });
+
+                        viewContainer.innerHTML = html;
+                    } else {
+                        viewContainer.innerHTML = '<div style="text-align: center; padding: 40px; color: #dc2626;">Error loading questions for display</div>';
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    console.error('Failed to load questions:', error);
+                    // Fallback: show answers without question text
+                    let html = '';
+                    result.answers.forEach(answer => {
+                        html += `
+                            <div class="response-item">
+                                <div class="response-question">Question ${answer.questionId}</div>
+                                <div class="response-answer">${answer.answerText || '<em style="color: #9ca3af;">No response provided</em>'}</div>
+                            </div>
+                        `;
+                    });
+                    viewContainer.innerHTML = html;
+                })
+                .getWorkProductQuestionsForClient();
+        }
+
+        function populateQuillWithStaffResponses() {
+            if (!scriptQuill || !cachedStaffResponses) {
+                return;
+            }
+
+            // Load questions and populate Quill editor
+            google.script.run
+                .withSuccessHandler(function(questionsResult) {
+                    if (questionsResult.success && cachedStaffResponses.answers) {
+                        const questionsMap = {};
+                        questionsResult.questions.forEach(q => {
+                            questionsMap[q.questionId] = q.questionText;
+                        });
+
+                        let content = '';
+                        cachedStaffResponses.answers.forEach((answer, index) => {
+                            const questionText = questionsMap[answer.questionId] || `Question ${answer.questionId}`;
+                            content += `${questionText}\n\n${answer.answerText || 'No response provided'}\n\n---\n\n`;
+                        });
+
+                        scriptQuill.setText(content);
+                        console.log('Populated Quill editor with staff responses');
+                    }
+                })
+                .getWorkProductQuestionsForClient();
+        }
+
+        function initializeScriptEditorMode() {
+            // Show mode toggle only for work product observations
+            if (window.currentObservationType === 'Work Product') {
+                document.getElementById('scriptEditorModeToggle').style.display = 'block';
+                // Start in view mode by default
+                switchToViewMode();
+            } else {
+                document.getElementById('scriptEditorModeToggle').style.display = 'none';
+                // For non-work product observations, ensure normal mode
+                scriptEditorMode = 'edit';
+                document.getElementById('scriptEditor').style.display = 'block';
+                document.querySelector('.script-tagging-toolbar').style.display = 'block';
+                hideStaffResponsesViewOnly();
+            }
+        }
+
         // Stop monitoring when page unloads
         window.addEventListener('beforeunload', function(e) {
             stopStateMonitoring();
@@ -5462,11 +5714,13 @@
                     
                     // Hide loading overlay and re-enable editor
                     hideScriptEditorLoading();
-                    
+
                     // Load component tags and restore highlighting AFTER content is loaded
                     // Small delay to ensure Quill content is fully processed
                     setTimeout(() => {
                         loadComponentTags();
+                        // Initialize script editor mode system AFTER everything is loaded
+                        initializeScriptEditorMode();
                     }, 50);
                 })
                 .withFailureHandler(function(error) {
@@ -5823,6 +6077,17 @@
             
             <div class="script-editor-header">
                 <h2>Observation Script Editor</h2>
+
+                <!-- Mode Toggle Buttons -->
+                <div class="script-editor-mode-toggle" id="scriptEditorModeToggle" style="display: none;">
+                    <button id="viewModeBtn" class="mode-toggle-btn active" onclick="switchToViewMode()">
+                        📖 View Staff Responses
+                    </button>
+                    <button id="editModeBtn" class="mode-toggle-btn" onclick="switchToEditMode()">
+                        ✏️ Edit & Tag Content
+                    </button>
+                </div>
+
                 <div class="script-editor-controls">
                     <button id="saveScriptBtn" class="btn-secondary" onclick="manualSaveScriptContent()" disabled>Saved!</button>
                     <button class="btn-secondary" onclick="closeScriptEditor()">Close</button>
@@ -5845,15 +6110,6 @@
             </div>
             
             <div class="script-editor-content">
-                <div id="workProductAnswersSection" style="display: none; margin-bottom: 15px;">
-                    <div style="background: #f0fdf4; border: 1px solid #86efac; border-radius: 6px; padding: 12px;">
-                        <h4 style="margin: 0 0 10px 0; color: #166534;">Staff Work Product Responses</h4>
-                        <button onclick="refreshWorkProductAnswers(true)" class="filter-btn" style="margin-bottom: 10px;">
-                            🔄 Refresh Staff Answers
-                        </button>
-                        <div id="workProductAnswersDisplay" style="font-size: 0.9rem; line-height: 1.4;"></div>
-                    </div>
-                </div>
                 <div id="scriptEditor"></div>
             </div>
         </div>
