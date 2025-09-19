@@ -2970,8 +2970,9 @@ function test_OrphanedFolderBugFix() {
                 : DriveApp.createFolder('Peer Evaluator Form Data');
             
             const userFolderName = 'Test User 2 (test.user2@example.com)';
-            const userFolder = rootFolder.getFoldersByName(userFolderName).hasNext()
-                ? rootFolder.getFoldersByName(userFolderName).next()
+            const userFolderIterator = rootFolder.getFoldersByName(userFolderName);
+            const userFolder = userFolderIterator.hasNext()
+                ? userFolderIterator.next()
                 : rootFolder.createFolder(userFolderName);
             
             const obsFolder = userFolder.createFolder(FOLDER_NAME_2);
