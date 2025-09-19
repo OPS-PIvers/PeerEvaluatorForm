@@ -1067,7 +1067,7 @@
         .read-only .look-for-item input,
         .read-only .media-upload-button,
         .read-only .filter-select,
-        .read-only .filter-btn {
+        .read-only .filter-btn:not(#workProductQuestionsBtn) {
             pointer-events: none;
             cursor: not-allowed;
             opacity: 0.7;
@@ -1082,6 +1082,9 @@
             margin: 20px 0;
             display: flex;
             justify-content: center;
+            align-items: center;
+            gap: 20px;
+            flex-wrap: wrap;
         }
 
         .view-toggle-switch {
@@ -1645,6 +1648,31 @@
 
         .save-status.error {
             color: #ef4444;
+        }
+
+        /* Filter Button Base Styles */
+        .filter-btn {
+            background: var(--color-blue-base);
+            color: white;
+            border: 2px solid var(--color-blue-base);
+            padding: 12px 15px;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .filter-btn:hover:not(:disabled) {
+            background: #2c5aa0;
+            border-color: #2c5aa0;
+        }
+
+        .filter-btn:disabled {
+            background: #cbd5e0;
+            border-color: #cbd5e0;
+            cursor: not-allowed;
         }
 
         /* Work Product Button State Styles */
