@@ -1632,6 +1632,13 @@
             box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
         }
 
+        .work-product-textarea:disabled {
+            background-color: #f3f4f6;
+            color: #6b7280;
+            cursor: wait;
+            opacity: 0.8;
+        }
+
         .save-status {
             font-size: 0.8rem;
             margin-top: 5px;
@@ -3547,7 +3554,12 @@
 
         function loadWorkProductQuestions() {
             const container = document.getElementById('questionsContainer');
-            container.innerHTML = '<div style="text-align: center; padding: 20px;">Loading questions...</div>';
+            container.innerHTML = `
+                <div style="text-align: center; padding: 40px;">
+                    <div style="color: #6b7280; font-size: 1.1rem; margin-bottom: 10px;">Loading Work Product Questions...</div>
+                    <div style="color: #9ca3af; font-size: 0.9rem;">Please wait while we retrieve your questions and responses.</div>
+                </div>
+            `;
 
             google.script.run
                 .withSuccessHandler(function(result) {
@@ -3579,9 +3591,10 @@
                         <div class="work-product-question-text">${question.questionText}</div>
                         <textarea class="work-product-textarea"
                                   id="answer-${question.questionId}"
-                                  placeholder="Enter your response here..."
+                                  placeholder="Loading your response..."
+                                  disabled
                                   oninput="handleAnswerInput('${question.questionId}')"></textarea>
-                        <div class="save-status" id="status-${question.questionId}"></div>
+                        <div class="save-status" id="status-${question.questionId}" style="color: #6b7280; font-style: italic;">Loading responses...</div>
                     </div>
                 `;
             });
@@ -3595,7 +3608,11 @@
         function loadExistingAnswers() {
             // Get observation ID from current context
             getCurrentWorkProductObservationId(function(observationId) {
-                if (!observationId) return;
+                if (!observationId) {
+                    // No observation ID - enable textareas and clear loading state
+                    enableTextareasAndClearLoadingState();
+                    return;
+                }
 
                 currentWorkProductObservationId = observationId;
 
@@ -3609,11 +3626,35 @@
                                 }
                             });
                         }
+                        // Enable textareas and clear loading state
+                        enableTextareasAndClearLoadingState();
                     })
                     .withFailureHandler(function(error) {
                         console.error('Failed to load existing answers:', error);
+                        // Enable textareas and clear loading state even on error
+                        enableTextareasAndClearLoadingState();
                     })
                     .getWorkProductAnswersForClient(observationId);
+            });
+        }
+
+        function enableTextareasAndClearLoadingState() {
+            // Enable all textareas and update placeholders
+            const textareas = document.querySelectorAll('.work-product-textarea');
+            textareas.forEach(textarea => {
+                textarea.disabled = false;
+                if (textarea.placeholder === 'Loading your response...') {
+                    textarea.placeholder = 'Enter your response here...';
+                }
+            });
+
+            // Clear loading status messages
+            const statusElements = document.querySelectorAll('.save-status');
+            statusElements.forEach(status => {
+                if (status.textContent === 'Loading responses...') {
+                    status.textContent = '';
+                    status.style.fontStyle = '';
+                }
             });
         }
 
@@ -3707,13 +3748,13 @@
 
     <!-- Work Product Questions Modal -->
     <div id="workProductModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;" onclick="closeWorkProductModalOnBackdrop(event)">
-        <div style="position: relative; top: 5%; margin: 0 auto; width: 90%; max-width: 800px; background: white; border-radius: 8px; padding: 0; max-height: 85vh; overflow: hidden;" onclick="event.stopPropagation()">
-            <div style="padding: 20px; border-bottom: 1px solid #e5e7eb; background: #f9fafb;">
+        <div style="position: relative; top: 5%; margin: 0 auto; width: 90%; max-width: 800px; background: white; border-radius: 8px; padding: 0; max-height: 85vh; overflow: hidden; display: flex; flex-direction: column;" onclick="event.stopPropagation()">
+            <div style="padding: 20px; border-bottom: 1px solid #e5e7eb; background: #f9fafb; flex-shrink: 0;">
                 <h2 style="margin: 0; color: #374151;">Work Product Reflection Questions</h2>
                 <p style="margin: 5px 0 0 0; color: #6b7280; font-size: 0.9rem;">Your responses are automatically saved as you type.</p>
             </div>
-            <div id="questionsContainer" style="padding: 20px; overflow-y: auto; max-height: calc(85vh - 140px);"></div>
-            <div style="padding: 15px 20px; border-top: 1px solid #e5e7eb; background: #f9fafb; text-align: right;">
+            <div id="questionsContainer" style="padding: 20px; overflow-y: auto; flex: 1; min-height: 0;"></div>
+            <div style="padding: 15px 20px; border-top: 1px solid #e5e7eb; background: #f9fafb; text-align: right; flex-shrink: 0;">
                 <button onclick="closeWorkProductModal()" class="filter-btn">Close</button>
             </div>
         </div>
