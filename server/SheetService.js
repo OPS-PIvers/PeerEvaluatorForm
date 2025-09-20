@@ -238,11 +238,31 @@ function getStaffData() {
     // Cache with enhanced system
     setCachedDataEnhanced('staff_data', {}, staffData, CACHE_SETTINGS.SHEET_DATA_TTL);
 
-    // Also cache each user individually for granular access
+    // Batch cache users for performance and to avoid TypeErrors on invalid data
+    const usersToCache = {};
+    const timestamp = Date.now();
+    const version = getMasterCacheVersion();
+
     users.forEach(user => {
-      const cacheParams = { email: user.email.toLowerCase().trim() };
-      setCachedDataEnhanced('user', cacheParams, user, CACHE_SETTINGS.USER_DATA_TTL);
+      if (user && typeof user.email === 'string' && user.email.trim()) {
+        const cacheParams = { email: user.email.toLowerCase().trim() };
+        const fullKey = generateCacheKey('user', cacheParams);
+
+        const cacheEntry = {
+          data: user,
+          timestamp: timestamp,
+          version: version,
+          baseKey: 'user',
+          params: cacheParams
+        };
+        usersToCache[fullKey] = JSON.stringify(cacheEntry);
+      }
     });
+
+    if (Object.keys(usersToCache).length > 0) {
+      CacheService.getScriptCache().putAll(usersToCache, CACHE_SETTINGS.USER_DATA_TTL);
+      debugLog('Cache SET for multiple users', { count: Object.keys(usersToCache).length, ttl: CACHE_SETTINGS.USER_DATA_TTL });
+    }
     
     const executionTime = Date.now() - startTime;
     logPerformanceMetrics('getStaffData', executionTime, {
