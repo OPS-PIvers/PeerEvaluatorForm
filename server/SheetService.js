@@ -237,6 +237,12 @@ function getStaffData() {
     
     // Cache with enhanced system
     setCachedDataEnhanced('staff_data', {}, staffData, CACHE_SETTINGS.SHEET_DATA_TTL);
+
+    // Also cache each user individually for granular access
+    users.forEach(user => {
+      const cacheParams = { email: user.email.toLowerCase().trim() };
+      setCachedDataEnhanced('user', cacheParams, user, CACHE_SETTINGS.USER_DATA_TTL);
+    });
     
     const executionTime = Date.now() - startTime;
     logPerformanceMetrics('getStaffData', executionTime, {
