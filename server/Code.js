@@ -328,7 +328,7 @@ function getStaffForAdmin(adminUserContext) {
     return [];
   }
 
-  const allStaff = getStaffData();
+  const allStaff = getStaffDataFromGlobalCache();
   if (!allStaff || !allStaff.users) {
     return [];
   }
@@ -1662,7 +1662,7 @@ function handleStaffListRequest(e) {
  */
 function getFilteredStaffList(filterType = 'all', role = null, year = null) {
   try {
-    const staffData = getStaffData();
+    const staffData = getStaffDataFromGlobalCache();
     if (!staffData || !staffData.users) {
       debugLog('No staff data available for filtering');
       return [];
@@ -1918,7 +1918,7 @@ function processRubricContentChange(roleName, editedRow, editedColumn, newValue,
     debugLog('Cleared sheet hash for change detection', { roleName: roleName, triggerId: triggerId });
 
     // Get all users with this role and clear their caches
-    const staffData = getStaffData();
+    const staffData = getStaffDataFromGlobalCache();
     if (staffData && staffData.users) {
       const usersWithRole = staffData.users.filter(user => user.role === roleName);
       
@@ -2188,7 +2188,7 @@ function checkAllUsersForRoleChanges() {
 
   try {
     const startTime = Date.now();
-    const staffData = getStaffData();
+    const staffData = getStaffDataFromGlobalCache();
 
     if (!staffData || !staffData.users) {
       debugLog('No staff data available for role change checking');

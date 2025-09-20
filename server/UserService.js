@@ -53,7 +53,7 @@ function getUserByEmail(email) {
     
     debugLog('Loading fresh user data', { email: email });
 
-    const staffData = getStaffData();
+    const staffData = getStaffDataFromGlobalCache();
     if (!staffData || !staffData.users) {
       debugLog('No staff data available');
       return null;
@@ -600,7 +600,7 @@ function isValidRole(role) {
  */
 function getUserStatistics() {
   try {
-    const staffData = getStaffData();
+    const staffData = getStaffDataFromGlobalCache();
     if (!staffData || !staffData.users) {
       return {
         totalUsers: 0,
