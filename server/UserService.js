@@ -431,7 +431,7 @@ function createUserContext(email = null) {
     } else {
       // For non-probationary users, get their assigned subdomains
       context.assignedSubdomains = getAssignedSubdomainsForRoleYear(context.role, context.year);
-      // Set view mode: FULL for all users by default, can be overridden by filters.
+      // Set default view mode for non-probationary users to FULL; can be overridden by filters.
       context.viewMode = VIEW_MODES.FULL;
       debugLog('Non-probationary user context: viewMode set', {
         role: context.role,
