@@ -4253,8 +4253,27 @@
         }
 
         function addGlobalRecording(fileUrl, filename, type) {
-            // Placeholder for now
-            console.log(`Recording saved: ${type} at ${fileUrl} with name ${filename}`);
+            if (!window.currentObservation) {
+                console.error('Cannot add global recording: No current observation');
+                return;
+            }
+
+            if (!window.currentObservation.globalRecordings) {
+                window.currentObservation.globalRecordings = { audio: [], video: [] };
+            }
+            
+            if (!window.currentObservation.globalRecordings[type]) {
+                window.currentObservation.globalRecordings[type] = [];
+            }
+
+            window.currentObservation.globalRecordings[type].push({
+                url: fileUrl,
+                name: filename,
+                type: type
+            });
+
+            console.log(`Recording saved and added to global state: ${type} at ${fileUrl}`);
+            
             // Update transcribe button visibility when recordings are added
             updateTranscribeButtonVisibility();
         }
