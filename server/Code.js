@@ -1614,7 +1614,13 @@ function uploadGlobalRecording(observationId, base64Data, filename, recordingTyp
 
         // Convert base64 to blob with dynamic MIME type
         const binaryData = Utilities.base64Decode(base64Data);
-        const mimeType = recordingType === 'video' ? 'video/webm' : 'audio/webm';
+        const extension = filename.split('.').pop().toLowerCase();
+        let mimeType;
+        if (recordingType === 'video') {
+            mimeType = extension === 'mp4' ? 'video/mp4' : 'video/webm';
+        } else {
+            mimeType = extension === 'mp3' ? 'audio/mpeg' : 'audio/webm';
+        }
         const blob = Utilities.newBlob(binaryData, mimeType, filename);
 
         // Create/get observation folder
