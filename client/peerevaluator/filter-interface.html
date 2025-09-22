@@ -54,6 +54,11 @@
     /* Reds for destructive actions */
     --color-red-base: #dc2626;
     --color-red-dark: #b91c1c;
+
+    /* Oranges for processing states */
+    --color-orange-base: #ea580c;
+    --color-orange-dark: #c2410c;
+    --color-orange-light: #fed7aa;
 }
 
         * {
@@ -643,6 +648,26 @@
         .global-tool-btn.processing, .ql-stt-button.processing {
             background: var(--color-orange-base);
             animation: pulse 1.5s infinite;
+        }
+
+        .global-tool-btn.transcribe-btn {
+            background: var(--color-amber-base);
+            color: white;
+        }
+
+        .global-tool-btn.transcribe-btn:hover {
+            background: var(--color-amber-dark);
+        }
+
+        .global-tool-btn.transcribe-btn.processing {
+            background: var(--color-orange-base);
+            animation: pulse 1.5s infinite;
+        }
+
+        .global-tool-btn.transcribe-btn:disabled {
+            background: var(--color-gray-bg-medium);
+            cursor: not-allowed;
+            opacity: 0.6;
         }
 
         /* Recording Timer Display Styling */
@@ -2662,6 +2687,8 @@
             currentObservationId = observation ? observation.observationId : null;
             clearWorkProductAnswersCache(); // Clear cache when switching observations
             if (observation) {
+                // Store observation globally for transcription button logic
+                window.currentObservation = observation;
                 currentObservedUser.email = observation.observedEmail;
                 currentObservedUser.name = observation.observedName;
                 console.log('Observation context set:', {
@@ -2727,6 +2754,8 @@
                 const globalToolsBar = document.getElementById('globalToolsBar');
                 if (globalToolsBar) {
                     globalToolsBar.style.display = 'block';
+                    // Update transcribe button visibility based on observation data
+                    updateTranscribeButtonVisibility();
                 } else {
                     console.error('ERROR: globalToolsBar element not found after HTML injection!');
                 }
@@ -2794,6 +2823,9 @@
                         📹 Record Video
                     </button>
                     <div id="videoTimerDisplay" class="timer-display"></div>
+                    <button class="global-tool-btn transcribe-btn" id="transcribeAudioBtn" onclick="requestTranscription()" style="display: none;" title="Get AI Transcription">
+                        ⭐ Get Transcription
+                    </button>
                     <button class="global-tool-btn" id="scriptEditorBtn" onclick="openScriptEditor()">
                         📝 Script Editor
                     </button>
@@ -4223,6 +4255,997 @@
         function addGlobalRecording(fileUrl, filename, type) {
             // Placeholder for now
             console.log(`Recording saved: ${type} at ${fileUrl} with name ${filename}`);
+            // Update transcribe button visibility when recordings are added
+            updateTranscribeButtonVisibility();
+        }
+
+        /**
+         * Updates the visibility and state of the transcribe button based on audio recordings
+         */
+        function updateTranscribeButtonVisibility() {
+            const transcribeBtn = document.getElementById('transcribeAudioBtn');
+            if (!transcribeBtn) return;
+
+            // Check if current observation has audio recordings
+            let hasAudioRecordings = false;
+
+            // Check for existing recordings in observation data (loaded observations)
+            if (window.currentObservation && window.currentObservation.globalRecordings && window.currentObservation.globalRecordings.audio) {
+                hasAudioRecordings = window.currentObservation.globalRecordings.audio.length > 0;
+            }
+
+            // Also check recording state for current session (new recordings)
+            if (recordingState.audio && recordingState.audio.sessionCount > 0) {
+                hasAudioRecordings = true;
+            }
+
+            if (hasAudioRecordings) {
+                transcribeBtn.style.display = 'inline-block';
+                transcribeBtn.disabled = false;
+                console.log('Transcribe button shown - audio recordings available');
+            } else {
+                transcribeBtn.style.display = 'none';
+                console.log('Transcribe button hidden - no audio recordings');
+            }
+        }
+
+        /**
+         * Requests transcription for the current observation's audio files
+         */
+        function requestTranscription() {
+            if (!currentObservationId) {
+                showToast('No observation selected', false);
+                return;
+            }
+
+            const transcribeBtn = document.getElementById('transcribeAudioBtn');
+            if (!transcribeBtn) return;
+
+            // Update button to processing state
+            transcribeBtn.classList.add('processing');
+            transcribeBtn.disabled = true;
+            transcribeBtn.innerHTML = '⭐ Processing...';
+
+            console.log('Starting transcription request for observation:', currentObservationId);
+
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    console.log('Transcription result:', result);
+
+                    // Reset button state
+                    transcribeBtn.classList.remove('processing');
+                    transcribeBtn.disabled = false;
+                    transcribeBtn.innerHTML = '⭐ Get Transcription';
+
+                    if (result.success) {
+                        if (result.cached) {
+                            showToast('Using recent transcription (cached)', true);
+                        } else {
+                            showToast('Transcription completed successfully!', true);
+                        }
+
+                        // Show transcription results (Phase 3.2 implementation)
+                        displayTranscriptionResults(result.data);
+                    } else {
+                        if (result.setupRequired) {
+                            showToast('Gemini API key not configured. Please contact your administrator.', false);
+                        } else {
+                            showToast('Transcription failed: ' + result.error, false);
+                        }
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    console.error('Transcription request failed:', error);
+
+                    // Reset button state
+                    transcribeBtn.classList.remove('processing');
+                    transcribeBtn.disabled = false;
+                    transcribeBtn.innerHTML = '⭐ Get Transcription';
+
+                    showToast('Failed to request transcription: ' + error.message, false);
+                })
+                .requestAudioTranscription(currentObservationId);
+        }
+
+        /**
+         * Displays transcription results in modal
+         * @param {Object} transcriptionData - The transcription data from server
+         */
+        function displayTranscriptionResults(transcriptionData) {
+            if (!transcriptionData) {
+                console.error('No transcription data provided');
+                showToast('Error: No transcription data received', false);
+                return;
+            }
+
+            console.log('Displaying transcription results:', transcriptionData);
+
+            try {
+                // Store transcription data globally for other functions
+                window.currentTranscriptionData = transcriptionData;
+
+                // Populate metadata section
+                populateTranscriptionMetadata(transcriptionData);
+
+                // Populate component tags section
+                populateComponentTags(transcriptionData.componentTags || {});
+
+                // Populate full transcription
+                populateTranscriptionContent(transcriptionData.transcription || '');
+
+                // Update insert button visibility based on script editor state
+                updateInsertButtonState();
+
+                // Show the modal
+                openTranscriptionModal();
+
+            } catch (error) {
+                console.error('Error displaying transcription results:', error);
+                showToast('Error displaying transcription: ' + error.message, false);
+            }
+        }
+
+        /**
+         * Populates the transcription metadata section
+         * @param {Object} data - Transcription data
+         */
+        function populateTranscriptionMetadata(data) {
+            const metadataDiv = document.getElementById('transcriptionMetadata');
+            if (!metadataDiv) return;
+
+            const processingTime = data.processingTime ? `${(data.processingTime / 1000).toFixed(1)}s` : 'Unknown';
+            const fileCount = data.fileCount || 0;
+            const timestamp = data.timestamp ? new Date(data.timestamp).toLocaleString() : 'Unknown';
+
+            metadataDiv.innerHTML = `
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-weight: 600;">⏱️ Processing Time:</span>
+                        <span>${processingTime}</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-weight: 600;">🎵 Audio Files:</span>
+                        <span>${fileCount} file${fileCount !== 1 ? 's' : ''}</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-weight: 600;">📅 Generated:</span>
+                        <span>${timestamp}</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        /**
+         * Populates the component tags section
+         * @param {Object} componentTags - Component tags object
+         */
+        function populateComponentTags(componentTags) {
+            const tagsDiv = document.getElementById('componentTagsContent');
+            if (!tagsDiv) return;
+
+            const tagKeys = Object.keys(componentTags);
+
+            if (tagKeys.length === 0) {
+                tagsDiv.innerHTML = `
+                    <div style="text-align: center; color: #718096; font-style: italic; padding: 20px;">
+                        No component tags were identified in this transcription.
+                    </div>
+                `;
+                return;
+            }
+
+            let tagsHtml = '';
+            tagKeys.forEach(component => {
+                const content = componentTags[component];
+                if (Array.isArray(content) && content.length > 0) {
+                    tagsHtml += `
+                        <div style="margin-bottom: 20px; border: 1px solid #e2e8f0; border-radius: 6px; overflow: hidden;">
+                            <div style="background: #4a5568; color: white; padding: 10px 15px; font-weight: 600; font-size: 0.9rem;">
+                                Component ${component.toUpperCase()}
+                            </div>
+                            <div style="padding: 15px;">
+                                ${content.map(text => `
+                                    <div style="background: white; border: 1px solid #e2e8f0; border-radius: 4px; padding: 12px; margin-bottom: 8px; font-size: 0.9rem; line-height: 1.5;">
+                                        ${escapeHtml(text)}
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
+            });
+
+            if (tagsHtml) {
+                tagsDiv.innerHTML = tagsHtml;
+            } else {
+                tagsDiv.innerHTML = `
+                    <div style="text-align: center; color: #718096; font-style: italic; padding: 20px;">
+                        Component tags were detected but no content was extracted.
+                    </div>
+                `;
+            }
+        }
+
+        /**
+         * Populates the full transcription content
+         * @param {string} transcription - The full transcription text
+         */
+        function populateTranscriptionContent(transcription) {
+            const contentDiv = document.getElementById('transcriptionContent');
+            if (!contentDiv) return;
+
+            if (!transcription || transcription.trim() === '') {
+                contentDiv.innerHTML = `
+                    <div style="text-align: center; color: #718096; font-style: italic;">
+                        No transcription content available.
+                    </div>
+                `;
+                return;
+            }
+
+            // Format the transcription for display
+            const formattedTranscription = formatTranscriptionForDisplay(transcription);
+            contentDiv.innerHTML = formattedTranscription;
+        }
+
+        /**
+         * Formats transcription text for display with proper styling
+         * @param {string} text - Raw transcription text
+         * @returns {string} Formatted HTML
+         */
+        function formatTranscriptionForDisplay(text) {
+            return escapeHtml(text)
+                .replace(/\*\*Speaker (\d+):\*\*/g, '<div style="font-weight: 600; color: #2d3748; margin-top: 15px; margin-bottom: 5px;">🎤 Speaker $1:</div>')
+                .replace(/\*\[(\d{2}:\d{2})\]\*/g, '<span style="background: #bee3f8; color: #2b6cb0; padding: 2px 6px; border-radius: 3px; font-size: 0.8rem; font-weight: 500;">⏰ $1</span>')
+                .replace(/\[(\d[a-f]):\]/g, '<span style="background: #d69e2e; color: white; padding: 2px 6px; border-radius: 3px; font-size: 0.8rem; font-weight: 500; margin-right: 5px;">🏷️ $1</span>')
+                .replace(/\n\n/g, '<br><br>')
+                .replace(/\n/g, '<br>');
+        }
+
+        /**
+         * Opens the transcription modal
+         */
+        function openTranscriptionModal() {
+            const overlay = document.getElementById('transcriptionModalOverlay');
+            if (!overlay) {
+                console.error('Transcription modal overlay not found');
+                return;
+            }
+
+            overlay.style.display = 'flex';
+            setTimeout(() => {
+                overlay.classList.add('show');
+                document.body.style.overflow = 'hidden'; // Prevent background scrolling
+            }, 10);
+
+            // Add escape key listener
+            const handleEscape = (event) => {
+                if (event.key === 'Escape') {
+                    closeTranscriptionModal();
+                    document.removeEventListener('keydown', handleEscape);
+                }
+            };
+            document.addEventListener('keydown', handleEscape);
+
+            // Add click-outside-to-close
+            overlay.addEventListener('click', function(event) {
+                if (event.target === overlay) {
+                    closeTranscriptionModal();
+                }
+            });
+        }
+
+        /**
+         * Closes the transcription modal
+         */
+        function closeTranscriptionModal() {
+            const overlay = document.getElementById('transcriptionModalOverlay');
+            if (!overlay) return;
+
+            overlay.classList.remove('show');
+            document.body.style.overflow = ''; // Restore scrolling
+
+            setTimeout(() => {
+                overlay.style.display = 'none';
+                // Clear transcription data
+                window.currentTranscriptionData = null;
+            }, 400);
+        }
+
+        /**
+         * Simple HTML escaping function to prevent XSS
+         * @param {string} unsafe - Unsafe text
+         * @returns {string} Escaped text
+         */
+        function escapeHtml(unsafe) {
+            if (typeof unsafe !== 'string') return '';
+            return unsafe
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        /**
+         * Copies the full transcription to clipboard
+         */
+        function copyTranscriptionToClipboard() {
+            if (!window.currentTranscriptionData || !window.currentTranscriptionData.transcription) {
+                showToast('No transcription available to copy', false);
+                return;
+            }
+
+            const transcription = window.currentTranscriptionData.transcription;
+
+            // Use the modern Clipboard API if available
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(transcription)
+                    .then(() => {
+                        showToast('Transcription copied to clipboard!', true);
+                        console.log('Transcription copied to clipboard via Clipboard API');
+                    })
+                    .catch(err => {
+                        console.error('Failed to copy via Clipboard API:', err);
+                        // Fallback to older method
+                        fallbackCopyToClipboard(transcription);
+                    });
+            } else {
+                // Fallback for older browsers or non-secure contexts
+                fallbackCopyToClipboard(transcription);
+            }
+        }
+
+        /**
+         * Fallback copy method for browsers without Clipboard API
+         * @param {string} text - Text to copy
+         */
+        function fallbackCopyToClipboard(text) {
+            try {
+                // Create a temporary textarea element
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                textarea.style.position = 'fixed';
+                textarea.style.left = '-999999px';
+                textarea.style.top = '-999999px';
+                document.body.appendChild(textarea);
+
+                // Select and copy the text
+                textarea.focus();
+                textarea.select();
+
+                const successful = document.execCommand('copy');
+                document.body.removeChild(textarea);
+
+                if (successful) {
+                    showToast('Transcription copied to clipboard!', true);
+                    console.log('Transcription copied to clipboard via fallback method');
+                } else {
+                    throw new Error('execCommand failed');
+                }
+            } catch (err) {
+                console.error('Failed to copy transcription:', err);
+                showToast('Failed to copy transcription. Please select and copy manually.', false);
+            }
+        }
+
+        /**
+         * Updates the insert button state based on script editor availability
+         */
+        function updateInsertButtonState() {
+            const insertBtn = document.getElementById('insertScriptBtn');
+            if (!insertBtn) return;
+
+            // Check if script editor is open and Quill instance exists
+            const scriptModal = document.getElementById('scriptEditorModal');
+            const isScriptEditorOpen = scriptModal && scriptModal.style.display !== 'none';
+            const hasQuillInstance = typeof scriptQuill !== 'undefined' && scriptQuill !== null;
+
+            if (isScriptEditorOpen && hasQuillInstance) {
+                insertBtn.style.display = 'flex';
+                insertBtn.disabled = false;
+                console.log('Insert button enabled - script editor is open');
+            } else {
+                insertBtn.style.display = 'none';
+                console.log('Insert button hidden - script editor not available');
+            }
+        }
+
+        /**
+         * Inserts the transcription into the script editor at cursor position
+         */
+        function insertTranscriptionIntoScript() {
+            if (!window.currentTranscriptionData || !window.currentTranscriptionData.transcription) {
+                showToast('No transcription available to insert', false);
+                return;
+            }
+
+            // Check if script editor is available
+            if (typeof scriptQuill === 'undefined' || scriptQuill === null) {
+                showToast('Script editor is not open. Please open the script editor first.', false);
+                return;
+            }
+
+            try {
+                // Format transcription for script insertion
+                const formattedText = formatTranscriptionForScript(window.currentTranscriptionData);
+
+                // Get current cursor position or selection
+                const range = scriptQuill.getSelection(true);
+                const insertPosition = range ? range.index : scriptQuill.getLength();
+
+                // Insert the formatted transcription
+                scriptQuill.insertText(insertPosition, formattedText, 'user');
+
+                // Position cursor after the inserted text
+                const newPosition = insertPosition + formattedText.length;
+                scriptQuill.setSelection(newPosition, 0, 'user');
+
+                // Focus the script editor
+                scriptQuill.focus();
+
+                showToast('Transcription inserted into script editor!', true);
+                console.log('Transcription successfully inserted into script editor');
+
+                // Optionally close the transcription modal after insertion
+                setTimeout(() => {
+                    closeTranscriptionModal();
+                }, 1000);
+
+            } catch (error) {
+                console.error('Error inserting transcription into script:', error);
+                showToast('Failed to insert transcription: ' + error.message, false);
+            }
+        }
+
+        /**
+         * Formats transcription data for script editor insertion
+         * @param {Object} transcriptionData - The complete transcription data
+         * @returns {string} Formatted text for script insertion
+         */
+        function formatTranscriptionForScript(transcriptionData) {
+            if (!transcriptionData.transcription) return '';
+
+            let formattedText = '\n\n=== AI TRANSCRIPTION ===\n\n';
+
+            // Add metadata
+            if (transcriptionData.timestamp) {
+                const date = new Date(transcriptionData.timestamp).toLocaleString();
+                formattedText += `Generated: ${date}\n`;
+            }
+            if (transcriptionData.fileCount) {
+                formattedText += `Audio files: ${transcriptionData.fileCount}\n`;
+            }
+            formattedText += '\n';
+
+            // Add component tags if available
+            const componentTags = transcriptionData.componentTags || {};
+            const tagKeys = Object.keys(componentTags);
+            if (tagKeys.length > 0) {
+                formattedText += '--- Component Tags ---\n';
+                tagKeys.forEach(component => {
+                    const content = componentTags[component];
+                    if (Array.isArray(content) && content.length > 0) {
+                        formattedText += `\n[${component.toUpperCase()}]\n`;
+                        content.forEach(text => {
+                            formattedText += `• ${text}\n`;
+                        });
+                    }
+                });
+                formattedText += '\n';
+            }
+
+            // Add full transcription
+            formattedText += '--- Full Transcription ---\n\n';
+            formattedText += transcriptionData.transcription;
+            formattedText += '\n\n=== END TRANSCRIPTION ===\n\n';
+
+            return formattedText;
+        }
+
+        // === Transcription Testing Functions ===
+
+        /**
+         * Comprehensive unit testing for all transcription components
+         * This function tests each component independently to ensure they work correctly
+         */
+        function runTranscriptionUnitTests() {
+            console.log('🧪 Starting Transcription Unit Tests...');
+
+            const testResults = {
+                passed: 0,
+                failed: 0,
+                tests: []
+            };
+
+            // Test 1: escapeHtml function
+            try {
+                const testInput = '<script>alert("test")</script>';
+                const expected = '&lt;script&gt;alert(&quot;test&quot;)&lt;/script&gt;';
+                const result = escapeHtml(testInput);
+
+                if (result === expected) {
+                    testResults.passed++;
+                    testResults.tests.push('✅ escapeHtml function works correctly');
+                } else {
+                    testResults.failed++;
+                    testResults.tests.push('❌ escapeHtml function failed');
+                }
+            } catch (error) {
+                testResults.failed++;
+                testResults.tests.push('❌ escapeHtml function threw error: ' + error.message);
+            }
+
+            // Test 2: formatTranscriptionForDisplay function
+            try {
+                const testTranscription = '**Speaker 1:** Hello world *[01:30]* This is a test [1a] Component reference.';
+                const result = formatTranscriptionForDisplay(testTranscription);
+
+                if (result.includes('🎤 Speaker 1:') && result.includes('⏰ 01:30') && result.includes('🏷️ 1a')) {
+                    testResults.passed++;
+                    testResults.tests.push('✅ formatTranscriptionForDisplay works correctly');
+                } else {
+                    testResults.failed++;
+                    testResults.tests.push('❌ formatTranscriptionForDisplay failed formatting');
+                }
+            } catch (error) {
+                testResults.failed++;
+                testResults.tests.push('❌ formatTranscriptionForDisplay threw error: ' + error.message);
+            }
+
+            // Test 3: formatTranscriptionForScript function
+            try {
+                const mockData = {
+                    transcription: 'Test transcription content',
+                    timestamp: new Date().toISOString(),
+                    fileCount: 2,
+                    componentTags: {
+                        '1a:': ['Test content for 1a']
+                    }
+                };
+                const result = formatTranscriptionForScript(mockData);
+
+                if (result.includes('=== AI TRANSCRIPTION ===') &&
+                    result.includes('Generated:') &&
+                    result.includes('[1A]') &&
+                    result.includes('Test transcription content')) {
+                    testResults.passed++;
+                    testResults.tests.push('✅ formatTranscriptionForScript works correctly');
+                } else {
+                    testResults.failed++;
+                    testResults.tests.push('❌ formatTranscriptionForScript failed formatting');
+                }
+            } catch (error) {
+                testResults.failed++;
+                testResults.tests.push('❌ formatTranscriptionForScript threw error: ' + error.message);
+            }
+
+            // Test 4: Modal functions exist and are callable
+            try {
+                if (typeof openTranscriptionModal === 'function' &&
+                    typeof closeTranscriptionModal === 'function' &&
+                    typeof displayTranscriptionResults === 'function') {
+                    testResults.passed++;
+                    testResults.tests.push('✅ All modal functions are defined');
+                } else {
+                    testResults.failed++;
+                    testResults.tests.push('❌ Some modal functions are missing');
+                }
+            } catch (error) {
+                testResults.failed++;
+                testResults.tests.push('❌ Modal function test threw error: ' + error.message);
+            }
+
+            // Test 5: Copy to clipboard function exists
+            try {
+                if (typeof copyTranscriptionToClipboard === 'function' &&
+                    typeof fallbackCopyToClipboard === 'function') {
+                    testResults.passed++;
+                    testResults.tests.push('✅ Copy functions are defined');
+                } else {
+                    testResults.failed++;
+                    testResults.tests.push('❌ Copy functions are missing');
+                }
+            } catch (error) {
+                testResults.failed++;
+                testResults.tests.push('❌ Copy function test threw error: ' + error.message);
+            }
+
+            // Test 6: Script integration functions exist
+            try {
+                if (typeof insertTranscriptionIntoScript === 'function' &&
+                    typeof updateInsertButtonState === 'function') {
+                    testResults.passed++;
+                    testResults.tests.push('✅ Script integration functions are defined');
+                } else {
+                    testResults.failed++;
+                    testResults.tests.push('❌ Script integration functions are missing');
+                }
+            } catch (error) {
+                testResults.failed++;
+                testResults.tests.push('❌ Script integration test threw error: ' + error.message);
+            }
+
+            // Test 7: DOM elements exist
+            try {
+                const transcribeBtn = document.getElementById('transcribeAudioBtn');
+                const modalOverlay = document.getElementById('transcriptionModalOverlay');
+
+                if (transcribeBtn && modalOverlay) {
+                    testResults.passed++;
+                    testResults.tests.push('✅ Required DOM elements exist');
+                } else {
+                    testResults.failed++;
+                    testResults.tests.push('❌ Required DOM elements missing');
+                }
+            } catch (error) {
+                testResults.failed++;
+                testResults.tests.push('❌ DOM element test threw error: ' + error.message);
+            }
+
+            // Test 8: Request transcription function exists and is bound correctly
+            try {
+                if (typeof requestTranscription === 'function') {
+                    testResults.passed++;
+                    testResults.tests.push('✅ requestTranscription function is defined');
+                } else {
+                    testResults.failed++;
+                    testResults.tests.push('❌ requestTranscription function is missing');
+                }
+            } catch (error) {
+                testResults.failed++;
+                testResults.tests.push('❌ requestTranscription test threw error: ' + error.message);
+            }
+
+            // Display test results
+            console.log('\n🧪 Transcription Unit Test Results:');
+            console.log(`✅ Passed: ${testResults.passed}`);
+            console.log(`❌ Failed: ${testResults.failed}`);
+            console.log(`📊 Success Rate: ${(testResults.passed / (testResults.passed + testResults.failed) * 100).toFixed(1)}%`);
+
+            testResults.tests.forEach(test => console.log(test));
+
+            const successRate = testResults.passed / (testResults.passed + testResults.failed) * 100;
+            if (successRate >= 90) {
+                console.log('🎉 Unit tests PASSED! All core functionality is working.');
+                showToast(`Unit tests passed! ${testResults.passed}/${testResults.passed + testResults.failed} tests successful`, true);
+            } else {
+                console.log('⚠️ Some unit tests FAILED. Check console for details.');
+                showToast(`Unit tests completed: ${testResults.passed}/${testResults.passed + testResults.failed} passed`, false);
+            }
+
+            return testResults;
+        }
+
+        /**
+         * Tests transcription UI with mock data
+         */
+        function testTranscriptionUIWithMockData() {
+            console.log('🎭 Testing transcription UI with mock data...');
+
+            const mockTranscriptionData = {
+                transcription: '**Speaker 1:** This is a test transcription for component 1a. *[01:30]* The teacher demonstrates excellent classroom management.\n\n**Speaker 2:** I agree, the students are very engaged. *[02:15]* [1b] The learning environment is well organized.',
+                componentTags: {
+                    '1a:': ['The teacher demonstrates excellent classroom management'],
+                    '1b:': ['The learning environment is well organized']
+                },
+                timestamp: new Date().toISOString(),
+                processingTime: 15000,
+                fileCount: 2
+            };
+
+            try {
+                displayTranscriptionResults(mockTranscriptionData);
+                console.log('✅ Mock data UI test successful');
+                showToast('Mock transcription displayed successfully!', true);
+                return true;
+            } catch (error) {
+                console.error('❌ Mock data UI test failed:', error);
+                showToast('Mock transcription test failed: ' + error.message, false);
+                return false;
+            }
+        }
+
+        /**
+         * Integration testing for the complete transcription workflow
+         */
+        function runTranscriptionIntegrationTests() {
+            console.log('🔗 Starting Transcription Integration Tests...');
+
+            const integrationResults = {
+                passed: 0,
+                failed: 0,
+                tests: []
+            };
+
+            // Test 1: Button visibility logic with different states
+            try {
+                // Test without recordings
+                window.currentObservation = { globalRecordings: { audio: [] } };
+                updateTranscribeButtonVisibility();
+
+                const transcribeBtn = document.getElementById('transcribeAudioBtn');
+                if (transcribeBtn && transcribeBtn.style.display === 'none') {
+                    integrationResults.passed++;
+                    integrationResults.tests.push('✅ Button hidden when no recordings');
+                } else {
+                    integrationResults.failed++;
+                    integrationResults.tests.push('❌ Button visibility logic failed (no recordings)');
+                }
+
+                // Test with recordings
+                window.currentObservation = { globalRecordings: { audio: [{ url: 'test.mp3' }] } };
+                updateTranscribeButtonVisibility();
+
+                if (transcribeBtn && transcribeBtn.style.display !== 'none') {
+                    integrationResults.passed++;
+                    integrationResults.tests.push('✅ Button shown when recordings exist');
+                } else {
+                    integrationResults.failed++;
+                    integrationResults.tests.push('❌ Button visibility logic failed (with recordings)');
+                }
+            } catch (error) {
+                integrationResults.failed += 2;
+                integrationResults.tests.push('❌ Button visibility test threw error: ' + error.message);
+            }
+
+            // Test 2: Modal open/close cycle
+            try {
+                const mockData = {
+                    transcription: 'Test integration transcription',
+                    componentTags: {},
+                    timestamp: new Date().toISOString(),
+                    processingTime: 5000,
+                    fileCount: 1
+                };
+
+                // Open modal
+                displayTranscriptionResults(mockData);
+                const overlay = document.getElementById('transcriptionModalOverlay');
+
+                if (overlay && overlay.style.display === 'flex') {
+                    integrationResults.passed++;
+                    integrationResults.tests.push('✅ Modal opens correctly');
+
+                    // Close modal
+                    closeTranscriptionModal();
+                    setTimeout(() => {
+                        if (overlay.style.display === 'none') {
+                            integrationResults.passed++;
+                            integrationResults.tests.push('✅ Modal closes correctly');
+                        } else {
+                            integrationResults.failed++;
+                            integrationResults.tests.push('❌ Modal close failed');
+                        }
+                    }, 500);
+                } else {
+                    integrationResults.failed++;
+                    integrationResults.tests.push('❌ Modal open failed');
+                }
+            } catch (error) {
+                integrationResults.failed++;
+                integrationResults.tests.push('❌ Modal open/close test threw error: ' + error.message);
+            }
+
+            // Test 3: Insert button state with script editor states
+            try {
+                // Test without script editor
+                window.scriptQuill = null;
+                updateInsertButtonState();
+
+                const insertBtn = document.getElementById('insertScriptBtn');
+                if (insertBtn && insertBtn.style.display === 'none') {
+                    integrationResults.passed++;
+                    integrationResults.tests.push('✅ Insert button hidden without script editor');
+                } else {
+                    integrationResults.failed++;
+                    integrationResults.tests.push('❌ Insert button state logic failed');
+                }
+            } catch (error) {
+                integrationResults.failed++;
+                integrationResults.tests.push('❌ Insert button test threw error: ' + error.message);
+            }
+
+            // Display results after a brief delay to account for async operations
+            setTimeout(() => {
+                console.log('\n🔗 Integration Test Results:');
+                console.log(`✅ Passed: ${integrationResults.passed}`);
+                console.log(`❌ Failed: ${integrationResults.failed}`);
+
+                const total = integrationResults.passed + integrationResults.failed;
+                if (total > 0) {
+                    console.log(`📊 Success Rate: ${(integrationResults.passed / total * 100).toFixed(1)}%`);
+                }
+
+                integrationResults.tests.forEach(test => console.log(test));
+
+                if (integrationResults.passed >= integrationResults.failed) {
+                    console.log('🎉 Integration tests PASSED!');
+                    showToast('Integration tests passed!', true);
+                } else {
+                    console.log('⚠️ Some integration tests FAILED.');
+                    showToast('Integration tests completed with issues', false);
+                }
+            }, 600);
+
+            return integrationResults;
+        }
+
+        /**
+         * Regression testing to ensure existing functionality is unaffected
+         */
+        function runTranscriptionRegressionTests() {
+            console.log('🔄 Starting Transcription Regression Tests...');
+
+            const regressionResults = {
+                passed: 0,
+                failed: 0,
+                tests: []
+            };
+
+            // Test 1: Existing recording functions still work
+            try {
+                if (typeof toggleAudioRecording === 'function' &&
+                    typeof toggleVideoRecording === 'function') {
+                    regressionResults.passed++;
+                    regressionResults.tests.push('✅ Recording functions still exist');
+                } else {
+                    regressionResults.failed++;
+                    regressionResults.tests.push('❌ Recording functions missing or modified');
+                }
+            } catch (error) {
+                regressionResults.failed++;
+                regressionResults.tests.push('❌ Recording function test threw error: ' + error.message);
+            }
+
+            // Test 2: Script editor functions still work
+            try {
+                if (typeof openScriptEditor === 'function' &&
+                    typeof closeScriptEditor === 'function') {
+                    regressionResults.passed++;
+                    regressionResults.tests.push('✅ Script editor functions still exist');
+                } else {
+                    regressionResults.failed++;
+                    regressionResults.tests.push('❌ Script editor functions missing or modified');
+                }
+            } catch (error) {
+                regressionResults.failed++;
+                regressionResults.tests.push('❌ Script editor function test threw error: ' + error.message);
+            }
+
+            // Test 3: Observation management functions still work
+            try {
+                if (typeof loadSelectedView === 'function' &&
+                    typeof clearFilters === 'function' &&
+                    typeof handleRubricData === 'function') {
+                    regressionResults.passed++;
+                    regressionResults.tests.push('✅ Observation management functions still exist');
+                } else {
+                    regressionResults.failed++;
+                    regressionResults.tests.push('❌ Observation management functions missing or modified');
+                }
+            } catch (error) {
+                regressionResults.failed++;
+                regressionResults.tests.push('❌ Observation management test threw error: ' + error.message);
+            }
+
+            // Test 4: Core UI functions still work
+            try {
+                if (typeof showToast === 'function' &&
+                    typeof showLoading === 'function' &&
+                    typeof hideLoading === 'function' &&
+                    typeof showError === 'function') {
+                    regressionResults.passed++;
+                    regressionResults.tests.push('✅ Core UI functions still exist');
+                } else {
+                    regressionResults.failed++;
+                    regressionResults.tests.push('❌ Core UI functions missing or modified');
+                }
+            } catch (error) {
+                regressionResults.failed++;
+                regressionResults.tests.push('❌ Core UI function test threw error: ' + error.message);
+            }
+
+            // Test 5: Welcome modal still works (original modal system)
+            try {
+                if (typeof showWelcomeModal === 'function' &&
+                    typeof closeWelcomeModal === 'function') {
+                    regressionResults.passed++;
+                    regressionResults.tests.push('✅ Welcome modal functions still exist');
+                } else {
+                    regressionResults.failed++;
+                    regressionResults.tests.push('❌ Welcome modal functions missing or modified');
+                }
+            } catch (error) {
+                regressionResults.failed++;
+                regressionResults.tests.push('❌ Welcome modal test threw error: ' + error.message);
+            }
+
+            // Test 6: No global namespace pollution
+            try {
+                const knownGlobals = ['currentObservationId', 'currentObservedUser', 'scriptQuill', 'recordingState'];
+                const unexpectedGlobals = [];
+
+                for (let prop in window) {
+                    if (prop.toLowerCase().includes('transcription') || prop.toLowerCase().includes('gemini')) {
+                        if (prop !== 'currentTranscriptionData') {
+                            unexpectedGlobals.push(prop);
+                        }
+                    }
+                }
+
+                if (unexpectedGlobals.length === 0) {
+                    regressionResults.passed++;
+                    regressionResults.tests.push('✅ No unexpected global variables added');
+                } else {
+                    regressionResults.failed++;
+                    regressionResults.tests.push('❌ Unexpected globals found: ' + unexpectedGlobals.join(', '));
+                }
+            } catch (error) {
+                regressionResults.failed++;
+                regressionResults.tests.push('❌ Global namespace test threw error: ' + error.message);
+            }
+
+            // Display results
+            console.log('\n🔄 Regression Test Results:');
+            console.log(`✅ Passed: ${regressionResults.passed}`);
+            console.log(`❌ Failed: ${regressionResults.failed}`);
+
+            const total = regressionResults.passed + regressionResults.failed;
+            if (total > 0) {
+                console.log(`📊 Success Rate: ${(regressionResults.passed / total * 100).toFixed(1)}%`);
+            }
+
+            regressionResults.tests.forEach(test => console.log(test));
+
+            if (regressionResults.failed === 0) {
+                console.log('🎉 Regression tests PASSED! No existing functionality was broken.');
+                showToast('Regression tests passed - no functionality broken!', true);
+            } else {
+                console.log('⚠️ Some regression tests FAILED. Existing functionality may be affected.');
+                showToast('Regression tests found issues with existing functionality', false);
+            }
+
+            return regressionResults;
+        }
+
+        /**
+         * Runs all transcription tests (unit, integration, regression)
+         */
+        function runAllTranscriptionTests() {
+            console.log('🚀 Running Complete Transcription Test Suite...');
+
+            const unitResults = runTranscriptionUnitTests();
+            setTimeout(() => {
+                const integrationResults = runTranscriptionIntegrationTests();
+                setTimeout(() => {
+                    const regressionResults = runTranscriptionRegressionTests();
+
+                    // Summary report after all tests complete
+                    setTimeout(() => {
+                        const totalPassed = unitResults.passed + integrationResults.passed + regressionResults.passed;
+                        const totalFailed = unitResults.failed + integrationResults.failed + regressionResults.failed;
+                        const totalTests = totalPassed + totalFailed;
+
+                        console.log('\n🏆 COMPLETE TEST SUITE SUMMARY:');
+                        console.log(`📊 Total Tests: ${totalTests}`);
+                        console.log(`✅ Total Passed: ${totalPassed}`);
+                        console.log(`❌ Total Failed: ${totalFailed}`);
+                        console.log(`🎯 Overall Success Rate: ${(totalPassed / totalTests * 100).toFixed(1)}%`);
+
+                        if (totalFailed === 0) {
+                            console.log('🎉 ALL TESTS PASSED! Transcription feature is ready for production.');
+                            showToast('🎉 All transcription tests passed! Feature is ready for use.', true, 5000);
+                        } else if (totalPassed / totalTests >= 0.9) {
+                            console.log('✅ TESTS MOSTLY PASSED! Minor issues detected.');
+                            showToast('✅ Transcription tests mostly passed with minor issues.', true, 3000);
+                        } else {
+                            console.log('⚠️ SIGNIFICANT ISSUES DETECTED! Review required before production.');
+                            showToast('⚠️ Transcription tests found significant issues.', false, 5000);
+                        }
+                    }, 1000);
+                }, 1000);
+            }, 1000);
         }
 
         // === Observation State Management Functions ===
@@ -6326,6 +7349,57 @@
             
             <div class="script-editor-content">
                 <div id="scriptEditor"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Transcription Results Modal -->
+    <div class="welcome-modal-overlay" id="transcriptionModalOverlay" style="display: none;">
+        <div class="welcome-modal" id="transcriptionModal" style="max-width: 900px;">
+            <div class="welcome-modal-header">
+                <div class="welcome-modal-icon">⭐</div>
+                <h1>AI Transcription Results</h1>
+                <p class="welcome-subtitle" id="transcriptionSubtitle">Enhanced transcription with component tagging</p>
+            </div>
+
+            <div class="welcome-modal-content" style="max-height: 60vh; overflow-y: auto;">
+                <!-- Transcription Metadata -->
+                <div class="transcription-metadata" id="transcriptionMetadata" style="background: #f8fafc; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-size: 0.9rem; color: #4a5568;">
+                    <!-- Metadata will be populated by JavaScript -->
+                </div>
+
+                <!-- Component Tags Section -->
+                <div class="transcription-section" id="componentTagsSection" style="margin-bottom: 25px;">
+                    <h3 style="color: #2d3748; margin-bottom: 15px; font-size: 1.1rem; display: flex; align-items: center; gap: 8px;">
+                        🏷️ Component Tags
+                    </h3>
+                    <div id="componentTagsContent" style="background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px;">
+                        <!-- Component tags will be populated by JavaScript -->
+                    </div>
+                </div>
+
+                <!-- Full Transcription Section -->
+                <div class="transcription-section">
+                    <h3 style="color: #2d3748; margin-bottom: 15px; font-size: 1.1rem; display: flex; align-items: center; gap: 8px;">
+                        📝 Full Transcription
+                    </h3>
+                    <div id="transcriptionContent" style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; line-height: 1.6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; white-space: pre-wrap; max-height: 400px; overflow-y: auto;">
+                        <!-- Transcription content will be populated by JavaScript -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="welcome-modal-footer" style="display: flex; gap: 12px; justify-content: center; align-items: center;">
+                <button class="btn-secondary" onclick="copyTranscriptionToClipboard()" style="display: flex; align-items: center; gap: 6px;">
+                    📋 Copy to Clipboard
+                </button>
+                <button class="btn-primary" id="insertScriptBtn" onclick="insertTranscriptionIntoScript()" style="display: none; align-items: center; gap: 6px;">
+                    ➡️ Insert into Script
+                </button>
+                <button class="welcome-continue-btn" onclick="closeTranscriptionModal()" style="background: #4a5568;">
+                    <span class="btn-icon">✖️</span>
+                    Close
+                </button>
             </div>
         </div>
     </div>

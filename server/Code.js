@@ -852,6 +852,283 @@ function getComponentTags(observationId) {
 }
 
 /**
+ * Requests AI transcription for audio files in an observation
+ * @param {string} observationId The ID of the observation containing audio files
+ * @returns {Object} A response object with transcription status and data
+ */
+function requestAudioTranscription(observationId) {
+    const startTime = Date.now();
+
+    try {
+        // Validate user permissions
+        const userContext = createUserContext();
+        if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR && userContext.role !== SPECIAL_ROLES.ADMINISTRATOR) {
+            return {
+                success: false,
+                error: ERROR_MESSAGES.PERMISSION_DENIED,
+                errorType: VALIDATION_ERROR_TYPES.PERMISSION_ERROR
+            };
+        }
+
+        if (!observationId) {
+            return {
+                success: false,
+                error: 'Observation ID is required',
+                errorType: VALIDATION_ERROR_TYPES.DATA_CORRUPTION
+            };
+        }
+
+        debugLog('Starting transcription request', {
+            observationId,
+            userEmail: userContext.email
+        });
+
+        // Validate Gemini configuration
+        const configValidation = validateGeminiConfiguration();
+        if (!configValidation.success) {
+            return {
+                success: false,
+                error: configValidation.error,
+                errorType: configValidation.errorType,
+                setupRequired: true
+            };
+        }
+
+        // Get observation and verify ownership
+        const observation = getObservationById(observationId);
+        if (!observation) {
+            return {
+                success: false,
+                error: 'Observation not found',
+                errorType: VALIDATION_ERROR_TYPES.MISSING_USER
+            };
+        }
+
+        // Verify user is the observer (owner) of this observation
+        if (observation.observerEmail !== userContext.email && userContext.role !== SPECIAL_ROLES.ADMINISTRATOR) {
+            return {
+                success: false,
+                error: 'You can only transcribe your own observations',
+                errorType: VALIDATION_ERROR_TYPES.PERMISSION_ERROR
+            };
+        }
+
+        // Check if observation has audio recordings
+        if (!hasAudioRecordings(observationId)) {
+            return {
+                success: false,
+                error: 'No audio recordings found for this observation',
+                errorType: VALIDATION_ERROR_TYPES.DATA_CORRUPTION
+            };
+        }
+
+        // Check if transcription already exists and is recent
+        const existingTranscription = getTranscriptionData(observationId);
+        if (existingTranscription && existingTranscription.status === TRANSCRIPTION_STATUS.COMPLETED) {
+            const transcriptionAge = Date.now() - new Date(existingTranscription.timestamp).getTime();
+            const oneHourMs = 60 * 60 * 1000;
+
+            if (transcriptionAge < oneHourMs) {
+                debugLog('Returning cached transcription', { observationId, age: transcriptionAge });
+                return {
+                    success: true,
+                    cached: true,
+                    data: existingTranscription,
+                    message: 'Using recent transcription (less than 1 hour old)'
+                };
+            }
+        }
+
+        // Update status to processing
+        const processingStatus = {
+            status: TRANSCRIPTION_STATUS.PROCESSING,
+            timestamp: new Date().toISOString(),
+            errorMessage: null
+        };
+
+        const updateResult = _updateTranscriptionData(observationId, processingStatus);
+        if (!updateResult.success) {
+            return updateResult;
+        }
+
+        // Get audio files from Drive
+        const audioFiles = getAudioFilesForTranscription(observationId);
+        if (!audioFiles || audioFiles.length === 0) {
+            const errorData = {
+                status: TRANSCRIPTION_STATUS.FAILED,
+                errorMessage: 'No accessible audio files found',
+                timestamp: new Date().toISOString()
+            };
+            _updateTranscriptionData(observationId, errorData);
+
+            return {
+                success: false,
+                error: 'No accessible audio files found for transcription',
+                errorType: VALIDATION_ERROR_TYPES.DATA_CORRUPTION
+            };
+        }
+
+        // Perform transcription using Gemini service
+        const transcriptionResult = transcribeAudioFiles(observationId, audioFiles, userContext);
+
+        if (transcriptionResult.success) {
+            // Save successful transcription
+            const completedData = {
+                ...transcriptionResult.data,
+                status: TRANSCRIPTION_STATUS.COMPLETED
+            };
+
+            const saveResult = _updateTranscriptionData(observationId, completedData);
+            if (!saveResult.success) {
+                return saveResult;
+            }
+
+            // Cache the result for future requests
+            cacheTranscriptionResult(observationId, completedData);
+
+            const processingTime = Date.now() - startTime;
+            logPerformanceMetrics('transcription_request_success', processingTime, {
+                observationId,
+                fileCount: audioFiles.length,
+                transcriptionLength: transcriptionResult.data.transcription.length
+            });
+
+            debugLog('Transcription completed successfully', {
+                observationId,
+                processingTime,
+                transcriptionLength: transcriptionResult.data.transcription.length
+            });
+
+            return {
+                success: true,
+                data: completedData,
+                message: 'Transcription completed successfully'
+            };
+
+        } else {
+            // Save failed transcription status
+            const failedData = {
+                status: TRANSCRIPTION_STATUS.FAILED,
+                errorMessage: transcriptionResult.error,
+                timestamp: new Date().toISOString()
+            };
+
+            _updateTranscriptionData(observationId, failedData);
+
+            const processingTime = Date.now() - startTime;
+            logPerformanceMetrics('transcription_request_error', processingTime, {
+                observationId,
+                error: transcriptionResult.error
+            });
+
+            return {
+                success: false,
+                error: transcriptionResult.error,
+                errorType: transcriptionResult.errorType || VALIDATION_ERROR_TYPES.CONFIGURATION_ERROR
+            };
+        }
+
+    } catch (error) {
+        console.error('Error in requestAudioTranscription:', error);
+
+        // Update transcription status to failed
+        try {
+            const failedData = {
+                status: TRANSCRIPTION_STATUS.FAILED,
+                errorMessage: 'Unexpected error during transcription: ' + error.message,
+                timestamp: new Date().toISOString()
+            };
+            _updateTranscriptionData(observationId, failedData);
+        } catch (updateError) {
+            console.error('Error updating failed transcription status:', updateError);
+        }
+
+        const processingTime = Date.now() - startTime;
+        logPerformanceMetrics('transcription_request_fatal_error', processingTime, {
+            observationId,
+            error: error.message
+        });
+
+        return {
+            success: false,
+            error: 'An unexpected error occurred during transcription: ' + error.message,
+            errorType: VALIDATION_ERROR_TYPES.CONFIGURATION_ERROR
+        };
+    }
+}
+
+/**
+ * Helper function to get audio files from an observation for transcription
+ * @param {string} observationId The observation ID
+ * @returns {Array} Array of audio file objects ready for Gemini API
+ */
+function getAudioFilesForTranscription(observationId) {
+    try {
+        const observation = getObservationById(observationId);
+        if (!observation || !observation.globalRecordings) {
+            return [];
+        }
+
+        const audioRecordings = observation.globalRecordings.audio || [];
+        const audioFiles = [];
+
+        for (const recording of audioRecordings) {
+            try {
+                // Get file from Drive using the URL
+                const fileId = extractFileIdFromUrl(recording.url);
+                if (fileId) {
+                    const file = DriveApp.getFileById(fileId);
+                    audioFiles.push({
+                        blob: file.getBlob(),
+                        filename: recording.filename || file.getName(),
+                        mimeType: file.getBlob().getContentType(),
+                        timestamp: recording.timestamp
+                    });
+                }
+            } catch (fileError) {
+                console.warn('Could not access audio file:', recording.url, fileError);
+                // Continue with other files rather than failing completely
+            }
+        }
+
+        debugLog('Retrieved audio files for transcription', {
+            observationId,
+            totalRecordings: audioRecordings.length,
+            accessibleFiles: audioFiles.length
+        });
+
+        return audioFiles;
+
+    } catch (error) {
+        console.error('Error getting audio files for transcription:', error);
+        return [];
+    }
+}
+
+/**
+ * Helper function to extract file ID from Google Drive URL
+ * @param {string} url Drive file URL
+ * @returns {string|null} File ID or null if not found
+ */
+function extractFileIdFromUrl(url) {
+    if (!url) return null;
+
+    // Handle different Google Drive URL formats
+    const patterns = [
+        /\/d\/([a-zA-Z0-9-_]+)/,  // /d/FILE_ID/
+        /id=([a-zA-Z0-9-_]+)/,    // ?id=FILE_ID
+        /file\/d\/([a-zA-Z0-9-_]+)/ // /file/d/FILE_ID/
+    ];
+
+    for (const pattern of patterns) {
+        const match = url.match(pattern);
+        if (match) return match[1];
+    }
+
+    return null;
+}
+
+/**
  * Finalizes an observation draft.
  * @param {string} observationId The ID of the observation to finalize.
  * @returns {Object} A response object indicating success or failure.

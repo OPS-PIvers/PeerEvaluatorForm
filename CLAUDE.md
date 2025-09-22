@@ -26,6 +26,7 @@ This is a Google Apps Script (GAS) web application called "Peer Evaluator Form" 
 │   ├── CacheManager.js              # Advanced caching system with versioning
 │   ├── Code.js                      # Main orchestrator and entry point (streamlined)
 │   ├── Constants.js                 # Global constants and configuration
+│   ├── GeminiService.js             # AI-powered audio transcription service
 │   ├── ObservationService.js        # Manages peer evaluation observations
 │   ├── PdfService.js                # PDF generation, styling, and Drive integration
 │   ├── SessionManager.js            # User sessions and state persistence
@@ -141,6 +142,27 @@ Observations are managed through server/ObservationService.js:
 
 The application requires these Script Properties to be set:
 - `SHEET_ID`: The Google Sheets ID containing the rubric data
+- `GEMINI_API_KEY`: (Optional) Google Gemini API key for enhanced audio transcription features
+
+#### Gemini API Key Setup
+
+To enable AI-powered audio transcription:
+
+1. **Obtain API Key:**
+   - Go to [Google AI Studio](https://aistudio.google.com/app/apikey)
+   - Create a new API key or use an existing one
+   - Copy the API key
+
+2. **Set Script Property:**
+   - In Google Apps Script editor, go to Project Settings
+   - Under Script Properties, add new property:
+     - Property: `GEMINI_API_KEY`
+     - Value: Your API key from step 1
+
+3. **Feature Behavior:**
+   - With API key: Full transcription functionality available
+   - Without API key: Feature gracefully hidden, no errors
+   - Invalid key: User gets helpful error message with setup instructions
 
 ### Important Constants
 

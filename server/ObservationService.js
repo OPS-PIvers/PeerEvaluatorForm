@@ -5,7 +5,7 @@
  */
 
 // JSON serialized fields in the observation database
-const JSON_SERIALIZED_FIELDS = ['observationData', 'evidenceLinks', 'observationNotes', 'scriptContent', 'componentTags'];
+const JSON_SERIALIZED_FIELDS = ['observationData', 'evidenceLinks', 'observationNotes', 'scriptContent', 'componentTags', 'transcriptionData'];
 
 
 /**
@@ -1013,6 +1013,103 @@ function sanitizeHtml(html) {
     return html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
                .replace(/>/g, '&gt;').replace(/</g, '&lt;')
                .replace(/&lt;(\/?(p|strong|em|u|ol|ul|li|br|h1|h2))&gt;/g, '<$1>');
+}
+
+/**
+ * Updates transcription data for an observation
+ * @param {string} observationId - The ID of the observation to update
+ * @param {Object} transcriptionData - The transcription data to save
+ * @returns {Object} Response object with success status
+ */
+function _updateTranscriptionData(observationId, transcriptionData) {
+  if (!observationId || !transcriptionData) {
+    return {
+      success: false,
+      error: 'Observation ID and transcription data are required.'
+    };
+  }
+
+  // Validate transcription data structure
+  const validatedData = {
+    status: transcriptionData.status || TRANSCRIPTION_STATUS.PENDING,
+    transcription: transcriptionData.transcription || '',
+    componentTags: transcriptionData.componentTags || {},
+    timestamp: transcriptionData.timestamp || new Date().toISOString(),
+    processingTime: transcriptionData.processingTime || 0,
+    fileCount: transcriptionData.fileCount || 0,
+    errorMessage: transcriptionData.errorMessage || null
+  };
+
+  debugLog('Updating transcription data', {
+    observationId,
+    status: validatedData.status,
+    transcriptionLength: validatedData.transcription.length,
+    componentCount: Object.keys(validatedData.componentTags).length
+  });
+
+  return _updateObservationJsonData(observationId, 'transcriptionData', (currentData) => {
+    // Merge with existing transcription data if any
+    return { ...currentData, ...validatedData };
+  });
+}
+
+/**
+ * Retrieves transcription data for an observation
+ * @param {string} observationId - The ID of the observation
+ * @returns {Object|null} Transcription data or null if not found
+ */
+function getTranscriptionData(observationId) {
+  if (!observationId) {
+    return null;
+  }
+
+  try {
+    const observation = getObservationById(observationId);
+    if (!observation) {
+      return null;
+    }
+
+    // Return transcription data with default structure if not present
+    return observation.transcriptionData || {
+      status: TRANSCRIPTION_STATUS.PENDING,
+      transcription: '',
+      componentTags: {},
+      timestamp: null,
+      processingTime: 0,
+      fileCount: 0,
+      errorMessage: null
+    };
+
+  } catch (error) {
+    console.error('Error retrieving transcription data:', error);
+    return null;
+  }
+}
+
+/**
+ * Checks if an observation has audio recordings available for transcription
+ * @param {string} observationId - The ID of the observation
+ * @returns {boolean} True if audio files are available
+ */
+function hasAudioRecordings(observationId) {
+  if (!observationId) {
+    return false;
+  }
+
+  try {
+    const observation = getObservationById(observationId);
+    if (!observation || !observation.globalRecordings) {
+      return false;
+    }
+
+    // Check if there are any audio recordings
+    const audioRecordings = observation.globalRecordings.audio || [];
+    return audioRecordings.length > 0;
+
+  } catch (error) {
+    console.error('Error checking audio recordings:', error);
+    return false;
+  }
 }
 
 /**

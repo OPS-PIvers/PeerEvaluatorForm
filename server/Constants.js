@@ -510,3 +510,52 @@ const SCRIPT_EDITOR_SETTINGS = {
     PDF_UNAVAILABLE: 'PDF export functionality will be available soon.'
   }
 };
+
+/**
+ * Gemini AI transcription settings
+ */
+const GEMINI_SETTINGS = {
+  API_ENDPOINT: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent',
+  MODEL_NAME: 'gemini-1.5-pro',
+  MAX_RETRY_ATTEMPTS: 3,
+  RATE_LIMIT_DELAY: 2000, // ms between requests
+  GENERATION_CONFIG: {
+    temperature: 0.1, // Low temperature for accurate transcription
+    maxOutputTokens: 8192 // Large enough for long observations
+  },
+  TRANSCRIPTION_PROMPT_TEMPLATE: {
+    baseInstructions: 'Create a 100% accurate transcription of the provided audio file(s). This is from a classroom observation using the Danielson Framework for Teaching evaluation.',
+    subdomainContext: 'Based on role \'{role}\' and focus areas: {subdomains}',
+    requirements: [
+      'Speaker diarization with [Speaker 1:], [Speaker 2:] format',
+      'Timestamps [MM:SS] at speaker switches and every 2-3 minutes',
+      'Component tagging [1a], [2b], etc. based on Danielson Framework when content relates to specific components',
+      'New paragraph for each speaker change',
+      'Preserve all spoken content including filler words for accuracy',
+      'Mark unclear audio as [unclear] rather than guessing'
+    ]
+  }
+};
+
+/**
+ * Transcription status constants
+ */
+const TRANSCRIPTION_STATUS = {
+  PENDING: 'pending',
+  PROCESSING: 'processing',
+  COMPLETED: 'completed',
+  FAILED: 'failed',
+  CACHED: 'cached'
+};
+
+/**
+ * Transcription error types
+ */
+const TRANSCRIPTION_ERROR_TYPES = {
+  API_KEY_MISSING: 'api_key_missing',
+  API_QUOTA_EXCEEDED: 'api_quota_exceeded',
+  AUDIO_FILE_INVALID: 'audio_file_invalid',
+  NETWORK_ERROR: 'network_error',
+  PROCESSING_TIMEOUT: 'processing_timeout',
+  INVALID_RESPONSE: 'invalid_response'
+};
