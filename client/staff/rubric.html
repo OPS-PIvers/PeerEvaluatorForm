@@ -1804,7 +1804,7 @@
                 <!-- View Mode Toggle (always available for reference viewing) -->
                 <div class="view-toggle-container">
                     <div class="view-toggle-switch">
-                        <button id="assignedToggle" class="toggle-option active" onclick="setViewMode('assigned')">
+                        <button id="assignedToggle" class="toggle-option" onclick="setViewMode('assigned')">
                             📋 Assigned Areas
                         </button>
                         <button id="fullToggle" class="toggle-option" onclick="setViewMode('full')">
@@ -2481,7 +2481,7 @@
         // The following functions manage the view mode (full/assigned) dynamically on the client-side
         // without a page reload. The preference is saved in sessionStorage for the current session.
         // View Mode Toggle Functions
-        let currentViewMode = <?= JSON.stringify(data.userContext?.viewMode || "full").replace(/</g, '\\u003c') ?>;
+        let currentViewMode = '<?= data.userContext?.viewMode || "full" ?>';
         const userAssignedSubdomains = <?= data.userContext?.assignedSubdomains ? JSON.stringify(data.userContext.assignedSubdomains).replace(/</g, '\\u003c') : 'null' ?>;
 
         function toggleViewMode() {
