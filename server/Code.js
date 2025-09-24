@@ -1623,8 +1623,8 @@ function uploadGlobalRecording(observationId, base64Data, filename, recordingTyp
         }
         const blob = Utilities.newBlob(binaryData, mimeType, filename);
 
-        // Create/get observation folder
-        const folder = getOrCreateObservationFolder(observationId);
+        // Create/get observation folder, passing the already-fetched observation object
+        const folder = getOrCreateObservationFolder(observationId, observation);
 
         // Save file with specific permissions
         const file = folder.createFile(blob);

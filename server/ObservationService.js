@@ -347,14 +347,25 @@ function _saveProficiencySelection(observationId, componentId, proficiency) {
 
 /**
  * Retrieves or creates the specific Google Drive folder for a given observation ID.
+ * This function is optimized to accept an optional observation object to prevent
+ * redundant lookups. If the object is not provided, it will be fetched.
  * @param {string} observationId The observation ID.
+ * @param {Object|null} [observation=null] Optional. The observation object to use, if already fetched.
  * @returns {GoogleAppsScript.Drive.Folder} The Google Drive folder for the observation.
  */
-function getOrCreateObservationFolder(observationId) {
-  const observation = getObservationById(observationId);
+function getOrCreateObservationFolder(observationId, observation = null) {
+  // If the observation object isn't provided, fetch it. This maintains backward compatibility.
   if (!observation) {
+    debugLog('Observation object not provided to getOrCreateObservationFolder, fetching from DB.', { observationId });
+    observation = getObservationById(observationId);
+  }
+
+  if (!observation) {
+    // If it's still null, then the observation truly doesn't exist.
     throw new Error(`Observation not found for ID: ${observationId}`);
   }
+
+  // Now, we can be sure we have the observation object and can pass it to the private helper.
   return _getObservationFolder(observation);
 }
 
