@@ -5,7 +5,7 @@
  */
 
 // JSON serialized fields in the observation database
-const JSON_SERIALIZED_FIELDS = ['observationData', 'evidenceLinks', 'observationNotes', 'scriptContent', 'componentTags', 'transcriptionData', 'globalRecordings'];
+const JSON_SERIALIZED_FIELDS = ['componentTags', 'evidenceLinks', 'globalRecordings', 'observationData', 'observationNotes', 'scriptContent', 'transcriptionData'];
 
 
 /**
