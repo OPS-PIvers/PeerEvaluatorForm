@@ -524,7 +524,8 @@ function saveWorkProductAnswerFromClient(observationId, questionId, answerText) 
       return { success: false, error: 'Access denied to this observation.' };
     }
 
-    const saved = saveWorkProductAnswer(observationId, questionId, answerText);
+    // Save to Google Doc instead of spreadsheet
+    const saved = saveWorkProductAnswerToDoc(observationId, questionId, answerText);
     return { success: saved };
   } catch (error) {
     console.error('Error in saveWorkProductAnswerFromClient:', error);
@@ -553,7 +554,8 @@ function getWorkProductAnswersForClient(observationId) {
       return { success: false, error: 'Access denied to this observation.' };
     }
 
-    const answers = getWorkProductAnswers(observationId);
+    // Get answers from Google Doc instead of spreadsheet
+    const answers = getWorkProductAnswersFromDoc(observationId);
     return { success: true, answers: answers };
   } catch (error) {
     console.error('Error in getWorkProductAnswersForClient:', error);
@@ -562,7 +564,7 @@ function getWorkProductAnswersForClient(observationId) {
 }
 
 /**
- * Gets the current user's work product observation ID.
+ * Gets the current user's work product observation ID and ensures response doc exists.
  * @returns {Object} A response object containing the observation ID.
  */
 function getCurrentUserWorkProductObservationId() {
@@ -577,6 +579,18 @@ function getCurrentUserWorkProductObservationId() {
     );
 
     if (userWorkProductObs) {
+      // Ensure response document exists
+      const peerEvaluatorEmail = userWorkProductObs.observerEmail;
+      const docResult = createOrGetWorkProductResponseDoc(
+        userWorkProductObs.observationId,
+        userContext.email,
+        peerEvaluatorEmail
+      );
+
+      if (!docResult) {
+        console.warn('Failed to create/get response document, but continuing...');
+      }
+
       return { success: true, observationId: userWorkProductObs.observationId };
     } else {
       return { success: false, error: 'No work product observation found' };
