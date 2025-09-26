@@ -1817,15 +1817,15 @@
                         📄 My Observations
                     </button>
                     <!-- Work Product Questions Button -->
-                    <? if (showWorkProductQuestionsButton) { ?>
+                    <? if (typeof showWorkProductQuestionsButton !== 'undefined' && showWorkProductQuestionsButton && data.userContext.role !== 'Peer Evaluator') { ?>
                     <button id="workProductQuestionsBtn" onclick="openWorkProductModal()"
-                            class="filter-btn wp-<?= workProductState ?>"
+                            class="filter-btn wp-<?= workProductState || 'not-started' ?>"
                             style="padding: 12px 24px; font-size: 1.1rem;">
                         📋 Work Product Questions
                         <span class="wp-state-text">
-                            <? if (workProductState === 'not-started') { ?>(Not Started)<? } ?>
-                            <? if (workProductState === 'in-progress') { ?>(In Progress)<? } ?>
-                            <? if (workProductState === 'submitted') { ?>(Submitted)<? } ?>
+                            <? if ((workProductState || 'not-started') === 'not-started') { ?>(Not Started)<? } ?>
+                            <? if ((workProductState || 'not-started') === 'in-progress') { ?>(In Progress)<? } ?>
+                            <? if ((workProductState || 'not-started') === 'submitted') { ?>(Submitted)<? } ?>
                         </span>
                     </button>
                     <? } ?>
