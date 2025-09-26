@@ -2161,6 +2161,192 @@
 
         let activePollers = {};
 
+        // Request deduplication system - prevents identical calls in succession
+        let pendingRequests = new Map();
+
+        // Feature flags for optimization controls
+        const OPTIMIZATION_FLAGS = {
+            enableAdaptivePolling: true,      // PDF polling with adaptive intervals
+            enableConcurrentLimits: true,     // Limit concurrent pollers
+            enableRequestDeduplication: true, // Skip duplicate requests
+            enableAdaptiveAutoSave: true,     // Adaptive auto-save timing
+            enableRequestMonitoring: true     // Track request frequency
+        };
+
+        // Request monitoring for rate limit detection
+        let requestTracker = {
+            requests: [],
+            warningThreshold: 8,      // requests per minute
+            criticalThreshold: 12     // requests per minute
+        };
+
+        function trackRequest(functionName) {
+            if (!OPTIMIZATION_FLAGS.enableRequestMonitoring) return;
+
+            const now = Date.now();
+            requestTracker.requests.push({ functionName, timestamp: now });
+
+            // Clean old requests (older than 1 minute)
+            requestTracker.requests = requestTracker.requests.filter(
+                req => now - req.timestamp < 60000
+            );
+
+            // Check for rate limit warnings
+            const requestsPerMinute = requestTracker.requests.length;
+            if (requestsPerMinute >= requestTracker.criticalThreshold) {
+                console.warn(`⚠️ CRITICAL: ${requestsPerMinute} API requests in last minute. Possible rate limiting.`);
+                showToast(`High API usage detected (${requestsPerMinute}/min). Consider refreshing if issues occur.`, false);
+            } else if (requestsPerMinute >= requestTracker.warningThreshold) {
+                console.warn(`⚠️ WARNING: ${requestsPerMinute} API requests in last minute. Approaching rate limits.`);
+            }
+        }
+
+        function createRequestKey(functionName, args) {
+            return `${functionName}:${JSON.stringify(args)}`;
+        }
+
+        function makeDeduplicatedRequest(functionName, args, successHandler, failureHandler) {
+            // Track this request for monitoring
+            trackRequest(functionName);
+
+            // Check if deduplication is disabled - fall back to normal request
+            if (!OPTIMIZATION_FLAGS.enableRequestDeduplication) {
+                try {
+                    google.script.run
+                        .withSuccessHandler(successHandler)
+                        .withFailureHandler(failureHandler)
+                        [functionName](...args);
+                    return true;
+                } catch (error) {
+                    if (failureHandler) failureHandler(error);
+                    return false;
+                }
+            }
+
+            const requestKey = createRequestKey(functionName, args);
+
+            // Check if identical request is already pending
+            if (pendingRequests.has(requestKey)) {
+                console.log(`Skipping duplicate request: ${functionName}`);
+                return false; // Request was deduplicated
+            }
+
+            // Mark request as pending
+            pendingRequests.set(requestKey, Date.now());
+
+            // Create wrapped handlers that clean up pending requests
+            const wrappedSuccessHandler = (result) => {
+                pendingRequests.delete(requestKey);
+                if (successHandler) successHandler(result);
+            };
+
+            const wrappedFailureHandler = (error) => {
+                pendingRequests.delete(requestKey);
+                if (failureHandler) failureHandler(error);
+            };
+
+            // Make the actual request
+            try {
+                google.script.run
+                    .withSuccessHandler(wrappedSuccessHandler)
+                    .withFailureHandler(wrappedFailureHandler)
+                    [functionName](...args);
+                return true; // Request was made
+            } catch (error) {
+                // Clean up if the request failed to start
+                pendingRequests.delete(requestKey);
+                if (failureHandler) failureHandler(error);
+                return false;
+            }
+        }
+
+        // Clean up old pending requests (older than 30 seconds) to prevent memory leaks
+        setInterval(() => {
+            const now = Date.now();
+            const thirtySecondsAgo = now - 30000;
+
+            for (const [key, timestamp] of pendingRequests.entries()) {
+                if (timestamp < thirtySecondsAgo) {
+                    pendingRequests.delete(key);
+                    console.log(`Cleaned up stale pending request: ${key}`);
+                }
+            }
+        }, 30000);
+
+        // Diagnostic functions for debugging (callable from browser console)
+        window.diagnostics = {
+            // Get current optimization status
+            getOptimizationStatus: () => {
+                const activePollerCount = Object.keys(activePollers).length;
+                const pendingRequestCount = pendingRequests.size;
+                const recentRequestCount = requestTracker.requests.filter(
+                    req => Date.now() - req.timestamp < 60000
+                ).length;
+
+                return {
+                    flags: OPTIMIZATION_FLAGS,
+                    activePollers: activePollerCount,
+                    pendingRequests: pendingRequestCount,
+                    recentRequests: recentRequestCount,
+                    isHighActivity: isHighActivityPeriod(),
+                    currentAutoSaveDelay: getAutoSaveDebounceTime()
+                };
+            },
+
+            // Disable all optimizations (emergency fallback)
+            disableAllOptimizations: () => {
+                Object.keys(OPTIMIZATION_FLAGS).forEach(key => {
+                    OPTIMIZATION_FLAGS[key] = false;
+                });
+                console.log('🚨 All optimizations disabled');
+                return window.diagnostics.getOptimizationStatus();
+            },
+
+            // Re-enable all optimizations
+            enableAllOptimizations: () => {
+                Object.keys(OPTIMIZATION_FLAGS).forEach(key => {
+                    OPTIMIZATION_FLAGS[key] = true;
+                });
+                console.log('✅ All optimizations re-enabled');
+                return window.diagnostics.getOptimizationStatus();
+            },
+
+            // Toggle specific optimization
+            toggleOptimization: (flagName) => {
+                if (OPTIMIZATION_FLAGS.hasOwnProperty(flagName)) {
+                    OPTIMIZATION_FLAGS[flagName] = !OPTIMIZATION_FLAGS[flagName];
+                    console.log(`🔄 ${flagName}: ${OPTIMIZATION_FLAGS[flagName]}`);
+                    return window.diagnostics.getOptimizationStatus();
+                } else {
+                    console.error(`Unknown flag: ${flagName}. Available: ${Object.keys(OPTIMIZATION_FLAGS).join(', ')}`);
+                }
+            },
+
+            // Get request history
+            getRequestHistory: () => {
+                return requestTracker.requests.map(req => ({
+                    function: req.functionName,
+                    timeAgo: Math.round((Date.now() - req.timestamp) / 1000) + 's'
+                }));
+            },
+
+            // Clear all active pollers (emergency stop)
+            emergencyStopPollers: () => {
+                const pollerIds = Object.keys(activePollers);
+                pollerIds.forEach(id => stopPdfPolling(id));
+                console.log(`🛑 Emergency stopped ${pollerIds.length} pollers`);
+                return pollerIds;
+            }
+        };
+
+        // Log optimization status on page load
+        setTimeout(() => {
+            console.log('📊 PDF Polling Optimizations Loaded:');
+            console.log(window.diagnostics.getOptimizationStatus());
+            console.log('💡 Use window.diagnostics.getOptimizationStatus() to check status');
+            console.log('🚨 Use window.diagnostics.disableAllOptimizations() if issues occur');
+        }, 1000);
+
         function _setPdfButtonState(observationId, state, pdfUrl = null) {
             const pdfButton = document.getElementById(`pdf-button-${observationId}`);
             if (!pdfButton) return;
@@ -2193,52 +2379,127 @@
                 return;
             }
 
+            // Concurrent polling limit - max 3 active pollers per user (if enabled)
+            if (OPTIMIZATION_FLAGS.enableConcurrentLimits) {
+                const activePollerCount = Object.keys(activePollers).length;
+                if (activePollerCount >= 3) {
+                    console.log(`Maximum concurrent pollers reached (${activePollerCount}). Queueing ${observationId}.`);
+                    showToast('Multiple PDFs generating. This one will start shortly.', true);
+                    setTimeout(() => startPdfPolling(observationId), 3000);
+                    return;
+                }
+            }
+
             console.log(`Starting PDF polling for ${observationId}`);
-            const pollInterval = 5000; // 5 seconds
-            const pollTimeout = 60000; // 60 seconds
+            const startTime = Date.now();
+            let currentInterval = 5000; // Start with 5 seconds (same as before)
+            let pollCount = 0;
 
-            const intervalId = setInterval(() => {
-                google.script.run
-                    .withSuccessHandler(res => {
-                        if (res.success) {
-                            if (res.pdfUrl) {
-                                console.log(`PDF found for ${observationId}`);
-                                showToast('PDF is ready!', true);
-                                _setPdfButtonState(observationId, 'ready', res.pdfUrl);
-                                stopPdfPolling(observationId);
-                            } else if (res.pdfStatus === 'failed') {
-                                console.log(`PDF generation failed for ${observationId}`);
-                                showToast('PDF generation failed. Please retry.', false);
-                                _setPdfButtonState(observationId, 'failed');
-                                stopPdfPolling(observationId);
+            function schedulePoll() {
+                const elapsed = Date.now() - startTime;
+
+                // Adaptive intervals: 5s -> 8s -> 15s (if enabled)
+                if (OPTIMIZATION_FLAGS.enableAdaptivePolling) {
+                    if (elapsed > 60000) {
+                        currentInterval = 15000; // 15 seconds after 1 minute
+                    } else if (elapsed > 30000) {
+                        currentInterval = 8000;  // 8 seconds after 30 seconds
+                    }
+                }
+
+                const timeoutId = setTimeout(() => {
+                    pollCount++;
+                    console.log(`PDF poll #${pollCount} for ${observationId} (interval: ${currentInterval}ms)`);
+
+                    // Use deduplication for PDF status checks
+                    const requestMade = makeDeduplicatedRequest(
+                        'getObservationStatusAndPdfUrl',
+                        [observationId],
+                        (res) => {
+                            if (res.success) {
+                                if (res.pdfUrl) {
+                                    console.log(`PDF found for ${observationId} after ${pollCount} polls`);
+                                    showToast('PDF is ready!', true);
+                                    _setPdfButtonState(observationId, 'ready', res.pdfUrl);
+                                    stopPdfPolling(observationId);
+                                } else if (res.pdfStatus === 'failed') {
+                                    console.log(`PDF generation failed for ${observationId}`);
+                                    showToast('PDF generation failed. Please retry.', false);
+                                    _setPdfButtonState(observationId, 'failed');
+                                    stopPdfPolling(observationId);
+                                } else {
+                                    // Continue polling with adaptive interval
+                                    if (activePollers[observationId]) {
+                                        schedulePoll();
+                                    }
+                                }
+                            } else {
+                                console.warn(`Polling check failed for ${observationId}: ${res.error}`);
+                                // Continue polling on server errors
+                                if (activePollers[observationId]) {
+                                    schedulePoll();
+                                }
                             }
-                        } else {
-                             console.warn(`Polling check failed for ${observationId}: ${res.error}`);
+                        },
+                        (err) => {
+                            console.error(`Polling error for ${observationId}:`, err);
+                            // Continue polling on network errors
+                            if (activePollers[observationId]) {
+                                schedulePoll();
+                            }
                         }
-                    })
-                    .withFailureHandler(err => {
-                        console.error(`Polling error for ${observationId}:`, err);
-                    })
-                    .getObservationStatusAndPdfUrl(observationId);
-            }, pollInterval);
+                    );
 
-            const timeoutId = setTimeout(() => {
-                console.log(`Polling timed out for ${observationId}`);
+                    // If request was deduplicated, schedule next poll anyway
+                    if (!requestMade && activePollers[observationId]) {
+                        console.log(`PDF status request deduplicated for ${observationId}, scheduling next poll`);
+                        schedulePoll();
+                    }
+                }, currentInterval);
+
+                // Update the active poller with new timeout ID
+                if (activePollers[observationId]) {
+                    if (activePollers[observationId].timeoutId) {
+                        clearTimeout(activePollers[observationId].timeoutId);
+                    }
+                    activePollers[observationId].timeoutId = timeoutId;
+                }
+            }
+
+            // Overall timeout (2 minutes instead of 1 to account for slower intervals)
+            const overallTimeoutId = setTimeout(() => {
+                console.log(`Polling timed out for ${observationId} after ${pollCount} polls`);
                 const pdfButton = document.getElementById(`pdf-button-${observationId}`);
                 if (pdfButton && pdfButton.disabled) {
                      showToast('PDF generation is taking longer than expected. Please check back later or retry.', false);
                     _setPdfButtonState(observationId, 'failed');
                 }
                 stopPdfPolling(observationId);
-            }, pollTimeout);
+            }, 120000); // 2 minutes
 
-            activePollers[observationId] = { intervalId, timeoutId };
+            activePollers[observationId] = {
+                timeoutId: null, // Will be updated by schedulePoll
+                overallTimeoutId: overallTimeoutId,
+                startTime: startTime
+            };
+
+            // Start first poll immediately
+            schedulePoll();
         }
 
         function stopPdfPolling(observationId) {
             if (activePollers[observationId]) {
-                clearInterval(activePollers[observationId].intervalId);
-                clearTimeout(activePollers[observationId].timeoutId);
+                // Clear both the current poll timeout and overall timeout
+                if (activePollers[observationId].timeoutId) {
+                    clearTimeout(activePollers[observationId].timeoutId);
+                }
+                if (activePollers[observationId].overallTimeoutId) {
+                    clearTimeout(activePollers[observationId].overallTimeoutId);
+                }
+                // Legacy support: clear intervalId if it exists (for backwards compatibility)
+                if (activePollers[observationId].intervalId) {
+                    clearInterval(activePollers[observationId].intervalId);
+                }
                 delete activePollers[observationId];
                 console.log(`Stopped polling for ${observationId}`);
             }
@@ -5089,9 +5350,41 @@
         let scriptQuill = null;
         let scriptContent = {};
         const SILENT_SAVE_DEBOUNCE_MS = 5000;
+        const SILENT_SAVE_DEBOUNCE_HIGH_ACTIVITY_MS = 8000; // Extended debounce during high activity
         let isScriptDirty = false;
         let scriptSaveDebounceTimer;
         let isSavingScript = false;
+
+        // Function to detect high activity periods
+        function isHighActivityPeriod() {
+            // High activity if:
+            // 1. Multiple PDF pollers active
+            const activePollerCount = Object.keys(activePollers).length;
+            // 2. Recent API requests (more than 3 in last 10 seconds)
+            const recentRequestCount = Array.from(pendingRequests.values()).filter(
+                timestamp => Date.now() - timestamp < 10000
+            ).length;
+
+            return activePollerCount >= 2 || recentRequestCount >= 3;
+        }
+
+        // Get appropriate debounce time based on current activity
+        function getAutoSaveDebounceTime() {
+            if (!OPTIMIZATION_FLAGS.enableAdaptiveAutoSave) {
+                // Fall back to original logic if adaptive auto-save is disabled
+                return (typeof sttIsRecording !== 'undefined' && sttIsRecording)
+                    ? SILENT_SAVE_DEBOUNCE_MS * 2
+                    : SILENT_SAVE_DEBOUNCE_MS;
+            }
+
+            if (typeof sttIsRecording !== 'undefined' && sttIsRecording) {
+                return SILENT_SAVE_DEBOUNCE_MS * 2.4; // 12 seconds during speech recording (was 10s)
+            } else if (isHighActivityPeriod()) {
+                return SILENT_SAVE_DEBOUNCE_HIGH_ACTIVITY_MS; // 8 seconds during high activity
+            } else {
+                return SILENT_SAVE_DEBOUNCE_MS; // 5 seconds normal
+            }
+        }
 
         function updateSaveButtonState() {
             const saveBtn = document.getElementById('saveScriptBtn');
@@ -5501,9 +5794,9 @@
                     updateSaveButtonState();
                     clearTimeout(scriptSaveDebounceTimer);
                     
-                    // Coordinate with STT: Extend debounce time if actively recording
-                    const debounceTime = sttIsRecording ? SILENT_SAVE_DEBOUNCE_MS * 2 : SILENT_SAVE_DEBOUNCE_MS;
-                    
+                    // Use adaptive debounce time based on activity level
+                    const debounceTime = getAutoSaveDebounceTime();
+
                     scriptSaveDebounceTimer = setTimeout(() => {
                         // No interim text to worry about - just save!
                         silentSaveScriptContent();
