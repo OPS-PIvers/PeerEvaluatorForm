@@ -6277,8 +6277,9 @@
                 window.rubricData.domains.forEach(domain => {
                     if (domain.components && domain.components.length > 0) {
                         domain.components.forEach(component => {
-                            // Only show assigned components to match main rubric behavior
-                            if (component.isAssigned) {
+                            // Administrators see all components, Peer Evaluators see only assigned components
+                            const shouldShowComponent = (userContext.role === 'Administrator') || component.isAssigned;
+                            if (shouldShowComponent) {
                                 const option = document.createElement('option');
                                 option.value = component.componentId;
                                 option.textContent = `${domain.name}: ${component.title}`;
