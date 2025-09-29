@@ -6219,9 +6219,6 @@
                     }
                     isScriptDirty = false;
                     updateSaveButtonState();
-                    
-                    // Hide loading overlay and re-enable editor
-                    hideScriptEditorLoading();
 
                     // Load component tags and restore highlighting AFTER content is loaded
                     // Small delay to ensure Quill content is fully processed
@@ -6501,9 +6498,15 @@
                         restoreVisualHighlighting();
                         console.log('Component tags loaded:', componentTags);
                     }
+
+                    // Hide loading overlay now that content and highlights are fully loaded
+                    hideScriptEditorLoading();
                 })
                 .withFailureHandler(function(error) {
                     console.error('Error loading component tags:', error);
+
+                    // Hide loading overlay even if tag loading fails
+                    hideScriptEditorLoading();
                 })
                 .getComponentTags(currentObservationId);
         }
