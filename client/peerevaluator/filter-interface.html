@@ -292,6 +292,28 @@
             border-color: var(--color-blue-base);
             box-shadow: 0 0 0 3px var(--color-blue-focus-shadow);
         }
+
+        /* Read-only field styling to mimic input boxes */
+        .obs-field-display {
+            padding: 12px 15px;
+            border: 1px solid var(--color-gray-border-light);
+            border-radius: 8px;
+            font-size: 1rem;
+            background: var(--color-gray-background-light);
+            flex: 1;
+            min-width: 200px;
+            color: var(--color-gray-text-medium);
+            cursor: default;
+            display: inline-block;
+        }
+
+        .obs-name-field {
+            font-weight: 500;
+        }
+
+        .obs-date-field {
+            font-weight: normal;
+        }
         .filter-btn {
             background: var(--color-blue-base);
             color: var(--color-white);
@@ -3023,9 +3045,9 @@
                 const defaultObsName = `${observation.observedName.split(' ').pop()}, ${observation.observedName.split(' ')[0]}_${today}`;
                 html += `
                 <div class="observation-metadata-display">
-                    <div class="observation-details">
-                        <span class="obs-name">${escapeHtml(observation.observationName || defaultObsName)}</span>
-                        <span class="obs-date">${escapeHtml(observation.observationDate || today)}</span>
+                    <div class="filter-row">
+                        <span class="obs-field-display obs-name-field">${escapeHtml(observation.observationName || defaultObsName)}</span>
+                        <span class="obs-field-display obs-date-field">${escapeHtml(observation.observationDate || today)}</span>
                     </div>
                 </div>`;
             } else if (isReadOnlyView) {
