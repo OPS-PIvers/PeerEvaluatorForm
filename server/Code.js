@@ -410,15 +410,17 @@ function createNewObservationForEvaluator(observedEmail) {
     }
     
     let assignedSubdomains = null;
-    // Both Peer Evaluator and Administrator should use assigned subdomains approach  
-    if (userContext.role === SPECIAL_ROLES.PEER_EVALUATOR || userContext.role === SPECIAL_ROLES.ADMINISTRATOR) {
+    // Peer Evaluator should use assigned subdomains approach, Administrator should see all subdomains
+    if (userContext.role === SPECIAL_ROLES.PEER_EVALUATOR) {
         assignedSubdomains = getAssignedSubdomainsForRoleYear(newObservation.observedRole, newObservation.observedYear);
     }
 
-    // Use 'assigned' view mode for both Peer Evaluator and Administrator to match the UI pattern
-    const viewMode = (userContext.role === SPECIAL_ROLES.PEER_EVALUATOR || userContext.role === SPECIAL_ROLES.ADMINISTRATOR) 
-      ? 'assigned' 
-      : 'full';
+    // Administrator evaluates on full rubric, Peer Evaluator uses assigned subdomains
+    const viewMode = (userContext.role === SPECIAL_ROLES.ADMINISTRATOR)
+      ? 'full'
+      : (userContext.role === SPECIAL_ROLES.PEER_EVALUATOR)
+        ? 'assigned'
+        : 'full';
       
     const rubricData = getAllDomainsData(
       newObservation.observedRole,
@@ -461,15 +463,17 @@ function createWorkProductObservationForEvaluator(observedEmail) {
     }
 
     let assignedSubdomains = null;
-    // Peer Evaluator should use assigned subdomains approach
+    // Peer Evaluator should use assigned subdomains approach, Administrator should see all subdomains
     if (userContext.role === SPECIAL_ROLES.PEER_EVALUATOR) {
         assignedSubdomains = getAssignedSubdomainsForRoleYear(newObservation.observedRole, newObservation.observedYear);
     }
 
-    // Use 'assigned' view mode for Peer Evaluator to match the UI pattern
-    const viewMode = (userContext.role === SPECIAL_ROLES.PEER_EVALUATOR)
-      ? 'assigned'
-      : 'full';
+    // Administrator evaluates on full rubric, Peer Evaluator uses assigned subdomains
+    const viewMode = (userContext.role === SPECIAL_ROLES.ADMINISTRATOR)
+      ? 'full'
+      : (userContext.role === SPECIAL_ROLES.PEER_EVALUATOR)
+        ? 'assigned'
+        : 'full';
 
     const rubricData = getAllDomainsData(
       newObservation.observedRole,
@@ -1006,10 +1010,13 @@ function loadFinalizedObservationForViewing(observationId) {
                 viewMode: actualViewerContext.viewMode
             });
         } else {
-            // Peer Evaluator or other authorized viewer
+            // Peer Evaluator, Administrator, or other authorized viewer
             actualViewerContext.isObservedStaff = false;
             // Maintain the viewer's original evaluator status and permissions
-            if (actualViewerContext.role === SPECIAL_ROLES.PEER_EVALUATOR) {
+            if (actualViewerContext.role === SPECIAL_ROLES.ADMINISTRATOR) {
+                actualViewerContext.isEvaluator = false; // Read-only for finalized observations
+                actualViewerContext.viewMode = 'full'; // Administrators always see full rubric
+            } else if (actualViewerContext.role === SPECIAL_ROLES.PEER_EVALUATOR) {
                 actualViewerContext.isEvaluator = false; // Read-only for finalized observations
                 // Peer evaluators can choose their view mode
                 actualViewerContext.viewMode = actualViewerContext.hasSpecialAccess ? 'full' : 'assigned';

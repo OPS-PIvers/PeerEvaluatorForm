@@ -757,18 +757,12 @@ function createFilteredUserContext(targetEmail, requestingRole) {
         hasAssignedSubdomains: context.assignedSubdomains ? context.assignedSubdomains.length : 0
       });
     } else if (requestingRole === SPECIAL_ROLES.ADMINISTRATOR) {
-      // Administrator observation logic - use same pattern as Peer Evaluator for consistency
-      // This ensures the UI components work properly with the subdomain/toggle pattern
-      if (targetUser && targetUser.year === PROBATIONARY_OBSERVATION_YEAR) {
-        context.viewMode = VIEW_MODES.FULL;
-        context.assignedSubdomains = null;
-      } else {
-        context.viewMode = VIEW_MODES.ASSIGNED;
-        context.assignedSubdomains = getAssignedSubdomainsForRoleYear(targetUser.role, targetUser.year);
-      }
+      // Administrator observation logic - Administrators always evaluate on full rubric
+      context.viewMode = VIEW_MODES.FULL;
+      context.assignedSubdomains = null;
       context.isObservationMode = true; // Flag for the UI to enable editing
       context.isEvaluator = true; // Explicitly set evaluator status
-      debugLog('Administrator observation mode enabled with assigned view default (matches Peer Evaluator pattern).', {
+      debugLog('Administrator observation mode enabled with full view (evaluates on complete rubric).', {
         targetEmail: targetEmail,
         requestingRole: requestingRole,
         viewMode: context.viewMode,
