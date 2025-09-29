@@ -3022,10 +3022,10 @@
                 const today = new Date().toISOString().slice(0, 10);
                 const defaultObsName = `${observation.observedName.split(' ').pop()}, ${observation.observedName.split(' ')[0]}_${today}`;
                 html += `
-                <div class="observation-metadata-editor">
-                    <div class="filter-row">
-                        <input type="text" id="observationName" class="filter-select" value="${escapeHtml(observation.observationName || defaultObsName)}" onchange="saveObservationMetadata()">
-                        <input type="date" id="observationDate" class="filter-select" value="${escapeHtml(observation.observationDate || today)}" onchange="saveObservationMetadata()">
+                <div class="observation-metadata-display">
+                    <div class="observation-details">
+                        <span class="obs-name">${escapeHtml(observation.observationName || defaultObsName)}</span>
+                        <span class="obs-date">${escapeHtml(observation.observationDate || today)}</span>
                     </div>
                 </div>`;
             } else if (isReadOnlyView) {
@@ -3204,24 +3204,6 @@
             status.style.display = 'block';
         }
 
-        function saveObservationMetadata() {
-            const obsId = currentObservationId;
-            const newName = document.getElementById('observationName').value;
-            const newDate = document.getElementById('observationDate').value;
-
-            if (!obsId || !newName || !newDate) return;
-
-            google.script.run
-                .withSuccessHandler(res => {
-                    if (res.success) {
-                        showToast('Observation details saved.', true);
-                    } else {
-                        showError(res.error);
-                    }
-                })
-                .withFailureHandler(handleError)
-                .updateObservationMetadata(obsId, { observationName: newName, observationDate: newDate });
-        }
 
         function selectProficiency(element, componentId, proficiency) {
             if (!currentObservationId || !componentId || !proficiency) {
