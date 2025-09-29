@@ -437,3 +437,5 @@ If you discover duplicate/conflicting code:
 ### Remember: Prevention > Correction
 
 **It is ALWAYS better to spend extra time analyzing existing code than to create conflicts that require emergency cleanup later.**
+
+**Focus on identifying actual issues and creating strategic and targeted fixes over non-strategic debugging and logging.**
