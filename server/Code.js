@@ -1487,10 +1487,13 @@ function renameObservationAudioFile(observationId, oldFilename, newFilename) {
         const file = files.next();
 
         // Preserve file extension
-        const oldExt = oldFilename.substring(oldFilename.lastIndexOf('.'));
+        const lastDotIndex = oldFilename.lastIndexOf('.');
         let finalNewFilename = newFilename;
-        if (!newFilename.endsWith(oldExt)) {
-            finalNewFilename = newFilename + oldExt;
+        if (lastDotIndex !== -1) {
+            const oldExt = oldFilename.substring(lastDotIndex);
+            if (!newFilename.endsWith(oldExt)) {
+                finalNewFilename = newFilename + oldExt;
+            }
         }
 
         // Rename file in Drive
