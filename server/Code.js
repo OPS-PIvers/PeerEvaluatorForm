@@ -1394,6 +1394,216 @@ function uploadGlobalRecording(observationId, base64Data, filename, recordingTyp
 }
 
 /**
+ * =================================================================
+ * AUDIO RECORDING MANAGEMENT FUNCTIONS
+ * =================================================================
+ */
+
+/**
+ * Retrieves the list of audio files for a given observation.
+ * @param {string} observationId The ID of the observation.
+ * @returns {Object} A response object with success status and the list of recordings.
+ */
+function getObservationAudioFiles(observationId) {
+    try {
+        setupObservationSheet();
+        const userContext = createUserContext();
+
+        // Verify permissions (Peer Evaluator or Administrator)
+        if (!SPECIAL_ACCESS_ROLES.includes(userContext.role)) {
+            return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
+        }
+
+        const observation = getObservationById(observationId);
+        if (!observation) {
+            return { success: false, error: 'Observation not found.' };
+        }
+
+        // Verify user is observer or admin
+        const isObserver = observation.observerEmail === userContext.email;
+        const isAdmin = userContext.role === SPECIAL_ROLES.ADMINISTRATOR;
+        if (!isObserver && !isAdmin) {
+            return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
+        }
+
+        // Return audio recordings from observation data
+        const audioRecordings = observation.globalRecordings?.audio || [];
+
+        return {
+            success: true,
+            recordings: audioRecordings
+        };
+
+    } catch (error) {
+        console.error('Error getting observation audio files:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Renames an audio file associated with an observation.
+ * @param {string} observationId The ID of the observation.
+ * @param {string} oldFilename The current filename.
+ * @param {string} newFilename The desired new filename (without extension).
+ * @returns {Object} A response object indicating success or failure.
+ */
+function renameObservationAudioFile(observationId, oldFilename, newFilename) {
+    const lock = LockService.getScriptLock();
+    try {
+        lock.waitLock(10000);
+
+        setupObservationSheet();
+        const userContext = createUserContext();
+
+        // Permission checks
+        if (!SPECIAL_ACCESS_ROLES.includes(userContext.role)) {
+            return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
+        }
+
+        const observation = getObservationById(observationId);
+        if (!observation) {
+            return { success: false, error: 'Observation not found.' };
+        }
+
+        const isObserver = observation.observerEmail === userContext.email;
+        const isAdmin = userContext.role === SPECIAL_ROLES.ADMINISTRATOR;
+        if (!isObserver && !isAdmin) {
+            return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
+        }
+
+        // Validate new filename
+        if (!newFilename || newFilename.trim() === '') {
+            return { success: false, error: 'New filename cannot be empty.' };
+        }
+
+        // Find the file in Drive
+        const folder = getOrCreateObservationFolder(observationId);
+        const files = folder.getFilesByName(oldFilename);
+
+        if (!files.hasNext()) {
+            return { success: false, error: 'Audio file not found in Drive folder.' };
+        }
+
+        const file = files.next();
+
+        // Preserve file extension
+        const oldExt = oldFilename.substring(oldFilename.lastIndexOf('.'));
+        let finalNewFilename = newFilename;
+        if (!newFilename.endsWith(oldExt)) {
+            finalNewFilename = newFilename + oldExt;
+        }
+
+        // Rename file in Drive
+        file.setName(finalNewFilename);
+
+        // Update observation.globalRecordings.audio array
+        if (observation.globalRecordings && observation.globalRecordings.audio) {
+            observation.globalRecordings.audio = observation.globalRecordings.audio.map(recording => {
+                if (recording.filename === oldFilename) {
+                    return {
+                        ...recording,
+                        filename: finalNewFilename,
+                        url: file.getUrl() // Also update the URL in case it changes
+                    };
+                }
+                return recording;
+            });
+
+            updateObservationInSheet(observation);
+        }
+
+        debugLog('Audio file renamed', {
+            observationId,
+            oldFilename,
+            newFilename: finalNewFilename
+        });
+
+        return {
+            success: true,
+            newFilename: finalNewFilename,
+            url: file.getUrl()
+        };
+
+    } catch (error) {
+        console.error('Error renaming audio file:', error);
+        return { success: false, error: error.message };
+    } finally {
+        lock.releaseLock();
+    }
+}
+
+/**
+ * Deletes an audio file associated with an observation.
+ * @param {string} observationId The ID of the observation.
+ * @param {string} filename The filename to delete.
+ * @returns {Object} A response object indicating success or failure.
+ */
+function deleteObservationAudioFile(observationId, filename) {
+    const lock = LockService.getScriptLock();
+    try {
+        lock.waitLock(10000);
+
+        setupObservationSheet();
+        const userContext = createUserContext();
+
+        // Permission checks
+        if (!SPECIAL_ACCESS_ROLES.includes(userContext.role)) {
+            return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
+        }
+
+        const observation = getObservationById(observationId);
+        if (!observation) {
+            return { success: false, error: 'Observation not found.' };
+        }
+
+        const isObserver = observation.observerEmail === userContext.email;
+        const isAdmin = userContext.role === SPECIAL_ROLES.ADMINISTRATOR;
+        if (!isObserver && !isAdmin) {
+            return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
+        }
+
+        // Find and delete file from Drive
+        const folder = getOrCreateObservationFolder(observationId);
+        const files = folder.getFilesByName(filename);
+
+        if (!files.hasNext()) {
+            // File not found in Drive, but we should still remove from observation record
+            console.warn(`Audio file ${filename} not found in Drive for observation ${observationId}, but removing from record.`);
+        } else {
+            const file = files.next();
+            file.setTrashed(true); // Move to trash (safer than permanent delete)
+        }
+
+        // Remove from observation.globalRecordings.audio array
+        if (observation.globalRecordings && observation.globalRecordings.audio) {
+            const initialCount = observation.globalRecordings.audio.length;
+            observation.globalRecordings.audio = observation.globalRecordings.audio.filter(
+                recording => recording.filename !== filename
+            );
+            const finalCount = observation.globalRecordings.audio.length;
+
+            // Only update the sheet if a change was actually made
+            if (initialCount > finalCount) {
+                updateObservationInSheet(observation);
+            }
+        }
+
+        debugLog('Audio file deleted', {
+            observationId,
+            filename
+        });
+
+        return { success: true };
+
+    } catch (error) {
+        console.error('Error deleting audio file:', error);
+        return { success: false, error: error.message };
+    } finally {
+        lock.releaseLock();
+    }
+}
+
+/**
  * Exports a script from the Script editor to a PDF. This is the client-facing function.
  * @param {string} scriptHtml The HTML content of the script to export.
  * @param {string} observationId The ID of the observation to associate the PDF with.
