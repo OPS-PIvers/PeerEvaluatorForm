@@ -2990,7 +2990,10 @@
             } else {
                 console.error('ERROR: rubricContainer element not found!');
             }
-            
+
+            // Switch to rubric view immediately after HTML injection
+            showView('rubricContainer');
+
             // Initialize notes data from observation if available
             if (observation && observation.observationData) {
                 console.log('Loading observation notes data for', Object.keys(observation.observationData).length, 'components');
@@ -3001,7 +3004,7 @@
                         console.log(`Loaded notes for component ${componentId}`);
                     }
                 });
-                
+
                 // Schedule recovery for components with notes data
                 setTimeout(() => {
                     ensureEditorsForNotesData(rubricData.userContext.isEvaluator);
@@ -3009,11 +3012,11 @@
             } else {
                 console.log('No observation data to load');
             }
-            
+
             // Show global tools bar for evaluators after DOM injection
             if (rubricData.userContext && rubricData.userContext.isEvaluator) {
                 updateComponentVisibility();
-                
+
                 // Show global tools bar after HTML is in the DOM
                 const globalToolsBar = document.getElementById('globalToolsBar');
                 if (globalToolsBar) {
@@ -3027,7 +3030,6 @@
                 updateComponentVisibility();
             }
             restoreLookForsState();
-            showView('rubricContainer');
         }
 
         function generateInteractiveRubricHtml(data, observation) {
