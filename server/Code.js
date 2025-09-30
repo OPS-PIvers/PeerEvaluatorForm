@@ -2838,8 +2838,11 @@ function getAllDomainsData(role = null, year = null, viewMode = 'full', assigned
     }
     
     // Apply assignment metadata and filtering
+    // Always enhance domains with assignments - this adds componentId to all components
+    // For Administrators (null assignedSubdomains), componentId is added without assignment info
+    // For Peer Evaluators (with assignedSubdomains), componentId and isAssigned flags are added
+    result.domains = enhanceDomainsWithAssignments(result.domains, effectiveAssignedSubdomains, effectiveViewMode);
     if (effectiveAssignedSubdomains) {
-      result.domains = enhanceDomainsWithAssignments(result.domains, effectiveAssignedSubdomains, effectiveViewMode);
       result.assignmentMetadata = calculateAssignmentMetadata(result.domains, effectiveAssignedSubdomains);
     }
 
