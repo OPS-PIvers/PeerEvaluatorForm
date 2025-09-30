@@ -1492,7 +1492,7 @@ function renameObservationAudioFile(observationId, oldFilename, newFilename) {
         if (lastDotIndex !== -1 && lastDotIndex > 0) {
             // File has an extension - preserve it
             const oldExt = oldFilename.substring(lastDotIndex);
-            if (!newFilename.endsWith(oldExt)) {
+            if (!newFilename.toLowerCase().endsWith(oldExt.toLowerCase())) {
                 finalNewFilename = newFilename + oldExt;
             }
         }
