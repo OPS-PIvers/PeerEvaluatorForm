@@ -2413,9 +2413,17 @@ function enhanceDomainsWithAssignments(domains, assignedSubdomains, viewMode = '
     throw new Error(errorMessage); // Throw an error to be caught by the caller
   }
 
-  // If assignedSubdomains is not provided, no enhancement is needed.
+  // If assignedSubdomains is not provided, still need to set componentId for all components
+  // (Required for Administrators who use full view without assigned subdomains)
   if (!assignedSubdomains) {
-    return domains;
+    return domains.map(domain => ({
+      ...domain,
+      components: domain.components ? domain.components.map(component => ({
+        ...component,
+        componentId: extractComponentId(component.title),
+        isAssigned: false  // All components treated as not assigned in full view mode
+      })) : []
+    }));
   }
 
   try {
