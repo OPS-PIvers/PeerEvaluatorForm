@@ -4962,7 +4962,7 @@
          * Deletes a recording after confirmation
          */
         function deleteRecording(index, filename) {
-            if (!confirm(`Are you sure you want to delete this recording?\n\n${filename}\n\nThis action cannot be undone.`)) {
+            if (!confirm(`Are you sure you want to delete this recording?\n\n${filename}\n\nThe recording will be moved to Google Drive's trash and can be recovered from there for 30 days.`)) {
                 return;
             }
 
