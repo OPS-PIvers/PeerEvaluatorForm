@@ -4807,7 +4807,7 @@
 
             let html = '';
             recordings.forEach((recording, index) => {
-                const displayName = recording.filename.replace(AUDIO_EXTENSION_REGEX, '');
+                const displayName = recording.filename.replace(/\.[^.]+$/, '');
                 html += `
                     <div class="recording-item" data-index="${index}">
                         <input type="checkbox"
