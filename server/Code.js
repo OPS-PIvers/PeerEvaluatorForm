@@ -1492,6 +1492,7 @@ function renameObservationAudioFile(observationId, oldFilename, newFilename) {
         if (lastDotIndex !== -1 && lastDotIndex > 0) {
             // File has an extension - preserve it
             const oldExt = oldFilename.substring(lastDotIndex);
+            // Case-insensitive check to avoid double extensions (e.g., .MP3 vs .mp3)
             if (!newFilename.toLowerCase().endsWith(oldExt.toLowerCase())) {
                 finalNewFilename = newFilename + oldExt;
             }
@@ -1543,6 +1544,8 @@ function renameObservationAudioFile(observationId, oldFilename, newFilename) {
  * @param {string} observationId The ID of the observation.
  * @param {string} filename The filename to delete.
  * @returns {Object} A response object indicating success or failure.
+ * @note Files are moved to Google Drive's trash (30-day retention) rather than permanently deleted.
+ *       This provides a recovery window but trashed files still count against storage quota.
  */
 function deleteObservationAudioFile(observationId, filename) {
     const lock = LockService.getScriptLock();

@@ -2324,8 +2324,11 @@
         let currentObservedUser = { email: null, name: null };
 
         // Audio file extension configuration
+        // Supported recording formats (mp3 via encoding, webm as fallback)
         const AUDIO_FILE_EXTENSIONS = ['mp3', 'webm'];
-        const AUDIO_EXTENSION_REGEX = new RegExp(`\\.(${AUDIO_FILE_EXTENSIONS.join('|')})$`);
+        // Generic regex to strip any file extension for display purposes
+        // (more robust in case files with other extensions are manually added to Drive)
+        const AUDIO_EXTENSION_REGEX = /\.[^.]+$/;
 
         // Client-side cache for work product answers
         let workProductAnswersCache = new Map();
