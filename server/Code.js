@@ -1574,6 +1574,9 @@ function deleteObservationAudioFile(observationId, filename) {
             console.warn(`Audio file ${filename} not found in Drive for observation ${observationId}, but removing from record.`);
         } else {
             const file = files.next();
+            // NOTE: Moving files to trash is safer than permanent deletion, but trashed files still count against Google Drive storage quota.
+            // Administrators should periodically empty the Drive trash to avoid quota issues.
+            // Optionally, implement a cleanup policy to permanently delete trashed files if needed.
             file.setTrashed(true); // Move to trash (safer than permanent delete)
         }
 
