@@ -2323,6 +2323,10 @@
         let observationViewMode = 'assigned';
         let currentObservedUser = { email: null, name: null };
 
+        // Audio file extension configuration
+        const AUDIO_FILE_EXTENSIONS = ['mp3', 'webm'];
+        const AUDIO_EXTENSION_REGEX = new RegExp(`\\.(${AUDIO_FILE_EXTENSIONS.join('|')})$`);
+
         // Client-side cache for work product answers
         let workProductAnswersCache = new Map();
 
@@ -4780,11 +4784,11 @@
                     if (result.success) {
                         displayAudioRecordings(result.recordings);
                     } else {
-                        listContainer.innerHTML = `<div class="error-message">Error loading recordings: ${result.error}</div>`;
+                        listContainer.innerHTML = `<div class="error-message">Error loading recordings: ${escapeHtml(result.error)}</div>`;
                     }
                 })
                 .withFailureHandler(function(error) {
-                    listContainer.innerHTML = `<div class="error-message">Failed to load recordings: ${error.message}</div>`;
+                    listContainer.innerHTML = `<div class="error-message">Failed to load recordings: ${escapeHtml(error.message)}</div>`;
                 })
                 .getObservationAudioFiles(currentObservationId);
         }
@@ -4803,7 +4807,7 @@
 
             let html = '';
             recordings.forEach((recording, index) => {
-                const displayName = recording.filename.replace(/\.(mp3|webm)$/, '');
+                const displayName = recording.filename.replace(AUDIO_EXTENSION_REGEX, '');
                 html += `
                     <div class="recording-item" data-index="${index}">
                         <input type="checkbox"
@@ -4822,17 +4826,17 @@
 
                         <div class="recording-actions" id="recordingActions_${index}">
                             <button class="recording-action-btn btn-drive"
-                                    onclick="openInDrive('${recording.url}')"
+                                    onclick="openInDrive('${escapeJsString(recording.url)}')"
                                     title="Open in Google Drive">
                                 📂 Drive
                             </button>
                             <button class="recording-action-btn btn-edit"
-                                    onclick="startEditRecording(${index}, '${recording.filename}')"
+                                    onclick="startEditRecording(${index}, '${escapeJsString(recording.filename)}')"
                                     title="Rename recording">
                                 ✏️ Edit
                             </button>
                             <button class="recording-action-btn btn-delete"
-                                    onclick="deleteRecording(${index}, '${recording.filename}')"
+                                    onclick="deleteRecording(${index}, '${escapeJsString(recording.filename)}')"
                                     title="Delete recording">
                                 🗑️ Delete
                             </button>
@@ -4840,7 +4844,7 @@
 
                         <div class="recording-actions" id="recordingEditActions_${index}" style="display: none;">
                             <button class="recording-action-btn btn-save"
-                                    onclick="saveRecordingName(${index}, '${recording.filename}')">
+                                    onclick="saveRecordingName(${index}, '${escapeJsString(recording.filename)}')">
                                 ✓ Save
                             </button>
                             <button class="recording-action-btn btn-cancel"
@@ -4860,6 +4864,17 @@
          */
         function openInDrive(url) {
             window.open(url, '_blank');
+        }
+
+        /**
+         * Helper function to reset UI state of a recording item
+         */
+        function resetRecordingItemUI(index) {
+            const item = document.querySelector(`[data-index="${index}"]`);
+            if (item) {
+                item.style.opacity = '1';
+                item.style.pointerEvents = 'auto';
+            }
         }
 
         /**
@@ -4916,18 +4931,12 @@
                         loadAudioRecordings(); // Refresh the list
                     } else {
                         showToast('Error renaming recording: ' + result.error, false);
-                        if (item) {
-                            item.style.opacity = '1';
-                            item.style.pointerEvents = 'auto';
-                        }
+                        resetRecordingItemUI(index);
                     }
                 })
                 .withFailureHandler(function(error) {
                     showToast('Failed to rename recording: ' + error.message, false);
-                    if (item) {
-                        item.style.opacity = '1';
-                        item.style.pointerEvents = 'auto';
-                    }
+                    resetRecordingItemUI(index);
                 })
                 .renameObservationAudioFile(currentObservationId, oldFilename, newName);
         }
@@ -4971,18 +4980,12 @@
                         loadAudioRecordings(); // Refresh the list
                     } else {
                         showToast('Error deleting recording: ' + result.error, false);
-                        if (item) {
-                            item.style.opacity = '1';
-                            item.style.pointerEvents = 'auto';
-                        }
+                        resetRecordingItemUI(index);
                     }
                 })
                 .withFailureHandler(function(error) {
                     showToast('Failed to delete recording: ' + error.message, false);
-                    if (item) {
-                        item.style.opacity = '1';
-                        item.style.pointerEvents = 'auto';
-                    }
+                    resetRecordingItemUI(index);
                 })
                 .deleteObservationAudioFile(currentObservationId, filename);
         }
