@@ -242,6 +242,11 @@ function getObservationsForUser(observedEmail, status = null) {
 }
 
 /**
+ * Gets all standard observation questions from the StandardObservationQuestions sheet.
+ * @returns {Array<Object>} Array of question objects with questionId, questionText, order, and type.
+ */
+
+/**
  * Creates a new, empty observation record in a "Draft" state.
  * @param {string} observerEmail The email of the Peer Evaluator creating the observation.
  * @param {string} observedEmail The email of the staff member being observed.
@@ -1152,50 +1157,62 @@ function getObservationType(observationId) {
 }
 
 /**
- * Gets all work product questions from the WorkProductQuestions sheet.
- * @returns {Array<Object>} Array of question objects with questionId, questionText, and order.
+ * Gets all questions of a specific type from its corresponding sheet.
+ * @param {string} questionType The type of questions to get ('WorkProduct' or 'Standard').
+ * @returns {Array<Object>} Array of question objects.
  */
-function getWorkProductQuestions() {
+function getQuestions(questionType) {
+  const isWorkProduct = questionType === 'WorkProduct';
+  const sheetName = isWorkProduct ? SHEET_NAMES.WORK_PRODUCT_QUESTIONS : SHEET_NAMES.STANDARD_OBSERVATION_QUESTIONS;
+  const cacheKey = isWorkProduct ? 'work_product_questions' : 'standard_observation_questions';
+  const numColumns = isWorkProduct ? 3 : 4;
+
   try {
-    const cacheKey = 'work_product_questions';
     const cached = getCachedDataEnhanced(cacheKey);
     if (cached) return cached;
 
     const spreadsheet = openSpreadsheet();
-    const sheet = getSheetByName(spreadsheet, SHEET_NAMES.WORK_PRODUCT_QUESTIONS);
+    const sheet = getSheetByName(spreadsheet, sheetName);
     if (!sheet || sheet.getLastRow() < 2) return [];
 
-    const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, 3).getValues();
+    const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, numColumns).getValues();
     const questions = values
       .filter(row => row[0]) // Filter out empty rows
-      .map(row => ({
-        questionId: row[0],
-        questionText: row[1],
-        order: row[2] || 0
-      }))
+      .map(row => {
+        const question = {
+          questionId: row[0],
+          questionText: row[1],
+          order: row[2] || 0
+        };
+        if (!isWorkProduct) {
+          question.type = row[3] || 'Pre-Observation';
+        }
+        return question;
+      })
       .sort((a, b) => a.order - b.order);
 
     setCachedDataEnhanced(cacheKey, questions);
     return questions;
   } catch (error) {
-    console.error('Error getting work product questions:', error);
+    console.error(`Error getting ${questionType} questions:`, error);
     return [];
   }
 }
 
 /**
- * Saves or updates a work product answer.
+ * Saves or updates an answer in a specified answer sheet.
+ * @param {string} answerSheetName The name of the sheet to save the answer to.
  * @param {string} observationId The ID of the observation.
  * @param {string} questionId The ID of the question.
  * @param {string} answerText The answer text.
  * @returns {boolean} True if saved successfully, false otherwise.
  */
-function saveWorkProductAnswer(observationId, questionId, answerText) {
+function saveAnswer(answerSheetName, observationId, questionId, answerText) {
   try {
     const spreadsheet = openSpreadsheet();
-    const sheet = getSheetByName(spreadsheet, SHEET_NAMES.WORK_PRODUCT_ANSWERS);
+    const sheet = getSheetByName(spreadsheet, answerSheetName);
     if (!sheet) {
-      console.error('WorkProductAnswers sheet not found');
+      console.error(`${answerSheetName} sheet not found`);
       return false;
     }
 
@@ -1223,36 +1240,38 @@ function saveWorkProductAnswer(observationId, questionId, answerText) {
     }
 
     // Invalidate the cache for this observation's answers
+    const cacheKey = answerSheetName.replace(/ /g, '_').toLowerCase();
     const cacheParams = { observationId: observationId };
-    setCachedDataEnhanced('workProductAnswers', cacheParams, null, 0); // Setting TTL to 0 invalidates the cache
+    setCachedDataEnhanced(cacheKey, cacheParams, null, 0); // Setting TTL to 0 invalidates the cache
 
     return true;
   } catch (error) {
-    console.error('Error saving work product answer:', error);
+    console.error(`Error saving answer to ${answerSheetName}:`, error);
     return false;
   }
 }
 
 /**
- * Gets work product answers for a specific observation.
+ * Gets answers for a specific observation from a specified answer sheet.
+ * @param {string} answerSheetName The name of the sheet to get answers from.
  * @param {string} observationId The ID of the observation.
  * @returns {Array<Object>} Array of answer objects with questionId and answerText.
  */
-function getWorkProductAnswers(observationId) {
+function getAnswers(answerSheetName, observationId) {
   try {
-    // Use enhanced cache with observation-specific key
+    const cacheKey = answerSheetName.replace(/ /g, '_').toLowerCase();
     const cacheParams = { observationId: observationId };
-    const cachedAnswers = getCachedDataEnhanced('workProductAnswers', cacheParams);
+    const cachedAnswers = getCachedDataEnhanced(cacheKey, cacheParams);
 
     if (cachedAnswers && cachedAnswers.data) {
-      debugLog('Work product answers retrieved from cache', { observationId: observationId });
+      debugLog(`Answers for ${answerSheetName} retrieved from cache`, { observationId: observationId });
       return cachedAnswers.data;
     }
 
-    debugLog('Loading fresh work product answers', { observationId: observationId });
+    debugLog(`Loading fresh answers from ${answerSheetName}`, { observationId: observationId });
 
     const spreadsheet = openSpreadsheet();
-    const sheet = getSheetByName(spreadsheet, SHEET_NAMES.WORK_PRODUCT_ANSWERS);
+    const sheet = getSheetByName(spreadsheet, answerSheetName);
     if (!sheet || sheet.getLastRow() < 2) return [];
 
     const values = sheet.getDataRange().getValues();
@@ -1265,12 +1284,11 @@ function getWorkProductAnswers(observationId) {
         answerText: row[3] || ''
       }));
 
-    // Cache the results with shorter TTL since answers may change frequently
-    setCachedDataEnhanced('workProductAnswers', cacheParams, answers, CACHE_SETTINGS.ROLE_CONFIG_TTL);
+    setCachedDataEnhanced(cacheKey, cacheParams, answers, CACHE_SETTINGS.ROLE_CONFIG_TTL);
 
     return answers;
   } catch (error) {
-    console.error('Error getting work product answers:', error);
+    console.error(`Error getting answers from ${answerSheetName}:`, error);
     return [];
   }
 }
@@ -1325,470 +1343,27 @@ function getWorkProductProgressState(userEmail) {
   try {
     const observations = _getObservationsDb();
     const workProductObs = observations.find(obs =>
-      obs.observedEmail === userEmail && obs.Type === 'Work Product'
+      obs.observedEmail === userEmail &&
+      obs.Type === 'Work Product' &&
+      obs.status === 'Draft'
     );
 
-    if (!workProductObs) return 'not-started';
+    if (!workProductObs) {
+      return 'not-started';
+    }
 
-    // Check if any answers exist in Google Doc
-    const answers = getWorkProductAnswersFromDoc(workProductObs.observationId);
-    const hasAnswers = answers && answers.some(answer =>
-      answer.answerText && answer.answerText.trim().length > 0
-    );
+    const answers = getAnswers(SHEET_NAMES.WORK_PRODUCT_ANSWERS, workProductObs.observationId);
+    const hasAnswers = answers && answers.some(answer => answer.answerText && answer.answerText.trim().length > 0);
 
-    if (workProductObs.status === 'Finalized') return 'submitted';
-    if (hasAnswers) return 'in-progress';
+    if (workProductObs.status === 'Finalized') {
+      return 'submitted';
+    }
+    if (hasAnswers) {
+      return 'in-progress';
+    }
     return 'not-started';
   } catch (error) {
     console.error('Error getting work product progress state:', error);
     return 'not-started';
-  }
-}
-
-/**
- * Finds a work product response document using Drive search with caching and error handling.
- * @param {string} observationId The ID of the observation.
- * @param {string} staffEmail The email of the staff member who owns the doc.
- * @param {string} currentUserEmail The email of the current user requesting access.
- * @returns {Object|null} Object with docId and docUrl, or null if not found.
- */
-function findWorkProductResponseDoc(observationId, staffEmail, currentUserEmail) {
-  try {
-    const searchName = `Work Product Responses - ${observationId}`;
-
-    // Add basic caching to avoid repeated Drive searches for the same observation
-    // Use observation-based cache key since document is same regardless of who accesses it
-    const cacheKey = `work_product_doc_${observationId}`;
-    const cached = getCachedDataEnhanced(cacheKey);
-    if (cached) {
-      debugLog('Work product doc found in cache', {
-        observationId: observationId,
-        staffEmail: staffEmail,
-        currentUserEmail: currentUserEmail
-      });
-      return cached;
-    }
-
-    debugLog('Searching for work product response doc', {
-      observationId: observationId,
-      staffEmail: staffEmail,
-      currentUserEmail: currentUserEmail
-    });
-
-    let docResult = null;
-
-    if (currentUserEmail === staffEmail) {
-      // Staff member searches their own drive
-      try {
-        const files = DriveApp.searchFiles(`title = "${searchName}" and trashed = false`);
-        if (files.hasNext()) {
-          const file = files.next();
-          docResult = {
-            docId: file.getId(),
-            docUrl: file.getUrl()
-          };
-          debugLog('Found work product doc in staff drive', { docId: docResult.docId });
-        }
-      } catch (driveError) {
-        console.error('Error searching staff drive for work product doc:', driveError);
-        return null;
-      }
-    } else {
-      // Peer evaluator searches for shared documents
-      try {
-        const files = DriveApp.searchFiles(`title = "${searchName}" and trashed = false`);
-        let searchCount = 0;
-        const maxSearchAttempts = 5; // Reduced from 10 for better performance
-
-        debugLog('Peer evaluator searching for shared work product docs', {
-          observationId: observationId,
-          currentUserEmail: currentUserEmail
-        });
-
-        while (files.hasNext() && searchCount < maxSearchAttempts) {
-          searchCount++;
-          const file = files.next();
-          const fileId = file.getId();
-
-          try {
-            // Test access by trying to open the document
-            const testDoc = DocumentApp.openById(fileId);
-            // If we can access it, it's shared with us
-            docResult = {
-              docId: fileId,
-              docUrl: file.getUrl()
-            };
-            debugLog('Successfully found accessible shared work product doc', {
-              docId: docResult.docId,
-              observationId: observationId,
-              searchAttempt: searchCount
-            });
-            break;
-          } catch (accessError) {
-            // File not accessible to current user, continue searching
-            debugLog('Work product doc not accessible to peer evaluator, continuing search', {
-              fileId: fileId,
-              observationId: observationId,
-              searchAttempt: searchCount,
-              error: accessError.message
-            });
-            continue;
-          }
-        }
-
-        if (searchCount >= maxSearchAttempts && !docResult) {
-          console.warn('Reached max search attempts for work product doc without finding accessible document:', {
-            observationId: observationId,
-            currentUserEmail: currentUserEmail,
-            staffEmail: staffEmail,
-            maxAttempts: maxSearchAttempts
-          });
-        }
-      } catch (driveError) {
-        console.error('Error searching for shared work product doc:', driveError, {
-          observationId: observationId,
-          currentUserEmail: currentUserEmail,
-          staffEmail: staffEmail
-        });
-        return null;
-      }
-    }
-
-    // Cache the result for a short time to improve performance
-    if (docResult) {
-      setCachedDataEnhanced(cacheKey, docResult, 300); // 5 minute cache
-    }
-
-    return docResult;
-  } catch (error) {
-    console.error('Critical error in findWorkProductResponseDoc:', error, {
-      observationId: observationId,
-      staffEmail: staffEmail,
-      currentUserEmail: currentUserEmail,
-      searchName: searchName,
-      operation: 'findWorkProductResponseDoc'
-    });
-    return null;
-  }
-}
-
-/**
- * Creates or gets a work product response document for staff member responses.
- * @param {string} observationId The ID of the observation.
- * @param {string} staffEmail The email of the staff member.
- * @param {string} peerEvaluatorEmail The email of the peer evaluator.
- * @returns {Object|null} Object with docId and docUrl, or null on error.
- */
-function createOrGetWorkProductResponseDoc(observationId, staffEmail, peerEvaluatorEmail) {
-  try {
-    const userContext = createUserContext();
-
-    // Check if doc already exists using Drive search
-    const existingDoc = findWorkProductResponseDoc(observationId, staffEmail, userContext.email);
-    if (existingDoc) {
-      console.log(`Found existing work product response doc: ${existingDoc.docId}`);
-      return existingDoc;
-    }
-
-    // Only staff members can create new response documents
-    // Peer evaluators should only access existing documents through findWorkProductResponseDoc
-    if (userContext.email !== staffEmail) {
-      debugLog('Non-staff member attempted to create work product response doc - this is expected for view-only access:', {
-        currentUser: userContext.email,
-        staffEmail: staffEmail,
-        observationId: observationId,
-        userRole: userContext.role
-      });
-      return null;
-    }
-
-    // Create new Google Doc in staff member's Drive
-    const docName = `Work Product Responses - ${observationId}`;
-    let doc, docId;
-
-    try {
-      doc = DocumentApp.create(docName);
-      docId = doc.getId();
-      console.log(`Created new work product response doc: ${docId}`);
-    } catch (docError) {
-      console.error('Error creating Google Doc:', docError);
-      return null;
-    }
-
-    // Set up document content
-    try {
-      const body = doc.getBody();
-      body.clear();
-
-      // Add header
-      const header = body.appendParagraph('Work Product Reflection Responses');
-      header.setHeading(DocumentApp.ParagraphHeading.HEADING1);
-      header.editAsText().setBold(true);
-
-      body.appendParagraph(`Observation ID: ${observationId}`);
-      body.appendParagraph(`Staff Member: ${staffEmail}`);
-      body.appendParagraph(`Peer Evaluator: ${peerEvaluatorEmail}`);
-      body.appendParagraph('Generated: ' + new Date().toLocaleString());
-      body.appendHorizontalRule();
-      body.appendParagraph(''); // Empty line
-
-      console.log('Successfully set up work product response doc content');
-    } catch (contentError) {
-      console.error('Error setting up document content:', contentError);
-      // Continue even if content setup fails - the document still exists
-    }
-
-    // Share with peer evaluator (silent notification)
-    try {
-      const file = DriveApp.getFileById(docId);
-      file.addEditor(peerEvaluatorEmail);
-      console.log(`Work product response doc shared with peer evaluator: ${peerEvaluatorEmail}`);
-    } catch (shareError) {
-      console.error('Error sharing response doc with peer evaluator:', shareError);
-      // Don't fail the entire operation if sharing fails - peer evaluator can be given access later
-    }
-
-    // No need to store doc ID - we use Drive search to find it
-
-    console.log(`Created work product response doc: ${docId} for observation: ${observationId}`);
-
-    return {
-      docId: docId,
-      docUrl: doc.getUrl()
-    };
-
-  } catch (error) {
-    console.error('Critical error creating work product response doc:', error, {
-      observationId: observationId,
-      staffEmail: staffEmail,
-      peerEvaluatorEmail: peerEvaluatorEmail,
-      currentUserEmail: userContext ? userContext.email : 'unknown',
-      operation: 'createOrGetWorkProductResponseDoc'
-    });
-    return null;
-  }
-}
-
-/**
- * Saves a work product answer to the response Google Doc.
- * @param {string} observationId The ID of the observation.
- * @param {string} questionId The ID of the question.
- * @param {string} answerText The answer text.
- * @returns {boolean} True if saved successfully, false otherwise.
- */
-function saveWorkProductAnswerToDoc(observationId, questionId, answerText) {
-  try {
-    // Get the observation to find staff email
-    const observations = _getObservationsDb();
-    const observation = observations.find(obs => obs.observationId === observationId);
-
-    if (!observation) {
-      console.error('Observation not found:', observationId);
-      return false;
-    }
-
-    const userContext = createUserContext();
-
-    // Find or create the response document using Drive search
-    let docResult = findWorkProductResponseDoc(observationId, observation.observedEmail, userContext.email);
-
-    // If document not found and user is staff member, create it
-    if (!docResult && userContext.email === observation.observedEmail) {
-      console.log('No response document found, creating new one for staff member:', observationId);
-      const newDocResult = createOrGetWorkProductResponseDoc(observationId, observation.observedEmail, observation.observerEmail);
-      if (!newDocResult) {
-        console.error('Failed to create work product response doc for observation:', observationId);
-        return false;
-      }
-      docResult = newDocResult;
-    }
-
-    // If still no document found (peer evaluator or creation failed)
-    if (!docResult) {
-      console.error('No response document found and unable to create for observation:', observationId, {
-        currentUserEmail: userContext.email,
-        observedEmail: observation.observedEmail,
-        isStaffMember: userContext.email === observation.observedEmail
-      });
-      return false;
-    }
-
-    let doc;
-    try {
-      doc = DocumentApp.openById(docResult.docId);
-    } catch (docError) {
-      console.error('Error opening work product response doc:', docError);
-      return false;
-    }
-    let body;
-    try {
-      body = doc.getBody();
-    } catch (bodyError) {
-      console.error('Error accessing document body:', bodyError);
-      return false;
-    }
-
-    try {
-      // Search for existing answer section
-      const searchPattern = `Question ${questionId}:`;
-      const searchResult = body.findText(searchPattern);
-
-      if (searchResult) {
-        // Update existing answer
-        const element = searchResult.getElement();
-        const paragraph = element.getParent();
-        const nextParagraph = paragraph.getNextSibling();
-
-        if (nextParagraph && nextParagraph.getType() === DocumentApp.ElementType.PARAGRAPH) {
-          // Update the answer in the next paragraph
-          nextParagraph.asParagraph().setText(answerText || '(No response provided)');
-        } else {
-          // Insert answer paragraph after question
-          const answerParagraph = body.insertParagraph(body.getChildIndex(paragraph) + 1, answerText || '(No response provided)');
-          answerParagraph.setIndentFirstLine(20);
-        }
-      } else {
-        // Add new question and answer at the end
-        body.appendParagraph(''); // Empty line
-        const questionParagraph = body.appendParagraph(`Question ${questionId}:`);
-        questionParagraph.editAsText().setBold(true);
-
-        const answerParagraph = body.appendParagraph(answerText || '(No response provided)');
-        answerParagraph.setIndentFirstLine(20);
-      }
-
-      // Update or add timestamp
-      const timestampPattern = 'Last updated:';
-      const timestampSearch = body.findText(timestampPattern);
-
-      if (timestampSearch) {
-        // Update existing timestamp
-        const element = timestampSearch.getElement();
-        const paragraph = element.getParent();
-        paragraph.asParagraph().setText(`Last updated: ${new Date().toLocaleString()}`);
-      } else {
-        // Add new timestamp
-        body.appendParagraph('');
-        body.appendParagraph(`Last updated: ${new Date().toLocaleString()}`);
-      }
-    } catch (editError) {
-      console.error('Error editing work product response doc content:', editError);
-      return false;
-    }
-
-    console.log(`Saved work product answer to doc for question ${questionId}`);
-    return true;
-
-  } catch (error) {
-    console.error('Critical error saving work product answer to doc:', error, {
-      observationId: observationId,
-      questionId: questionId,
-      currentUserEmail: userContext ? userContext.email : 'unknown',
-      observedEmail: observation ? observation.observedEmail : 'unknown',
-      operation: 'saveWorkProductAnswerToDoc',
-      answerLength: answerText ? answerText.length : 0
-    });
-    return false;
-  }
-}
-
-/**
- * Gets work product answers from the response Google Doc.
- * @param {string} observationId The ID of the observation.
- * @returns {Array<Object>} Array of answer objects with questionId and answerText.
- */
-function getWorkProductAnswersFromDoc(observationId) {
-  try {
-    // Get the observation to find staff email
-    const observations = _getObservationsDb();
-    const observation = observations.find(obs => obs.observationId === observationId);
-
-    if (!observation) {
-      console.log('Observation not found:', observationId);
-      return [];
-    }
-
-    const userContext = createUserContext();
-
-    // Find the response document using Drive search
-    const docResult = findWorkProductResponseDoc(observationId, observation.observedEmail, userContext.email);
-    if (!docResult) {
-      console.log('No response document found for observation:', observationId);
-      return [];
-    }
-
-    let doc;
-    try {
-      doc = DocumentApp.openById(docResult.docId);
-    } catch (docError) {
-      console.error('Error opening work product response doc for reading:', docError);
-      return [];
-    }
-    const body = doc.getBody();
-    const text = body.getText();
-
-    // Parse questions and answers
-    const answers = [];
-    const lines = text.split('\n');
-    let currentQuestionId = null;
-    let currentAnswer = '';
-    let collectingAnswer = false;
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
-
-      // Check if this is a question line
-      const questionMatch = line.match(/^Question\s+([^:]+):\s*$/);
-      if (questionMatch) {
-        // Save previous answer if we have one
-        if (currentQuestionId && currentAnswer.trim() && currentAnswer.trim() !== '(No response provided)') {
-          answers.push({
-            questionId: currentQuestionId,
-            answerText: currentAnswer.trim()
-          });
-        }
-
-        // Start new question
-        currentQuestionId = questionMatch[1].trim();
-        currentAnswer = '';
-        collectingAnswer = true;
-        continue;
-      }
-
-      // Skip metadata lines and horizontal rules
-      if (line.startsWith('Last updated:') || line.startsWith('Observation ID:') ||
-          line.startsWith('Staff Member:') || line.startsWith('Peer Evaluator:') ||
-          line.startsWith('Generated:') || line === '' ||
-          line === 'Work Product Reflection Responses' ||
-          line.includes('---') || line.includes('___')) {
-        continue;
-      }
-
-      // Collect answer text
-      if (collectingAnswer && currentQuestionId) {
-        if (currentAnswer) currentAnswer += '\n';
-        currentAnswer += line;
-      }
-    }
-
-    // Save the last answer
-    if (currentQuestionId && currentAnswer.trim() && currentAnswer.trim() !== '(No response provided)') {
-      answers.push({
-        questionId: currentQuestionId,
-        answerText: currentAnswer.trim()
-      });
-    }
-
-    console.log(`Retrieved ${answers.length} work product answers from doc`);
-    return answers;
-
-  } catch (error) {
-    console.error('Critical error getting work product answers from doc:', error, {
-      observationId: observationId,
-      currentUserEmail: userContext ? userContext.email : 'unknown',
-      observedEmail: observation ? observation.observedEmail : 'unknown',
-      operation: 'getWorkProductAnswersFromDoc'
-    });
-    return [];
   }
 }

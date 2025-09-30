@@ -10,10 +10,11 @@ const SHEET_NAMES = {
   STAFF: 'Staff',
   SETTINGS: 'Settings',
   TEACHER: 'Teacher',
-  OBSERVATIONS: 'Observations', // This doesn't exist.  Ensure it is unused, then remove.
-  OBSERVATION_DATA: 'Observation_Data', // Added for consistency
+  OBSERVATION_DATA: 'Observation_Data',
   WORK_PRODUCT_QUESTIONS: 'WorkProductQuestions',
-  WORK_PRODUCT_ANSWERS: 'WorkProductAnswers'
+  STANDARD_OBSERVATION_QUESTIONS: 'StandardObservationQuestions',
+  WORK_PRODUCT_ANSWERS: 'WorkProductAnswers',
+  STANDARD_OBSERVATION_ANSWERS: 'StandardObservationAnswers'
 };
 
 const COLUMN_NAMES = {

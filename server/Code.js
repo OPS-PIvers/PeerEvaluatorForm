@@ -143,6 +143,13 @@ function doGet(e) {
 
     htmlTemplate.hasMyObservations = hasMyObservations;
     htmlTemplate.workProductState = workProductState;
+
+    // Check if user has any Standard observations
+    let hasStandardObservation = false;
+    if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
+      hasStandardObservation = checkUserHasStandardObservation(userContext.email);
+    }
+    htmlTemplate.showStandardObservationQuestionsButton = hasStandardObservation;
     
     // Generate the HTML output with error handling
     let htmlOutput;
@@ -503,7 +510,7 @@ function createWorkProductObservationForEvaluator(observedEmail) {
  */
 function getWorkProductQuestionsForClient() {
   try {
-    const questions = getWorkProductQuestions();
+    const questions = getQuestions('WorkProduct');
     return { success: true, questions: questions };
   } catch (error) {
     console.error('Error in getWorkProductQuestionsForClient:', error);
@@ -511,25 +518,14 @@ function getWorkProductQuestionsForClient() {
   }
 }
 
-/**
- * Saves a work product answer from client-side.
- * @param {string} observationId The ID of the observation.
- * @param {string} questionId The ID of the question.
- * @param {string} answerText The answer text.
- * @returns {Object} A response object with success status.
- */
 function saveWorkProductAnswerFromClient(observationId, questionId, answerText) {
   try {
     const userContext = createUserContext();
-
-    // Verify user has access to this observation
     const observation = getObservationById(observationId);
     if (!observation || observation.observedEmail !== userContext.email) {
       return { success: false, error: 'Access denied to this observation.' };
     }
-
-    // Save to Google Doc instead of spreadsheet
-    const saved = saveWorkProductAnswerToDoc(observationId, questionId, answerText);
+    const saved = saveAnswer(SHEET_NAMES.WORK_PRODUCT_ANSWERS, observationId, questionId, answerText);
     return { success: saved };
   } catch (error) {
     console.error('Error in saveWorkProductAnswerFromClient:', error);
@@ -537,29 +533,17 @@ function saveWorkProductAnswerFromClient(observationId, questionId, answerText) 
   }
 }
 
-/**
- * Gets work product answers for client-side use.
- * @param {string} observationId The ID of the observation.
- * @returns {Object} A response object containing the answers array.
- */
 function getWorkProductAnswersForClient(observationId) {
   try {
     const userContext = createUserContext();
-
-    // Verify user has access to this observation
     const observation = getObservationById(observationId);
     if (!observation) {
       return { success: false, error: 'Observation not found.' };
     }
-
-    // Allow access for observed staff or peer evaluators
-    if (observation.observedEmail !== userContext.email &&
-        userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
+    if (observation.observedEmail !== userContext.email && userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
       return { success: false, error: 'Access denied to this observation.' };
     }
-
-    // Get answers from Google Doc instead of spreadsheet
-    const answers = getWorkProductAnswersFromDoc(observationId);
+    const answers = getAnswers(SHEET_NAMES.WORK_PRODUCT_ANSWERS, observationId);
     return { success: true, answers: answers };
   } catch (error) {
     console.error('Error in getWorkProductAnswersForClient:', error);
@@ -567,34 +551,16 @@ function getWorkProductAnswersForClient(observationId) {
   }
 }
 
-/**
- * Gets the current user's work product observation ID and ensures response doc exists.
- * @returns {Object} A response object containing the observation ID.
- */
 function getCurrentUserWorkProductObservationId() {
   try {
     const userContext = createUserContext();
     const observations = _getObservationsDb();
-
     const userWorkProductObs = observations.find(obs =>
       obs.observedEmail === userContext.email &&
       obs.Type === 'Work Product' &&
       obs.status === 'Draft'
     );
-
     if (userWorkProductObs) {
-      // Ensure response document exists
-      const peerEvaluatorEmail = userWorkProductObs.observerEmail;
-      const docResult = createOrGetWorkProductResponseDoc(
-        userWorkProductObs.observationId,
-        userContext.email,
-        peerEvaluatorEmail
-      );
-
-      if (!docResult) {
-        console.warn('Failed to create/get response document, but continuing...');
-      }
-
       return { success: true, observationId: userWorkProductObs.observationId };
     } else {
       return { success: false, error: 'No work product observation found' };
@@ -602,6 +568,69 @@ function getCurrentUserWorkProductObservationId() {
   } catch (error) {
     console.error('Error getting current user work product observation:', error);
     return { success: false, error: 'Failed to get observation ID: ' + error.message };
+  }
+}
+
+function getStandardObservationQuestionsForClient() {
+  try {
+    const questions = getQuestions('Standard');
+    return { success: true, questions: questions };
+  } catch (error) {
+    console.error('Error in getStandardObservationQuestionsForClient:', error);
+    return { success: false, error: 'Failed to load questions: ' + error.message };
+  }
+}
+
+function getStandardObservationAnswersForClient(observationId) {
+  try {
+    const userContext = createUserContext();
+    const observation = getObservationById(observationId);
+    if (!observation) {
+      return { success: false, error: 'Observation not found.' };
+    }
+    if (observation.observedEmail !== userContext.email && userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
+      return { success: false, error: 'Access denied to this observation.' };
+    }
+    const answers = getAnswers(SHEET_NAMES.STANDARD_OBSERVATION_ANSWERS, observationId);
+    return { success: true, answers: answers };
+  } catch (error) {
+    console.error('Error in getStandardObservationAnswersForClient:', error);
+    return { success: false, error: 'Failed to load answers: ' + error.message };
+  }
+}
+
+function getCurrentUserStandardObservationId() {
+  try {
+    const userContext = createUserContext();
+    const observations = _getObservationsDb();
+    const userStandardObs = observations.find(obs =>
+      obs.observedEmail === userContext.email &&
+      (obs.Type === 'Standard' || !obs.Type) &&
+      obs.status === 'Draft'
+    );
+    if (userStandardObs) {
+      return { success: true, observationId: userStandardObs.observationId };
+    } else {
+      return { success: false, error: 'No standard observation found' };
+    }
+  } catch (error) {
+    console.error('Error getting current user standard observation:', error);
+    return { success: false, error: 'Failed to get observation ID: ' + error.message };
+  }
+}
+
+function saveStandardObservationAnswerFromClient(observationId, questionId, answerText) {
+  try {
+    const userContext = createUserContext();
+    const observation = getObservationById(observationId);
+    if (!observation || observation.observedEmail !== userContext.email) {
+      return { success: false, error: 'Access denied to this observation.' };
+    }
+    const saved = saveAnswer(SHEET_NAMES.STANDARD_OBSERVATION_ANSWERS, observationId, questionId, answerText);
+    return { success: saved };
+  } catch (error) {
+    console.error('Error in saveStandardObservationAnswerFromClient:', error);
+    return { success: false, error: 'Failed to save answer: ' + error.message };
   }
 }
 

@@ -1771,7 +1771,21 @@
             </div>
         </div>
     </div>
-    
+
+    <!-- Generic Questions Modal -->
+    <div id="questionsModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;" onclick="closeQuestionsModalOnBackdrop(event)">
+        <div style="position: relative; top: 5%; margin: 0 auto; width: 90%; max-width: 800px; background: white; border-radius: 8px; padding: 0; max-height: 85vh; overflow: hidden; display: flex; flex-direction: column;" onclick="event.stopPropagation()">
+            <div style="padding: 20px; border-bottom: 1px solid #e5e7eb; background: #f9fafb; flex-shrink: 0;">
+                <h2 id="questionsModalTitle" style="margin: 0; color: #374151;">Reflection Questions</h2>
+                <p style="margin: 5px 0 0 0; color: #6b7280; font-size: 0.9rem;">Your responses are automatically saved as you type.</p>
+            </div>
+            <div id="questionsModalContainer" style="padding: 20px; overflow-y: auto; flex: 1; min-height: 0;"></div>
+            <div style="padding: 15px 20px; border-top: 1px solid #e5e7eb; background: #f9fafb; text-align: right; flex-shrink: 0;">
+                <button onclick="closeQuestionsModal()" class="filter-btn">Close</button>
+            </div>
+        </div>
+    </div>
+
     <div id="toastNotification" class="toast-notification"></div>
     <!-- Debug Information (only visible in debug mode) -->
     <? if (data.userContext && data.userContext.debugMode) { ?>
@@ -1818,7 +1832,7 @@
                     </button>
                     <!-- Work Product Questions Button -->
                     <? if (typeof showWorkProductQuestionsButton !== 'undefined' && showWorkProductQuestionsButton && data.userContext.role !== 'Peer Evaluator') { ?>
-                    <button id="workProductQuestionsBtn" onclick="openWorkProductModal()"
+                    <button id="workProductQuestionsBtn" onclick="openQuestionsModal('WorkProduct')"
                             class="filter-btn wp-<?= workProductState || 'not-started' ?>"
                             style="padding: 12px 24px; font-size: 1.1rem;">
                         📋 Work Product Questions
@@ -1827,6 +1841,14 @@
                             <? if ((workProductState || 'not-started') === 'in-progress') { ?>(In Progress)<? } ?>
                             <? if ((workProductState || 'not-started') === 'submitted') { ?>(Submitted)<? } ?>
                         </span>
+                    </button>
+                    <? } ?>
+
+                    <!-- Standard Observation Questions Button -->
+                    <? if (typeof showStandardObservationQuestionsButton !== 'undefined' && showStandardObservationQuestionsButton && data.userContext.role !== 'Peer Evaluator') { ?>
+                    <button id="standardObservationQuestionsBtn" onclick="openQuestionsModal('Standard')"
+                            class="filter-btn">
+                        📝 Observation Questions
                     </button>
                     <? } ?>
                 </div>
@@ -3531,54 +3553,69 @@
             }
         }
 
-        // === Work Product Modal Functions ===
-        let saveTimeouts = {};
-        let currentWorkProductObservationId = null;
+        // === Generic Questions Modal Functions ===
+        let currentQuestionContext = {
+            type: null, // 'WorkProduct' or 'Standard'
+            observationId: null,
+            saveTimeouts: {}
+        };
 
-        function openWorkProductModal() {
-            loadWorkProductQuestions();
-            document.getElementById('workProductModal').style.display = 'block';
-            document.body.style.overflow = 'hidden'; // Prevent background scrolling
+        function openQuestionsModal(questionType) {
+            // Set context for this modal session
+            currentQuestionContext.type = questionType;
+            currentQuestionContext.observationId = null;
+            currentQuestionContext.saveTimeouts = {};
+
+            // Update modal title
+            const titleEl = document.getElementById('questionsModalTitle');
+            if (questionType === 'WorkProduct') {
+                titleEl.textContent = 'Work Product Reflection Questions';
+            } else {
+                titleEl.textContent = 'Observation Reflection Questions';
+            }
+
+            // Load questions and open modal
+            loadQuestions();
+            document.getElementById('questionsModal').style.display = 'block';
+            document.body.style.overflow = 'hidden';
         }
 
-        function closeWorkProductModal() {
-            document.getElementById('workProductModal').style.display = 'none';
-            document.body.style.overflow = 'auto'; // Restore scrolling
+        function closeQuestionsModal() {
+            document.getElementById('questionsModal').style.display = 'none';
+            document.body.style.overflow = 'auto';
         }
 
-        function closeWorkProductModalOnBackdrop(event) {
+        function closeQuestionsModalOnBackdrop(event) {
             if (event.target === event.currentTarget) {
-                closeWorkProductModal();
+                closeQuestionsModal();
             }
         }
 
-        function loadWorkProductQuestions() {
-            const container = document.getElementById('questionsContainer');
-            container.innerHTML = `
-                <div style="text-align: center; padding: 40px;">
-                    <div style="color: #6b7280; font-size: 1.1rem; margin-bottom: 10px;">Loading Work Product Questions...</div>
-                    <div style="color: #9ca3af; font-size: 0.9rem;">Please wait while we retrieve your questions and responses.</div>
-                </div>
-            `;
+        function loadQuestions() {
+            const container = document.getElementById('questionsModalContainer');
+            container.innerHTML = `<div style="text-align: center; padding: 40px;">Loading...</div>`;
+
+            const serverFunction = currentQuestionContext.type === 'WorkProduct'
+                ? 'getWorkProductQuestionsForClient'
+                : 'getStandardObservationQuestionsForClient';
 
             google.script.run
                 .withSuccessHandler(function(result) {
                     if (result.success) {
                         displayQuestions(result.questions);
                     } else {
-                        container.innerHTML = '<div style="text-align: center; padding: 20px; color: #ef4444;">Error loading questions: ' + result.error + '</div>';
+                        container.innerHTML = `<div style="text-align: center; padding: 20px; color: #ef4444;">Error loading questions: ${result.error}</div>`;
                     }
                 })
                 .withFailureHandler(function(error) {
-                    console.error('Failed to load questions:', error);
+                    console.error(`Failed to load ${currentQuestionContext.type} questions:`, error);
                     container.innerHTML = '<div style="text-align: center; padding: 20px; color: #ef4444;">Failed to load questions. Please try again.</div>';
                 })
-                .getWorkProductQuestionsForClient();
+                [serverFunction]();
         }
 
         function displayQuestions(questions) {
-            const container = document.getElementById('questionsContainer');
-
+            const container = document.getElementById('questionsModalContainer');
             if (!questions || questions.length === 0) {
                 container.innerHTML = '<div style="text-align: center; padding: 20px; color: #6b7280;">No questions available.</div>';
                 return;
@@ -3586,9 +3623,13 @@
 
             let html = '';
             questions.forEach(question => {
+                const questionLabel = currentQuestionContext.type === 'Standard'
+                    ? `${question.questionText} (${question.type})`
+                    : question.questionText;
+
                 html += `
                     <div class="work-product-question">
-                        <div class="work-product-question-text">${question.questionText}</div>
+                        <div class="work-product-question-text">${questionLabel}</div>
                         <textarea class="work-product-textarea"
                                   id="answer-${question.questionId}"
                                   placeholder="Loading your response..."
@@ -3598,23 +3639,21 @@
                     </div>
                 `;
             });
-
             container.innerHTML = html;
-
-            // Load existing answers
             loadExistingAnswers();
         }
 
         function loadExistingAnswers() {
-            // Get observation ID from current context
-            getCurrentWorkProductObservationId(function(observationId) {
+            getCurrentObservationId(function(observationId) {
                 if (!observationId) {
-                    // No observation ID - enable textareas and clear loading state
                     enableTextareasAndClearLoadingState();
                     return;
                 }
+                currentQuestionContext.observationId = observationId;
 
-                currentWorkProductObservationId = observationId;
+                const serverFunction = currentQuestionContext.type === 'WorkProduct'
+                    ? 'getWorkProductAnswersForClient'
+                    : 'getStandardObservationAnswersForClient';
 
                 google.script.run
                     .withSuccessHandler(function(result) {
@@ -3626,21 +3665,18 @@
                                 }
                             });
                         }
-                        // Enable textareas and clear loading state
                         enableTextareasAndClearLoadingState();
                     })
                     .withFailureHandler(function(error) {
-                        console.error('Failed to load existing answers:', error);
-                        // Enable textareas and clear loading state even on error
+                        console.error(`Failed to load existing ${currentQuestionContext.type} answers:`, error);
                         enableTextareasAndClearLoadingState();
                     })
-                    .getWorkProductAnswersForClient(observationId);
+                    [serverFunction](observationId);
             });
         }
 
         function enableTextareasAndClearLoadingState() {
-            // Enable all textareas and update placeholders
-            const textareas = document.querySelectorAll('.work-product-textarea');
+            const textareas = document.querySelectorAll('#questionsModalContainer .work-product-textarea');
             textareas.forEach(textarea => {
                 textarea.disabled = false;
                 if (textarea.placeholder === 'Loading your response...') {
@@ -3648,8 +3684,7 @@
                 }
             });
 
-            // Clear loading status messages
-            const statusElements = document.querySelectorAll('.save-status');
+            const statusElements = document.querySelectorAll('#questionsModalContainer .save-status');
             statusElements.forEach(status => {
                 if (status.textContent === 'Loading responses...') {
                     status.textContent = '';
@@ -3658,7 +3693,11 @@
             });
         }
 
-        function getCurrentWorkProductObservationId(callback) {
+        function getCurrentObservationId(callback) {
+            const serverFunction = currentQuestionContext.type === 'WorkProduct'
+                ? 'getCurrentUserWorkProductObservationId'
+                : 'getCurrentUserStandardObservationId';
+
             google.script.run
                 .withSuccessHandler(function(result) {
                     if (result.success && result.observationId) {
@@ -3668,45 +3707,43 @@
                     }
                 })
                 .withFailureHandler(function(error) {
-                    console.error('Failed to get observation ID:', error);
+                    console.error(`Failed to get ${currentQuestionContext.type} observation ID:`, error);
                     callback(null);
                 })
-                .getCurrentUserWorkProductObservationId();
+                [serverFunction]();
         }
 
         function handleAnswerInput(questionId) {
             const textarea = document.getElementById('answer-' + questionId);
             const statusDiv = document.getElementById('status-' + questionId);
 
-            if (!textarea || !currentWorkProductObservationId) return;
+            if (!textarea || !currentQuestionContext.observationId) return;
 
-            // Clear existing timeout
-            if (saveTimeouts[questionId]) {
-                clearTimeout(saveTimeouts[questionId]);
+            if (currentQuestionContext.saveTimeouts[questionId]) {
+                clearTimeout(currentQuestionContext.saveTimeouts[questionId]);
             }
 
-            // Show saving status
             statusDiv.textContent = 'Typing...';
             statusDiv.className = 'save-status saving';
 
-            // Set new timeout for debounced save
-            saveTimeouts[questionId] = setTimeout(() => {
+            currentQuestionContext.saveTimeouts[questionId] = setTimeout(() => {
                 saveAnswer(questionId, textarea.value, statusDiv);
-            }, 1500); // 1.5 second debounce
+            }, 1500);
         }
 
         function saveAnswer(questionId, answerText, statusDiv) {
             statusDiv.textContent = 'Saving...';
             statusDiv.className = 'save-status saving';
 
+            const serverFunction = currentQuestionContext.type === 'WorkProduct'
+                ? 'saveWorkProductAnswerFromClient'
+                : 'saveStandardObservationAnswerFromClient';
+
             google.script.run
                 .withSuccessHandler(function(result) {
                     if (result.success) {
                         statusDiv.textContent = 'Saved';
                         statusDiv.className = 'save-status saved';
-                        setTimeout(() => {
-                            statusDiv.style.opacity = '0.5';
-                        }, 2000);
                     } else {
                         statusDiv.textContent = 'Error saving: ' + result.error;
                         statusDiv.className = 'save-status error';
@@ -3717,9 +3754,8 @@
                     statusDiv.textContent = 'Save failed. Please try again.';
                     statusDiv.className = 'save-status error';
                 })
-                .saveWorkProductAnswerFromClient(currentWorkProductObservationId, questionId, answerText);
+                [serverFunction](currentQuestionContext.observationId, questionId, answerText);
         }
-
     </script>
 
     <!-- Observations Modal -->
@@ -3746,18 +3782,6 @@
         </div>
     </div>
 
-    <!-- Work Product Questions Modal -->
-    <div id="workProductModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;" onclick="closeWorkProductModalOnBackdrop(event)">
-        <div style="position: relative; top: 5%; margin: 0 auto; width: 90%; max-width: 800px; background: white; border-radius: 8px; padding: 0; max-height: 85vh; overflow: hidden; display: flex; flex-direction: column;" onclick="event.stopPropagation()">
-            <div style="padding: 20px; border-bottom: 1px solid #e5e7eb; background: #f9fafb; flex-shrink: 0;">
-                <h2 style="margin: 0; color: #374151;">Work Product Reflection Questions</h2>
-                <p style="margin: 5px 0 0 0; color: #6b7280; font-size: 0.9rem;">Your responses are automatically saved as you type.</p>
-            </div>
-            <div id="questionsContainer" style="padding: 20px; overflow-y: auto; flex: 1; min-height: 0;"></div>
-            <div style="padding: 15px 20px; border-top: 1px solid #e5e7eb; background: #f9fafb; text-align: right; flex-shrink: 0;">
-                <button onclick="closeWorkProductModal()" class="filter-btn">Close</button>
-            </div>
-        </div>
-    </div>
+    <!-- This modal was removed and replaced by the generic #questionsModal -->
 </body>
 </html>
