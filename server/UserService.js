@@ -757,16 +757,25 @@ function createFilteredUserContext(targetEmail, requestingRole) {
         hasAssignedSubdomains: context.assignedSubdomains ? context.assignedSubdomains.length : 0
       });
     } else if (requestingRole === SPECIAL_ROLES.ADMINISTRATOR) {
-      // Administrator observation logic - Administrators always evaluate on full rubric
-      context.viewMode = VIEW_MODES.FULL;
-      context.assignedSubdomains = null;
+      // Administrator observation logic - Populate assignedSubdomains for toggle functionality
+      // while defaulting to full rubric view
+      if (targetUser && targetUser.year === PROBATIONARY_OBSERVATION_YEAR) {
+        context.viewMode = VIEW_MODES.FULL;
+        context.assignedSubdomains = null;
+      } else if (targetUser) {
+        context.viewMode = VIEW_MODES.FULL;
+        context.assignedSubdomains = getAssignedSubdomainsForRoleYear(targetUser.role, targetUser.year);
+      } else {
+        context.viewMode = VIEW_MODES.FULL; // Fallback
+        context.assignedSubdomains = null;
+      }
       context.isObservationMode = true; // Flag for the UI to enable editing
       context.isEvaluator = true; // Explicitly set evaluator status
-      debugLog('Administrator observation mode enabled with full view (evaluates on complete rubric).', {
+      debugLog('Administrator observation mode enabled with full view default (toggle to assigned subdomains available).', {
         targetEmail: targetEmail,
         requestingRole: requestingRole,
         viewMode: context.viewMode,
-        hasAssignedSubdomains: context.assignedSubdomains ? context.assignedSubdomains.length : 0
+        hasAssignedSubdomains: context.assignedSubdomains ? Object.keys(context.assignedSubdomains).reduce((sum, key) => sum + (context.assignedSubdomains[key]?.length || 0), 0) : 0
       });
     } else {
       // Logic for other special roles (Full Access, etc.) - keep original behavior
