@@ -408,11 +408,14 @@ function createNewObservationForEvaluator(observedEmail) {
     if (!newObservation) {
       return { success: false, error: 'Failed to create a new observation record.' };
     }
-    
+
     let assignedSubdomains = null;
-    // Peer Evaluator should use assigned subdomains approach, Administrator should see all subdomains
-    if (userContext.role === SPECIAL_ROLES.PEER_EVALUATOR) {
-        assignedSubdomains = getAssignedSubdomainsForRoleYear(newObservation.observedRole, newObservation.observedYear);
+    // Populate assignedSubdomains for both Peer Evaluator and Administrator to enable toggle functionality
+    // Administrators default to full view but can toggle to assigned subdomains
+    if (userContext.role === SPECIAL_ROLES.PEER_EVALUATOR || userContext.role === SPECIAL_ROLES.ADMINISTRATOR) {
+        if (newObservation.observedYear !== PROBATIONARY_OBSERVATION_YEAR) {
+            assignedSubdomains = getAssignedSubdomainsForRoleYear(newObservation.observedRole, newObservation.observedYear);
+        }
     }
 
     // Administrator evaluates on full rubric, Peer Evaluator uses assigned subdomains
