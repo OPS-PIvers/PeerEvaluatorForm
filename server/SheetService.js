@@ -59,7 +59,7 @@ function openSpreadsheet() {
       _spreadsheet.getId();
     } catch (cacheError) {
       // Spreadsheet is no longer valid; clear cache
-      _spreadsheet = null;
+      _spreadsheet = undefined;
     }
     if (_spreadsheet) {
       return _spreadsheet;
