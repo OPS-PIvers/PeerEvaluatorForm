@@ -1607,6 +1607,258 @@
             }
         }
 
+        /* Media Manager Modal Styles */
+        .media-manager-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(4px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+        }
+
+        .media-manager-container {
+            background: white;
+            width: 90%;
+            max-width: 800px;
+            height: 80%;
+            max-height: 700px;
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .media-manager-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 24px;
+            border-bottom: 2px solid var(--color-gray-border-medium);
+            background: linear-gradient(135deg, var(--color-blue-base), var(--color-blue-dark));
+        }
+
+        .media-manager-header h2 {
+            font-size: 1.5rem;
+            color: white;
+            margin: 0;
+        }
+
+        .media-manager-close-btn {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 8px 16px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .media-manager-close-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .media-manager-content {
+            flex-grow: 1;
+            padding: 24px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .media-section {
+            background: var(--color-gray-bg-light);
+            border-radius: 8px;
+            padding: 20px;
+            border: 1px solid var(--color-gray-border-light);
+        }
+
+        .media-section h3 {
+            font-size: 1.1rem;
+            color: var(--color-gray-text-light);
+            margin: 0 0 16px 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .media-upload-controls {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .media-upload-btn, .media-add-link-btn {
+            background: var(--color-blue-base);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 10px 20px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .media-upload-btn:hover, .media-add-link-btn:hover {
+            background: var(--color-blue-dark);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+        }
+
+        .media-upload-btn:disabled, .media-add-link-btn:disabled {
+            background: var(--color-gray-border-medium);
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .media-doc-link-input {
+            flex: 1;
+            min-width: 200px;
+            padding: 10px 14px;
+            border: 1px solid var(--color-gray-border-medium);
+            border-radius: 6px;
+            font-size: 14px;
+            transition: all 0.2s ease;
+        }
+
+        .media-doc-link-input:focus {
+            outline: none;
+            border-color: var(--color-blue-base);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .media-doc-name-input {
+            padding: 10px 14px;
+            border: 1px solid var(--color-gray-border-medium);
+            border-radius: 6px;
+            font-size: 14px;
+            width: 200px;
+            transition: all 0.2s ease;
+        }
+
+        .media-doc-name-input:focus {
+            outline: none;
+            border-color: var(--color-blue-base);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .media-files-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .media-file-item {
+            background: white;
+            border: 1px solid var(--color-gray-border-light);
+            border-radius: 6px;
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+
+        .media-file-item:hover {
+            border-color: var(--color-blue-base);
+            box-shadow: 0 2px 8px rgba(37, 99, 235, 0.1);
+            transform: translateX(4px);
+        }
+
+        .media-file-icon {
+            font-size: 1.5rem;
+            flex-shrink: 0;
+        }
+
+        .media-file-info {
+            flex-grow: 1;
+            min-width: 0;
+        }
+
+        .media-file-name {
+            font-weight: 500;
+            color: var(--color-blue-base);
+            margin-bottom: 4px;
+            word-break: break-word;
+        }
+
+        .media-file-meta {
+            font-size: 0.85rem;
+            color: var(--color-gray-text-medium);
+        }
+
+        .media-empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--color-gray-text-medium);
+        }
+
+        .media-empty-state-icon {
+            font-size: 3rem;
+            margin-bottom: 12px;
+            opacity: 0.5;
+        }
+
+        .media-loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 40px;
+            color: var(--color-gray-text-medium);
+        }
+
+        .media-status-message {
+            padding: 12px;
+            border-radius: 6px;
+            margin-top: 12px;
+            font-size: 14px;
+        }
+
+        .media-status-message.success {
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #6ee7b7;
+        }
+
+        .media-status-message.error {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fca5a5;
+        }
+
+        @media (max-width: 768px) {
+            .media-manager-container {
+                width: 95%;
+                height: 90%;
+            }
+
+            .media-upload-controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .media-doc-link-input, .media-doc-name-input {
+                width: 100%;
+            }
+        }
+
         /* Professional Welcome Modal Styles */
         .welcome-modal-overlay {
             position: fixed;
@@ -3115,6 +3367,9 @@
                     <div id="videoTimerDisplay" class="timer-display"></div>
                     <button class="global-tool-btn" id="scriptEditorBtn" onclick="openScriptEditor()">
                         📝 Script Editor
+                    </button>
+                    <button class="global-tool-btn" id="mediaManagerBtn" onclick="openMediaManager()">
+                        📁 Upload & View Media
                     </button>
                 </div>
             </div>`;
@@ -6002,6 +6257,226 @@
             isScriptDirty = false;
         }
 
+        /* ==========================================
+         * MEDIA MANAGER FUNCTIONS
+         * ========================================== */
+
+        /**
+         * Opens the media manager modal and loads the file list
+         */
+        function openMediaManager() {
+            if (!currentObservationId) {
+                showToast('Please select an observation first.', false);
+                return;
+            }
+
+            const modal = document.getElementById('mediaManagerModal');
+            modal.style.display = 'flex';
+            document.body.style.overflow = 'hidden'; // Prevent background scrolling
+
+            // Clear previous inputs
+            document.getElementById('docLinkInput').value = '';
+            document.getElementById('docNameInput').value = '';
+            document.getElementById('mediaUploadStatus').textContent = '';
+            document.getElementById('mediaUploadMessage').innerHTML = '';
+            document.getElementById('docLinkMessage').innerHTML = '';
+
+            // Load files
+            refreshMediaList();
+        }
+
+        /**
+         * Closes the media manager modal
+         */
+        function closeMediaManager() {
+            const modal = document.getElementById('mediaManagerModal');
+            modal.style.display = 'none';
+            document.body.style.overflow = ''; // Restore background scrolling
+        }
+
+        /**
+         * Refreshes the file list from the server
+         */
+        function refreshMediaList() {
+            const listContainer = document.getElementById('mediaFilesList');
+            listContainer.innerHTML = `
+                <div class="media-loading">
+                    <div class="loading-spinner"></div>
+                    <span style="margin-left: 12px;">Loading files...</span>
+                </div>
+            `;
+
+            google.script.run
+                .withSuccessHandler(function(files) {
+                    renderMediaFilesList(files);
+                })
+                .withFailureHandler(function(error) {
+                    listContainer.innerHTML = `
+                        <div class="media-empty-state">
+                            <div class="media-empty-state-icon">⚠️</div>
+                            <p>Failed to load files: ${error.message}</p>
+                        </div>
+                    `;
+                })
+                .getObservationFiles(currentObservationId);
+        }
+
+        /**
+         * Renders the file list in the UI
+         * @param {Array} files - Array of file objects from the server
+         */
+        function renderMediaFilesList(files) {
+            const listContainer = document.getElementById('mediaFilesList');
+
+            if (!files || files.length === 0) {
+                listContainer.innerHTML = `
+                    <div class="media-empty-state">
+                        <div class="media-empty-state-icon">📂</div>
+                        <p>No files uploaded yet</p>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '<div class="media-files-list">';
+            files.forEach(file => {
+                const icon = getFileIcon(file.type || file.name);
+                const sizeMB = file.size ? (file.size / (1024 * 1024)).toFixed(2) : '?';
+                const dateStr = file.lastModified ? new Date(file.lastModified).toLocaleDateString() : '';
+
+                html += `
+                    <div class="media-file-item" onclick="window.open('${file.url}', '_blank')">
+                        <div class="media-file-icon">${icon}</div>
+                        <div class="media-file-info">
+                            <div class="media-file-name">${escapeHtml(file.name)}</div>
+                            <div class="media-file-meta">${sizeMB} MB • ${dateStr}</div>
+                        </div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+
+            listContainer.innerHTML = html;
+        }
+
+        /**
+         * Gets an appropriate icon for a file based on its type
+         * @param {string} typeOrName - MIME type or file name
+         * @returns {string} - Emoji icon
+         */
+        function getFileIcon(typeOrName) {
+            const str = typeOrName.toLowerCase();
+            if (str.includes('image') || str.match(/\.(jpg|jpeg|png|gif|bmp)$/)) return '🖼️';
+            if (str.includes('video') || str.match(/\.(mp4|avi|mov|wmv)$/)) return '🎥';
+            if (str.includes('audio') || str.match(/\.(mp3|wav|ogg|m4a)$/)) return '🎵';
+            if (str.includes('pdf') || str.endsWith('.pdf')) return '📕';
+            if (str.includes('text') || str.endsWith('.txt')) return '📄';
+            if (str.includes('sheet') || str.includes('excel') || str.match(/\.(xlsx|xls|csv)$/)) return '📊';
+            if (str.includes('presentation') || str.includes('powerpoint') || str.match(/\.(pptx|ppt)$/)) return '📽️';
+            if (str.includes('document') || str.includes('word') || str.match(/\.(docx|doc)$/)) return '📝';
+            return '📎';
+        }
+
+        /**
+         * Handles file selection from the file input
+         * @param {Event} event - The change event from the file input
+         */
+        function handleMediaFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const statusEl = document.getElementById('mediaUploadStatus');
+            const messageEl = document.getElementById('mediaUploadMessage');
+
+            // Check file size (max 50MB)
+            const maxSize = 50 * 1024 * 1024;
+            if (file.size > maxSize) {
+                messageEl.innerHTML = '<div class="media-status-message error">File is too large. Maximum size is 50MB.</div>';
+                return;
+            }
+
+            statusEl.textContent = 'Uploading...';
+            messageEl.innerHTML = '';
+
+            // Read file as base64
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const base64Data = e.target.result.split(',')[1]; // Remove data:... prefix
+
+                google.script.run
+                    .withSuccessHandler(function(result) {
+                        statusEl.textContent = '';
+                        if (result.success) {
+                            messageEl.innerHTML = '<div class="media-status-message success">✅ File uploaded successfully!</div>';
+                            setTimeout(() => {
+                                messageEl.innerHTML = '';
+                            }, 3000);
+                            // Refresh the file list
+                            refreshMediaList();
+                        } else {
+                            messageEl.innerHTML = `<div class="media-status-message error">❌ Upload failed: ${result.error}</div>`;
+                        }
+                        // Reset file input
+                        event.target.value = '';
+                    })
+                    .withFailureHandler(function(error) {
+                        statusEl.textContent = '';
+                        messageEl.innerHTML = `<div class="media-status-message error">❌ Upload failed: ${error.message}</div>`;
+                        event.target.value = '';
+                    })
+                    .uploadGlobalMediaFile(currentObservationId, base64Data, file.name, file.type);
+            };
+
+            reader.onerror = function() {
+                statusEl.textContent = '';
+                messageEl.innerHTML = '<div class="media-status-message error">❌ Failed to read file.</div>';
+                event.target.value = '';
+            };
+
+            reader.readAsDataURL(file);
+        }
+
+        /**
+         * Handles adding a Google Doc link
+         */
+        function handleAddDocLink() {
+            const linkInput = document.getElementById('docLinkInput');
+            const nameInput = document.getElementById('docNameInput');
+            const messageEl = document.getElementById('docLinkMessage');
+
+            const docUrl = linkInput.value.trim();
+            const docName = nameInput.value.trim() || null;
+
+            if (!docUrl) {
+                messageEl.innerHTML = '<div class="media-status-message error">Please enter a URL.</div>';
+                return;
+            }
+
+            messageEl.innerHTML = '<div class="media-status-message">Adding link...</div>';
+
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    if (result.success) {
+                        messageEl.innerHTML = '<div class="media-status-message success">✅ Link added successfully!</div>';
+                        linkInput.value = '';
+                        nameInput.value = '';
+                        setTimeout(() => {
+                            messageEl.innerHTML = '';
+                        }, 3000);
+                        // Refresh the file list to show the new link file
+                        refreshMediaList();
+                    } else {
+                        messageEl.innerHTML = `<div class="media-status-message error">❌ Failed to add link: ${result.error}</div>`;
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    messageEl.innerHTML = `<div class="media-status-message error">❌ Failed to add link: ${error.message}</div>`;
+                })
+                .addGoogleDocLink(currentObservationId, docUrl, docName);
+        }
+
+        /* ========================================== */
+
         function manualSaveScriptContent() {
             if (!scriptQuill || !currentObservationId || isSavingScript) return;
 
@@ -6670,6 +7145,65 @@
             
             <div class="script-editor-content">
                 <div id="scriptEditor"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Media Manager Modal -->
+    <div class="media-manager-modal" id="mediaManagerModal">
+        <div class="media-manager-container">
+            <div class="media-manager-header">
+                <h2>📁 Upload & View Media</h2>
+                <button class="media-manager-close-btn" onclick="closeMediaManager()">Close</button>
+            </div>
+
+            <div class="media-manager-content">
+                <!-- Upload Section -->
+                <div class="media-section">
+                    <h3>📤 Upload Files</h3>
+                    <div class="media-upload-controls">
+                        <input type="file" id="mediaFileInput" style="display: none;" onchange="handleMediaFileSelect(event)" />
+                        <button class="media-upload-btn" onclick="document.getElementById('mediaFileInput').click()">
+                            📎 Select File to Upload
+                        </button>
+                        <span id="mediaUploadStatus" style="font-size: 0.9rem; color: var(--color-gray-text-medium);"></span>
+                    </div>
+                    <div id="mediaUploadMessage"></div>
+                </div>
+
+                <!-- Google Doc Link Section -->
+                <div class="media-section">
+                    <h3>🔗 Add Google Doc Link</h3>
+                    <div class="media-upload-controls">
+                        <input
+                            type="text"
+                            id="docLinkInput"
+                            class="media-doc-link-input"
+                            placeholder="Paste Google Doc URL here..."
+                        />
+                        <input
+                            type="text"
+                            id="docNameInput"
+                            class="media-doc-name-input"
+                            placeholder="Document name (optional)"
+                        />
+                        <button class="media-add-link-btn" onclick="handleAddDocLink()">
+                            ➕ Add Link
+                        </button>
+                    </div>
+                    <div id="docLinkMessage"></div>
+                </div>
+
+                <!-- Files List Section -->
+                <div class="media-section">
+                    <h3>📄 Observation Files</h3>
+                    <div id="mediaFilesList">
+                        <div class="media-loading">
+                            <div class="loading-spinner"></div>
+                            <span style="margin-left: 12px;">Loading files...</span>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

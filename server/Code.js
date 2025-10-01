@@ -1215,6 +1215,148 @@ function getObservationFiles(observationId) {
     }
 }
 
+/**
+ * Uploads a file to the observation's Drive folder (observation-level, not component-specific).
+ * This is for the global media manager feature.
+ * @param {string} observationId The ID of the observation
+ * @param {string} base64Data The base64 encoded file data
+ * @param {string} fileName The original file name
+ * @param {string} mimeType The MIME type of the file
+ * @returns {Object} A response object with success status and file details
+ */
+function uploadGlobalMediaFile(observationId, base64Data, fileName, mimeType) {
+    try {
+        const userContext = createUserContext();
+
+        // Only peer evaluators and administrators can upload files
+        if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR && userContext.role !== SPECIAL_ROLES.ADMINISTRATOR) {
+            return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
+        }
+
+        if (!observationId || !base64Data || !fileName || !mimeType) {
+            return { success: false, error: 'Missing required parameters for upload.' };
+        }
+
+        const observation = getObservationById(observationId);
+        if (!observation) {
+            return { success: false, error: 'Observation not found.' };
+        }
+
+        // Verify the current user is the observer
+        if (observation.observerEmail !== userContext.email) {
+            return { success: false, error: 'Permission denied. You did not create this observation.' };
+        }
+
+        // Get or create the observation folder
+        const obsFolder = getOrCreateObservationFolder(observationId);
+
+        // Decode base64 and create a blob
+        const blob = Utilities.newBlob(Utilities.base64Decode(base64Data), mimeType, fileName);
+
+        // Create the file in the observation folder
+        const file = obsFolder.createFile(blob);
+        const fileUrl = file.getUrl();
+        const fileId = file.getId();
+
+        debugLog('Global media file uploaded', {
+            observationId,
+            fileName,
+            fileId,
+            uploadedBy: userContext.email
+        });
+
+        return {
+            success: true,
+            fileUrl: fileUrl,
+            fileId: fileId,
+            fileName: fileName,
+            fileType: mimeType,
+            uploadedAt: new Date().toISOString()
+        };
+
+    } catch (error) {
+        console.error('Error in uploadGlobalMediaFile:', error);
+        return { success: false, error: 'Failed to upload file: ' + error.message };
+    }
+}
+
+/**
+ * Adds a Google Doc link by creating a text file with the URL in the observation folder.
+ * This approach requires no schema changes and the link appears in the file list naturally.
+ * @param {string} observationId The ID of the observation
+ * @param {string} docUrl The URL of the Google Doc
+ * @param {string} docName Optional name for the link
+ * @returns {Object} A response object with success status
+ */
+function addGoogleDocLink(observationId, docUrl, docName = null) {
+    try {
+        const userContext = createUserContext();
+
+        // Only peer evaluators and administrators can add links
+        if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR && userContext.role !== SPECIAL_ROLES.ADMINISTRATOR) {
+            return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
+        }
+
+        if (!observationId || !docUrl) {
+            return { success: false, error: 'Observation ID and document URL are required.' };
+        }
+
+        // Validate URL format
+        if (!docUrl.startsWith('http://') && !docUrl.startsWith('https://')) {
+            return { success: false, error: 'Invalid URL format. URL must start with http:// or https://' };
+        }
+
+        const observation = getObservationById(observationId);
+        if (!observation) {
+            return { success: false, error: 'Observation not found.' };
+        }
+
+        // Verify the current user is the observer
+        if (observation.observerEmail !== userContext.email) {
+            return { success: false, error: 'Permission denied. You did not create this observation.' };
+        }
+
+        // Extract document name from URL if not provided
+        if (!docName || docName.trim() === '') {
+            docName = 'Linked Document';
+        }
+
+        // Get or create the observation folder
+        const obsFolder = getOrCreateObservationFolder(observationId);
+
+        // Create a text file containing the URL as a clickable link
+        // This will show up in the file list and be accessible to anyone with folder access
+        const linkContent = `Link to document:\n\n${docUrl}\n\nAdded: ${new Date().toLocaleString()}\nAdded by: ${userContext.email}`;
+        const linkFileName = `📄 ${docName}.txt`;
+
+        const blob = Utilities.newBlob(linkContent, 'text/plain', linkFileName);
+        const file = obsFolder.createFile(blob);
+
+        const fileUrl = file.getUrl();
+        const fileId = file.getId();
+
+        debugLog('Google Doc link added as text file', {
+            observationId,
+            docUrl,
+            docName,
+            fileId,
+            addedBy: userContext.email
+        });
+
+        return {
+            success: true,
+            fileUrl: fileUrl,
+            fileId: fileId,
+            fileName: linkFileName,
+            linkedUrl: docUrl
+        };
+
+    } catch (error) {
+        console.error('Error in addGoogleDocLink:', error);
+        return { success: false, error: 'Failed to add link: ' + error.message };
+    }
+}
+
 
 /**
  * Retrieves the status and PDF URL for a given observation, optimized for polling.
