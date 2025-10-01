@@ -1971,18 +1971,10 @@
     </div>
     <div class="toast-notification" id="toastNotification"></div>
     <script>
-        // Probationary year constants from server
-        const PROB_YEAR_1 = <?= probYear1 ?>;
-        const PROB_YEAR_2 = <?= probYear2 ?>;
-        const PROB_YEAR_3 = <?= probYear3 ?>;
-
-        // DEBUG: Verify constants were passed correctly from server
-        console.log('PROB_YEAR constants initialized:', {
-            PROB_YEAR_1: PROB_YEAR_1,
-            PROB_YEAR_2: PROB_YEAR_2,
-            PROB_YEAR_3: PROB_YEAR_3,
-            types: [typeof PROB_YEAR_1, typeof PROB_YEAR_2, typeof PROB_YEAR_3]
-        });
+        // Probationary year constants from server (parsed as integers to match staff.year type)
+        const PROB_YEAR_1 = parseInt(<?= probYear1 ?>);
+        const PROB_YEAR_2 = parseInt(<?= probYear2 ?>);
+        const PROB_YEAR_3 = parseInt(<?= probYear3 ?>);
 
         /**
          * Professional Welcome Modal Functions
@@ -3913,32 +3905,10 @@
                     );
                     break;
                 case 'probationary':
-                    // DEBUG: Log constants and staff data
-                    console.log('=== PROBATIONARY FILTER DEBUG ===');
-                    console.log('Constants:', {
-                        PROB_YEAR_1: PROB_YEAR_1,
-                        PROB_YEAR_2: PROB_YEAR_2,
-                        PROB_YEAR_3: PROB_YEAR_3,
-                        PROB_YEAR_1_type: typeof PROB_YEAR_1,
-                        PROB_YEAR_2_type: typeof PROB_YEAR_2,
-                        PROB_YEAR_3_type: typeof PROB_YEAR_3
-                    });
-                    console.log('All staff data:', allStaffData.map(s => ({
-                        name: s.name,
-                        year: s.year,
-                        yearType: typeof s.year
-                    })));
-
                     // Probationary = P1, P2, P3 (years 4, 5, 6) plus legacy format
-                    filteredStaff = allStaffData.filter(staff => {
-                        const validYears = [PROB_YEAR_1, PROB_YEAR_2, PROB_YEAR_3, 0, 'Probationary'];
-                        const matches = validYears.includes(staff.year);
-                        console.log(`Staff ${staff.name}: year=${staff.year} (${typeof staff.year}), matches=${matches}`);
-                        return matches;
-                    });
-
-                    console.log('Filtered count:', filteredStaff.length);
-                    console.log('=== END DEBUG ===');
+                    filteredStaff = allStaffData.filter(staff =>
+                        [PROB_YEAR_1, PROB_YEAR_2, PROB_YEAR_3, 0, 'Probationary'].includes(staff.year)
+                    );
                     break;
                 default:
                     filteredStaff = allStaffData;
