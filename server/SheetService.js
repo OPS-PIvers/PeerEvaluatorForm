@@ -3,6 +3,8 @@
  * Data access layer for the Danielson Framework Multi-Role System
  */
 
+let _spreadsheet;
+
 /**
  * Gets the Sheet ID from Script Properties
  * @return {string} The spreadsheet ID
@@ -45,16 +47,19 @@ function getSheetByName(spreadsheet, sheetName) {
  * @throws {Error} If spreadsheet cannot be opened
  */
 function openSpreadsheet() {
+  if (_spreadsheet) {
+    return _spreadsheet;
+  }
   try {
     const sheetId = getSheetId();
-    const spreadsheet = SpreadsheetApp.openById(sheetId);
+    _spreadsheet = SpreadsheetApp.openById(sheetId);
     
     debugLog('Spreadsheet opened successfully', {
-      name: spreadsheet.getName(),
-      sheetCount: spreadsheet.getSheets().length
+      name: _spreadsheet.getName(),
+      sheetCount: _spreadsheet.getSheets().length
     });
     
-    return spreadsheet;
+    return _spreadsheet;
   } catch (error) {
     throw new Error(`Failed to open spreadsheet: ${error.message}`);
   }
