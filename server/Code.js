@@ -354,9 +354,11 @@ function getStaffForAdmin(adminUserContext) {
   }
 
   // Filter by building and summative year
+  // Support multi-building assignments: Staff with "High School, Special Services"
+  // will appear for both High School and Special Services administrators
   const filteredStaff = allStaff.users.filter(user => {
     const isSummative = isSummativeYear(user.summativeYear);
-    const isInSameBuilding = user.building === adminBuilding;
+    const isInSameBuilding = buildingsMatch(user.building, adminBuilding);
     const isNotSelf = user.email !== adminUserContext.email;
 
     return isNotSelf && isInSameBuilding && isSummative;

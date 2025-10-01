@@ -148,6 +148,8 @@ function getStaffData() {
     }
     
     // Read all data - check if building and summative year columns exist for backward compatibility
+    // Column E (BUILDING) supports comma-separated values for multi-building assignments
+    // Example: "High School, Special Services" allows staff to appear in lists for multiple administrators
     const lastColumn = sheet.getLastColumn();
     const hasBuilding = lastColumn >= 5;
     const hasSummative = lastColumn >= 6;

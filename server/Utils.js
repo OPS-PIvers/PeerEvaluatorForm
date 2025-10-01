@@ -902,3 +902,44 @@ function stripHtml(html) {
 function isSummativeYear(value) {
     return value === true || value === 'TRUE';
 }
+
+/**
+ * Parses a building string into an array of individual buildings
+ * Supports both single building (e.g., "High School") and comma-separated buildings (e.g., "High School, Special Services")
+ * @param {string|null|undefined} buildingString - Building value from staff record
+ * @return {Array<string>} Array of trimmed, lowercase building names for matching
+ */
+function parseBuildings(buildingString) {
+  // Handle null, undefined, or empty values
+  if (!buildingString || typeof buildingString !== 'string') {
+    return [];
+  }
+
+  // Split by comma, trim whitespace, convert to lowercase, and filter out empty strings
+  return buildingString
+    .split(',')
+    .map(building => building.trim().toLowerCase())
+    .filter(building => building.length > 0);
+}
+
+/**
+ * Checks if any buildings in the user's building list match any buildings in the admin's building list
+ * @param {string|null|undefined} userBuildingString - User's building value (can be comma-separated)
+ * @param {string|null|undefined} adminBuildingString - Admin's building value (can be comma-separated)
+ * @return {boolean} True if any buildings overlap, false otherwise
+ */
+function buildingsMatch(userBuildingString, adminBuildingString) {
+  // Parse both building strings into arrays
+  const userBuildings = parseBuildings(userBuildingString);
+  const adminBuildings = parseBuildings(adminBuildingString);
+
+  // If either list is empty, no match
+  if (userBuildings.length === 0 || adminBuildings.length === 0) {
+    return false;
+  }
+
+  // Check if any user building matches any admin building
+  return userBuildings.some(userBuilding =>
+    adminBuildings.includes(userBuilding)
+  );
+}
