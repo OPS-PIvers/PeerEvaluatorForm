@@ -3,6 +3,11 @@
  * Data access layer for the Danielson Framework Multi-Role System
  */
 
+/**
+ * Module-level cache for the main spreadsheet object to avoid redundant API calls
+ * within a single script execution.
+ * @type {GoogleAppsScript.Spreadsheet.Spreadsheet|undefined}
+ */
 let _spreadsheet;
 
 /**
@@ -48,7 +53,17 @@ function getSheetByName(spreadsheet, sheetName) {
  */
 function openSpreadsheet() {
   if (_spreadsheet) {
-    return _spreadsheet;
+    // Validate that the cached spreadsheet is still accessible
+    try {
+      // Attempt a lightweight operation to check validity
+      _spreadsheet.getId();
+    } catch (cacheError) {
+      // Spreadsheet is no longer valid; clear cache
+      _spreadsheet = null;
+    }
+    if (_spreadsheet) {
+      return _spreadsheet;
+    }
   }
   try {
     const sheetId = getSheetId();
