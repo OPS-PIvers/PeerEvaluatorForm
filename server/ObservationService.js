@@ -223,18 +223,34 @@ function getObservationsForUser(observedEmail, status = null) {
     userObservations.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
     // Ensure essential fields for the UI are present
-    return userObservations.map(obs => ({
-      observationId: obs.observationId,
-      observedName: obs.observedName,
-      createdAt: obs.createdAt,
-      status: obs.status,
-      type: obs.Type || 'Standard',
-      observationName: obs.observationName || null,
-      observationDate: obs.observationDate || null,
-      pdfUrl: obs.pdfUrl || null,
-      pdfStatus: obs.pdfStatus || null,
-      folderUrl: obs.folderUrl || null
-    }));
+    return userObservations.map(obs => {
+      // Look up the observer's name from the Staff sheet
+      let observerName = 'Unknown';
+      if (obs.observerEmail) {
+        const observer = getUserByEmail(obs.observerEmail);
+        if (observer && observer.name) {
+          observerName = observer.name;
+        } else {
+          // Fallback to email if observer not found in Staff sheet
+          observerName = obs.observerEmail;
+        }
+      }
+
+      return {
+        observationId: obs.observationId,
+        observedName: obs.observedName,
+        createdAt: obs.createdAt,
+        status: obs.status,
+        type: obs.Type || 'Standard',
+        observationName: obs.observationName || null,
+        observationDate: obs.observationDate || null,
+        pdfUrl: obs.pdfUrl || null,
+        pdfStatus: obs.pdfStatus || null,
+        folderUrl: obs.folderUrl || null,
+        observerEmail: obs.observerEmail || null,
+        observerName: observerName
+      };
+    });
   } catch (error) {
     console.error(`Error in getObservationsForUser for ${observedEmail}:`, error);
     return [];

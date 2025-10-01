@@ -484,7 +484,7 @@
 
         .observations-list-header {
             display: grid;
-            grid-template-columns: 2fr 1fr 1fr 1fr 2fr;
+            grid-template-columns: 2fr 1fr 1fr 1fr 1fr 2fr;
             gap: 20px;
             align-items: center;
             padding: 16px 20px;
@@ -497,7 +497,7 @@
 
         .observations-list-item {
             display: grid;
-            grid-template-columns: 2fr 1fr 1fr 1fr 2fr;
+            grid-template-columns: 2fr 1fr 1fr 1fr 1fr 2fr;
             gap: 20px;
             align-items: center;
             padding: 16px 20px;
@@ -525,6 +525,11 @@
         }
 
         .obs-list-type {
+            color: var(--color-gray-text-light);
+            font-size: 0.9rem;
+        }
+
+        .obs-list-creator {
             color: var(--color-gray-text-light);
             font-size: 0.9rem;
         }
@@ -2641,6 +2646,7 @@
                         <div>Title</div>
                         <div>Date</div>
                         <div>Type</div>
+                        <div>Created By</div>
                         <div>Status</div>
                         <div>Actions</div>
                     </div>`;
@@ -2680,11 +2686,15 @@
                         <button class="filter-btn btn-delete" onclick="handleDeleteFinalizedObservation('${safeObsIdJs}', '${safeObservedEmailJs}', '${safeObservedNameJs}')">Delete</button>`;
                 }
 
+                // Get observer name with escaping
+                const safeObserverNameHtml = escapeHtml(obs.observerName || 'Unknown');
+
                 listHtml += `
                     <div class="observations-list-item" data-status="${obs.status.toLowerCase()}">
                         <div class="obs-list-title">${safeTitleHtml}</div>
                         <div class="obs-list-date">${date}</div>
                         <div class="obs-list-type">${safeTypeHtml}</div>
+                        <div class="obs-list-creator">${safeObserverNameHtml}</div>
                         <div class="obs-list-status">
                             <div class="status-badge ${obs.status === 'Draft' ? 'status-draft' : 'status-finalized'}">${safeStatusHtml}</div>
                         </div>
