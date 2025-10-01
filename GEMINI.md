@@ -277,8 +277,10 @@ SPECIAL_ROLES = {
 }
 
 // Observation years
-OBSERVATION_YEARS = [1, 2, 3]
-PROBATIONARY_OBSERVATION_YEAR = 1
+OBSERVATION_YEARS = [1, 2, 3, 4, 5, 6]
+PROB_YEAR_1 = 4  // P1 (Probationary Year 1)
+PROB_YEAR_2 = 5  // P2 (Probationary Year 2)
+PROB_YEAR_3 = 6  // P3 (Probationary Year 3)
 
 // View modes
 VIEW_MODES = {

@@ -17,7 +17,10 @@ const UiService = (function() {
     try {
       const htmlTemplate = HtmlService.createTemplateFromFile(TEMPLATE_PATHS.PEER_EVALUATOR_FILTER);
       htmlTemplate.userContext = userContext;
-      htmlTemplate.userContext.probationaryYearValue = PROBATIONARY_OBSERVATION_YEAR;
+      // Pass probationary year constants to client for proper year classification
+      htmlTemplate.probYear1 = PROB_YEAR_1;
+      htmlTemplate.probYear2 = PROB_YEAR_2;
+      htmlTemplate.probYear3 = PROB_YEAR_3;
       htmlTemplate.availableRoles = AVAILABLE_ROLES;
       htmlTemplate.availableYears = OBSERVATION_YEARS;
       htmlTemplate.requestId = requestId;

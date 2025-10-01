@@ -41,8 +41,11 @@ const STAFF_COLUMNS = {
 const SETTINGS_COLUMNS = {
   ROLE: 0,        // Column A: "Roles"
   YEAR_1: 1,      // Column B: Year 1 Domains
-  YEAR_2: 2,      // Column C: Year 2 Domains  
-  YEAR_3: 3       // Column D: Year 3 Domains
+  YEAR_2: 2,      // Column C: Year 2 Domains
+  YEAR_3: 3,      // Column D: Year 3 Domains
+  PROB_1: 4,      // Column E: Probationary (1) Domains
+  PROB_2: 5,      // Column F: Probationary (2) Domains
+  PROB_3: 6       // Column G: Probationary (3) Domains
 };
 
 /**
@@ -218,19 +221,18 @@ const DOMAIN_TEMPLATE = {
 };
 
 /**
- * String identifier for probationary status
+ * Probationary year constants
+ * P1, P2, P3 are represented as 4, 5, 6 internally for distinct subdomain assignments
  */
-const PROBATIONARY_STATUS_STRING = 'probationary';
-
-/**
- * Numeric representation for probationary observation year
- */
-const PROBATIONARY_OBSERVATION_YEAR = 0;
+const PROB_YEAR_1 = 4;
+const PROB_YEAR_2 = 5;
+const PROB_YEAR_3 = 6;
 
 /**
  * Default years for observation cycle
+ * Years 1-3 are standard, years 4-6 are probationary years P1-P3
  */
-const OBSERVATION_YEARS = [1, 2, 3, PROBATIONARY_OBSERVATION_YEAR];
+const OBSERVATION_YEARS = [1, 2, 3, PROB_YEAR_1, PROB_YEAR_2, PROB_YEAR_3];
 
 /**
  * Special access roles that can filter and view other users' data

@@ -424,23 +424,20 @@ function createUserContext(email = null) {
     context.isEvaluator = (context.role === SPECIAL_ROLES.PEER_EVALUATOR);
 
     // Set assignedSubdomains and viewMode based on year
-    if (context.year === PROBATIONARY_OBSERVATION_YEAR) {
-      context.assignedSubdomains = null;
-      context.viewMode = VIEW_MODES.FULL;
-      debugLog('Probationary user context: full view, no assigned subdomains', { role: context.role, year: context.year });
-    } else {
-      // For non-probationary users, get their assigned subdomains
-      context.assignedSubdomains = getAssignedSubdomainsForRoleYear(context.role, context.year);
-      // Set view mode: ASSIGNED for regular users, FULL for special access (unless overridden by specific filters later)
-      context.viewMode = context.hasSpecialAccess ? VIEW_MODES.FULL : VIEW_MODES.ASSIGNED;
-      debugLog('Non-probationary user context: viewMode set', {
-        role: context.role,
-        year: context.year,
-        viewMode: context.viewMode,
-        hasSpecialAccess: context.hasSpecialAccess,
-        subdomains: context.assignedSubdomains
-      });
-    }
+    // ALL users now have assigned subdomains, including probationary years (P1, P2, P3)
+    context.assignedSubdomains = getAssignedSubdomainsForRoleYear(context.role, context.year);
+
+    // Set view mode: ASSIGNED for regular users, FULL for special access (unless overridden by specific filters later)
+    context.viewMode = context.hasSpecialAccess ? VIEW_MODES.FULL : VIEW_MODES.ASSIGNED;
+
+    debugLog('User context subdomain assignment complete', {
+      role: context.role,
+      year: context.year,
+      viewMode: context.viewMode,
+      hasSpecialAccess: context.hasSpecialAccess,
+      isProbationary: [PROB_YEAR_1, PROB_YEAR_2, PROB_YEAR_3].includes(context.year),
+      hasAssignedSubdomains: !!context.assignedSubdomains
+    });
 
     // Detect state changes
     const changeDetection = detectUserStateChanges(userEmail, {
@@ -738,10 +735,8 @@ function createFilteredUserContext(targetEmail, requestingRole) {
     // If the requesting user is a Peer Evaluator, enable editable observation mode
     if (requestingRole === SPECIAL_ROLES.PEER_EVALUATOR) {
       // Default to assigned view for better performance and UX - evaluators can toggle to full view if needed
-      if (targetUser && targetUser.year === PROBATIONARY_OBSERVATION_YEAR) {
-        context.viewMode = VIEW_MODES.FULL;
-        context.assignedSubdomains = null;
-      } else if (targetUser) {
+      // All users (including probationary) now have assigned subdomains
+      if (targetUser) {
         context.viewMode = VIEW_MODES.ASSIGNED;
         context.assignedSubdomains = getAssignedSubdomainsForRoleYear(targetUser.role, targetUser.year);
       } else {
@@ -754,15 +749,14 @@ function createFilteredUserContext(targetEmail, requestingRole) {
         targetEmail: targetEmail,
         requestingRole: requestingRole,
         viewMode: context.viewMode,
-        hasAssignedSubdomains: context.assignedSubdomains ? context.assignedSubdomains.length : 0
+        targetYear: targetUser ? targetUser.year : 'N/A',
+        isProbationary: targetUser ? [PROB_YEAR_1, PROB_YEAR_2, PROB_YEAR_3].includes(targetUser.year) : false,
+        hasAssignedSubdomains: context.assignedSubdomains ? Object.keys(context.assignedSubdomains).reduce((sum, key) => sum + (context.assignedSubdomains[key]?.length || 0), 0) : 0
       });
     } else if (requestingRole === SPECIAL_ROLES.ADMINISTRATOR) {
       // Administrator observation logic - Populate assignedSubdomains for toggle functionality
       // while defaulting to full rubric view
-      if (targetUser && targetUser.year === PROBATIONARY_OBSERVATION_YEAR) {
-        context.viewMode = VIEW_MODES.FULL;
-        context.assignedSubdomains = null;
-      } else if (targetUser) {
+      if (targetUser) {
         context.viewMode = VIEW_MODES.FULL;
         context.assignedSubdomains = getAssignedSubdomainsForRoleYear(targetUser.role, targetUser.year);
       } else {
@@ -775,25 +769,27 @@ function createFilteredUserContext(targetEmail, requestingRole) {
         targetEmail: targetEmail,
         requestingRole: requestingRole,
         viewMode: context.viewMode,
+        targetYear: targetUser ? targetUser.year : 'N/A',
+        isProbationary: targetUser ? [PROB_YEAR_1, PROB_YEAR_2, PROB_YEAR_3].includes(targetUser.year) : false,
         hasAssignedSubdomains: context.assignedSubdomains ? Object.keys(context.assignedSubdomains).reduce((sum, key) => sum + (context.assignedSubdomains[key]?.length || 0), 0) : 0
       });
     } else {
-      // Logic for other special roles (Full Access, etc.) - keep original behavior
-      let assignedSubdomainsResult = null;
-      let viewModeResult = VIEW_MODES.FULL; // Default to full view
-
-      if (targetUser && targetUser.year === PROBATIONARY_OBSERVATION_YEAR) {
-        assignedSubdomainsResult = null;
-        viewModeResult = VIEW_MODES.FULL;
-        debugLog('Filtered context for Probationary user: full view', { targetEmail: targetEmail, requestingRole: requestingRole });
-      } else if (targetUser) {
-        assignedSubdomainsResult = getAssignedSubdomainsForRoleYear(targetUser.role, targetUser.year);
-        viewModeResult = VIEW_MODES.ASSIGNED;
-        debugLog('Filtered context for Non-Probationary user: assigned view', { targetEmail: targetEmail, requestingRole: requestingRole });
+      // Logic for other special roles (Full Access, etc.)
+      // All users now have assigned subdomains
+      if (targetUser) {
+        context.assignedSubdomains = getAssignedSubdomainsForRoleYear(targetUser.role, targetUser.year);
+        context.viewMode = VIEW_MODES.ASSIGNED;
+        debugLog('Filtered context created with assigned subdomains', {
+          targetEmail: targetEmail,
+          requestingRole: requestingRole,
+          targetYear: targetUser.year,
+          isProbationary: [PROB_YEAR_1, PROB_YEAR_2, PROB_YEAR_3].includes(targetUser.year)
+        });
+      } else {
+        context.assignedSubdomains = null;
+        context.viewMode = VIEW_MODES.FULL;
       }
-      context.assignedSubdomains = assignedSubdomainsResult;
-      context.viewMode = viewModeResult;
-      
+
       // Set isEvaluator based on whether this is for observation creation/editing
       if (requestingRole === SPECIAL_ROLES.FULL_ACCESS) {
         context.isEvaluator = true; // Enable editing capabilities for Full Access role

@@ -373,19 +373,34 @@ function parseYearValue(yearValue) {
     return null;
   }
 
-  // Check for probationary variations (case-insensitive)
+  // Check for probationary year variations (case-insensitive)
   const lowerYearString = yearString.toLowerCase();
-  if (lowerYearString === 'probationary' || 
-      lowerYearString === 'prob' || 
-      lowerYearString === 'p' ||
-      lowerYearString === '0') {
-    return PROBATIONARY_OBSERVATION_YEAR; // This should be 0 based on Constants.js
+
+  // Check for P1/P2/P3 formats
+  if (lowerYearString === 'p1' || lowerYearString === 'probationary 1' ||
+      lowerYearString === 'probationary (1)' || lowerYearString === 'prob 1') {
+    return PROB_YEAR_1; // 4
+  }
+  if (lowerYearString === 'p2' || lowerYearString === 'probationary 2' ||
+      lowerYearString === 'probationary (2)' || lowerYearString === 'prob 2') {
+    return PROB_YEAR_2; // 5
+  }
+  if (lowerYearString === 'p3' || lowerYearString === 'probationary 3' ||
+      lowerYearString === 'probationary (3)' || lowerYearString === 'prob 3') {
+    return PROB_YEAR_3; // 6
+  }
+
+  // Backward compatibility: map old "Probationary" to P1 as default
+  if (lowerYearString === 'probationary' || lowerYearString === 'prob' ||
+      lowerYearString === 'p' || lowerYearString === '0') {
+    console.warn('Legacy probationary format detected, mapping to P1. Please update to P1, P2, or P3.');
+    return PROB_YEAR_1; // Default to P1 for backward compatibility
   }
 
   // Try to parse as number
   const numericYear = parseInt(yearString);
   if (!isNaN(numericYear)) {
-    // Valid numeric years are 1, 2, 3, or 0 (probationary)
+    // Valid numeric years are 1, 2, 3, 4, 5, 6
     if (OBSERVATION_YEARS.includes(numericYear)) {
       return numericYear;
     }
@@ -405,21 +420,32 @@ function parseYearValue(yearValue) {
 }
 
 /**
- * Format year value for display purposes, handling the special case of Probationary (0)
+ * Format year value for display purposes, handling probationary years P1/P2/P3
  * @param {number|string|null|undefined} year - Year value to format
  * @return {string} Formatted year display text
  */
 function formatYearDisplay(year) {
-  // Handle Probationary year (0 or 'Probationary')
-  if (year === 0 || year === 'Probationary') {
-    return 'Probationary';
+  // Handle probationary years P1, P2, P3
+  if (year === PROB_YEAR_1 || year === 4) {
+    return 'P1';
   }
-  
+  if (year === PROB_YEAR_2 || year === 5) {
+    return 'P2';
+  }
+  if (year === PROB_YEAR_3 || year === 6) {
+    return 'P3';
+  }
+
+  // Backward compatibility: handle legacy probationary format
+  if (year === 0 || year === 'Probationary') {
+    return 'P1 (Legacy)';
+  }
+
   // Handle null, undefined, or empty values
   if (year === null || year === undefined || year === '') {
     return 'N/A';
   }
-  
+
   // Return the year as-is for valid numeric years (1, 2, 3)
   return year.toString();
 }
@@ -660,8 +686,27 @@ function getAssignedSubdomainsForRoleYear(role, year) {
       return { domain1: [], domain2: [], domain3: [], domain4: [] };
     }
 
-    // Probationary users see all subdomains (Year 1 content)
-    const yearKey = year === 'Probationary' ? 'year1' : `year${year}`;
+    // Determine the year key based on the year value
+    let yearKey;
+    if (year === PROB_YEAR_1 || year === 4) {
+      yearKey = 'prob1';
+    } else if (year === PROB_YEAR_2 || year === 5) {
+      yearKey = 'prob2';
+    } else if (year === PROB_YEAR_3 || year === 6) {
+      yearKey = 'prob3';
+    } else if (year === 1 || year === 2 || year === 3) {
+      yearKey = `year${year}`;
+    } else {
+      // Backward compatibility: handle legacy 'Probationary' or 0
+      if (year === 'Probationary' || year === 0) {
+        console.warn('Legacy probationary year format detected, using prob1');
+        yearKey = 'prob1';
+      } else {
+        debugLog('Invalid year value', { role: role, year: year });
+        return { domain1: [], domain2: [], domain3: [], domain4: [] };
+      }
+    }
+
     const yearData = roleMapping[yearKey];
 
     if (!yearData || !Array.isArray(yearData) || yearData.length < 4) {

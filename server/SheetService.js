@@ -288,7 +288,8 @@ function getSettingsData() {
     }
     
     // Read all data (assuming row 1 has headers)
-    const range = sheet.getRange(2, 1, lastRow - 1, 4); // Rows 2 to end, columns A-D
+    // Updated to read columns A-G (7 columns) to include Probationary years P1, P2, P3
+    const range = sheet.getRange(2, 1, lastRow - 1, 7); // Rows 2 to end, columns A-G
     const values = range.getValues();
     
     // Check if data has changed
@@ -355,13 +356,34 @@ function getSettingsData() {
           sanitizeText(values[i+2][SETTINGS_COLUMNS.YEAR_3]),  // Domain 3, Year 3
           sanitizeText(values[i+3][SETTINGS_COLUMNS.YEAR_3])   // Domain 4, Year 3
         ],
+        prob1: [
+          sanitizeText(values[i][SETTINGS_COLUMNS.PROB_1]),    // Domain 1, Probationary Year 1
+          sanitizeText(values[i+1][SETTINGS_COLUMNS.PROB_1]),  // Domain 2, Probationary Year 1
+          sanitizeText(values[i+2][SETTINGS_COLUMNS.PROB_1]),  // Domain 3, Probationary Year 1
+          sanitizeText(values[i+3][SETTINGS_COLUMNS.PROB_1])   // Domain 4, Probationary Year 1
+        ],
+        prob2: [
+          sanitizeText(values[i][SETTINGS_COLUMNS.PROB_2]),    // Domain 1, Probationary Year 2
+          sanitizeText(values[i+1][SETTINGS_COLUMNS.PROB_2]),  // Domain 2, Probationary Year 2
+          sanitizeText(values[i+2][SETTINGS_COLUMNS.PROB_2]),  // Domain 3, Probationary Year 2
+          sanitizeText(values[i+3][SETTINGS_COLUMNS.PROB_2])   // Domain 4, Probationary Year 2
+        ],
+        prob3: [
+          sanitizeText(values[i][SETTINGS_COLUMNS.PROB_3]),    // Domain 1, Probationary Year 3
+          sanitizeText(values[i+1][SETTINGS_COLUMNS.PROB_3]),  // Domain 2, Probationary Year 3
+          sanitizeText(values[i+2][SETTINGS_COLUMNS.PROB_3]),  // Domain 3, Probationary Year 3
+          sanitizeText(values[i+3][SETTINGS_COLUMNS.PROB_3])   // Domain 4, Probationary Year 3
+        ],
         startRow: i + 2 // For debugging, refers to the 1-based sheet row number for the roleName
       };
       
       debugLog(`Settings loaded for role: ${roleName}`, {
         year1Domains: roleYearMappings[roleName].year1,
         year2Domains: roleYearMappings[roleName].year2,
-        year3Domains: roleYearMappings[roleName].year3
+        year3Domains: roleYearMappings[roleName].year3,
+        prob1Domains: roleYearMappings[roleName].prob1,
+        prob2Domains: roleYearMappings[roleName].prob2,
+        prob3Domains: roleYearMappings[roleName].prob3
       });
       // Advance the index by 3 to account for the 3 additional rows just processed for the current role.
       // The loop's i++ will then move to the next row, effectively skipping the 4 processed data rows.

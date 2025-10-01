@@ -412,10 +412,9 @@ function createNewObservationForEvaluator(observedEmail) {
     let assignedSubdomains = null;
     // Populate assignedSubdomains for both Peer Evaluator and Administrator to enable toggle functionality
     // Administrators default to full view but can toggle to assigned subdomains
+    // ALL years (including probationary P1, P2, P3) now have assigned subdomains
     if (userContext.role === SPECIAL_ROLES.PEER_EVALUATOR || userContext.role === SPECIAL_ROLES.ADMINISTRATOR) {
-        if (newObservation.observedYear !== PROBATIONARY_OBSERVATION_YEAR) {
-            assignedSubdomains = getAssignedSubdomainsForRoleYear(newObservation.observedRole, newObservation.observedYear);
-        }
+        assignedSubdomains = getAssignedSubdomainsForRoleYear(newObservation.observedRole, newObservation.observedYear);
     }
 
     // Administrator evaluates on full rubric, Peer Evaluator uses assigned subdomains
@@ -1697,7 +1696,10 @@ function getFilteredStaffList(filterType = 'all', role = null, year = null) {
     // Apply type-based filtering
     switch (filterType) {
       case 'probationary':
-        filteredUsers = filteredUsers.filter(user => user.year === PROBATIONARY_OBSERVATION_YEAR);
+        // Filter for all probationary years: P1, P2, P3
+        filteredUsers = filteredUsers.filter(user =>
+          [PROB_YEAR_1, PROB_YEAR_2, PROB_YEAR_3].includes(user.year)
+        );
         break;
 
       case 'by_role':
