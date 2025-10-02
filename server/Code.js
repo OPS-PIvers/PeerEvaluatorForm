@@ -1328,13 +1328,20 @@ function deleteObservationFile(observationId, fileName) {
                 if (files.hasNext()) {
                     const file = files.next();
                     fileUrl = file.getUrl();
+                    const fileId = file.getId();
+                    const mimeType = file.getMimeType();
+                    const isShortcut = mimeType === 'application/vnd.google-apps.shortcut';
+
+                    // Delete the file (works for both shortcuts and actual files)
                     file.setTrashed(true);
                     fileDeleted = true;
 
                     debugLog('File moved to trash', {
                         observationId,
                         fileName,
-                        fileId: file.getId(),
+                        fileId: fileId,
+                        isShortcut: isShortcut,
+                        mimeType: mimeType,
                         deletedBy: userContext.email
                     });
                     break;
@@ -1401,11 +1408,11 @@ function deleteObservationFile(observationId, fileName) {
 }
 
 /**
- * Adds a Google Doc link by creating a text file with the URL in the observation folder.
- * This approach requires no schema changes and the link appears in the file list naturally.
+ * Adds a Google Doc/Sheet/Slide by moving the file or creating a shortcut in the observation folder.
+ * If the current user owns the file, it will be moved. Otherwise, a shortcut is created.
  * @param {string} observationId The ID of the observation
- * @param {string} docUrl The URL of the Google Doc
- * @param {string} docName Optional name for the link
+ * @param {string} docUrl The URL of the Google Doc/Sheet/Slide
+ * @param {string} docName Optional name (deprecated, kept for backward compatibility)
  * @returns {Object} A response object with success status
  */
 function addGoogleDocLink(observationId, docUrl, docName = null) {
@@ -1436,44 +1443,121 @@ function addGoogleDocLink(observationId, docUrl, docName = null) {
             return { success: false, error: 'Permission denied. You did not create this observation.' };
         }
 
-        // Extract document name from URL if not provided
-        if (!docName || docName.trim() === '') {
-            docName = 'Linked Document';
+        // Extract file ID from Google Docs/Sheets/Slides URL
+        const fileId = extractGoogleFileId(docUrl);
+        if (!fileId) {
+            return { success: false, error: 'Invalid Google Docs/Sheets/Slides URL. Could not extract file ID.' };
+        }
+
+        // Try to access the file
+        let file;
+        try {
+            file = DriveApp.getFileById(fileId);
+        } catch (error) {
+            return { success: false, error: 'Could not access the file. Please check the URL and ensure you have permission to access the document.' };
         }
 
         // Get or create the observation folder
         const obsFolder = getOrCreateObservationFolder(observationId);
 
-        // Create a text file containing the URL as a clickable link
-        // This will show up in the file list and be accessible to anyone with folder access
-        const linkContent = `Link to document:\n\n${docUrl}\n\nAdded: ${new Date().toLocaleString()}\nAdded by: ${userContext.email}`;
-        const linkFileName = `📄 ${docName}.txt`;
+        // Check if the current user is the owner of the file
+        let isOwner = false;
+        try {
+            const owner = file.getOwner();
+            isOwner = owner && owner.getEmail() === userContext.email;
+        } catch (error) {
+            // If we can't get owner info, assume not owner
+            console.warn('Could not determine file ownership:', error);
+        }
 
-        const blob = Utilities.newBlob(linkContent, 'text/plain', linkFileName);
-        const file = obsFolder.createFile(blob);
+        let resultFile;
+        let actionTaken;
 
-        const fileUrl = file.getUrl();
-        const fileId = file.getId();
+        if (isOwner) {
+            // User owns the file - move it to the observation folder
+            try {
+                // Remove from all current parents and add to observation folder
+                const parents = file.getParents();
+                while (parents.hasNext()) {
+                    const parent = parents.next();
+                    parent.removeFile(file);
+                }
+                obsFolder.addFile(file);
+                resultFile = file;
+                actionTaken = 'moved';
 
-        debugLog('Google Doc link added as text file', {
-            observationId,
-            docUrl,
-            docName,
-            fileId,
-            addedBy: userContext.email
-        });
+                debugLog('Google Doc file moved to observation folder', {
+                    observationId,
+                    fileId: fileId,
+                    fileName: file.getName(),
+                    movedBy: userContext.email
+                });
+            } catch (error) {
+                return { success: false, error: 'Failed to move the file: ' + error.message };
+            }
+        } else {
+            // User does not own the file - create a shortcut
+            try {
+                resultFile = obsFolder.createShortcut(fileId);
+                actionTaken = 'shortcut_created';
+
+                debugLog('Shortcut to Google Doc created in observation folder', {
+                    observationId,
+                    fileId: fileId,
+                    shortcutId: resultFile.getId(),
+                    fileName: file.getName(),
+                    createdBy: userContext.email
+                });
+            } catch (error) {
+                return { success: false, error: 'Failed to create shortcut: ' + error.message };
+            }
+        }
 
         return {
             success: true,
-            fileUrl: fileUrl,
-            fileId: fileId,
-            fileName: linkFileName,
-            linkedUrl: docUrl
+            fileUrl: resultFile.getUrl(),
+            fileId: resultFile.getId(),
+            fileName: resultFile.getName(),
+            linkedUrl: docUrl,
+            actionTaken: actionTaken,
+            isOwner: isOwner
         };
 
     } catch (error) {
         console.error('Error in addGoogleDocLink:', error);
         return { success: false, error: 'Failed to add link: ' + error.message };
+    }
+}
+
+/**
+ * Extracts the file ID from a Google Docs/Sheets/Slides URL.
+ * Supports various URL formats:
+ * - https://docs.google.com/document/d/{FILE_ID}/edit
+ * - https://docs.google.com/spreadsheets/d/{FILE_ID}/edit
+ * - https://docs.google.com/presentation/d/{FILE_ID}/edit
+ * @param {string} url The Google Docs URL
+ * @returns {string|null} The file ID or null if not found
+ * @private
+ */
+function extractGoogleFileId(url) {
+    try {
+        // Pattern to match Google Docs/Sheets/Slides URLs
+        const patterns = [
+            /\/d\/([a-zA-Z0-9_-]+)/,  // Match /d/{FILE_ID}
+            /id=([a-zA-Z0-9_-]+)/,     // Match id={FILE_ID}
+        ];
+
+        for (const pattern of patterns) {
+            const match = url.match(pattern);
+            if (match && match[1]) {
+                return match[1];
+            }
+        }
+
+        return null;
+    } catch (error) {
+        console.error('Error extracting file ID from URL:', error);
+        return null;
     }
 }
 

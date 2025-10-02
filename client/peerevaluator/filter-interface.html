@@ -1741,20 +1741,6 @@
             box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
         }
 
-        .media-doc-name-input {
-            padding: 10px 14px;
-            border: 1px solid var(--color-gray-border-medium);
-            border-radius: 6px;
-            font-size: 14px;
-            width: 200px;
-            transition: all 0.2s ease;
-        }
-
-        .media-doc-name-input:focus {
-            outline: none;
-            border-color: var(--color-blue-base);
-            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-        }
 
         .media-files-list {
             display: flex;
@@ -1884,7 +1870,7 @@
                 align-items: stretch;
             }
 
-            .media-doc-link-input, .media-doc-name-input {
+            .media-doc-link-input {
                 width: 100%;
             }
         }
@@ -6306,7 +6292,6 @@
 
             // Clear previous inputs
             document.getElementById('docLinkInput').value = '';
-            document.getElementById('docNameInput').value = '';
             document.getElementById('mediaUploadStatus').textContent = '';
             document.getElementById('mediaUploadMessage').innerHTML = '';
             document.getElementById('docLinkMessage').innerHTML = '';
@@ -6477,38 +6462,36 @@
          */
         function handleAddDocLink() {
             const linkInput = document.getElementById('docLinkInput');
-            const nameInput = document.getElementById('docNameInput');
             const messageEl = document.getElementById('docLinkMessage');
 
             const docUrl = linkInput.value.trim();
-            const docName = nameInput.value.trim() || null;
 
             if (!docUrl) {
                 messageEl.innerHTML = '<div class="media-status-message error">Please enter a URL.</div>';
                 return;
             }
 
-            messageEl.innerHTML = '<div class="media-status-message">Adding link...</div>';
+            messageEl.innerHTML = '<div class="media-status-message">Adding document...</div>';
 
             google.script.run
                 .withSuccessHandler(function(result) {
                     if (result.success) {
-                        messageEl.innerHTML = '<div class="media-status-message success">✅ Link added successfully!</div>';
+                        const actionText = result.isOwner ? 'moved' : 'shortcut created';
+                        messageEl.innerHTML = `<div class="media-status-message success">✅ Document ${actionText} successfully!</div>`;
                         linkInput.value = '';
-                        nameInput.value = '';
                         setTimeout(() => {
                             messageEl.innerHTML = '';
                         }, 3000);
-                        // Refresh the file list to show the new link file
+                        // Refresh the file list to show the new document/shortcut
                         refreshMediaList();
                     } else {
-                        messageEl.innerHTML = `<div class="media-status-message error">❌ Failed to add link: ${result.error}</div>`;
+                        messageEl.innerHTML = `<div class="media-status-message error">❌ Failed to add document: ${result.error}</div>`;
                     }
                 })
                 .withFailureHandler(function(error) {
-                    messageEl.innerHTML = `<div class="media-status-message error">❌ Failed to add link: ${error.message}</div>`;
+                    messageEl.innerHTML = `<div class="media-status-message error">❌ Failed to add document: ${error.message}</div>`;
                 })
-                .addGoogleDocLink(currentObservationId, docUrl, docName);
+                .addGoogleDocLink(currentObservationId, docUrl);
         }
 
         /**
@@ -7257,13 +7240,7 @@
                             type="text"
                             id="docLinkInput"
                             class="media-doc-link-input"
-                            placeholder="Paste Google Doc URL here..."
-                        />
-                        <input
-                            type="text"
-                            id="docNameInput"
-                            class="media-doc-name-input"
-                            placeholder="Document name (optional)"
+                            placeholder="Paste Google Doc/Sheet/Slide URL here..."
                         />
                         <button class="media-add-link-btn" onclick="handleAddDocLink()">
                             ➕ Add Link
