@@ -1773,13 +1773,43 @@
             align-items: center;
             gap: 12px;
             transition: all 0.2s ease;
-            cursor: pointer;
         }
 
-        .media-file-item:hover {
-            border-color: var(--color-blue-base);
-            box-shadow: 0 2px 8px rgba(37, 99, 235, 0.1);
-            transform: translateX(4px);
+        .media-file-clickable {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-grow: 1;
+            cursor: pointer;
+            min-width: 0;
+        }
+
+        .media-file-clickable:hover .media-file-name {
+            text-decoration: underline;
+        }
+
+        .media-file-delete-btn {
+            background: transparent;
+            border: none;
+            color: #dc2626;
+            font-size: 1.5rem;
+            line-height: 1;
+            padding: 4px 8px;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.2s ease;
+            flex-shrink: 0;
+            opacity: 0.7;
+        }
+
+        .media-file-delete-btn:hover {
+            background: #fee2e2;
+            opacity: 1;
+            transform: scale(1.1);
+        }
+
+        .media-file-delete-btn:active {
+            transform: scale(0.95);
         }
 
         .media-file-icon {
@@ -6343,14 +6373,20 @@
                 const icon = getFileIcon(file.type || file.name);
                 const sizeMB = file.size ? (file.size / (1024 * 1024)).toFixed(2) : '?';
                 const dateStr = file.lastModified ? new Date(file.lastModified).toLocaleDateString() : '';
+                const escapedFileName = escapeHtml(file.name);
 
                 html += `
-                    <div class="media-file-item" onclick="window.open('${file.url}', '_blank')">
-                        <div class="media-file-icon">${icon}</div>
-                        <div class="media-file-info">
-                            <div class="media-file-name">${escapeHtml(file.name)}</div>
-                            <div class="media-file-meta">${sizeMB} MB • ${dateStr}</div>
+                    <div class="media-file-item">
+                        <div class="media-file-clickable" onclick="window.open('${file.url}', '_blank')">
+                            <div class="media-file-icon">${icon}</div>
+                            <div class="media-file-info">
+                                <div class="media-file-name">${escapedFileName}</div>
+                                <div class="media-file-meta">${sizeMB} MB • ${dateStr}</div>
+                            </div>
                         </div>
+                        <button class="media-file-delete-btn" onclick="handleDeleteFile('${escapedFileName.replace(/'/g, "\\'")}', event)" title="Delete file">
+                            ✕
+                        </button>
                     </div>
                 `;
             });
@@ -6473,6 +6509,48 @@
                     messageEl.innerHTML = `<div class="media-status-message error">❌ Failed to add link: ${error.message}</div>`;
                 })
                 .addGoogleDocLink(currentObservationId, docUrl, docName);
+        }
+
+        /**
+         * Handles file deletion with confirmation
+         * @param {string} fileName - The name of the file to delete
+         * @param {Event} event - The click event
+         */
+        function handleDeleteFile(fileName, event) {
+            // Prevent triggering the file item click
+            if (event) {
+                event.stopPropagation();
+            }
+
+            // Show confirmation dialog
+            const confirmed = confirm(`Are you sure you want to delete "${fileName}"?\n\nThis action cannot be undone.`);
+
+            if (!confirmed) {
+                return;
+            }
+
+            if (!currentObservationId) {
+                showToast('No observation selected.', false);
+                return;
+            }
+
+            // Show loading state
+            showToast('Deleting file...', false);
+
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    if (result.success) {
+                        showToast(`✅ File "${result.fileName}" deleted successfully.`, true);
+                        // Refresh the file list to reflect the deletion
+                        refreshMediaList();
+                    } else {
+                        showToast(`❌ Failed to delete file: ${result.error}`, false);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    showToast(`❌ Failed to delete file: ${error.message}`, false);
+                })
+                .deleteObservationFile(currentObservationId, fileName);
         }
 
         /* ========================================== */

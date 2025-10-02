@@ -1281,6 +1281,126 @@ function uploadGlobalMediaFile(observationId, base64Data, fileName, mimeType) {
 }
 
 /**
+ * Deletes a file from an observation's Drive folder and removes it from evidenceLinks if present.
+ * @param {string} observationId The ID of the observation
+ * @param {string} fileName The name of the file to delete
+ * @returns {Object} A response object with success status
+ */
+function deleteObservationFile(observationId, fileName) {
+    try {
+        const userContext = createUserContext();
+
+        // Only peer evaluators and administrators can delete files
+        if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR && userContext.role !== SPECIAL_ROLES.ADMINISTRATOR) {
+            return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
+        }
+
+        if (!observationId || !fileName) {
+            return { success: false, error: 'Observation ID and file name are required.' };
+        }
+
+        const observation = getObservationById(observationId);
+        if (!observation) {
+            return { success: false, error: 'Observation not found.' };
+        }
+
+        // Verify the current user is the observer
+        if (observation.observerEmail !== userContext.email) {
+            return { success: false, error: 'Permission denied. You did not create this observation.' };
+        }
+
+        // Get the observation folder from Drive
+        const folderName = `Observation - ${observationId}`;
+        const userFolderName = observation.observedName || 'Unknown User';
+
+        let fileDeleted = false;
+        let fileUrl = null;
+
+        // Search for the folder and file in Drive
+        const folders = DriveApp.searchFolders(`title contains "${userFolderName}"`);
+        while (folders.hasNext()) {
+            const userFolder = folders.next();
+            const obsFolders = userFolder.searchFolders(`title contains "${folderName}"`);
+            if (obsFolders.hasNext()) {
+                const obsFolder = obsFolders.next();
+                const files = obsFolder.getFilesByName(fileName);
+
+                if (files.hasNext()) {
+                    const file = files.next();
+                    fileUrl = file.getUrl();
+                    file.setTrashed(true);
+                    fileDeleted = true;
+
+                    debugLog('File moved to trash', {
+                        observationId,
+                        fileName,
+                        fileId: file.getId(),
+                        deletedBy: userContext.email
+                    });
+                    break;
+                }
+            }
+        }
+
+        if (!fileDeleted) {
+            return { success: false, error: 'File not found in observation folder.' };
+        }
+
+        // Clean up evidenceLinks if the file exists there
+        if (observation.evidenceLinks && fileUrl) {
+            let linksUpdated = false;
+            const updatedEvidenceLinks = {};
+
+            for (const componentId in observation.evidenceLinks) {
+                const componentLinks = observation.evidenceLinks[componentId];
+                if (Array.isArray(componentLinks)) {
+                    // Filter out the deleted file by matching URL or name
+                    const filteredLinks = componentLinks.filter(link =>
+                        link.url !== fileUrl && link.name !== fileName
+                    );
+
+                    if (filteredLinks.length !== componentLinks.length) {
+                        linksUpdated = true;
+                    }
+
+                    // Only keep the component if it still has links
+                    if (filteredLinks.length > 0) {
+                        updatedEvidenceLinks[componentId] = filteredLinks;
+                    }
+                } else {
+                    updatedEvidenceLinks[componentId] = componentLinks;
+                }
+            }
+
+            if (linksUpdated) {
+                // Update the observation with cleaned evidenceLinks
+                observation.evidenceLinks = updatedEvidenceLinks;
+                const updateResult = updateObservationInSheet(observation);
+
+                if (updateResult.success) {
+                    debugLog('EvidenceLinks updated after file deletion', {
+                        observationId,
+                        fileName
+                    });
+                } else {
+                    console.warn('File deleted from Drive but failed to update evidenceLinks:', updateResult.error);
+                }
+            }
+        }
+
+        return {
+            success: true,
+            message: 'File deleted successfully.',
+            fileName: fileName
+        };
+
+    } catch (error) {
+        console.error('Error in deleteObservationFile:', error);
+        return { success: false, error: 'Failed to delete file: ' + error.message };
+    }
+}
+
+/**
  * Adds a Google Doc link by creating a text file with the URL in the observation folder.
  * This approach requires no schema changes and the link appears in the file list naturally.
  * @param {string} observationId The ID of the observation
