@@ -1508,7 +1508,7 @@
             box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.1);
         }
 
-        .btn-tag, .btn-push, .btn-clear-tags {
+        .btn-tag, .btn-auto-tag, .btn-push, .btn-clear-tags {
             padding: 8px 16px;
             border: none;
             border-radius: 6px;
@@ -1557,6 +1557,18 @@
             box-shadow: 0 4px 8px rgba(245, 101, 101, 0.3);
         }
 
+        .btn-auto-tag {
+            background: linear-gradient(135deg, #9f7aea 0%, #805ad5 100%);
+            color: white;
+            border: 2px solid transparent;
+        }
+
+        .btn-auto-tag:hover {
+            background: linear-gradient(135deg, #805ad5 0%, #6b46c1 100%);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(128, 90, 213, 0.3);
+        }
+
         .tag-status {
             font-size: 12px;
             color: #4a5568;
@@ -1602,7 +1614,7 @@
                 max-width: unset;
             }
             
-            .btn-tag, .btn-push, .btn-clear-tags {
+            .btn-tag, .btn-auto-tag, .btn-push, .btn-clear-tags {
                 justify-content: center;
             }
         }
@@ -6941,6 +6953,150 @@
             showToast('Text tagged successfully', true);
         }
 
+        function autoTagEvidence() {
+            if (!scriptQuill) {
+                showToast('Script editor not initialized', false);
+                return;
+            }
+
+            // Get the full text content
+            const fullText = scriptQuill.getText();
+            if (!fullText || fullText.trim().length === 0) {
+                showToast('Script editor is empty', false);
+                return;
+            }
+
+            // Build list of valid component IDs from rubricData
+            const validComponentIds = new Set();
+            if (window.rubricData && window.rubricData.domains) {
+                window.rubricData.domains.forEach(domain => {
+                    if (domain.components) {
+                        domain.components.forEach(component => {
+                            validComponentIds.add(component.componentId);
+                        });
+                    }
+                });
+            }
+
+            if (validComponentIds.size === 0) {
+                showToast('No valid components available for tagging', false);
+                return;
+            }
+
+            // Regex pattern to match subdomain references
+            // Matches: 1a:, 2B., 3c), 4F (standalone), etc.
+            // Captures the domain number (1-4) and subdomain letter (a-f)
+            const subdomainPattern = /\b([1-4])([a-f])[:.\s)\],]|\b([1-4])([a-f])\b/gi;
+
+            let matches = [];
+            let match;
+
+            // Find all subdomain matches with their positions
+            while ((match = subdomainPattern.exec(fullText)) !== null) {
+                const domain = match[1] || match[3];
+                const subdomain = match[2] || match[4];
+                const componentId = `${domain}${subdomain.toLowerCase()}:`;
+                const matchIndex = match.index;
+
+                // Only process if this is a valid component
+                if (validComponentIds.has(componentId)) {
+                    matches.push({
+                        componentId: componentId,
+                        matchIndex: matchIndex,
+                        matchText: match[0]
+                    });
+                }
+            }
+
+            if (matches.length === 0) {
+                showToast('No subdomain references found in script', false);
+                return;
+            }
+
+            // Process each match and find line boundaries
+            const lines = fullText.split('\n');
+            let currentPosition = 0;
+            const linesToTag = [];
+
+            lines.forEach((line, lineIndex) => {
+                const lineStart = currentPosition;
+                const lineEnd = currentPosition + line.length;
+
+                // Check if this line contains any matches
+                matches.forEach(matchData => {
+                    if (matchData.matchIndex >= lineStart && matchData.matchIndex < lineEnd) {
+                        // Check if this line is already tagged for this component
+                        const alreadyTagged = linesToTag.some(
+                            tag => tag.lineIndex === lineIndex && tag.componentId === matchData.componentId
+                        );
+
+                        if (!alreadyTagged && line.trim().length > 0) {
+                            linesToTag.push({
+                                lineIndex: lineIndex,
+                                componentId: matchData.componentId,
+                                lineStart: lineStart,
+                                lineLength: line.length,
+                                lineText: line.trim()
+                            });
+                        }
+                    }
+                });
+
+                // Account for newline character
+                currentPosition = lineEnd + 1;
+            });
+
+            if (linesToTag.length === 0) {
+                showToast('No valid lines to tag', false);
+                return;
+            }
+
+            // Apply tags to all identified lines
+            let taggedCount = 0;
+            const componentCounts = {};
+
+            linesToTag.forEach(lineData => {
+                const { componentId, lineStart, lineLength, lineText } = lineData;
+
+                // Apply visual formatting
+                const tagColor = TAG_COLORS[componentId] || '#e3f2fd';
+                scriptQuill.formatText(lineStart, lineLength, 'background', tagColor);
+                scriptQuill.formatText(lineStart, lineLength, 'color', '#1565c0');
+
+                // Store tag information
+                const tagData = {
+                    componentId: componentId,
+                    start: lineStart,
+                    length: lineLength,
+                    text: lineText,
+                    timestamp: new Date().toISOString(),
+                    color: tagColor
+                };
+
+                if (!componentTags[componentId]) {
+                    componentTags[componentId] = [];
+                }
+                componentTags[componentId].push(tagData);
+
+                // Track counts
+                componentCounts[componentId] = (componentCounts[componentId] || 0) + 1;
+                taggedCount++;
+            });
+
+            // Save tags
+            saveComponentTags();
+
+            // Generate summary message
+            const componentList = Object.keys(componentCounts)
+                .map(id => `${id} (${componentCounts[id]})`)
+                .join(', ');
+
+            const statusMessage = `Auto-tagged ${taggedCount} line${taggedCount !== 1 ? 's' : ''}: ${componentList}`;
+            document.getElementById('tagStatus').textContent = statusMessage;
+
+            showToast(`Successfully auto-tagged ${taggedCount} line${taggedCount !== 1 ? 's' : ''} across ${Object.keys(componentCounts).length} component${Object.keys(componentCounts).length !== 1 ? 's' : ''}`, true);
+        }
+
         function pushTaggedToNotes() {
             const allTags = Object.keys(componentTags);
             if (allTags.length === 0) {
@@ -7196,6 +7352,7 @@
                         <option value="">Select Component to Tag</option>
                     </select>
                     <button class="btn-tag" onclick="tagSelectedText()">🏷️ Tag Selection</button>
+                    <button class="btn-auto-tag" onclick="autoTagEvidence()" title="Auto-Tag Evidence: Automatically tags lines containing subdomain references (e.g., 1a, 2b, 3c, 4f). Searches for patterns like '1a:', '2B.', '3c)', or standalone '4f'.">🤖 Auto-Tag Evidence</button>
                     <button class="btn-push" onclick="pushTaggedToNotes()">➡️ Push Tagged to Notes</button>
                     <button class="btn-clear-tags" onclick="clearComponentTags()">🗑️ Clear Tags</button>
                 </div>
