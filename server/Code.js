@@ -3082,7 +3082,8 @@ function removeAutoTrigger() {
 
 
 /**
- * Enhanced function to get all domains data with view mode and assignment support
+ * Enhanced function to get all domains data with view mode and assignment support,
+ * now with caching for the processed data.
  */
 function getAllDomainsData(role = null, year = null, viewMode = 'full', assignedSubdomains = null) {
   const startTime = Date.now();
@@ -3091,64 +3092,57 @@ function getAllDomainsData(role = null, year = null, viewMode = 'full', assigned
   let effectiveViewMode = VIEW_MODES.FULL;
   let effectiveAssignedSubdomains = null;
 
-  // Validate role
-  if (role) {
-    if (typeof role === 'string' && AVAILABLE_ROLES.includes(role)) {
-      userRole = role;
-    } else {
-      console.error(`Invalid role: ${role}. Returning error structure.`);
-      return {
-        title: "Error Loading Data",
-        subtitle: `Invalid role specified: ${role}. Please select a valid role.`, 
-        role: role,
-        year: year,
-        viewMode: viewMode,
-        domains: [],
-        isError: true,
-        errorMessage: `Invalid role: ${role}. Valid roles are: ${AVAILABLE_ROLES.join(', ')}.`
-      };
-    }
+  // --- Parameter Validation ---
+  if (role && typeof role === 'string' && AVAILABLE_ROLES.includes(role)) {
+    userRole = role;
+  } else if (role) {
+    // Handle invalid role
+    return {
+      title: "Error Loading Data",
+      subtitle: `Invalid role specified: ${role}.`,
+      role: role, year: year, viewMode: viewMode, domains: [], isError: true,
+      errorMessage: `Invalid role: ${role}. Valid roles are: ${AVAILABLE_ROLES.join(', ')}.`
+    };
   }
 
-  // Validate year
   if (year !== null && year !== undefined) {
     const observationYear = parseInt(year);
-    if (isNaN(observationYear) || !OBSERVATION_YEARS.includes(observationYear)) {
-      console.error(`Invalid year: ${year}. Returning error structure.`);
+    if (!isNaN(observationYear) && OBSERVATION_YEARS.includes(observationYear)) {
+      userYear = observationYear;
+    } else {
+      // Handle invalid year
       return {
         title: "Error Loading Data",
-        subtitle: `Invalid year specified: ${year}. Please select a valid year.`, 
-        role: role,
-        year: year,     // original invalid year
-        viewMode: viewMode,
-        domains: [],
-        isError: true,
+        subtitle: `Invalid year specified: ${year}.`,
+        role: role, year: year, viewMode: viewMode, domains: [], isError: true,
         errorMessage: `Invalid year: ${year}. Valid years are: ${OBSERVATION_YEARS.join(', ')}`
       };
-    } else {
-      userYear = observationYear;
     }
   }
 
-  // Validate viewMode
-  if (viewMode && typeof viewMode === 'string') {
-    const lowerViewMode = viewMode.toLowerCase();
-    if (Object.values(VIEW_MODES).includes(lowerViewMode)) {
-      effectiveViewMode = lowerViewMode;
-    } else {
-      console.warn(`Invalid viewMode: ${viewMode}. Defaulting to 'full'.`);
-      // effectiveViewMode is already VIEW_MODES.FULL
-    }
+  if (viewMode && typeof viewMode === 'string' && Object.values(VIEW_MODES).includes(viewMode.toLowerCase())) {
+    effectiveViewMode = viewMode.toLowerCase();
   }
 
-  // Validate assignedSubdomains
-  if (assignedSubdomains) {
-    if (typeof assignedSubdomains === 'object' && !Array.isArray(assignedSubdomains)) {
-      effectiveAssignedSubdomains = assignedSubdomains;
-    } else {
-      console.warn(`Invalid assignedSubdomains: not an object. Proceeding as if no assignments were provided.`);
-      // effectiveAssignedSubdomains remains null
-    }
+  if (assignedSubdomains && typeof assignedSubdomains === 'object' && !Array.isArray(assignedSubdomains)) {
+    effectiveAssignedSubdomains = assignedSubdomains;
+  }
+
+  // --- Caching Logic ---
+  const cacheKeyBase = 'processed_rubric_data';
+  const cacheParams = {
+    role: userRole,
+    year: userYear,
+    viewMode: effectiveViewMode,
+    subdomainsHash: effectiveAssignedSubdomains ? generateDataHash(effectiveAssignedSubdomains) : 'none'
+  };
+
+  const cachedData = getCachedDataEnhanced(cacheKeyBase, cacheParams);
+  if (cachedData && cachedData.data) {
+    debugLog('Processed rubric data retrieved from cache', { role: userRole, year: userYear, viewMode: effectiveViewMode });
+    // Still log performance for cache hits to monitor cache effectiveness
+    logPerformanceMetrics('getAllDomainsData (cached)', Date.now() - startTime, cacheParams);
+    return cachedData.data;
   }
   
   try {
@@ -3159,14 +3153,11 @@ function getAllDomainsData(role = null, year = null, viewMode = 'full', assigned
       hasAssignedSubdomains: !!effectiveAssignedSubdomains
     });
     
-    // Get role-specific sheet data
     const roleSheetData = getRoleSheetData(userRole);
     if (!roleSheetData) {
-      // This case should ideally be handled by role validation, but as a fallback:
       throw new Error(`Unable to load data for role: ${userRole}`);
     }
     
-    // Build result structure
     const result = {
       title: roleSheetData.title || `${userRole} Framework`,
       subtitle: roleSheetData.subtitle || "Professional practices and standards",
@@ -3182,45 +3173,35 @@ function getAllDomainsData(role = null, year = null, viewMode = 'full', assigned
       }
     };
     
-    // For Teacher role, use legacy processing for backward compatibility
     if (userRole === 'Teacher') {
       result.domains = processLegacyTeacherDomains(roleSheetData.data);
     } else {
-      // Use dynamic processing for other roles
       result.domains = processRoleDomains(roleSheetData, userRole, userYear);
     }
     
-    // Apply assignment metadata and filtering
-    // Always enhance domains with assignments - this adds componentId to all components
-    // For Administrators (null assignedSubdomains), componentId is added without assignment info
-    // For Peer Evaluators (with assignedSubdomains), componentId and isAssigned flags are added
     result.domains = enhanceDomainsWithAssignments(result.domains, effectiveAssignedSubdomains, effectiveViewMode);
     if (effectiveAssignedSubdomains) {
       result.assignmentMetadata = calculateAssignmentMetadata(result.domains, effectiveAssignedSubdomains);
     }
 
-    // Apply year-based filtering if specified
-    if (userYear !== null) { // Check against null explicitly
+    if (userYear !== null) {
       result.domains = applyYearFiltering(result.domains, userRole, userYear);
     }
     
+    // --- Store in Cache ---
+    setCachedDataEnhanced(cacheKeyBase, cacheParams, result, CACHE_SETTINGS.PROCESSED_DATA_TTL);
+    
     const executionTime = Date.now() - startTime;
-    
-    
-    logPerformanceMetrics('getAllDomainsData', executionTime, {
-      role: userRole,
-      year: userYear,
-      viewMode: effectiveViewMode,
+    logPerformanceMetrics('getAllDomainsData (processed)', executionTime, {
+      ...cacheParams,
       domainCount: result.domains.length,
-      totalComponents: result.assignmentMetadata.totalComponents,
-      assignedComponents: result.assignmentMetadata.totalAssigned
+      totalComponents: result.assignmentMetadata.totalComponents
     });
     
-    debugLog('Enhanced domains data loaded successfully', {
+    debugLog('Enhanced domains data loaded and cached successfully', {
       role: userRole,
       domainCount: result.domains.length,
       totalComponents: result.assignmentMetadata.totalComponents,
-      assignedComponents: result.assignmentMetadata.totalAssigned,
       viewMode: viewMode
     });
     
@@ -3231,18 +3212,15 @@ function getAllDomainsData(role = null, year = null, viewMode = 'full', assigned
     
     return {
       title: "Error Loading Data",
-      subtitle: `An unexpected error occurred. Please see details below.`, // Subtitle can be generic
-      role: role || 'Teacher', // Keep role if available
-      year: year, // Keep year if available
-      viewMode: viewMode || 'full', // Keep viewMode if available
+      subtitle: `An unexpected error occurred. Please see details below.`,
+      role: userRole,
+      year: userYear,
+      viewMode: effectiveViewMode,
       domains: [],
       isError: true,
-      errorMessage: `An unexpected error occurred while loading data for role '${role || 'default'}'. Error details: ${error.message}. Please try again later or contact support if the issue persists.`,
-      assignmentMetadata: { // Keep this structure for consistency if the UI expects it
-        hasAssignments: false,
-        totalAssigned: 0,
-        totalComponents: 0,
-        assignmentsByDomain: {}
+      errorMessage: `An unexpected error occurred while loading data for role '${userRole}'. Error details: ${error.message}. Please try again later or contact support.`,
+      assignmentMetadata: {
+        hasAssignments: false, totalAssigned: 0, totalComponents: 0, assignmentsByDomain: {}
       }
     };
   }
