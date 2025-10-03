@@ -2333,3 +2333,34 @@ function getStandardObservationAnswersFromDoc(observationId) {
     return [];
   }
 }
+
+/**
+ * TEMPORARY: Diagnostic function to debug Standard Observation button visibility.
+ * Run this function from Apps Script Editor while logged in as the staff member.
+ * Remove this function once issue is resolved.
+ */
+function debugStandardObservationButton() {
+  const userEmail = Session.getActiveUser().getEmail();
+  console.log('Current user:', userEmail);
+
+  const observations = _getObservationsDb();
+  console.log('Total observations:', observations.length);
+
+  const userDrafts = observations.filter(obs => obs.observedEmail === userEmail && obs.status === 'Draft');
+  console.log('User draft observations:', userDrafts.length);
+
+  userDrafts.forEach(obs => {
+    console.log('Observation:', {
+      id: obs.observationId,
+      type: obs.Type,
+      observer: obs.observerEmail,
+      status: obs.status
+    });
+
+    const observer = getUserByEmail(obs.observerEmail);
+    console.log('Observer details:', observer);
+  });
+
+  const result = checkUserHasStandardObservationFromPeerEvaluator(userEmail);
+  console.log('Check result:', result);
+}
