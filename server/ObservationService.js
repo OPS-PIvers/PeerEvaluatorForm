@@ -1169,6 +1169,7 @@ function getObservationType(observationId) {
 
 /**
  * Gets all work product questions from the WorkProductQuestions sheet.
+ * Only returns questions with IDs starting with 'WPQ'.
  * @returns {Array<Object>} Array of question objects with questionId, questionText, and order.
  */
 function getWorkProductQuestions() {
@@ -1183,7 +1184,7 @@ function getWorkProductQuestions() {
 
     const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, 3).getValues();
     const questions = values
-      .filter(row => row[0]) // Filter out empty rows
+      .filter(row => row[0] && row[0].toString().startsWith('WPQ')) // Filter for WPQ prefix only
       .map(row => ({
         questionId: row[0],
         questionText: row[1],
@@ -1195,6 +1196,39 @@ function getWorkProductQuestions() {
     return questions;
   } catch (error) {
     console.error('Error getting work product questions:', error);
+    return [];
+  }
+}
+
+/**
+ * Gets all standard observation questions from the WorkProductQuestions sheet.
+ * Only returns questions with IDs starting with 'OBSQ'.
+ * @returns {Array<Object>} Array of question objects with questionId, questionText, and order.
+ */
+function getStandardObservationQuestions() {
+  try {
+    const cacheKey = 'standard_observation_questions';
+    const cached = getCachedDataEnhanced(cacheKey);
+    if (cached) return cached;
+
+    const spreadsheet = openSpreadsheet();
+    const sheet = getSheetByName(spreadsheet, SHEET_NAMES.WORK_PRODUCT_QUESTIONS);
+    if (!sheet || sheet.getLastRow() < 2) return [];
+
+    const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, 3).getValues();
+    const questions = values
+      .filter(row => row[0] && row[0].toString().startsWith('OBSQ')) // Filter for OBSQ prefix only
+      .map(row => ({
+        questionId: row[0],
+        questionText: row[1],
+        order: row[2] || 0
+      }))
+      .sort((a, b) => a.order - b.order);
+
+    setCachedDataEnhanced(cacheKey, questions);
+    return questions;
+  } catch (error) {
+    console.error('Error getting standard observation questions:', error);
     return [];
   }
 }
@@ -1311,6 +1345,29 @@ function checkUserHasWorkProductObservation(userEmail) {
 }
 
 /**
+ * Checks if user has a Standard observation created by a Peer Evaluator.
+ * @param {string} userEmail The email of the user.
+ * @returns {boolean} True if user has Standard observation from Peer Evaluator, false otherwise.
+ */
+function checkUserHasStandardObservationFromPeerEvaluator(userEmail) {
+  try {
+    const observations = _getObservationsDb();
+    return observations.some(obs => {
+      if (obs.observedEmail !== userEmail) return false;
+      if ((obs.Type || 'Standard') !== 'Standard') return false;
+      if (obs.status !== 'Draft') return false;
+
+      // Check if observer is Peer Evaluator
+      const observer = getUserByEmail(obs.observerEmail);
+      return observer && observer.role === 'Peer Evaluator';
+    });
+  } catch (error) {
+    console.error('Error checking standard observation from peer evaluator:', error);
+    return false;
+  }
+}
+
+/**
  * Gets a summary of staff observations.
  * @param {string} userEmail The email of the user.
  * @returns {Object} Object with hasFinalized and count properties.
@@ -1357,6 +1414,41 @@ function getWorkProductProgressState(userEmail) {
     return 'not-started';
   } catch (error) {
     console.error('Error getting work product progress state:', error);
+    return 'not-started';
+  }
+}
+
+/**
+ * Gets the standard observation progress state for a user.
+ * Only considers Standard observations created by Peer Evaluators.
+ * @param {string} userEmail The email of the user.
+ * @returns {string} Progress state: 'not-started', 'in-progress', or 'submitted'.
+ */
+function getStandardObservationProgressState(userEmail) {
+  try {
+    const observations = _getObservationsDb();
+    const standardObs = observations.find(obs => {
+      if (obs.observedEmail !== userEmail) return false;
+      if ((obs.Type || 'Standard') !== 'Standard') return false;
+
+      // Check if observer is Peer Evaluator
+      const observer = getUserByEmail(obs.observerEmail);
+      return observer && observer.role === 'Peer Evaluator';
+    });
+
+    if (!standardObs) return 'not-started';
+
+    // Check if any answers exist in Google Doc
+    const answers = getStandardObservationAnswersFromDoc(standardObs.observationId);
+    const hasAnswers = answers && answers.some(answer =>
+      answer.answerText && answer.answerText.trim().length > 0
+    );
+
+    if (standardObs.status === 'Finalized') return 'submitted';
+    if (hasAnswers) return 'in-progress';
+    return 'not-started';
+  } catch (error) {
+    console.error('Error getting standard observation progress state:', error);
     return 'not-started';
   }
 }
@@ -1804,6 +1896,439 @@ function getWorkProductAnswersFromDoc(observationId) {
       currentUserEmail: userContext ? userContext.email : 'unknown',
       observedEmail: observation ? observation.observedEmail : 'unknown',
       operation: 'getWorkProductAnswersFromDoc'
+    });
+    return [];
+  }
+}
+
+/**
+ * Finds a standard observation response document using Drive search.
+ * @param {string} observationId The ID of the observation.
+ * @param {string} staffEmail The email of the staff member who owns the doc.
+ * @param {string} currentUserEmail The email of the current user requesting access.
+ * @returns {Object|null} Object with docId and docUrl, or null if not found.
+ */
+function findStandardObservationResponseDoc(observationId, staffEmail, currentUserEmail) {
+  try {
+    const searchName = `Standard Observation Responses - ${observationId}`;
+
+    // Add basic caching to avoid repeated Drive searches
+    const cacheKey = `standard_obs_doc_${observationId}`;
+    const cached = getCachedDataEnhanced(cacheKey);
+    if (cached) {
+      debugLog('Standard observation doc found in cache', {
+        observationId: observationId,
+        staffEmail: staffEmail,
+        currentUserEmail: currentUserEmail
+      });
+      return cached;
+    }
+
+    debugLog('Searching for standard observation response doc', {
+      observationId: observationId,
+      staffEmail: staffEmail,
+      currentUserEmail: currentUserEmail
+    });
+
+    let docResult = null;
+
+    if (currentUserEmail === staffEmail) {
+      // Staff member searches their own drive
+      try {
+        const files = DriveApp.searchFiles(`title = "${searchName}" and trashed = false`);
+        if (files.hasNext()) {
+          const file = files.next();
+          docResult = {
+            docId: file.getId(),
+            docUrl: file.getUrl()
+          };
+          debugLog('Found standard observation doc in staff drive', { docId: docResult.docId });
+        }
+      } catch (driveError) {
+        console.error('Error searching staff drive for standard observation doc:', driveError);
+        return null;
+      }
+    } else {
+      // Peer evaluator searches for shared documents
+      try {
+        const files = DriveApp.searchFiles(`title = "${searchName}" and trashed = false`);
+        let searchCount = 0;
+        const maxSearchAttempts = 5;
+
+        debugLog('Peer evaluator searching for shared standard observation docs', {
+          observationId: observationId,
+          currentUserEmail: currentUserEmail
+        });
+
+        while (files.hasNext() && searchCount < maxSearchAttempts) {
+          searchCount++;
+          const file = files.next();
+          const fileId = file.getId();
+
+          try {
+            const testDoc = DocumentApp.openById(fileId);
+            docResult = {
+              docId: fileId,
+              docUrl: file.getUrl()
+            };
+            debugLog('Successfully found accessible shared standard observation doc', {
+              docId: docResult.docId,
+              observationId: observationId,
+              searchAttempt: searchCount
+            });
+            break;
+          } catch (accessError) {
+            debugLog('Standard observation doc not accessible to peer evaluator, continuing search', {
+              fileId: fileId,
+              observationId: observationId,
+              searchAttempt: searchCount,
+              error: accessError.message
+            });
+            continue;
+          }
+        }
+
+        if (searchCount >= maxSearchAttempts && !docResult) {
+          console.warn('Reached max search attempts for standard observation doc without finding accessible document:', {
+            observationId: observationId,
+            currentUserEmail: currentUserEmail,
+            staffEmail: staffEmail,
+            maxAttempts: maxSearchAttempts
+          });
+        }
+      } catch (driveError) {
+        console.error('Error searching for shared standard observation doc:', driveError, {
+          observationId: observationId,
+          currentUserEmail: currentUserEmail,
+          staffEmail: staffEmail
+        });
+        return null;
+      }
+    }
+
+    // Cache the result for a short time
+    if (docResult) {
+      setCachedDataEnhanced(cacheKey, docResult, 300); // 5 minute cache
+    }
+
+    return docResult;
+  } catch (error) {
+    console.error('Critical error in findStandardObservationResponseDoc:', error, {
+      observationId: observationId,
+      staffEmail: staffEmail,
+      currentUserEmail: currentUserEmail,
+      searchName: `Standard Observation Responses - ${observationId}`,
+      operation: 'findStandardObservationResponseDoc'
+    });
+    return null;
+  }
+}
+
+/**
+ * Saves a standard observation answer to the response Google Doc.
+ * @param {string} observationId The ID of the observation.
+ * @param {string} questionId The ID of the question.
+ * @param {string} answerText The answer text.
+ * @returns {boolean} True if saved successfully, false otherwise.
+ */
+function saveStandardObservationAnswerToDoc(observationId, questionId, answerText) {
+  try {
+    const observations = _getObservationsDb();
+    const observation = observations.find(obs => obs.observationId === observationId);
+
+    if (!observation) {
+      console.error('Observation not found:', observationId);
+      return false;
+    }
+
+    const userContext = createUserContext();
+
+    // Find or create the response document
+    let docResult = findStandardObservationResponseDoc(observationId, observation.observedEmail, userContext.email);
+
+    // If document not found and user is staff member, create it
+    if (!docResult && userContext.email === observation.observedEmail) {
+      console.log('No response document found, creating new one for staff member:', observationId);
+      const newDocResult = createOrGetStandardObservationResponseDoc(observationId, observation.observedEmail, observation.observerEmail);
+      if (!newDocResult) {
+        console.error('Failed to create standard observation response doc for observation:', observationId);
+        return false;
+      }
+      docResult = newDocResult;
+    }
+
+    if (!docResult) {
+      console.error('No response document found and unable to create for observation:', observationId, {
+        currentUserEmail: userContext.email,
+        observedEmail: observation.observedEmail,
+        isStaffMember: userContext.email === observation.observedEmail
+      });
+      return false;
+    }
+
+    let doc;
+    try {
+      doc = DocumentApp.openById(docResult.docId);
+    } catch (docError) {
+      console.error('Error opening standard observation response doc:', docError);
+      return false;
+    }
+
+    let body;
+    try {
+      body = doc.getBody();
+    } catch (bodyError) {
+      console.error('Error accessing document body:', bodyError);
+      return false;
+    }
+
+    try {
+      // Search for existing answer section
+      const searchPattern = `Question ${questionId}:`;
+      const searchResult = body.findText(searchPattern);
+
+      if (searchResult) {
+        // Update existing answer
+        const element = searchResult.getElement();
+        const paragraph = element.getParent();
+        const nextParagraph = paragraph.getNextSibling();
+
+        if (nextParagraph && nextParagraph.getType() === DocumentApp.ElementType.PARAGRAPH) {
+          nextParagraph.asParagraph().setText(answerText || '(No response provided)');
+        } else {
+          const answerParagraph = body.insertParagraph(body.getChildIndex(paragraph) + 1, answerText || '(No response provided)');
+          answerParagraph.setIndentFirstLine(20);
+        }
+      } else {
+        // Add new question and answer at the end
+        body.appendParagraph('');
+        const questionParagraph = body.appendParagraph(`Question ${questionId}:`);
+        questionParagraph.editAsText().setBold(true);
+
+        const answerParagraph = body.appendParagraph(answerText || '(No response provided)');
+        answerParagraph.setIndentFirstLine(20);
+      }
+
+      // Update or add timestamp
+      const timestampPattern = 'Last updated:';
+      const timestampSearch = body.findText(timestampPattern);
+
+      if (timestampSearch) {
+        const element = timestampSearch.getElement();
+        const paragraph = element.getParent();
+        paragraph.asParagraph().setText(`Last updated: ${new Date().toLocaleString()}`);
+      } else {
+        body.appendParagraph('');
+        body.appendParagraph(`Last updated: ${new Date().toLocaleString()}`);
+      }
+    } catch (editError) {
+      console.error('Error editing standard observation response doc content:', editError);
+      return false;
+    }
+
+    console.log(`Saved standard observation answer to doc for question ${questionId}`);
+    return true;
+
+  } catch (error) {
+    console.error('Critical error saving standard observation answer to doc:', error, {
+      observationId: observationId,
+      questionId: questionId,
+      currentUserEmail: userContext ? userContext.email : 'unknown',
+      observedEmail: observation ? observation.observedEmail : 'unknown',
+      operation: 'saveStandardObservationAnswerToDoc',
+      answerLength: answerText ? answerText.length : 0
+    });
+    return false;
+  }
+}
+
+/**
+ * Creates or gets a standard observation response document for staff member responses.
+ * @param {string} observationId The ID of the observation.
+ * @param {string} staffEmail The email of the staff member.
+ * @param {string} peerEvaluatorEmail The email of the peer evaluator.
+ * @returns {Object|null} Object with docId and docUrl, or null on error.
+ */
+function createOrGetStandardObservationResponseDoc(observationId, staffEmail, peerEvaluatorEmail) {
+  try {
+    const userContext = createUserContext();
+
+    // Check if doc already exists
+    const existingDoc = findStandardObservationResponseDoc(observationId, staffEmail, userContext.email);
+    if (existingDoc) {
+      console.log(`Found existing standard observation response doc: ${existingDoc.docId}`);
+      return existingDoc;
+    }
+
+    // Only staff members can create new response documents
+    if (userContext.email !== staffEmail) {
+      debugLog('Non-staff member attempted to create standard observation response doc - this is expected for view-only access:', {
+        currentUser: userContext.email,
+        staffEmail: staffEmail,
+        observationId: observationId,
+        userRole: userContext.role
+      });
+      return null;
+    }
+
+    // Create new Google Doc
+    const docName = `Standard Observation Responses - ${observationId}`;
+    let doc, docId;
+
+    try {
+      doc = DocumentApp.create(docName);
+      docId = doc.getId();
+      console.log(`Created new standard observation response doc: ${docId}`);
+    } catch (docError) {
+      console.error('Error creating Google Doc:', docError);
+      return null;
+    }
+
+    // Set up document content
+    try {
+      const body = doc.getBody();
+      body.clear();
+
+      const header = body.appendParagraph('Standard Observation Reflection Responses');
+      header.setHeading(DocumentApp.ParagraphHeading.HEADING1);
+      header.editAsText().setBold(true);
+
+      body.appendParagraph(`Observation ID: ${observationId}`);
+      body.appendParagraph(`Staff Member: ${staffEmail}`);
+      body.appendParagraph(`Peer Evaluator: ${peerEvaluatorEmail}`);
+      body.appendParagraph('Generated: ' + new Date().toLocaleString());
+      body.appendHorizontalRule();
+      body.appendParagraph('');
+
+      console.log('Successfully set up standard observation response doc content');
+    } catch (contentError) {
+      console.error('Error setting up document content:', contentError);
+    }
+
+    // Share with peer evaluator
+    try {
+      const file = DriveApp.getFileById(docId);
+      file.addEditor(peerEvaluatorEmail);
+      console.log(`Standard observation response doc shared with peer evaluator: ${peerEvaluatorEmail}`);
+    } catch (shareError) {
+      console.error('Error sharing response doc with peer evaluator:', shareError);
+    }
+
+    console.log(`Created standard observation response doc: ${docId} for observation: ${observationId}`);
+
+    return {
+      docId: docId,
+      docUrl: doc.getUrl()
+    };
+
+  } catch (error) {
+    console.error('Critical error creating standard observation response doc:', error, {
+      observationId: observationId,
+      staffEmail: staffEmail,
+      peerEvaluatorEmail: peerEvaluatorEmail,
+      currentUserEmail: userContext ? userContext.email : 'unknown',
+      operation: 'createOrGetStandardObservationResponseDoc'
+    });
+    return null;
+  }
+}
+
+/**
+ * Gets standard observation answers from the response Google Doc.
+ * @param {string} observationId The ID of the observation.
+ * @returns {Array<Object>} Array of answer objects with questionId and answerText.
+ */
+function getStandardObservationAnswersFromDoc(observationId) {
+  try {
+    const observations = _getObservationsDb();
+    const observation = observations.find(obs => obs.observationId === observationId);
+
+    if (!observation) {
+      console.log('Observation not found:', observationId);
+      return [];
+    }
+
+    const userContext = createUserContext();
+
+    // Find the response document
+    const docResult = findStandardObservationResponseDoc(observationId, observation.observedEmail, userContext.email);
+    if (!docResult) {
+      console.log('No response document found for observation:', observationId);
+      return [];
+    }
+
+    let doc;
+    try {
+      doc = DocumentApp.openById(docResult.docId);
+    } catch (docError) {
+      console.error('Error opening standard observation response doc for reading:', docError);
+      return [];
+    }
+
+    const body = doc.getBody();
+    const text = body.getText();
+
+    // Parse questions and answers
+    const answers = [];
+    const lines = text.split('\n');
+    let currentQuestionId = null;
+    let currentAnswer = '';
+    let collectingAnswer = false;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+
+      // Check if this is a question line
+      const questionMatch = line.match(/^Question\s+([^:]+):\s*$/);
+      if (questionMatch) {
+        // Save previous answer if we have one
+        if (currentQuestionId && currentAnswer.trim() && currentAnswer.trim() !== '(No response provided)') {
+          answers.push({
+            questionId: currentQuestionId,
+            answerText: currentAnswer.trim()
+          });
+        }
+
+        // Start new question
+        currentQuestionId = questionMatch[1].trim();
+        currentAnswer = '';
+        collectingAnswer = true;
+        continue;
+      }
+
+      // Skip metadata lines and horizontal rules
+      if (line.startsWith('Last updated:') || line.startsWith('Observation ID:') ||
+          line.startsWith('Staff Member:') || line.startsWith('Peer Evaluator:') ||
+          line.startsWith('Generated:') || line === '' ||
+          line === 'Standard Observation Reflection Responses' ||
+          line.includes('---') || line.includes('___')) {
+        continue;
+      }
+
+      // Collect answer text
+      if (collectingAnswer && currentQuestionId) {
+        if (currentAnswer) currentAnswer += '\n';
+        currentAnswer += line;
+      }
+    }
+
+    // Save the last answer
+    if (currentQuestionId && currentAnswer.trim() && currentAnswer.trim() !== '(No response provided)') {
+      answers.push({
+        questionId: currentQuestionId,
+        answerText: currentAnswer.trim()
+      });
+    }
+
+    console.log(`Retrieved ${answers.length} standard observation answers from doc`);
+    return answers;
+
+  } catch (error) {
+    console.error('Critical error getting standard observation answers from doc:', error, {
+      observationId: observationId,
+      currentUserEmail: userContext ? userContext.email : 'unknown',
+      observedEmail: observation ? observation.observedEmail : 'unknown',
+      operation: 'getStandardObservationAnswersFromDoc'
     });
     return [];
   }

@@ -128,21 +128,26 @@ function doGet(e) {
 
     // Check if user has any Work Product observations
     let hasWorkProduct = false;
+    let hasStandardObservation = false;
     if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
       hasWorkProduct = checkUserHasWorkProductObservation(userContext.email);
+      hasStandardObservation = checkUserHasStandardObservationFromPeerEvaluator(userContext.email);
     }
     htmlTemplate.showWorkProductQuestionsButton = hasWorkProduct;
+    htmlTemplate.showStandardObservationQuestionsButton = hasStandardObservation;
 
     // Determine if staff member has finalized observations (for button positioning)
     const hasMyObservations = userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR ?
       getStaffObservationSummary(userContext.email).hasFinalized : false;
 
-    // Get work product progress state
-    const workProductState = hasWorkProduct ?
-      getWorkProductProgressState(userContext.email) : 'not-started';
+    // Set default state to avoid expensive doc lookups on page load
+    // Progress state is calculated when modal opens for better performance
+    const workProductState = 'not-started';
+    const standardObservationState = 'not-started';
 
     htmlTemplate.hasMyObservations = hasMyObservations;
     htmlTemplate.workProductState = workProductState;
+    htmlTemplate.standardObservationState = standardObservationState;
     
     // Generate the HTML output with error handling
     let htmlOutput;
@@ -605,6 +610,128 @@ function getCurrentUserWorkProductObservationId() {
     }
   } catch (error) {
     console.error('Error getting current user work product observation:', error);
+    return { success: false, error: 'Failed to get observation ID: ' + error.message };
+  }
+}
+
+/**
+ * Gets standard observation questions for client-side use.
+ * @returns {Object} A response object containing the questions array.
+ */
+function getStandardObservationQuestionsForClient() {
+  try {
+    const questions = getStandardObservationQuestions();
+    return { success: true, questions: questions };
+  } catch (error) {
+    console.error('Error in getStandardObservationQuestionsForClient:', error);
+    return { success: false, error: 'Failed to load questions: ' + error.message };
+  }
+}
+
+/**
+ * Saves a standard observation answer from client-side.
+ * @param {string} observationId The ID of the observation.
+ * @param {string} questionId The ID of the question.
+ * @param {string} answerText The answer text.
+ * @returns {Object} A response object with success status.
+ */
+function saveStandardObservationAnswerFromClient(observationId, questionId, answerText) {
+  try {
+    const userContext = createUserContext();
+
+    // Verify user has access to this observation
+    const observation = getObservationById(observationId);
+    if (!observation || observation.observedEmail !== userContext.email) {
+      return { success: false, error: 'Access denied to this observation.' };
+    }
+
+    // Verify observation is Standard type and created by Peer Evaluator
+    if ((observation.Type || 'Standard') !== 'Standard') {
+      return { success: false, error: 'This is not a standard observation.' };
+    }
+
+    const observer = getUserByEmail(observation.observerEmail);
+    if (!observer || observer.role !== 'Peer Evaluator') {
+      return { success: false, error: 'This observation was not created by a Peer Evaluator.' };
+    }
+
+    // Save to Google Doc
+    const saved = saveStandardObservationAnswerToDoc(observationId, questionId, answerText);
+    return { success: saved };
+  } catch (error) {
+    console.error('Error in saveStandardObservationAnswerFromClient:', error);
+    return { success: false, error: 'Failed to save answer: ' + error.message };
+  }
+}
+
+/**
+ * Gets standard observation answers for client-side use.
+ * @param {string} observationId The ID of the observation.
+ * @returns {Object} A response object containing the answers array.
+ */
+function getStandardObservationAnswersForClient(observationId) {
+  try {
+    const userContext = createUserContext();
+
+    // Verify user has access to this observation
+    const observation = getObservationById(observationId);
+    if (!observation) {
+      return { success: false, error: 'Observation not found.' };
+    }
+
+    // Allow access for observed staff or peer evaluators
+    if (observation.observedEmail !== userContext.email &&
+        userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
+      return { success: false, error: 'Access denied to this observation.' };
+    }
+
+    // Get answers from Google Doc
+    const answers = getStandardObservationAnswersFromDoc(observationId);
+    return { success: true, answers: answers };
+  } catch (error) {
+    console.error('Error in getStandardObservationAnswersForClient:', error);
+    return { success: false, error: 'Failed to load answers: ' + error.message };
+  }
+}
+
+/**
+ * Gets the current user's standard observation ID (created by Peer Evaluator) and ensures response doc exists.
+ * @returns {Object} A response object containing the observation ID.
+ */
+function getCurrentUserStandardObservationId() {
+  try {
+    const userContext = createUserContext();
+    const observations = _getObservationsDb();
+
+    const userStandardObs = observations.find(obs => {
+      if (obs.observedEmail !== userContext.email) return false;
+      if ((obs.Type || 'Standard') !== 'Standard') return false;
+      if (obs.status !== 'Draft') return false;
+
+      // Check if observer is Peer Evaluator
+      const observer = getUserByEmail(obs.observerEmail);
+      return observer && observer.role === 'Peer Evaluator';
+    });
+
+    if (userStandardObs) {
+      // Ensure response document exists
+      const peerEvaluatorEmail = userStandardObs.observerEmail;
+      const docResult = createOrGetStandardObservationResponseDoc(
+        userStandardObs.observationId,
+        userContext.email,
+        peerEvaluatorEmail
+      );
+
+      if (!docResult) {
+        console.warn('Failed to create/get response document, but continuing...');
+      }
+
+      return { success: true, observationId: userStandardObs.observationId };
+    } else {
+      return { success: false, error: 'No standard observation from Peer Evaluator found' };
+    }
+  } catch (error) {
+    console.error('Error getting current user standard observation:', error);
     return { success: false, error: 'Failed to get observation ID: ' + error.message };
   }
 }

@@ -1819,14 +1819,16 @@
                     <!-- Work Product Questions Button -->
                     <? if (typeof showWorkProductQuestionsButton !== 'undefined' && showWorkProductQuestionsButton && data.userContext.role !== 'Peer Evaluator') { ?>
                     <button id="workProductQuestionsBtn" onclick="openWorkProductModal()"
-                            class="filter-btn wp-<?= workProductState || 'not-started' ?>"
+                            class="filter-btn"
                             style="padding: 12px 24px; font-size: 1.1rem;">
                         📋 Work Product Questions
-                        <span class="wp-state-text">
-                            <? if ((workProductState || 'not-started') === 'not-started') { ?>(Not Started)<? } ?>
-                            <? if ((workProductState || 'not-started') === 'in-progress') { ?>(In Progress)<? } ?>
-                            <? if ((workProductState || 'not-started') === 'submitted') { ?>(Submitted)<? } ?>
-                        </span>
+                    </button>
+                    <? } ?>
+                    <? if (typeof showStandardObservationQuestionsButton !== 'undefined' && showStandardObservationQuestionsButton && data.userContext.role !== 'Peer Evaluator') { ?>
+                    <button id="standardObservationQuestionsBtn" onclick="openStandardObservationModal()"
+                            class="filter-btn"
+                            style="padding: 12px 24px; font-size: 1.1rem;">
+                        📝 Observation Questions
                     </button>
                     <? } ?>
                 </div>
@@ -3731,6 +3733,190 @@
                 .saveWorkProductAnswerFromClient(currentWorkProductObservationId, questionId, answerText);
         }
 
+        // === Standard Observation Modal Functions ===
+        let standardObservationSaveTimeouts = {};
+        let currentStandardObservationId = null;
+
+        function openStandardObservationModal() {
+            loadStandardObservationQuestions();
+            document.getElementById('standardObservationModal').style.display = 'block';
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeStandardObservationModal() {
+            document.getElementById('standardObservationModal').style.display = 'none';
+            document.body.style.overflow = 'auto';
+        }
+
+        function closeStandardObservationModalOnBackdrop(event) {
+            if (event.target === event.currentTarget) {
+                closeStandardObservationModal();
+            }
+        }
+
+        function loadStandardObservationQuestions() {
+            const container = document.getElementById('standardObservationQuestionsContainer');
+            container.innerHTML = `
+                <div style="text-align: center; padding: 40px;">
+                    <div style="color: #6b7280; font-size: 1.1rem; margin-bottom: 10px;">Loading Observation Questions...</div>
+                    <div style="color: #9ca3af; font-size: 0.9rem;">Please wait while we retrieve your questions and responses.</div>
+                </div>
+            `;
+
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    if (result.success) {
+                        displayStandardObservationQuestions(result.questions);
+                    } else {
+                        container.innerHTML = '<div style="text-align: center; padding: 20px; color: #ef4444;">Error loading questions: ' + result.error + '</div>';
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    console.error('Failed to load questions:', error);
+                    container.innerHTML = '<div style="text-align: center; padding: 20px; color: #ef4444;">Failed to load questions. Please try again.</div>';
+                })
+                .getStandardObservationQuestionsForClient();
+        }
+
+        function displayStandardObservationQuestions(questions) {
+            const container = document.getElementById('standardObservationQuestionsContainer');
+
+            if (!questions || questions.length === 0) {
+                container.innerHTML = '<div style="text-align: center; padding: 20px; color: #6b7280;">No questions available.</div>';
+                return;
+            }
+
+            let html = '';
+            questions.forEach(question => {
+                html += `
+                    <div class="work-product-question">
+                        <div class="work-product-question-text">${question.questionText}</div>
+                        <textarea class="work-product-textarea"
+                                  id="standard-answer-${question.questionId}"
+                                  placeholder="Loading your response..."
+                                  disabled
+                                  oninput="handleStandardObservationAnswerInput('${question.questionId}')"></textarea>
+                        <div class="save-status" id="standard-status-${question.questionId}" style="color: #6b7280; font-style: italic;">Loading responses...</div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+
+            // Load existing answers
+            loadExistingStandardObservationAnswers();
+        }
+
+        function loadExistingStandardObservationAnswers() {
+            getCurrentStandardObservationId(function(observationId) {
+                if (!observationId) {
+                    enableStandardObservationTextareasAndClearLoadingState();
+                    return;
+                }
+
+                currentStandardObservationId = observationId;
+
+                google.script.run
+                    .withSuccessHandler(function(result) {
+                        if (result.success && result.answers) {
+                            result.answers.forEach(answer => {
+                                const textarea = document.getElementById('standard-answer-' + answer.questionId);
+                                if (textarea) {
+                                    textarea.value = answer.answerText;
+                                }
+                            });
+                        }
+                        enableStandardObservationTextareasAndClearLoadingState();
+                    })
+                    .withFailureHandler(function(error) {
+                        console.error('Failed to load existing answers:', error);
+                        enableStandardObservationTextareasAndClearLoadingState();
+                    })
+                    .getStandardObservationAnswersForClient(observationId);
+            });
+        }
+
+        function enableStandardObservationTextareasAndClearLoadingState() {
+            const textareas = document.querySelectorAll('#standardObservationQuestionsContainer .work-product-textarea');
+            textareas.forEach(textarea => {
+                textarea.disabled = false;
+                if (textarea.placeholder === 'Loading your response...') {
+                    textarea.placeholder = 'Enter your response here...';
+                }
+            });
+
+            const statusElements = document.querySelectorAll('#standardObservationQuestionsContainer .save-status');
+            statusElements.forEach(status => {
+                if (status.textContent === 'Loading responses...') {
+                    status.textContent = '';
+                    status.style.fontStyle = '';
+                }
+            });
+        }
+
+        function getCurrentStandardObservationId(callback) {
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    if (result.success && result.observationId) {
+                        callback(result.observationId);
+                    } else {
+                        callback(null);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    console.error('Failed to get observation ID:', error);
+                    callback(null);
+                })
+                .getCurrentUserStandardObservationId();
+        }
+
+        function handleStandardObservationAnswerInput(questionId) {
+            const textarea = document.getElementById('standard-answer-' + questionId);
+            const statusDiv = document.getElementById('standard-status-' + questionId);
+
+            if (!textarea || !currentStandardObservationId) return;
+
+            // Clear existing timeout
+            if (standardObservationSaveTimeouts[questionId]) {
+                clearTimeout(standardObservationSaveTimeouts[questionId]);
+            }
+
+            // Set status to show user input is captured
+            statusDiv.textContent = 'Typing...';
+            statusDiv.className = 'save-status typing';
+            statusDiv.style.opacity = '1';
+
+            // Save after 1.5 seconds of inactivity
+            standardObservationSaveTimeouts[questionId] = setTimeout(() => {
+                saveStandardObservationAnswer(questionId, textarea.value, statusDiv);
+            }, 1500);
+        }
+
+        function saveStandardObservationAnswer(questionId, answerText, statusDiv) {
+            statusDiv.textContent = 'Saving...';
+            statusDiv.className = 'save-status saving';
+
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    if (result.success) {
+                        statusDiv.textContent = 'Saved';
+                        statusDiv.className = 'save-status saved';
+                        setTimeout(() => {
+                            statusDiv.style.opacity = '0.5';
+                        }, 2000);
+                    } else {
+                        statusDiv.textContent = 'Error saving: ' + result.error;
+                        statusDiv.className = 'save-status error';
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    console.error('Save failed:', error);
+                    statusDiv.textContent = 'Save failed. Please try again.';
+                    statusDiv.className = 'save-status error';
+                })
+                .saveStandardObservationAnswerFromClient(currentStandardObservationId, questionId, answerText);
+        }
+
     </script>
 
     <!-- Observations Modal -->
@@ -3767,6 +3953,20 @@
             <div id="questionsContainer" style="padding: 20px; overflow-y: auto; flex: 1; min-height: 0;"></div>
             <div style="padding: 15px 20px; border-top: 1px solid #e5e7eb; background: #f9fafb; text-align: right; flex-shrink: 0;">
                 <button onclick="closeWorkProductModal()" class="filter-btn">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Standard Observation Questions Modal -->
+    <div id="standardObservationModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;" onclick="closeStandardObservationModalOnBackdrop(event)">
+        <div style="position: relative; top: 5%; margin: 0 auto; width: 90%; max-width: 800px; background: white; border-radius: 8px; padding: 0; max-height: 85vh; overflow: hidden; display: flex; flex-direction: column;" onclick="event.stopPropagation()">
+            <div style="padding: 20px; border-bottom: 1px solid #e5e7eb; background: #f9fafb; flex-shrink: 0;">
+                <h2 style="margin: 0; color: #374151;">Observation Reflection Questions</h2>
+                <p style="margin: 5px 0 0 0; color: #6b7280; font-size: 0.9rem;">Your responses are automatically saved as you type.</p>
+            </div>
+            <div id="standardObservationQuestionsContainer" style="padding: 20px; overflow-y: auto; flex: 1; min-height: 0;"></div>
+            <div style="padding: 15px 20px; border-top: 1px solid #e5e7eb; background: #f9fafb; text-align: right; flex-shrink: 0;">
+                <button onclick="closeStandardObservationModal()" class="filter-btn">Close</button>
             </div>
         </div>
     </div>
