@@ -4,6 +4,14 @@
  */
 
 /**
+ * Module-level cache for the main spreadsheet object to avoid redundant API calls
+ * within a single script execution. This is safe in Google Apps Script because each
+ * web request runs in an isolated execution context with no cross-request contamination.
+ * @type {GoogleAppsScript.Spreadsheet.Spreadsheet|undefined}
+ */
+let _spreadsheet;
+
+/**
  * Gets the Sheet ID from Script Properties
  * @return {string} The spreadsheet ID
  * @throws {Error} If SHEET_ID is not configured
@@ -41,20 +49,26 @@ function getSheetByName(spreadsheet, sheetName) {
 
 /**
  * Opens the main spreadsheet
+ * Returns a cached spreadsheet object if available within the same execution context.
  * @return {Spreadsheet} The spreadsheet object
  * @throws {Error} If spreadsheet cannot be opened
  */
 function openSpreadsheet() {
+  // Return cached spreadsheet if available (within same execution)
+  if (_spreadsheet) {
+    return _spreadsheet;
+  }
+
   try {
     const sheetId = getSheetId();
-    const spreadsheet = SpreadsheetApp.openById(sheetId);
-    
+    _spreadsheet = SpreadsheetApp.openById(sheetId);
+
     debugLog('Spreadsheet opened successfully', {
-      name: spreadsheet.getName(),
-      sheetCount: spreadsheet.getSheets().length
+      name: _spreadsheet.getName(),
+      sheetCount: _spreadsheet.getSheets().length
     });
-    
-    return spreadsheet;
+
+    return _spreadsheet;
   } catch (error) {
     throw new Error(`Failed to open spreadsheet: ${error.message}`);
   }
