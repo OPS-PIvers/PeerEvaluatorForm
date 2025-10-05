@@ -2570,7 +2570,8 @@
                                   '2. Upload/drag your audio file\n' +
                                   '3. Wait for transcription\n' +
                                   '4. Copy result back to Script Editor\n' +
-                                  '5. Use Auto-Tag to identify subdomains'
+                                  '5. Use Auto-Tag to identify subdomains',
+            GEMINI_SUCCESS_TOAST_DURATION: 10000
         };
         /**
          * Professional Welcome Modal Functions
@@ -7887,14 +7888,14 @@ function copyPromptAndOpenGemini() {
     const prompt = buildTranscriptionPrompt();
 
     navigator.clipboard.writeText(prompt).then(() => {
-        // Open Gemini Gem in new tab using the constant
-        window.open(UI_CONSTANTS.GEMINI_URL, '_blank');
+        // Open Gemini Gem in new tab using the constant, with security attributes
+        window.open(UI_CONSTANTS.GEMINI_URL, '_blank', 'noopener,noreferrer');
 
         // Close modal
         closeTranscriptionPromptModal();
 
-        // Show detailed instructions from the constant
-        showToast(UI_CONSTANTS.GEMINI_SUCCESS_TOAST, true, 10000);
+        // Show detailed instructions from the constant, using the duration constant
+        showToast(UI_CONSTANTS.GEMINI_SUCCESS_TOAST, true, UI_CONSTANTS.GEMINI_SUCCESS_TOAST_DURATION);
 
     }).catch(err => {
         showToast('Failed to copy prompt. Please try again.', false);
