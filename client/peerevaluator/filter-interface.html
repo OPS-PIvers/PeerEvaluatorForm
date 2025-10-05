@@ -54,6 +54,14 @@
     /* Reds for destructive actions */
     --color-red-base: #dc2626;
     --color-red-dark: #b91c1c;
+
+    /* New colors for Transcription Feature */
+    --color-transcribe-gradient-start: #667eea;
+    --color-transcribe-gradient-end: #764ba2;
+    --color-transcribe-gradient-hover-start: #7c8ef0;
+    --color-transcribe-gradient-hover-end: #8a5db8;
+    --color-transcribe-shadow: rgba(102, 126, 234, 0.4);
+    --color-transcribe-shadow-active: rgba(102, 126, 234, 0.3);
 }
 
         * {
@@ -1819,7 +1827,7 @@
 
 .media-file-transcribe-btn {
     padding: 8px 12px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, var(--color-transcribe-gradient-start) 0%, var(--color-transcribe-gradient-end) 100%);
     color: white;
     border: none;
     border-radius: 6px;
@@ -1834,20 +1842,15 @@
 
 .media-file-transcribe-btn:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-    background: linear-gradient(135deg, #7c8ef0 0%, #8a5db8 100%);
+    box-shadow: 0 4px 12px var(--color-transcribe-shadow);
+    background: linear-gradient(135deg, var(--color-transcribe-gradient-hover-start) 0%, var(--color-transcribe-gradient-hover-end) 100%);
 }
 
 .media-file-transcribe-btn:active {
     transform: translateY(0);
-    box-shadow: 0 2px 6px rgba(102, 126, 234, 0.3);
+    box-shadow: 0 2px 6px var(--color-transcribe-shadow-active);
 }
 
-/* Update delete button to work alongside transcribe button */
-.media-file-delete-btn {
-    /* Existing styles should be preserved */
-    /* Just ensure they work well in flex layout */
-}
         .media-file-icon {
             font-size: 1.5rem;
             flex-shrink: 0;
@@ -2556,11 +2559,19 @@
     </div>
     <div class="toast-notification" id="toastNotification"></div>
     <script>
-        // Probationary year constants from server (parsed as integers to match staff.year type)
-        const PROB_YEAR_1 = parseInt(<?= probYear1 ?>);
-        const PROB_YEAR_2 = parseInt(<?= probYear2 ?>);
-        const PROB_YEAR_3 = parseInt(<?= probYear3 ?>);
-
+        // Constants for UI elements and settings
+        const UI_CONSTANTS = {
+            PROB_YEAR_1: parseInt(<?= probYear1 ?>),
+            PROB_YEAR_2: parseInt(<?= probYear2 ?>),
+            PROB_YEAR_3: parseInt(<?= probYear3 ?>),
+            GEMINI_URL: 'https://gemini.google.com/gem/1KLwvj25ilNePNE2x3cyFCm3T5t0OCm36?usp=sharing',
+            GEMINI_SUCCESS_TOAST: '✅ Prompt copied! Next steps:\n\n' +
+                                  '1. Paste the prompt in Gemini\n' +
+                                  '2. Upload/drag your audio file\n' +
+                                  '3. Wait for transcription\n' +
+                                  '4. Copy result back to Script Editor\n' +
+                                  '5. Use Auto-Tag to identify subdomains'
+        };
         /**
          * Professional Welcome Modal Functions
          */
@@ -2626,6 +2637,12 @@
                         closeWelcomeModal();
                     }
                 });
+            }
+
+            // Centralized event listener for the media manager file list
+            const mediaListContainer = document.getElementById('mediaFilesList');
+            if (mediaListContainer) {
+                mediaListContainer.addEventListener('click', handleMediaListClick);
             }
         });
 
@@ -4429,7 +4446,7 @@
                     listItem.onclick = () => displayObservationOptions(staff.email, staff.name);
 
                     // Determine if probationary (P1, P2, P3: years 4, 5, 6) or tenured (years 1, 2, 3)
-                    const isProbationary = [PROB_YEAR_1, PROB_YEAR_2, PROB_YEAR_3].includes(staff.year) ||
+                    const isProbationary = [UI_CONSTANTS.PROB_YEAR_1, UI_CONSTANTS.PROB_YEAR_2, UI_CONSTANTS.PROB_YEAR_3].includes(staff.year) ||
                                          staff.year === 0 || staff.year === 'Probationary'; // backward compatibility
                     
                     // Set data attribute for filtering
@@ -4494,13 +4511,13 @@
                 case 'tenured':
                     // Tenured = years 1, 2, 3 (exclude probationary years 4, 5, 6 and legacy 0)
                     filteredStaff = allStaffData.filter(staff =>
-                        ![PROB_YEAR_1, PROB_YEAR_2, PROB_YEAR_3, 0, 'Probationary'].includes(staff.year)
+                        ![UI_CONSTANTS.PROB_YEAR_1, UI_CONSTANTS.PROB_YEAR_2, UI_CONSTANTS.PROB_YEAR_3, 0, 'Probationary'].includes(staff.year)
                     );
                     break;
                 case 'probationary':
                     // Probationary = P1, P2, P3 (years 4, 5, 6) plus legacy format
                     filteredStaff = allStaffData.filter(staff =>
-                        [PROB_YEAR_1, PROB_YEAR_2, PROB_YEAR_3, 0, 'Probationary'].includes(staff.year)
+                        [UI_CONSTANTS.PROB_YEAR_1, UI_CONSTANTS.PROB_YEAR_2, UI_CONSTANTS.PROB_YEAR_3, 0, 'Probationary'].includes(staff.year)
                     );
                     break;
                 default:
@@ -6689,13 +6706,13 @@
                         <div class="media-file-actions">
                             ${isAudioOrVideo ? `
                                 <button class="media-file-transcribe-btn"
-                                        onclick="openTranscriptionPromptBuilder('${escapedFileName.replace(/'/g, "\\'")}', event)"
+                                        data-filename="${escapedFileName}"
                                         title="Transcribe with AI">
                                     🎙️
                                 </button>
                             ` : ''}
                             <button class="media-file-delete-btn"
-                                    onclick="handleDeleteFile('${escapedFileName.replace(/'/g, "\\'")}', event)"
+                                    data-filename="${escapedFileName}"
                                     title="Delete file">
                                 ✕
                             </button>
@@ -6823,16 +6840,29 @@
         }
 
         /**
-         * Handles file deletion with confirmation
-         * @param {string} fileName - The name of the file to delete
+         * Centralized event handler for the media file list.
+         * Uses event delegation to handle clicks on transcribe and delete buttons.
          * @param {Event} event - The click event
          */
-        function handleDeleteFile(fileName, event) {
-            // Prevent triggering the file item click
-            if (event) {
-                event.stopPropagation();
-            }
+        function handleMediaListClick(event) {
+            const target = event.target.closest('button');
+            if (!target) return;
 
+            const filename = target.dataset.filename;
+            if (!filename) return;
+
+            if (target.classList.contains('media-file-transcribe-btn')) {
+                openTranscriptionPromptBuilder(filename);
+            } else if (target.classList.contains('media-file-delete-btn')) {
+                handleDeleteFile(filename);
+            }
+        }
+
+        /**
+         * Handles file deletion with confirmation
+         * @param {string} fileName - The name of the file to delete
+         */
+        function handleDeleteFile(fileName) {
             // Show confirmation dialog
             const confirmed = confirm(`Are you sure you want to delete "${fileName}"?\n\nThis action cannot be undone.`);
 
@@ -7628,8 +7658,12 @@
 // TRANSCRIPTION MODAL - PHASE 1
 // ============================================
 
-// Global state for transcription
-let currentTranscriptionFile = null;
+// Namespaced state for the transcription feature
+const transcriptionState = {
+    currentFile: null,
+    listenersAdded: false,
+    observationData: null
+};
 
 /**
  * Opens the advanced transcription prompt builder modal
@@ -7637,13 +7671,8 @@ let currentTranscriptionFile = null;
  * IMPORTANT: This function relies on the global observation loaded into the filter interface.
  * The observation is loaded via loadObservationForEditing and stored in currentObservationId.
  */
-function openTranscriptionPromptBuilder(filename, event) {
-    // Prevent click from bubbling to parent (which would open the file)
-    if (event) {
-        event.stopPropagation();
-    }
-
-    currentTranscriptionFile = filename;
+function openTranscriptionPromptBuilder(filename) {
+    transcriptionState.currentFile = filename;
 
     // Access observation from the current context
     if (!currentObservationId) {
@@ -7661,8 +7690,8 @@ function openTranscriptionPromptBuilder(filename, event) {
                 document.getElementById('mainSpeakerLabel').textContent =
                     observation.observedName || 'Staff Member';
 
-                // Store observation temporarily for prompt building
-                window._transcriptionObservation = observation;
+                // Store observation in our namespaced state
+                transcriptionState.observationData = observation;
 
                 // Show the modal
                 document.getElementById('transcriptionPromptModal').style.display = 'flex';
@@ -7671,14 +7700,14 @@ function openTranscriptionPromptBuilder(filename, event) {
                 updatePromptPreview();
 
                 // Add listeners for real-time preview (only once)
-                if (!window._transcriptionListenersAdded) {
+                if (!transcriptionState.listenersAdded) {
                     const checkboxes = document.querySelectorAll('#transcriptionPromptModal input[type="checkbox"]');
                     checkboxes.forEach(cb => {
                         cb.addEventListener('change', updatePromptPreview);
                     });
 
                     document.getElementById('customInstructions').addEventListener('input', updatePromptPreview);
-                    window._transcriptionListenersAdded = true;
+                    transcriptionState.listenersAdded = true;
                 }
             } else {
                 showToast('Failed to load observation details', false);
@@ -7696,15 +7725,15 @@ function openTranscriptionPromptBuilder(filename, event) {
  */
 function closeTranscriptionPromptModal() {
     document.getElementById('transcriptionPromptModal').style.display = 'none';
-    currentTranscriptionFile = null;
-    window._transcriptionObservation = null;
+    transcriptionState.currentFile = null;
+    transcriptionState.observationData = null;
 }
 
 /**
  * Builds the transcription prompt based on user selections
  */
 function buildTranscriptionPrompt() {
-    const obs = window._transcriptionObservation;
+    const obs = transcriptionState.observationData;
 
     if (!obs) {
         console.error('No observation data available for prompt building');
@@ -7858,20 +7887,15 @@ function copyPromptAndOpenGemini() {
     const prompt = buildTranscriptionPrompt();
 
     navigator.clipboard.writeText(prompt).then(() => {
-        // Open Gemini Gem in new tab
-        window.open('https://gemini.google.com/gem/1KLwvj25ilNePNE2x3cyFCm3T5t0OCm36?usp=sharing', '_blank');
+        // Open Gemini Gem in new tab using the constant
+        window.open(UI_CONSTANTS.GEMINI_URL, '_blank');
 
         // Close modal
         closeTranscriptionPromptModal();
 
-        // Show detailed instructions
-        showToast('✅ Prompt copied! Next steps:\n\n' +
-                  '1. Paste the prompt in Gemini\n' +
-                  '2. Upload/drag your audio file\n' +
-                  '3. Wait for transcription\n' +
-                  '4. Copy result back to Script Editor\n' +
-                  '5. Use Auto-Tag to identify subdomains',
-                  true, 10000);
+        // Show detailed instructions from the constant
+        showToast(UI_CONSTANTS.GEMINI_SUCCESS_TOAST, true, 10000);
+
     }).catch(err => {
         showToast('Failed to copy prompt. Please try again.', false);
         console.error('Clipboard error:', err);
