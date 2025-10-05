@@ -6729,7 +6729,7 @@
                 const sizeMB = file.size ? (file.size / (1024 * 1024)).toFixed(2) : '?';
                 const dateStr = file.lastModified ? new Date(file.lastModified).toLocaleDateString() : '';
                 const displayFileName = escapeHtml(file.name);
-                const dataFileName = escapeHtml(encodeURIComponent(file.name));
+                const dataFileName = encodeURIComponent(file.name);
 
                 // Determine if file is audio or video for transcription button
                 const fileType = (file.type || file.name).toLowerCase();
