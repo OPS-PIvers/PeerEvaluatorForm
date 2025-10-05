@@ -207,11 +207,11 @@ Both phases use the same advanced prompt builder UI, allowing seamless transitio
 ```
 
 **Success Criteria:**
-- ✅ Modal renders correctly on all screen sizes
-- ✅ No layout conflicts with existing modals
-- ✅ All checkboxes are functional
-- ✅ Preview updates in real-time
-- ✅ Modal closes without errors
+- ☑️ Modal renders correctly on all screen sizes
+- ☑️ No layout conflicts with existing modals
+- ☑️ All checkboxes are functional
+- ☑️ Preview updates in real-time
+- ☑️ Modal closes without errors
 
 ---
 
@@ -489,11 +489,11 @@ Both phases use the same advanced prompt builder UI, allowing seamless transitio
 ```
 
 **Success Criteria:**
-- ✅ Modal is visually polished and professional
-- ✅ Animations are smooth
-- ✅ Responsive on mobile/tablet/desktop
-- ✅ Colors match existing design system
-- ✅ No CSS conflicts with existing styles
+- ☑️ Modal is visually polished and professional
+- ☑️ Animations are smooth
+- ☑️ Responsive on mobile/tablet/desktop
+- ☑️ Colors match existing design system
+- ☑️ No CSS conflicts with existing styles
 
 ---
 
@@ -762,12 +762,12 @@ function copyPromptAndOpenGemini() {
 ```
 
 **Success Criteria:**
-- ✅ Modal opens without errors
-- ✅ Prompt builds correctly with all selected options
-- ✅ Preview updates in real-time as options change
-- ✅ Clipboard copy works on all browsers
-- ✅ Gemini Gem opens in new tab
-- ✅ Toast notification provides clear instructions
+- ☑️ Modal opens without errors
+- ☑️ Prompt builds correctly with all selected options
+- ☑️ Preview updates in real-time as options change
+- ☑️ Clipboard copy works on all browsers
+- ☑️ Gemini Gem opens in new tab
+- ☑️ Toast notification provides clear instructions
 
 ---
 
@@ -896,11 +896,11 @@ html += `
 ```
 
 **Success Criteria:**
-- ✅ "Transcribe" button appears next to each audio file
-- ✅ Button is visually distinct and professional
-- ✅ Clicking button opens transcription modal
-- ✅ Correct filename is passed to modal
-- ✅ No conflicts with existing file action buttons
+- ☑️ "Transcribe" button appears next to each audio file
+- ☑️ Button is visually distinct and professional
+- ☑️ Clicking button opens transcription modal
+- ☑️ Correct filename is passed to modal
+- ☑️ No conflicts with existing file action buttons
 
 ---
 
