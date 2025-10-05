@@ -2559,7 +2559,26 @@
     </div>
     <div class="toast-notification" id="toastNotification"></div>
     <script>
-        // Constants for UI elements and settings
+        // ============================================================================
+        // FEATURE FLAGS CONFIGURATION
+        // ============================================================================
+        // This system allows controlled rollout of new features.
+        //
+        // HOW TO USE:
+        // 1. During beta testing: Keep 'enabled: false' and add beta tester emails
+        // 2. After testing complete: Change 'enabled: true' to enable for everyone
+        // 3. Beta testers list is ignored when 'enabled: true'
+        //
+        // EXAMPLE - To enable transcription for everyone:
+        //   TRANSCRIPTION: { enabled: true, betaTesters: [] }
+        // ============================================================================
+        const FEATURE_FLAGS = {
+            TRANSCRIPTION: {
+                enabled: false, // SET TO true TO ENABLE FOR EVERYONE
+                betaTesters: ['paul.ivers@orono.k12.mn.us']
+            }
+        };
+
         const UI_CONSTANTS = {
             PROB_YEAR_1: parseInt(<?= probYear1 ?>),
             PROB_YEAR_2: parseInt(<?= probYear2 ?>),
@@ -2573,6 +2592,23 @@
                                   '5. Use Auto-Tag to identify subdomains',
             GEMINI_SUCCESS_TOAST_DURATION: 10000
         };
+
+        /**
+         * Check if a feature is enabled for the current user
+         * @param {string} featureName - The name of the feature to check
+         * @returns {boolean} True if the feature is enabled for this user
+         */
+        function isFeatureEnabled(featureName) {
+            const feature = FEATURE_FLAGS[featureName];
+            if (!feature) return false;
+
+            // If feature is globally enabled, allow everyone
+            if (feature.enabled) return true;
+
+            // Otherwise, check if user is in beta testers list
+            const userEmail = userContext?.email;
+            return feature.betaTesters && feature.betaTesters.includes(userEmail);
+        }
         /**
          * Professional Welcome Modal Functions
          */
@@ -6696,6 +6732,9 @@
                 const isAudioOrVideo = fileType.includes('audio') || fileType.includes('video') ||
                                        /\.(mp3|wav|ogg|m4a|mp4|avi|mov|wmv)$/.test(fileType);
 
+                // Check if transcription feature is enabled for this user
+                const showTranscribeButton = isAudioOrVideo && isFeatureEnabled('TRANSCRIPTION');
+
                 html += `
                     <div class="media-file-item">
                         <div class="media-file-clickable" onclick="window.open('${file.url}', '_blank')">
@@ -6706,7 +6745,7 @@
                             </div>
                         </div>
                         <div class="media-file-actions">
-                            ${isAudioOrVideo ? `
+                            ${showTranscribeButton ? `
                                 <button class="media-file-transcribe-btn"
                                         data-filename="${dataFileName}"
                                         title="Transcribe with AI">
@@ -7838,7 +7877,6 @@ function getAssignedSubdomainsForPrompt() {
         return 'Not specified';
     }
 
-    const assigned = [];
     const assignedSet = new Set(); // Prevent duplicates
 
     window.rubricData.domains.forEach(domain => {
