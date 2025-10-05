@@ -497,11 +497,62 @@ Both phases use the same advanced prompt builder UI, allowing seamless transitio
 
 ---
 
-### Step 3: Add JavaScript Functions
+### Step 3: Add Feature Flag System and UI Constants
 
 **File:** `client/peerevaluator/filter-interface.html`
 
-**Location:** In the existing `<script>` section (around line 4000-5000)
+**Location:** In the existing `<script>` section, before other transcription code (around line 2575-2600)
+
+**Action:** Add feature flags and UI constants:
+
+```javascript
+// Feature flags for beta testing
+const FEATURE_FLAGS = {
+    TRANSCRIPTION: {
+        enabled: false, // SET TO true TO ENABLE FOR EVERYONE
+        betaTesters: ['paul.ivers@orono.k12.mn.us']
+    }
+};
+
+const UI_CONSTANTS = {
+    PROB_YEAR_1: parseInt(<?= probYear1 ?>),
+    PROB_YEAR_2: parseInt(<?= probYear2 ?>),
+    PROB_YEAR_3: parseInt(<?= probYear3 ?>),
+    GEMINI_URL: 'https://gemini.google.com/gem/1KLwvj25ilNePNE2x3cyFCm3T5t0OCm36?usp=sharing',
+    GEMINI_SUCCESS_TOAST: '✅ Prompt copied! Next steps:\n\n' +
+                          '1. Paste the prompt in Gemini\n' +
+                          '2. Upload/drag your audio file\n' +
+                          '3. Wait for transcription\n' +
+                          '4. Copy result back to Script Editor\n' +
+                          '5. Use Auto-Tag to identify subdomains',
+    GEMINI_SUCCESS_TOAST_DURATION: 10000
+};
+
+/**
+ * Check if a feature is enabled for the current user
+ * @param {string} featureName - The name of the feature to check
+ * @returns {boolean} True if the feature is enabled for this user
+ */
+function isFeatureEnabled(featureName) {
+    const feature = FEATURE_FLAGS[featureName];
+    if (!feature) return false;
+
+    // If feature is globally enabled, allow everyone
+    if (feature.enabled) return true;
+
+    // Otherwise, check if user is in beta testers list
+    const userEmail = userContext?.email;
+    return feature.betaTesters && feature.betaTesters.includes(userEmail);
+}
+```
+
+---
+
+### Step 4: Add JavaScript Functions
+
+**File:** `client/peerevaluator/filter-interface.html`
+
+**Location:** In the existing `<script>` section (around line 7700)
 
 **Action:** Add the following JavaScript:
 
@@ -510,8 +561,12 @@ Both phases use the same advanced prompt builder UI, allowing seamless transitio
 // TRANSCRIPTION MODAL - PHASE 1
 // ============================================
 
-// Global state for transcription
-let currentTranscriptionFile = null;
+// Namespaced state for the transcription feature
+const transcriptionState = {
+    currentFile: null,
+    listenersAdded: false,
+    observationData: null
+};
 
 /**
  * Opens the advanced transcription prompt builder modal
@@ -519,13 +574,8 @@ let currentTranscriptionFile = null;
  * IMPORTANT: This function relies on the global observation loaded into the filter interface.
  * The observation is loaded via loadObservationForEditing and stored in currentObservationId.
  */
-function openTranscriptionPromptBuilder(filename, event) {
-    // Prevent click from bubbling to parent (which would open the file)
-    if (event) {
-        event.stopPropagation();
-    }
-
-    currentTranscriptionFile = filename;
+function openTranscriptionPromptBuilder(filename) {
+    transcriptionState.currentFile = filename;
 
     // Access observation from the current context
     if (!currentObservationId) {
@@ -543,8 +593,8 @@ function openTranscriptionPromptBuilder(filename, event) {
                 document.getElementById('mainSpeakerLabel').textContent =
                     observation.observedName || 'Staff Member';
 
-                // Store observation temporarily for prompt building
-                window._transcriptionObservation = observation;
+                // Store observation in our namespaced state
+                transcriptionState.observationData = observation;
 
                 // Show the modal
                 document.getElementById('transcriptionPromptModal').style.display = 'flex';
@@ -553,14 +603,14 @@ function openTranscriptionPromptBuilder(filename, event) {
                 updatePromptPreview();
 
                 // Add listeners for real-time preview (only once)
-                if (!window._transcriptionListenersAdded) {
+                if (!transcriptionState.listenersAdded) {
                     const checkboxes = document.querySelectorAll('#transcriptionPromptModal input[type="checkbox"]');
                     checkboxes.forEach(cb => {
                         cb.addEventListener('change', updatePromptPreview);
                     });
 
                     document.getElementById('customInstructions').addEventListener('input', updatePromptPreview);
-                    window._transcriptionListenersAdded = true;
+                    transcriptionState.listenersAdded = true;
                 }
             } else {
                 showToast('Failed to load observation details', false);
@@ -578,15 +628,15 @@ function openTranscriptionPromptBuilder(filename, event) {
  */
 function closeTranscriptionPromptModal() {
     document.getElementById('transcriptionPromptModal').style.display = 'none';
-    currentTranscriptionFile = null;
-    window._transcriptionObservation = null;
+    transcriptionState.currentFile = null;
+    transcriptionState.observationData = null;
 }
 
 /**
  * Builds the transcription prompt based on user selections
  */
 function buildTranscriptionPrompt() {
-    const obs = window._transcriptionObservation;
+    const obs = transcriptionState.observationData;
 
     if (!obs) {
         console.error('No observation data available for prompt building');
@@ -687,7 +737,6 @@ function getAssignedSubdomainsForPrompt() {
         return 'Not specified';
     }
 
-    const assigned = [];
     const assignedSet = new Set(); // Prevent duplicates
 
     window.rubricData.domains.forEach(domain => {
@@ -738,22 +787,16 @@ function getAssignedComponentTitles() {
  */
 function copyPromptAndOpenGemini() {
     const prompt = buildTranscriptionPrompt();
-    
+
     navigator.clipboard.writeText(prompt).then(() => {
-        // Open Gemini Gem in new tab
-        window.open('https://gemini.google.com/gem/1KLwvj25ilNePNE2x3cyFCm3T5t0OCm36?usp=sharing', '_blank');
-        
+        // Open Gemini Gem in new tab using the constant, with security attributes
+        window.open(UI_CONSTANTS.GEMINI_URL, '_blank', 'noopener,noreferrer');
+
         // Close modal
         closeTranscriptionPromptModal();
-        
-        // Show detailed instructions
-        showToast('✅ Prompt copied! Next steps:\n\n' +
-                  '1. Paste the prompt in Gemini\n' +
-                  '2. Upload/drag your audio file\n' +
-                  '3. Wait for transcription\n' +
-                  '4. Copy result back to Script Editor\n' +
-                  '5. Use Auto-Tag to identify subdomains', 
-                  true, 10000);
+
+        // Show detailed instructions from the constant, using the duration constant
+        showToast(UI_CONSTANTS.GEMINI_SUCCESS_TOAST, true, UI_CONSTANTS.GEMINI_SUCCESS_TOAST_DURATION);
     }).catch(err => {
         showToast('Failed to copy prompt. Please try again.', false);
         console.error('Clipboard error:', err);
@@ -771,7 +814,7 @@ function copyPromptAndOpenGemini() {
 
 ---
 
-### Step 4: Add Transcribe Button to Existing Media Manager
+### Step 5: Add Transcribe Button to Existing Media Manager
 
 **✅ GREAT NEWS: Media viewing UI already exists!**
 
@@ -819,6 +862,12 @@ const fileType = (file.type || file.name).toLowerCase();
 const isAudioOrVideo = fileType.includes('audio') || fileType.includes('video') ||
                        /\.(mp3|wav|ogg|m4a|mp4|avi|mov|wmv)$/.test(fileType);
 
+// Check if transcription feature is enabled for this user
+const showTranscribeButton = isAudioOrVideo && isFeatureEnabled('TRANSCRIPTION');
+
+// URL-encode the filename for use in data attributes
+const dataFileName = encodeURIComponent(file.name);
+
 html += `
     <div class="media-file-item">
         <div class="media-file-clickable" onclick="window.open('${file.url}', '_blank')">
@@ -829,15 +878,15 @@ html += `
             </div>
         </div>
         <div class="media-file-actions">
-            ${isAudioOrVideo ? `
+            ${showTranscribeButton ? `
                 <button class="media-file-transcribe-btn"
-                        onclick="openTranscriptionPromptBuilder('${escapedFileName.replace(/'/g, "\\'")}', event)"
+                        data-filename="${dataFileName}"
                         title="Transcribe with AI">
                     🎙️
                 </button>
             ` : ''}
             <button class="media-file-delete-btn"
-                    onclick="handleDeleteFile('${escapedFileName.replace(/'/g, "\\'")}', event)"
+                    data-filename="${dataFileName}"
                     title="Delete file">
                 ✕
             </button>
@@ -846,7 +895,40 @@ html += `
 `;
 ```
 
-**Note:** The `openTranscriptionPromptBuilder` function already includes event handling (see Step 3), so no additional changes are needed.
+**Important:** Use event delegation instead of inline `onclick` handlers. Add this centralized handler:
+
+```javascript
+/**
+ * Centralized event handler for the media file list.
+ * Uses event delegation to handle clicks on transcribe and delete buttons.
+ * @param {Event} event - The click event
+ */
+function handleMediaListClick(event) {
+    const target = event.target.closest('button');
+    if (!target) return;
+
+    const encodedFilename = target.dataset.filename;
+    if (!encodedFilename) return;
+
+    const filename = decodeURIComponent(encodedFilename);
+
+    if (target.classList.contains('media-file-transcribe-btn')) {
+        openTranscriptionPromptBuilder(filename);
+    } else if (target.classList.contains('media-file-delete-btn')) {
+        handleDeleteFile(filename);
+    }
+}
+```
+
+**Register the event listener on the media list container:**
+
+```javascript
+// In your initialization code (e.g., DOMContentLoaded or after rendering media list)
+const mediaListContainer = document.getElementById('mediaFilesList');
+if (mediaListContainer) {
+    mediaListContainer.addEventListener('click', handleMediaListClick);
+}
+```
 
 **Add CSS styling for the transcribe button:**
 
@@ -904,9 +986,23 @@ html += `
 
 ---
 
-## Phase 1 Success Criteria
+## Phase 1 Implementation - COMPLETED ✅
 
-### Functional Requirements
+**Status:** Successfully deployed and operational
+**Completion Date:** October 5, 2025
+**PR:** #210 - [feature/transcription-phase-1](https://github.com/OPS-PIvers/PeerEvaluatorForm/pull/210)
+
+### Actual Implementation Highlights
+
+**Key Changes from Original Plan:**
+1. ✅ **Feature Flag System**: Added beta testing capability with user whitelist
+2. ✅ **Namespaced State**: Used `transcriptionState` object instead of global variables
+3. ✅ **Event Delegation**: Implemented centralized `handleMediaListClick()` for better performance
+4. ✅ **CSS Variables**: Defined gradient colors as CSS variables for maintainability
+5. ✅ **UI Constants**: All configurable values in `UI_CONSTANTS` object
+6. ✅ **Security Enhancements**: Added `noopener,noreferrer` to external links
+
+### Functional Requirements - VERIFIED ✅
 - ✅ Transcription modal opens and closes without errors
 - ✅ All checkboxes control prompt generation correctly
 - ✅ Custom instructions field updates preview in real-time
@@ -916,16 +1012,16 @@ html += `
 - ✅ Gemini Gem opens in new tab with correct URL
 - ✅ Instructions toast provides clear next steps
 
-### User Experience Requirements
+### User Experience Requirements - VERIFIED ✅
 - ✅ Modal is responsive on all screen sizes (mobile, tablet, desktop)
 - ✅ All interactions feel smooth and professional
 - ✅ No layout conflicts with existing UI
 - ✅ Error handling for clipboard failures
 - ✅ Clear visual feedback for all user actions
 
-### Technical Requirements
+### Technical Requirements - VERIFIED ✅
 - ✅ No console errors on modal open/close
-- ✅ No memory leaks from event listeners
+- ✅ Event listeners properly managed (no memory leaks)
 - ✅ Code follows existing naming conventions
 - ✅ Comments explain non-obvious logic
 - ✅ Works in Chrome, Firefox, Safari, Edge
@@ -1092,7 +1188,7 @@ html += `
 
 ```javascript
 /**
- * Auto-transcribe with Gemini Batch API
+ * Auto-transcribe with Gemini Batch API (Phase 2)
  */
 function autoTranscribeWithAPI() {
     const prompt = buildTranscriptionPrompt();
@@ -1125,7 +1221,7 @@ function autoTranscribeWithAPI() {
         })
         .createTranscriptionJob(
             currentObservationId,
-            currentTranscriptionFile,
+            transcriptionState.currentFile,  // Use namespaced state
             prompt
         );
 }
