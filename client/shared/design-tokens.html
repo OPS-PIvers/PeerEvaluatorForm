@@ -1,0 +1,202 @@
+<!-- design-tokens.html -->
+<!-- GAS-Compatible Design System CSS Variables -->
+<!-- Include this file in other HTML templates using: <?!= include('client/shared/design-tokens'); ?> -->
+
+<style>
+:root {
+    /* ============================================
+       DESIGN SYSTEM v1.0 - CSS Variables
+       ============================================ */
+
+    /* Base Colors */
+    --color-white: #ffffff;
+    --color-black: #000000;
+
+    /* Text Colors */
+    --color-text-default: #333333;
+    --color-text-light: #374151;
+    --color-text-muted: #4a5568;
+    --color-text-disabled: #9ca3af;
+    --color-text-deemphasized: #718096;
+
+    /* Background Colors */
+    --color-bg-body: #f5f5f5;
+    --color-bg-white: #ffffff;
+
+    /* Green System (Success, Assignments) */
+    --color-green-base: #10b981;
+    --color-green-dark: #059669;
+    --color-green-darker: #047857;
+    --color-green-light: #34d399;
+    --color-green-light-bg: #f0fdf4;
+    --color-green-light-border: #d1fae5;
+
+    /* Amber System (Warnings, Assigned Mode) */
+    --color-amber-base: #f59e0b;
+    --color-amber-dark: #d97706;
+    --color-amber-darker: #b45309;
+    --color-amber-light-bg: #fef3c7;
+    --color-amber-light-border: #fde68a;
+    --color-amber-text-dark: #92400e;
+
+    /* Blue System (Primary Actions, Links) */
+    --color-blue-base: #3b82f6;
+    --color-blue-dark: #2563eb;
+    --color-blue-darker: #1e40af;
+    --color-blue-light: #60a5fa;
+    --color-blue-light-bg: #dbeafe;
+    --color-blue-lighter-bg: #eff6ff;
+    --color-blue-light-border: #bfdbfe;
+    --color-blue-text-dark: #1e40af;
+    --color-blue-focus-shadow: rgba(59, 130, 246, 0.1);
+
+    /* Red System (Errors, Destructive Actions) */
+    --color-red-base: #dc2626;
+    --color-red-dark: #b91c1c;
+    --color-red-darker: #991b1b;
+    --color-red-light: #ef4444;
+    --color-red-light-bg: #fee2e2;
+    --color-red-lighter-bg: #fef2f2;
+    --color-red-light-border: #fecaca;
+
+    /* Orange System (Warnings, Alerts) */
+    --color-orange-base: #f97316;
+    --color-orange-dark: #ea580c;
+    --color-orange-darker: #c2410c;
+    --color-orange-light-bg: #ffedd5;
+    --color-orange-light-border: #fed7aa;
+
+    /* Purple System (Special Features, Transcription) */
+    --color-purple-base: #9f7aea;
+    --color-purple-dark: #805ad5;
+    --color-purple-darker: #6b46c1;
+    --color-purple-light-bg: #f3e8ff;
+    --color-purple-light-border: #e9d5ff;
+
+    /* Gray System (Borders, Backgrounds, Disabled States) */
+    --color-gray-50: #f9fafb;
+    --color-gray-100: #f3f4f6;
+    --color-gray-200: #e5e7eb;
+    --color-gray-300: #d1d5db;
+    --color-gray-400: #9ca3af;
+    --color-gray-500: #6b7280;
+    --color-gray-600: #4b5563;
+    --color-gray-700: #374151;
+    --color-gray-800: #1f2937;
+    --color-gray-900: #111827;
+
+    /* Semantic Gray Aliases (backward compatibility) */
+    --color-gray-text: var(--color-gray-600);
+    --color-gray-text-light: var(--color-gray-700);
+    --color-gray-border-light: var(--color-gray-300);
+    --color-gray-border-medium: var(--color-gray-200);
+    --color-gray-bg-light: #f8fafc;
+    --color-gray-bg-lighter: var(--color-gray-50);
+    --color-gray-bg-medium: var(--color-gray-500);
+    --color-gray-bg-dark: var(--color-gray-600);
+    --color-gray-hover-bg: var(--color-gray-100);
+    --color-gray-component-not-assigned-border: var(--color-gray-200);
+    --color-gray-assignment-indicator-not-assigned-bg: var(--color-gray-200);
+
+    /* Domain-Specific Colors */
+    --color-domain-1: #7c9ac5;
+    --color-domain-1-dark: #5a82b8;
+    --color-domain-2: #8fbc8f;
+    --color-domain-2-dark: #6a9d6a;
+    --color-domain-3: #dda15e;
+    --color-domain-3-dark: #bc6c25;
+    --color-domain-4: #9f7aea;
+    --color-domain-4-dark: #805ad5;
+
+    /* Look-Fors Header Colors */
+    --color-lookfors-header: var(--color-blue-base);
+    --color-lookfors-header-dark: var(--color-blue-dark);
+
+    /* Transcription Feature Colors */
+    --color-transcribe-gradient-start: #667eea;
+    --color-transcribe-gradient-end: #764ba2;
+    --color-transcribe-gradient-hover-start: #7c8ef0;
+    --color-transcribe-gradient-hover-end: #8a5db8;
+    --color-transcribe-shadow: rgba(102, 126, 234, 0.4);
+    --color-transcribe-shadow-active: rgba(102, 126, 234, 0.3);
+
+    /* ============================================
+       GRADIENTS
+       ============================================ */
+
+    --gradient-header: linear-gradient(135deg, var(--color-gray-600), var(--color-gray-800));
+    --gradient-domain-1: linear-gradient(135deg, var(--color-domain-1), var(--color-domain-1-dark));
+    --gradient-domain-2: linear-gradient(135deg, var(--color-domain-2), var(--color-domain-2-dark));
+    --gradient-domain-3: linear-gradient(135deg, var(--color-domain-3), var(--color-domain-3-dark));
+    --gradient-domain-4: linear-gradient(135deg, var(--color-domain-4), var(--color-domain-4-dark));
+    --gradient-lookfors: linear-gradient(135deg, var(--color-lookfors-header), var(--color-lookfors-header-dark));
+    --gradient-success: linear-gradient(135deg, var(--color-green-base), var(--color-green-dark));
+    --gradient-warning: linear-gradient(135deg, var(--color-amber-base), var(--color-amber-dark));
+    --gradient-error: linear-gradient(135deg, var(--color-red-base), var(--color-red-dark));
+    --gradient-transcribe: linear-gradient(135deg, var(--color-transcribe-gradient-start), var(--color-transcribe-gradient-end));
+
+    /* ============================================
+       SHADOWS
+       ============================================ */
+
+    --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.05);
+    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.1);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.15);
+    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.2);
+    --shadow-xl: 0 20px 40px rgba(0, 0, 0, 0.25);
+    --shadow-2xl: 0 25px 50px rgba(0, 0, 0, 0.3);
+
+    /* Colored Shadows */
+    --shadow-blue: 0 4px 12px rgba(59, 130, 246, 0.3);
+    --shadow-green: 0 4px 12px rgba(16, 185, 129, 0.3);
+    --shadow-amber: 0 4px 12px rgba(245, 158, 11, 0.3);
+    --shadow-red: 0 4px 12px rgba(220, 38, 38, 0.3);
+    --shadow-transcribe: 0 4px 12px var(--color-transcribe-shadow);
+
+    /* ============================================
+       BORDER RADIUS
+       ============================================ */
+
+    --radius-none: 0;
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --radius-xl: 16px;
+    --radius-2xl: 20px;
+    --radius-3xl: 24px;
+    --radius-full: 50%;
+    --radius-pill: 9999px;
+
+    /* ============================================
+       SPACING
+       ============================================ */
+
+    --spacing-xs: 4px;
+    --spacing-sm: 8px;
+    --spacing-md: 12px;
+    --spacing-lg: 16px;
+    --spacing-xl: 24px;
+    --spacing-2xl: 32px;
+    --spacing-3xl: 48px;
+
+    /* ============================================
+       TYPOGRAPHY
+       ============================================ */
+
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    --font-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+    --font-email: Arial, sans-serif;
+
+    /* ============================================
+       Z-INDEX SCALE
+       ============================================ */
+
+    --z-base: 0;
+    --z-dropdown: 100;
+    --z-sticky: 101;
+    --z-overlay: 1000;
+    --z-modal: 10000;
+    --z-popover: 10001;
+    --z-tooltip: 10002;
+}
+</style>
