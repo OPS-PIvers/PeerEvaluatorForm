@@ -261,7 +261,7 @@
             background: var(--color-gray-background-light);
             flex: 1;
             min-width: 200px;
-            color: var(--color-gray-text-medium);
+            color: var(--color-gray-500);
             cursor: default;
             display: inline-block;
             line-height: 1.4;
@@ -367,7 +367,7 @@
         }
         
         /* Error states */
-        .error { text-align: center; padding: 40px; margin: 20px 0; border-radius: 12px; display: none; background: var(--color-red-light-bg); color: var(--color-red-dark); border: 2px solid var(--color-red-border); }
+        .error { text-align: center; padding: 40px; margin: 20px 0; border-radius: 12px; display: none; background: var(--color-red-light-bg); color: var(--color-red-dark); border: 2px solid var(--color-red-light-border); }
         @keyframes spin { to { transform: rotate(360deg); } }
 
         /* Status badges and action buttons */
@@ -532,7 +532,7 @@
         /* Finalized Observation Header */
         .finalized-observation-header {
             padding: 12px 20px;
-            background: var(--gradient-finalized);
+            background: var(--gradient-success);
             color: var(--color-white);
             border-bottom: 1px solid var(--color-green-darker);
         }
@@ -581,7 +581,7 @@
             background: var(--color-gray-bg-light);
             border: 1px solid var(--color-gray-border-light);
             border-radius: 6px;
-            color: var(--color-gray-text-medium);
+            color: var(--color-gray-500);
             font-style: italic;
             text-align: center;
         }
@@ -919,7 +919,7 @@
         /* === Rubric Styles (from rubric.html) === */
         .rubric-container { display: none; margin-top: 30px; }
         .domain-section { border-bottom: 3px solid var(--color-gray-border-medium); }
-        .domain-header { background: var(--gradient-domain); color: var(--color-white); padding: 15px 20px; font-size: 1.1rem; font-weight: 600; position: sticky; top: 76px; z-index: 50; box-shadow: var(--shadow-sm); }
+        .domain-header { background: var(--gradient-domain-1); color: var(--color-white); padding: 15px 20px; font-size: 1.1rem; font-weight: 600; position: sticky; top: 76px; z-index: 50; box-shadow: var(--shadow-sm); }
         .component-section { border-bottom: 1px solid var(--color-gray-border-medium); position: relative; transition: background-color 0.2s; }
         .performance-levels-header { position: sticky; top: 132px; z-index: 40; background: var(--color-white); border-bottom: 2px solid var(--color-gray-border-medium); box-shadow: var(--shadow-sm); }
         
@@ -936,12 +936,12 @@
         .level-header { background: var(--color-gray-bg-light); padding: 12px; font-weight: 600; text-align: center; border-bottom: 1px solid var(--color-gray-border-medium); color: var(--color-gray-text); font-size: 0.9rem; }
         .level-content { padding: 20px; border-right: 1px solid var(--color-gray-border-medium); border-bottom: 1px solid var(--color-gray-border-medium); background: var(--color-white); color: var(--color-gray-text); font-size: 0.9rem; transition: background-color 0.2s; }
         .level-content:last-child { border-right: none; }
-        .row-label { background: var(--color-gray-header); padding: 20px; font-weight: 600; color: var(--color-white); border-bottom: 1px solid var(--color-gray-border-medium); display: flex; align-items: center; font-size: 0.9rem; }
+        .row-label { background: var(--color-gray-600); padding: 20px; font-weight: 600; color: var(--color-white); border-bottom: 1px solid var(--color-gray-border-medium); display: flex; align-items: center; font-size: 0.9rem; }
 
         /* Look-fors (Best Practices) */
         .look-fors-section { border-top: 1px solid var(--color-gray-border-medium); }
-        .look-fors-header { background: var(--gradient-look-fors); color: var(--color-white); padding: 10px 20px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-weight: 600; transition: background 0.3s ease; font-size: 0.85rem; }
-        .look-fors-header:hover { background: var(--gradient-look-fors-hover); }
+        .look-fors-header { background: var(--gradient-lookfors); color: var(--color-white); padding: 10px 20px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-weight: 600; transition: background 0.3s ease; font-size: 0.85rem; }
+        .look-fors-header:hover { background: var(--color-lookfors-header-dark); }
         .chevron { transition: all 0.3s ease; font-size: 1rem; }
         .look-fors-content { max-height: 0; overflow: hidden; transition: max-height 0.3s ease; background: var(--color-gray-bg-light); }
         .look-fors-content.expanded { max-height: 1000px; }
@@ -1081,7 +1081,7 @@
         }
 
         .evidence-toggle-btn {
-            background: var(--gradient-evidence);
+            background: var(--gradient-header);
             color: var(--color-white);
             border: none;
             padding: 10px 20px;
@@ -1097,7 +1097,7 @@
         }
 
         .evidence-toggle-btn:hover {
-            background: var(--gradient-evidence-hover);
+            background: var(--color-gray-800);
         }
 
         .evidence-content {
@@ -1130,7 +1130,7 @@
         }
 
         .clear-notes-btn {
-            background: var(--gradient-red);
+            background: var(--gradient-error);
             color: var(--color-white);
             border: none;
             border-radius: 4px;
@@ -1142,7 +1142,7 @@
         }
 
         .clear-notes-btn:hover {
-            background: var(--gradient-red-hover);
+            background: var(--color-red-dark);
             transform: translateY(-1px);
             box-shadow: var(--shadow-md);
         }
@@ -1788,13 +1788,13 @@
 
         .media-file-meta {
             font-size: 0.85rem;
-            color: var(--color-gray-text-medium);
+            color: var(--color-gray-500);
         }
 
         .media-empty-state {
             text-align: center;
             padding: 40px 20px;
-            color: var(--color-gray-text-medium);
+            color: var(--color-gray-500);
         }
 
         .media-empty-state-icon {
@@ -1808,7 +1808,7 @@
             justify-content: center;
             align-items: center;
             padding: 40px;
-            color: var(--color-gray-text-medium);
+            color: var(--color-gray-500);
         }
 
         .media-status-message {
@@ -7343,7 +7343,7 @@
                         <button class="media-upload-btn" onclick="document.getElementById('mediaFileInput').click()">
                             📎 Select File to Upload
                         </button>
-                        <span id="mediaUploadStatus" style="font-size: 0.9rem; color: var(--color-gray-text-medium);"></span>
+                        <span id="mediaUploadStatus" style="font-size: 0.9rem; color: var(--color-gray-500);"></span>
                     </div>
                     <div id="mediaUploadMessage"></div>
                 </div>
