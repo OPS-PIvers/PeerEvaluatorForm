@@ -6688,7 +6688,8 @@
                 const icon = getFileIcon(file.type || file.name);
                 const sizeMB = file.size ? (file.size / (1024 * 1024)).toFixed(2) : '?';
                 const dateStr = file.lastModified ? new Date(file.lastModified).toLocaleDateString() : '';
-                const escapedFileName = escapeHtml(file.name);
+                const displayFileName = escapeHtml(file.name);
+                const dataFileName = encodeURIComponent(file.name);
 
                 // Determine if file is audio or video for transcription button
                 const fileType = (file.type || file.name).toLowerCase();
@@ -6700,20 +6701,20 @@
                         <div class="media-file-clickable" onclick="window.open('${file.url}', '_blank')">
                             <div class="media-file-icon">${icon}</div>
                             <div class="media-file-info">
-                                <div class="media-file-name">${escapedFileName}</div>
+                                <div class="media-file-name">${displayFileName}</div>
                                 <div class="media-file-meta">${sizeMB} MB • ${dateStr}</div>
                             </div>
                         </div>
                         <div class="media-file-actions">
                             ${isAudioOrVideo ? `
                                 <button class="media-file-transcribe-btn"
-                                        data-filename="${escapedFileName}"
+                                        data-filename="${dataFileName}"
                                         title="Transcribe with AI">
                                     🎙️
                                 </button>
                             ` : ''}
                             <button class="media-file-delete-btn"
-                                    data-filename="${escapedFileName}"
+                                    data-filename="${dataFileName}"
                                     title="Delete file">
                                 ✕
                             </button>
@@ -6849,8 +6850,10 @@
             const target = event.target.closest('button');
             if (!target) return;
 
-            const filename = target.dataset.filename;
-            if (!filename) return;
+            const encodedFilename = target.dataset.filename;
+            if (!encodedFilename) return;
+
+            const filename = decodeURIComponent(encodedFilename);
 
             if (target.classList.contains('media-file-transcribe-btn')) {
                 openTranscriptionPromptBuilder(filename);
