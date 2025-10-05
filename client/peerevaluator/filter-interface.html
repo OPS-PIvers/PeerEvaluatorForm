@@ -2198,7 +2198,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, var(--color-transcribe-gradient-start) 0%, var(--color-transcribe-gradient-end) 100%);
     color: white;
     border-radius: 12px 12px 0 0;
 }
@@ -2307,7 +2307,7 @@
 
 #customInstructions:focus {
     outline: none;
-    border-color: #667eea;
+    border-color: var(--color-transcribe-gradient-start);
 }
 
 .prompt-preview {
@@ -2338,7 +2338,7 @@
 }
 
 .workflow-option:hover {
-    border-color: #667eea;
+    border-color: var(--color-transcribe-gradient-start);
     box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
     transform: translateY(-2px);
 }
