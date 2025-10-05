@@ -36,6 +36,8 @@
     --color-blue-base: #3b82f6;
     --color-blue-dark: #2563eb;
     --color-blue-light-bg: #dbeafe;
+    --color-blue-lighter-bg: #eff6ff;
+    --color-blue-light-border: #bfdbfe;
     --color-blue-text-dark: #1e40af;
     --color-blue-focus-shadow: rgba(59, 130, 246, 0.1);
 
@@ -45,10 +47,12 @@
     --color-gray-border-light: #d1d5db;
     --color-gray-border-medium: #e2e8f0;
     --color-gray-bg-light: #f8fafc;
+    --color-gray-bg-lighter: #f9fafb;
     --color-gray-bg-medium: #6b7280;
     --color-gray-bg-dark: #4b5563;
     --color-gray-component-not-assigned-border: #e5e7eb;
     --color-gray-assignment-indicator-not-assigned-bg: #e5e7eb;
+    --color-gray-hover-bg: #f3f4f6;
     --color-text-deemphasized: #718096;
 
     /* Reds for destructive actions */
@@ -2170,7 +2174,7 @@
 }
 
 .transcription-modal {
-    background: white;
+    background: var(--color-white);
     border-radius: 12px;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
     width: 90%;
@@ -2194,12 +2198,12 @@
 
 .transcription-modal-header {
     padding: 20px 24px;
-    border-bottom: 2px solid #e5e7eb;
+    border-bottom: 2px solid var(--color-gray-component-not-assigned-border);
     display: flex;
     justify-content: space-between;
     align-items: center;
     background: linear-gradient(135deg, var(--color-transcribe-gradient-start) 0%, var(--color-transcribe-gradient-end) 100%);
-    color: white;
+    color: var(--color-white);
     border-radius: 12px 12px 0 0;
 }
 
@@ -2212,7 +2216,7 @@
 .transcription-modal-header .close-btn {
     background: rgba(255, 255, 255, 0.2);
     border: none;
-    color: white;
+    color: var(--color-white);
     font-size: 24px;
     cursor: pointer;
     width: 32px;
@@ -2236,15 +2240,15 @@
 
 .transcription-modal-footer {
     padding: 24px;
-    border-top: 2px solid #e5e7eb;
-    background: #f9fafb;
+    border-top: 2px solid var(--color-gray-component-not-assigned-border);
+    background: var(--color-gray-bg-lighter);
     border-radius: 0 0 12px 12px;
 }
 
 .prompt-section {
     margin-bottom: 24px;
     padding-bottom: 20px;
-    border-bottom: 1px solid #e5e7eb;
+    border-bottom: 1px solid var(--color-gray-component-not-assigned-border);
 }
 
 .prompt-section:last-child {
@@ -2255,7 +2259,7 @@
     margin: 0 0 12px 0;
     font-size: 16px;
     font-weight: 600;
-    color: #374151;
+    color: var(--color-gray-text-light);
 }
 
 .checkbox-group {
@@ -2275,7 +2279,7 @@
 }
 
 .checkbox-group label:hover {
-    background: #f3f4f6;
+    background: var(--color-gray-hover-bg);
 }
 
 .checkbox-group input[type="checkbox"] {
@@ -2285,11 +2289,11 @@
 }
 
 .info-box {
-    background: #eff6ff;
-    border: 1px solid #bfdbfe;
+    background: var(--color-blue-lighter-bg);
+    border: 1px solid var(--color-blue-light-border);
     border-radius: 8px;
     padding: 12px;
-    color: #1e40af;
+    color: var(--color-blue-text-dark);
     font-size: 14px;
     line-height: 1.6;
 }
@@ -2297,7 +2301,7 @@
 #customInstructions {
     width: 100%;
     padding: 12px;
-    border: 2px solid #d1d5db;
+    border: 2px solid var(--color-gray-border-light);
     border-radius: 8px;
     font-family: inherit;
     font-size: 14px;
@@ -2311,14 +2315,14 @@
 }
 
 .prompt-preview {
-    background: #f9fafb;
-    border: 1px solid #e5e7eb;
+    background: var(--color-gray-bg-lighter);
+    border: 1px solid var(--color-gray-component-not-assigned-border);
     border-radius: 8px;
     padding: 16px;
     font-family: 'Courier New', monospace;
     font-size: 13px;
     line-height: 1.6;
-    color: #374151;
+    color: var(--color-gray-text-light);
     max-height: 200px;
     overflow-y: auto;
     white-space: pre-wrap;
@@ -2329,12 +2333,12 @@
 }
 
 .workflow-option {
-    background: white;
-    border: 2px solid #e5e7eb;
+    background: var(--color-white);
+    border: 2px solid var(--color-gray-component-not-assigned-border);
     border-radius: 12px;
     padding: 20px;
     transition: all 0.3s ease;
-    border-left: 4px solid #f59e0b;
+    border-left: 4px solid var(--color-amber-base);
 }
 
 .workflow-option:hover {
@@ -6725,7 +6729,7 @@
                 const sizeMB = file.size ? (file.size / (1024 * 1024)).toFixed(2) : '?';
                 const dateStr = file.lastModified ? new Date(file.lastModified).toLocaleDateString() : '';
                 const displayFileName = escapeHtml(file.name);
-                const dataFileName = encodeURIComponent(file.name);
+                const dataFileName = escapeHtml(encodeURIComponent(file.name));
 
                 // Determine if file is audio or video for transcription button
                 const fileType = (file.type || file.name).toLowerCase();
@@ -7930,7 +7934,8 @@ function copyPromptAndOpenGemini() {
 
     navigator.clipboard.writeText(prompt).then(() => {
         // Open Gemini Gem in new tab using the constant, with security attributes
-        window.open(UI_CONSTANTS.GEMINI_URL, '_blank', 'noopener,noreferrer');
+        const newWindow = window.open(UI_CONSTANTS.GEMINI_URL, '_blank', 'noopener,noreferrer');
+        if (newWindow) newWindow.opener = null;
 
         // Close modal
         closeTranscriptionPromptModal();
