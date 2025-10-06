@@ -8043,8 +8043,7 @@ function autoTranscribeWithAPI() {
                 showToast(
                     `✅ Batch job queued!\\n\\n` +
                     `📧 You'll receive an email when complete\\n` +
-                    `⏱️ Estimated wait: ${estimatedWait} minute(s)\\n` +
-                    `💰 ${costSavings}\\n\\n` +
+                    `⏱️ Estimated wait: ${estimatedWait} minute(s)\\n\\n` +
                     `Feel free to continue working - no need to wait around!`,
                     true,
                     12000
@@ -8261,9 +8260,9 @@ function autoTranscribeWithAPI() {
                             <span class="workflow-icon">⚡</span>
                             <span class="workflow-title">Need it now?</span>
                         </div>
-                        <p class="workflow-description">Get your transcript in 2-3 minutes. You'll stay on Gemini to paste the prompt and upload your audio file.</p>
+                        <p class="workflow-description">Get your transcript in 2-3 minutes. You'll use the TranscriptionPal gem to paste the prompt and upload your audio file.</p>
                         <button class="btn-copy-prompt" onclick="copyPromptAndOpenGemini()">
-                            📋 Copy Prompt & Open Gemini
+                            📋 Copy Prompt & Open TranscriptionPal
                         </button>
                     </div>
 
@@ -8273,15 +8272,12 @@ function autoTranscribeWithAPI() {
                         <div class="workflow-header">
                             <span class="workflow-icon">🤖</span>
                             <span class="workflow-title">Can wait?</span>
-                            <span class="cost-badge">50% cheaper</span>
                         </div>
                         <p class="workflow-description">
-                            Submit via Gemini Batch API for <strong>50% cost savings</strong>.
-                            You'll get an email when complete (typically within <span id="batchWaitTime">30-60 minutes</span>).
-                            Continue your work - no need to wait!
+                            Submit multiple audio files and continue working. The transcript will be ready when you check back tomorrow, and you'll get an email when it's complete (can take up to 24 hours).
                         </p>
                         <button class="btn-batch-transcribe" onclick="autoTranscribeWithAPI()">
-                            🚀 Queue Batch Transcription (50% Off)
+                            🚀 Queue Batch Transcription
                         </button>
                     </div>
                 </div>
