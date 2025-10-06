@@ -3260,9 +3260,16 @@
                     forcePageRefresh();
                 }
 
-                // V key to toggle view mode
+                // V key to toggle view mode (only when not typing in input fields)
                 if (e.key === 'v' || e.key === 'V') {
-                    if (userAssignedSubdomains && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                    const activeElement = document.activeElement;
+                    const isTyping = activeElement && (
+                        activeElement.tagName === 'INPUT' ||
+                        activeElement.tagName === 'TEXTAREA' ||
+                        activeElement.isContentEditable
+                    );
+
+                    if (userAssignedSubdomains && !e.ctrlKey && !e.metaKey && !e.altKey && !isTyping) {
                         e.preventDefault();
                         toggleViewMode();
                     }
