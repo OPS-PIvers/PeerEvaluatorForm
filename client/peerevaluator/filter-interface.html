@@ -2329,7 +2329,50 @@
 }
 
 .workflow-selection {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 20px;
+    align-items: center;
     margin-bottom: 16px;
+}
+
+.workflow-divider {
+    font-weight: 700;
+    color: #9ca3af;
+    text-align: center;
+    font-size: 14px;
+}
+
+.workflow-batch {
+    border-left: 4px solid #10b981;
+}
+
+.cost-badge {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 700;
+    margin-left: auto;
+}
+
+.btn-batch-transcribe {
+    width: 100%;
+    padding: 12px 20px;
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 14px;
+}
+
+.btn-batch-transcribe:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
 }
 
 .workflow-option {
@@ -2415,6 +2458,15 @@
 
     .transcription-modal-body {
         padding: 16px;
+    }
+
+    .workflow-selection {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto auto auto;
+    }
+
+    .workflow-divider {
+        margin: 10px 0;
     }
 }
     </style>
@@ -7948,6 +8000,45 @@ function copyPromptAndOpenGemini() {
         console.error('Clipboard error:', err);
     });
 }
+
+/**
+ * Auto-transcribe with Gemini Batch API (Phase 2)
+ */
+function autoTranscribeWithAPI() {
+    const prompt = buildTranscriptionPrompt();
+
+    closeTranscriptionPromptModal();
+
+    showToast('Submitting batch transcription job...', true, 2000);
+
+    google.script.run
+        .withSuccessHandler(function(result) {
+            if (result.success) {
+                showToast(
+                    `✅ Batch job queued!\\n\\n` +
+                    `📧 You'll receive an email when complete\\n` +
+                    `⏱️ Estimated wait: ${result.estimatedWaitMinutes} minute(s)\\n` +
+                    `💰 ${result.costSavings}\\n\\n` +
+                    `Feel free to continue working - no need to wait around!`,
+                    true,
+                    12000
+                );
+
+                console.log('Transcription job created:', result.jobId);
+            } else {
+                showToast('❌ ' + result.error, false);
+            }
+        })
+        .withFailureHandler(function(error) {
+            console.error('Error creating transcription job:', error);
+            showToast('❌ Error: ' + error.message, false);
+        })
+        .createTranscriptionJob(
+            currentObservationId,
+            transcriptionState.currentFile,  // Use namespaced state
+            prompt
+        );
+}
     </script>
 
     <!-- Loading Overlay -->
@@ -8146,6 +8237,24 @@ function copyPromptAndOpenGemini() {
                         <p class="workflow-description">Get your transcript in 2-3 minutes. You'll stay on Gemini to paste the prompt and upload your audio file.</p>
                         <button class="btn-copy-prompt" onclick="copyPromptAndOpenGemini()">
                             📋 Copy Prompt & Open Gemini
+                        </button>
+                    </div>
+
+                    <div class="workflow-divider">OR</div>
+
+                    <div class="workflow-option workflow-batch">
+                        <div class="workflow-header">
+                            <span class="workflow-icon">🤖</span>
+                            <span class="workflow-title">Can wait?</span>
+                            <span class="cost-badge">50% cheaper</span>
+                        </div>
+                        <p class="workflow-description">
+                            Submit via Gemini Batch API for <strong>50% cost savings</strong>.
+                            You'll get an email when complete (typically within <span id="batchWaitTime">30-60 minutes</span>).
+                            Continue your work - no need to wait!
+                        </p>
+                        <button class="btn-batch-transcribe" onclick="autoTranscribeWithAPI()">
+                            🚀 Queue Batch Transcription (50% Off)
                         </button>
                     </div>
                 </div>
