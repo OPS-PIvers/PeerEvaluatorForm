@@ -168,7 +168,7 @@
             font-weight: 600;
             position: sticky;
             top: 0;
-            z-index: 50;
+            z-index: var(--z-above-content-50);
             box-shadow: var(--shadow-sm);
         }
         
@@ -180,7 +180,7 @@
         .performance-levels-header {
             position: sticky;
             top: 56px;
-            z-index: 40;
+            z-index: var(--z-above-content-40);
             background: var(--color-white);
             border-bottom: 2px solid var(--color-gray-200);
             box-shadow: var(--shadow-xs);
@@ -402,13 +402,13 @@
             .domain-header {
                 position: sticky;
                 top: 0;
-                z-index: 50;
+                z-index: var(--z-above-content-50);
             }
 
             .performance-levels-header {
                 position: sticky;
                 top: 56px;
-                z-index: 40;
+                z-index: var(--z-above-content-40);
             }
         }
 
@@ -424,7 +424,7 @@
             border-radius: 6px;
             font-size: 0.8rem;
             font-family: monospace;
-            z-index: 9999;
+            z-index: var(--z-modal-high);
             max-width: 300px;
             word-break: break-all;
         }
@@ -436,6 +436,18 @@
 
         .debug-info div {
             margin-bottom: 4px;
+        }
+
+        .debug-notification {
+            position: fixed;
+            top: 50px;
+            right: 10px;
+            background: #007bff;
+            color: white;
+            padding: 10px;
+            border-radius: 6px;
+            z-index: var(--z-modal-high);
+            font-size: 0.9rem;
         }
         <? } ?>
 
@@ -1064,7 +1076,7 @@
 
         .toggle-option {
             position: relative;
-            z-index: 2;
+            z-index: var(--z-beneath-2);
             background: none;
             border: none;
             padding: 10px 20px;
@@ -1103,7 +1115,7 @@
             border-radius: var(--radius-sm);
             box-shadow: var(--shadow-md);
             transition: transform 0.3s ease, width 0.3s ease;
-            z-index: 1;
+            z-index: var(--z-beneath-1);
             border: 1px solid rgba(255, 255, 255, 0.2);
         }
 
@@ -1163,6 +1175,18 @@
                 opacity: 1;
                 transform: translateY(0) scale(1);
             }
+        }
+
+        /* Reusable Modal Overlay Class */
+        .questions-modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: var(--z-overlay);
         }
 
         .modal-header {
@@ -3284,7 +3308,7 @@
             // In debug mode, show notification
             <? if (data.userContext && data.userContext.debugMode) { ?>
             const notice = document.createElement('div');
-            notice.style.cssText = 'position:fixed; top:50px; right:10px; background:#007bff; color:white; padding:10px; border-radius:6px; z-index:9998; font-size:0.9rem;';
+            notice.className = 'debug-notification';
             notice.textContent = '🔄 Auto-refreshing to get latest data...';
             document.body.appendChild(notice);
 
@@ -3910,7 +3934,7 @@
     </div>
 
     <!-- Work Product Questions Modal -->
-    <div id="workProductModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;" onclick="closeWorkProductModalOnBackdrop(event)">
+    <div id="workProductModal" class="questions-modal-overlay" onclick="closeWorkProductModalOnBackdrop(event)">
         <div style="position: relative; top: 5%; margin: 0 auto; width: 90%; max-width: 800px; background: white; border-radius: 8px; padding: 0; max-height: 85vh; overflow: hidden; display: flex; flex-direction: column;" onclick="event.stopPropagation()">
             <div style="padding: 20px; border-bottom: 1px solid #e5e7eb; background: #f9fafb; flex-shrink: 0;">
                 <h2 style="margin: 0; color: #374151;">Work Product Reflection Questions</h2>
@@ -3924,7 +3948,7 @@
     </div>
 
     <!-- Standard Observation Questions Modal -->
-    <div id="standardObservationModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;" onclick="closeStandardObservationModalOnBackdrop(event)">
+    <div id="standardObservationModal" class="questions-modal-overlay" onclick="closeStandardObservationModalOnBackdrop(event)">
         <div style="position: relative; top: 5%; margin: 0 auto; width: 90%; max-width: 800px; background: white; border-radius: 8px; padding: 0; max-height: 85vh; overflow: hidden; display: flex; flex-direction: column;" onclick="event.stopPropagation()">
             <div style="padding: 20px; border-bottom: 1px solid #e5e7eb; background: #f9fafb; flex-shrink: 0;">
                 <h2 style="margin: 0; color: #374151;">Observation Reflection Questions</h2>

@@ -2,36 +2,81 @@
 <!-- GAS-Compatible Design System CSS Variables -->
 <!-- Include this file in other HTML templates using: <?!= include('client/shared/design-tokens'); ?> -->
 
+<!--
+    USAGE GUIDELINES:
+
+    1. COLOR SYSTEM:
+       - Use semantic color names (--color-blue-base) over hardcoded hex values
+       - Color structure: base → light → dark → darker → light-bg → light-border → text variants
+
+    2. GRAY SCALE:
+       - Numbered grays (50-900): Use for systematic, predictable scales
+       - Semantic aliases (gray-bg-light, gray-border-medium): Use for specific UI purposes
+       - Note: --color-gray-bg-light (#f8fafc) is intentionally between gray-50/100 for subtle backgrounds
+
+    3. GRADIENTS:
+       - Always use gradient variables, never hardcode linear-gradient()
+       - Hover variants defined for interactive elements
+
+    4. SHADOWS:
+       - Generic shadows (sm, md, lg): Use for depth/elevation
+       - Colored shadows: Use to reinforce brand/state (blue for primary, green for success, etc.)
+
+    5. Z-INDEX:
+       - Always use z-index variables to prevent layer conflicts
+       - Scale: base(0) → dropdown(100) → sticky(101) → overlay(1000) → modal(10000+)
+
+    6. SPACING & RADIUS:
+       - Use spacing tokens for consistent padding/margins
+       - Use radius tokens for consistent border-radius values
+-->
+
 <style>
 :root {
     /* ============================================
-       DESIGN SYSTEM v1.0 - CSS Variables
+       DESIGN SYSTEM v1.1 - CSS Variables
+       Last Updated: 2025-10-05
        ============================================ */
 
-    /* Base Colors */
+    /* ============================================
+       BASE COLORS
+       ============================================ */
+
     --color-white: #ffffff;
     --color-black: #000000;
 
-    /* Text Colors */
+    /* ============================================
+       TEXT COLORS
+       ============================================ */
+
     --color-text-default: #333333;
     --color-text-light: #374151;
     --color-text-muted: #4a5568;
     --color-text-disabled: #9ca3af;
     --color-text-deemphasized: #718096;
 
-    /* Background Colors */
+    /* ============================================
+       BACKGROUND COLORS
+       ============================================ */
+
     --color-bg-body: #f5f5f5;
     --color-bg-white: #ffffff;
 
-    /* Green System (Success, Assignments) */
+    /* ============================================
+       GREEN SYSTEM (Success, Assignments, Positive States)
+       ============================================ */
+
     --color-green-base: #10b981;
+    --color-green-light: #34d399;
     --color-green-dark: #059669;
     --color-green-darker: #047857;
-    --color-green-light: #34d399;
     --color-green-light-bg: #f0fdf4;
     --color-green-light-border: #d1fae5;
 
-    /* Amber System (Warnings, Assigned Mode) */
+    /* ============================================
+       AMBER SYSTEM (Warnings, Assigned Mode, Caution States)
+       ============================================ */
+
     --color-amber-base: #f59e0b;
     --color-amber-dark: #d97706;
     --color-amber-darker: #b45309;
@@ -39,41 +84,75 @@
     --color-amber-light-border: #fde68a;
     --color-amber-text-dark: #92400e;
 
-    /* Blue System (Primary Actions, Links) */
+    /* ============================================
+       BLUE SYSTEM (Primary Actions, Links, Interactive Elements)
+       ============================================ */
+
     --color-blue-base: #3b82f6;
+    --color-blue-light: #60a5fa;
     --color-blue-dark: #2563eb;
     --color-blue-darker: #1e40af;
-    --color-blue-light: #60a5fa;
+    --color-blue-darkest: #2c5aa0;
     --color-blue-light-bg: #dbeafe;
     --color-blue-lighter-bg: #eff6ff;
     --color-blue-light-border: #bfdbfe;
     --color-blue-text-dark: #1e40af;
     --color-blue-focus-shadow: rgba(59, 130, 246, 0.1);
+    --color-blue-hover-intermediate: #2b77cb;
 
-    /* Red System (Errors, Destructive Actions) */
+    /* ============================================
+       RED SYSTEM (Errors, Destructive Actions, Critical States)
+       ============================================ */
+
     --color-red-base: #dc2626;
+    --color-red-light: #ef4444;
     --color-red-dark: #b91c1c;
     --color-red-darker: #991b1b;
-    --color-red-light: #ef4444;
+    --color-red-hover-intermediate: #e53e3e;
+    --color-red-hover-dark: #c53030;
     --color-red-light-bg: #fee2e2;
     --color-red-lighter-bg: #fef2f2;
     --color-red-light-border: #fecaca;
 
-    /* Orange System (Warnings, Alerts) */
+    /* ============================================
+       ORANGE SYSTEM (Warnings, Alerts, Attention States)
+       ============================================ */
+
     --color-orange-base: #f97316;
     --color-orange-dark: #ea580c;
     --color-orange-darker: #c2410c;
     --color-orange-light-bg: #ffedd5;
     --color-orange-light-border: #fed7aa;
 
-    /* Purple System (Special Features, Transcription) */
+    /* ============================================
+       PURPLE SYSTEM (Not currently used - reserved for future features)
+       Note: Available for special features, advanced modes, or premium content
+       ============================================ */
+
     --color-purple-base: #9f7aea;
     --color-purple-dark: #805ad5;
     --color-purple-darker: #6b46c1;
     --color-purple-light-bg: #f3e8ff;
     --color-purple-light-border: #e9d5ff;
 
-    /* Gray System (Borders, Backgrounds, Disabled States) */
+    /* ============================================
+       GRAY SYSTEM (Borders, Backgrounds, Disabled States, UI Structure)
+
+       NUMBERED SCALE (50-900): Systematic, predictable grayscale
+       - Use when you need precise control over gray intensity
+       - Lower numbers = lighter, higher numbers = darker
+
+       SEMANTIC ALIASES: Purpose-specific gray references
+       - Use when semantic meaning is more important than exact shade
+       - Example: --color-gray-bg-light makes intent clear vs --color-gray-50
+
+       SPECIAL CASE: --color-gray-bg-light (#f8fafc)
+       - Intentionally between gray-50 and gray-100
+       - Provides subtle background that's slightly warmer than pure gray-50
+       - Used for section backgrounds and content areas
+       ============================================ */
+
+    /* Numbered Gray Scale */
     --color-gray-50: #f9fafb;
     --color-gray-100: #f3f4f6;
     --color-gray-200: #e5e7eb;
@@ -85,34 +164,52 @@
     --color-gray-800: #1f2937;
     --color-gray-900: #111827;
 
-    /* Semantic Gray Aliases (backward compatibility) */
+    /* Semantic Gray Aliases (backward compatibility + semantic clarity) */
     --color-gray-text: var(--color-gray-600);
     --color-gray-text-light: var(--color-gray-700);
     --color-gray-border-light: var(--color-gray-300);
     --color-gray-border-medium: var(--color-gray-200);
-    --color-gray-bg-light: #f8fafc;
+    --color-gray-bg-light: #f8fafc;  /* Intentional custom value - warmer than gray-50 */
     --color-gray-bg-lighter: var(--color-gray-50);
     --color-gray-bg-medium: var(--color-gray-500);
     --color-gray-bg-dark: var(--color-gray-600);
+    --color-gray-bg-darker: #3a3a3a;  /* Used for dark header hover states */
+    --color-gray-bg-darkest: #2a2a2a;  /* Used for darkest header hover states */
     --color-gray-hover-bg: var(--color-gray-100);
     --color-gray-component-not-assigned-border: var(--color-gray-200);
     --color-gray-assignment-indicator-not-assigned-bg: var(--color-gray-200);
 
-    /* Domain-Specific Colors */
-    --color-domain-1: #7c9ac5;
+    /* ============================================
+       DOMAIN-SPECIFIC COLORS
+
+       These colors represent different sections/domains in the application.
+       Domain numbering is generic and maps to application-specific sections.
+       Each domain has a base color and darker variant for gradients.
+       ============================================ */
+
+    --color-domain-1: #7c9ac5;  /* Domain 1 - Blue theme */
     --color-domain-1-dark: #5a82b8;
-    --color-domain-2: #8fbc8f;
+    --color-domain-2: #8fbc8f;  /* Domain 2 - Green theme */
     --color-domain-2-dark: #6a9d6a;
-    --color-domain-3: #dda15e;
+    --color-domain-3: #dda15e;  /* Domain 3 - Orange theme */
     --color-domain-3-dark: #bc6c25;
-    --color-domain-4: #9f7aea;
+    --color-domain-4: #9f7aea;  /* Domain 4 - Purple theme */
     --color-domain-4-dark: #805ad5;
 
-    /* Look-Fors Header Colors */
+    /* ============================================
+       LOOK-FORS HEADER COLORS
+       ============================================ */
+
     --color-lookfors-header: var(--color-blue-base);
     --color-lookfors-header-dark: var(--color-blue-dark);
 
-    /* Transcription Feature Colors */
+    /* ============================================
+       TRANSCRIPTION FEATURE COLORS
+
+       Dedicated color palette for speech-to-text transcription feature.
+       Uses purple tones to differentiate from primary blue actions.
+       ============================================ */
+
     --color-transcribe-gradient-start: #667eea;
     --color-transcribe-gradient-end: #764ba2;
     --color-transcribe-gradient-hover-start: #7c8ef0;
@@ -122,8 +219,13 @@
 
     /* ============================================
        GRADIENTS
+
+       Gradients provide visual depth and brand consistency.
+       All gradients use 135deg angle for uniform directionality.
+       Always use gradient variables instead of inline linear-gradient().
        ============================================ */
 
+    /* Primary Gradients */
     --gradient-header: linear-gradient(135deg, var(--color-gray-600), var(--color-gray-800));
     --gradient-domain-1: linear-gradient(135deg, var(--color-domain-1), var(--color-domain-1-dark));
     --gradient-domain-2: linear-gradient(135deg, var(--color-domain-2), var(--color-domain-2-dark));
@@ -136,14 +238,25 @@
     --gradient-transcribe: linear-gradient(135deg, var(--color-transcribe-gradient-start), var(--color-transcribe-gradient-end));
 
     /* Hover Gradient Variants */
-    --gradient-lookfors-hover: linear-gradient(135deg, #2b77cb, #2c5aa0);
-    --gradient-header-hover: linear-gradient(135deg, #3a3a3a, #2a2a2a);
-    --gradient-error-hover: linear-gradient(135deg, #e53e3e, #c53030);
+    --gradient-lookfors-hover: linear-gradient(135deg, var(--color-blue-hover-intermediate), var(--color-blue-darkest));
+    --gradient-header-hover: linear-gradient(135deg, var(--color-gray-bg-darker), var(--color-gray-bg-darkest));
+    --gradient-error-hover: linear-gradient(135deg, var(--color-red-hover-intermediate), var(--color-red-hover-dark));
+    --gradient-transcribe-hover: linear-gradient(135deg, var(--color-transcribe-gradient-hover-start), var(--color-transcribe-gradient-hover-end));
 
     /* ============================================
        SHADOWS
+
+       Generic shadows for elevation/depth (xs to 2xl).
+       Colored shadows reinforce brand colors and interactive states.
+
+       Usage:
+       - xs/sm: Subtle elevation (cards, inputs)
+       - md/lg: Medium elevation (dropdowns, modals)
+       - xl/2xl: High elevation (overlays, important modals)
+       - Colored: Reinforce interactive element color (buttons, focused inputs)
        ============================================ */
 
+    /* Generic Shadows */
     --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.05);
     --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.1);
     --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.15);
@@ -151,7 +264,7 @@
     --shadow-xl: 0 20px 40px rgba(0, 0, 0, 0.25);
     --shadow-2xl: 0 25px 50px rgba(0, 0, 0, 0.3);
 
-    /* Colored Shadows */
+    /* Colored Shadows (for brand reinforcement) */
     --shadow-blue: 0 4px 12px rgba(59, 130, 246, 0.3);
     --shadow-green: 0 4px 12px rgba(16, 185, 129, 0.3);
     --shadow-amber: 0 4px 12px rgba(245, 158, 11, 0.3);
@@ -160,6 +273,10 @@
 
     /* ============================================
        BORDER RADIUS
+
+       Consistent border-radius values for UI elements.
+       Use semantic names (sm, md, lg) for most cases.
+       Special values: full (circles), pill (rounded buttons/badges).
        ============================================ */
 
     --radius-none: 0;
@@ -173,7 +290,12 @@
     --radius-pill: 9999px;
 
     /* ============================================
-       SPACING
+       SPACING SCALE
+
+       Consistent spacing for padding, margins, gaps.
+       Scale follows 4px base unit for visual rhythm.
+
+       xs(4px) → sm(8px) → md(12px) → lg(16px) → xl(24px) → 2xl(32px) → 3xl(48px)
        ============================================ */
 
     --spacing-xs: 4px;
@@ -186,6 +308,11 @@
 
     /* ============================================
        TYPOGRAPHY
+
+       System font stacks for different contexts:
+       - sans: Primary UI font (system fonts for performance)
+       - mono: Code, technical content
+       - email: Email-safe fonts (Arial for maximum compatibility)
        ============================================ */
 
     --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
@@ -194,12 +321,34 @@
 
     /* ============================================
        Z-INDEX SCALE
+
+       Standardized z-index values prevent layer conflicts.
+       ALWAYS use these variables instead of hardcoded z-index values.
+
+       Layer hierarchy (bottom to top):
+       - base(0): Normal flow
+       - beneath(1-2): Elements that should be below normal content
+       - above-content(40-50): Content that floats above normal flow (sticky headers, etc.)
+       - dropdown(100): Dropdowns, menus
+       - sticky(101): Sticky navigation elements
+       - overlay(1000): Overlays, toasts, notifications
+       - overlay-popover(1001): Popovers within overlays
+       - modal(10000): Modal dialogs
+       - modal-high(9999): High-priority modals/notifications
+       - popover(10001): Popovers over modals
+       - tooltip(10002): Tooltips (highest)
        ============================================ */
 
     --z-base: 0;
+    --z-beneath-1: 1;
+    --z-beneath-2: 2;
+    --z-above-content-40: 40;
+    --z-above-content-50: 50;
     --z-dropdown: 100;
     --z-sticky: 101;
     --z-overlay: 1000;
+    --z-overlay-popover: 1001;
+    --z-modal-high: 9999;
     --z-modal: 10000;
     --z-popover: 10001;
     --z-tooltip: 10002;
