@@ -472,6 +472,7 @@ function submitToBatchAPI(jobId, jobData, apiKey) {
         const batchApiUrl = `https://generativelanguage.googleapis.com/v1beta/batches?key=${apiKey}`;
 
         const payload = {
+            name: `batches/transcription-${jobId}`,
             requests: [
                 {
                     model: `models/${model}`,
