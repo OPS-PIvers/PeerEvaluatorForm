@@ -8014,8 +8014,9 @@ function autoTranscribeWithAPI() {
         .withSuccessHandler(function(result) {
             if (result.success) {
                 // Validate and sanitize server-provided data before displaying it
-                const estimatedWait = Number.isFinite(Number(result.estimatedWaitMinutes)) && Number(result.estimatedWaitMinutes) > 0
-                    ? Math.round(Number(result.estimatedWaitMinutes))
+                const waitMinutesNum = Number(result.estimatedWaitMinutes);
+                const estimatedWait = Number.isFinite(waitMinutesNum) && waitMinutesNum > 0
+                    ? Math.round(waitMinutesNum)
                     : 'N/A';
                 const costSavings = result.costSavings ? escapeHtml(result.costSavings) : 'N/A';
 

@@ -351,7 +351,13 @@ function processTranscriptionQueue() {
                 return;
             }
 
-            const jobData = JSON.parse(jobDataStr);
+            let jobData;
+            try {
+                jobData = JSON.parse(jobDataStr);
+            } catch (err) {
+                console.error('Malformed JSON for job:', jobId, err);
+                return;
+            }
 
             if (jobData.status === 'pending') {
                 pendingJobs.push({ jobId, jobData });
@@ -367,20 +373,21 @@ function processTranscriptionQueue() {
         });
 
         // STEP 1: Check status of processing jobs
+        const jobsToRemoveFromQueue = [];
         for (const job of processingJobs) {
             try {
                 const result = checkBatchJobStatus(job.jobData.batchJobName, apiKey);
 
                 if (result.state === 'SUCCEEDED') {
                     completeBatchTranscription(job.jobId, job.jobData, result, apiKey);
+                    // Always remove from queue after completeBatchTranscription, whether it succeeded or failed
+                    // (completeBatchTranscription sets status to 'complete' or 'failed')
+                    jobsToRemoveFromQueue.push(job.jobId);
                 } else if (result.state === 'FAILED') {
                     job.jobData.status = 'failed';
                     job.jobData.error = result.error || 'Batch API processing failed';
                     properties.setProperty('transcription_job_' + job.jobId, JSON.stringify(job.jobData));
-
-                    jobQueue = jobQueue.filter(id => id !== job.jobId);
-                    properties.setProperty('transcription_queue', JSON.stringify(jobQueue));
-
+                    jobsToRemoveFromQueue.push(job.jobId);
                     sendTranscriptionNotification(job.jobData, false);
                 }
             } catch (error) {
@@ -388,9 +395,16 @@ function processTranscriptionQueue() {
             }
         }
 
+        // Batch update the queue after processing all jobs
+        if (jobsToRemoveFromQueue.length > 0) {
+            jobQueue = jobQueue.filter(id => !jobsToRemoveFromQueue.includes(id));
+            properties.setProperty('transcription_queue', JSON.stringify(jobQueue));
+        }
+
         // STEP 2: Submit pending jobs to Batch API
         if (pendingJobs.length > 0) {
             const jobsToSubmit = pendingJobs.slice(0, MAX_JOBS_PER_RUN); // Process up to 5 per trigger
+            const jobsToRemoveFromQueuePending = [];
 
             for (const job of jobsToSubmit) {
                 try {
@@ -419,10 +433,7 @@ function processTranscriptionQueue() {
                             job.jobData.status = 'failed';
                             job.jobData.error = batchResult.error;
                             properties.setProperty('transcription_job_' + job.jobId, JSON.stringify(job.jobData));
-
-                            jobQueue = jobQueue.filter(id => id !== job.jobId);
-                            properties.setProperty('transcription_queue', JSON.stringify(jobQueue));
-
+                            jobsToRemoveFromQueuePending.push(job.jobId);
                             sendTranscriptionNotification(job.jobData, false);
                         } else {
                             job.jobData.error = batchResult.error;
@@ -432,6 +443,12 @@ function processTranscriptionQueue() {
                 } catch (error) {
                     console.error('Error submitting job to Batch API:', error);
                 }
+            }
+
+            // Batch update the queue after processing pending jobs
+            if (jobsToRemoveFromQueuePending.length > 0) {
+                jobQueue = jobQueue.filter(id => !jobsToRemoveFromQueuePending.includes(id));
+                properties.setProperty('transcription_queue', JSON.stringify(jobQueue));
             }
         }
 
@@ -627,10 +644,8 @@ function completeBatchTranscription(jobId, jobData, batchResult, apiKey) {
         jobData.transcriptionContent = transcriptionText;
         properties.setProperty('transcription_job_' + jobId, JSON.stringify(jobData));
 
-        // Remove from queue
-        let jobQueue = JSON.parse(properties.getProperty('transcription_queue') || '[]');
-        jobQueue = jobQueue.filter(id => id !== jobId);
-        properties.setProperty('transcription_queue', JSON.stringify(jobQueue));
+        // Note: Queue removal is now batched in processTranscriptionQueue for performance
+        // The calling function will handle removing completed jobs from the queue
 
         sendTranscriptionNotification(jobData, true);
 
@@ -647,9 +662,8 @@ function completeBatchTranscription(jobId, jobData, batchResult, apiKey) {
         jobData.error = error.message;
         PropertiesService.getScriptProperties().setProperty('transcription_job_' + jobId, JSON.stringify(jobData));
 
-        let jobQueue = JSON.parse(PropertiesService.getScriptProperties().getProperty('transcription_queue') || '[]');
-        jobQueue = jobQueue.filter(id => id !== jobId);
-        PropertiesService.getScriptProperties().setProperty('transcription_queue', JSON.stringify(jobQueue));
+        // Note: Queue removal is now batched in processTranscriptionQueue for performance
+        // The calling function will handle removing failed jobs from the queue
 
         sendTranscriptionNotification(jobData, false);
 
@@ -712,19 +726,7 @@ function sendTranscriptionNotification(jobData, success) {
             return;
         }
 
-        // Helper to escape HTML special characters for security
-        const escapeHtml = (unsafe) => {
-            if (typeof unsafe !== 'string') {
-                return '';
-            }
-            return unsafe
-                .replace(/&/g, "&amp;")
-                .replace(/</g, "&lt;")
-                .replace(/>/g, "&gt;")
-                .replace(/"/g, "&quot;")
-                .replace(/'/g, "&#039;");
-        };
-
+        // Use the centralized escapeHtml utility function from Utils.js
         const safeFilename = escapeHtml(jobData.filename);
         const safeError = escapeHtml(jobData.error);
 
