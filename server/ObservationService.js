@@ -1779,6 +1779,11 @@ function saveWorkProductAnswerToDoc(observationId, questionId, answerText) {
     }
 
     try {
+      // Get the question text from the questions sheet
+      const questions = getWorkProductQuestions();
+      const question = questions.find(q => q.questionId === questionId);
+      const questionText = question ? question.questionText : '';
+
       // Search for existing answer section
       const searchPattern = `Question ${questionId}:`;
       const searchResult = body.findText(searchPattern);
@@ -1787,21 +1792,59 @@ function saveWorkProductAnswerToDoc(observationId, questionId, answerText) {
         // Update existing answer
         const element = searchResult.getElement();
         const paragraph = element.getParent();
-        const nextParagraph = paragraph.getNextSibling();
 
-        if (nextParagraph && nextParagraph.getType() === DocumentApp.ElementType.PARAGRAPH) {
-          // Update the answer in the next paragraph
-          nextParagraph.asParagraph().setText(answerText || '(No response provided)');
+        // Check if there's a question text paragraph after the question ID
+        let currentSibling = paragraph.getNextSibling();
+        let questionTextParagraph = null;
+        let answerParagraph = null;
+
+        // Look for the question text and answer paragraphs
+        if (currentSibling && currentSibling.getType() === DocumentApp.ElementType.PARAGRAPH) {
+          const siblingText = currentSibling.asParagraph().getText();
+          // If it's italic, it's the question text
+          if (currentSibling.asParagraph().editAsText().isItalic()) {
+            questionTextParagraph = currentSibling.asParagraph();
+            currentSibling = currentSibling.getNextSibling();
+          }
+        }
+
+        // The next paragraph should be the answer
+        if (currentSibling && currentSibling.getType() === DocumentApp.ElementType.PARAGRAPH) {
+          answerParagraph = currentSibling.asParagraph();
+          answerParagraph.setText(answerText || '(No response provided)');
         } else {
-          // Insert answer paragraph after question
-          const answerParagraph = body.insertParagraph(body.getChildIndex(paragraph) + 1, answerText || '(No response provided)');
+          // Insert answer paragraph
+          const insertIndex = questionTextParagraph
+            ? body.getChildIndex(questionTextParagraph) + 1
+            : body.getChildIndex(paragraph) + 1;
+          answerParagraph = body.insertParagraph(insertIndex, answerText || '(No response provided)');
           answerParagraph.setIndentFirstLine(20);
+        }
+
+        // Update question text if it exists and is different
+        if (questionText && questionTextParagraph) {
+          questionTextParagraph.setText(questionText);
+        } else if (questionText && !questionTextParagraph) {
+          // Insert question text paragraph after question ID
+          const insertIndex = body.getChildIndex(paragraph) + 1;
+          const newQuestionTextPara = body.insertParagraph(insertIndex, questionText);
+          newQuestionTextPara.setIndentFirstLine(20);
+          newQuestionTextPara.editAsText().setItalic(true);
+          newQuestionTextPara.editAsText().setForegroundColor('#6b7280');
         }
       } else {
         // Add new question and answer at the end
         body.appendParagraph(''); // Empty line
         const questionParagraph = body.appendParagraph(`Question ${questionId}:`);
         questionParagraph.editAsText().setBold(true);
+
+        // Add question text if available
+        if (questionText) {
+          const questionTextParagraph = body.appendParagraph(questionText);
+          questionTextParagraph.setIndentFirstLine(20);
+          questionTextParagraph.editAsText().setItalic(true);
+          questionTextParagraph.editAsText().setForegroundColor('#6b7280');
+        }
 
         const answerParagraph = body.appendParagraph(answerText || '(No response provided)');
         answerParagraph.setIndentFirstLine(20);
@@ -2681,6 +2724,11 @@ function saveInstructionalRoundAnswerToDoc(observationId, questionId, answerText
     }
 
     try {
+      // Get the question text from the questions sheet
+      const questions = getStandardObservationQuestions();
+      const question = questions.find(q => q.questionId === questionId);
+      const questionText = question ? question.questionText : '';
+
       // Search for existing answer section
       const searchPattern = `Question ${questionId}:`;
       const searchResult = body.findText(searchPattern);
@@ -2689,19 +2737,59 @@ function saveInstructionalRoundAnswerToDoc(observationId, questionId, answerText
         // Update existing answer
         const element = searchResult.getElement();
         const paragraph = element.getParent();
-        const nextParagraph = paragraph.getNextSibling();
 
-        if (nextParagraph && nextParagraph.getType() === DocumentApp.ElementType.PARAGRAPH) {
-          nextParagraph.asParagraph().setText(answerText || '(No response provided)');
+        // Check if there's a question text paragraph after the question ID
+        let currentSibling = paragraph.getNextSibling();
+        let questionTextParagraph = null;
+        let answerParagraph = null;
+
+        // Look for the question text and answer paragraphs
+        if (currentSibling && currentSibling.getType() === DocumentApp.ElementType.PARAGRAPH) {
+          const siblingText = currentSibling.asParagraph().getText();
+          // If it's italic, it's the question text
+          if (currentSibling.asParagraph().editAsText().isItalic()) {
+            questionTextParagraph = currentSibling.asParagraph();
+            currentSibling = currentSibling.getNextSibling();
+          }
+        }
+
+        // The next paragraph should be the answer
+        if (currentSibling && currentSibling.getType() === DocumentApp.ElementType.PARAGRAPH) {
+          answerParagraph = currentSibling.asParagraph();
+          answerParagraph.setText(answerText || '(No response provided)');
         } else {
-          const answerParagraph = body.insertParagraph(body.getChildIndex(paragraph) + 1, answerText || '(No response provided)');
+          // Insert answer paragraph
+          const insertIndex = questionTextParagraph
+            ? body.getChildIndex(questionTextParagraph) + 1
+            : body.getChildIndex(paragraph) + 1;
+          answerParagraph = body.insertParagraph(insertIndex, answerText || '(No response provided)');
           answerParagraph.setIndentFirstLine(20);
+        }
+
+        // Update question text if it exists and is different
+        if (questionText && questionTextParagraph) {
+          questionTextParagraph.setText(questionText);
+        } else if (questionText && !questionTextParagraph) {
+          // Insert question text paragraph after question ID
+          const insertIndex = body.getChildIndex(paragraph) + 1;
+          const newQuestionTextPara = body.insertParagraph(insertIndex, questionText);
+          newQuestionTextPara.setIndentFirstLine(20);
+          newQuestionTextPara.editAsText().setItalic(true);
+          newQuestionTextPara.editAsText().setForegroundColor('#6b7280');
         }
       } else {
         // Add new question and answer at the end
         body.appendParagraph('');
         const questionParagraph = body.appendParagraph(`Question ${questionId}:`);
         questionParagraph.editAsText().setBold(true);
+
+        // Add question text if available
+        if (questionText) {
+          const questionTextParagraph = body.appendParagraph(questionText);
+          questionTextParagraph.setIndentFirstLine(20);
+          questionTextParagraph.editAsText().setItalic(true);
+          questionTextParagraph.editAsText().setForegroundColor('#6b7280');
+        }
 
         const answerParagraph = body.appendParagraph(answerText || '(No response provided)');
         answerParagraph.setIndentFirstLine(20);
