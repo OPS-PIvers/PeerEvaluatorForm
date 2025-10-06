@@ -301,6 +301,23 @@ function loadRubricData(filterParams) {
     }
 }
 
+/**
+ * Include helper for GAS HTML templates
+ * Allows including HTML partials in other HTML files
+ *
+ * IMPORTANT: File paths in GAS are relative to project root
+ * For subdirectories, use format: 'client/shared/design-tokens'
+ * DO NOT use: './client/...' or '/client/...'
+ *
+ * Usage in HTML: <?!= include('client/shared/design-tokens'); ?>
+ *
+ * @param {string} filename - Path to HTML file (no .html extension)
+ * @return {string} Content of the HTML file
+ */
+function include(filename) {
+  return HtmlService.createHtmlOutputFromFile(filename).getContent();
+}
+
 // loadRubricDataWithViewMode function removed - using client-side toggle approach instead
 
 

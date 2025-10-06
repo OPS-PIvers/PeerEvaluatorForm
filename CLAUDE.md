@@ -226,6 +226,36 @@ The system includes comprehensive error handling:
 - Change detection to minimize unnecessary operations
 - Bulk operations where possible
 
+## Design System & Styling
+
+### CSS Design Tokens
+
+The application uses a centralized design token system located in `client/shared/design-tokens.html`. This file contains all CSS variables for colors, gradients, shadows, spacing, typography, and z-index values.
+
+**Key Points:**
+- All HTML templates include design tokens via: `<?!= include('client/shared/design-tokens'); ?>`
+- Never hardcode colors, spacing, or other design values - always use CSS variables
+- See usage guidelines at the top of `design-tokens.html` for proper token usage
+
+### Email Template Style Synchronization
+
+**IMPORTANT:** The email template (`client/shared/finalized-observation-email.html`) cannot use the design token include because email clients don't support CSS variables or server-side includes.
+
+**Email Template Maintenance Process:**
+1. Styles are manually inlined in the email template
+2. Comment annotations map inline styles back to design tokens (e.g., `<!-- --color-bg-body: #f5f5f5; -->`)
+3. When updating design tokens that affect emails, manually update the corresponding inline styles
+4. Always maintain the comment annotations for future reference
+
+**Email Template Affected Tokens:**
+- `--font-email`, `--color-bg-body`, `--color-white`, `--color-text-default`, `--color-text-muted`
+- `--color-gray-border-light`, `--color-blue-base`, `--radius-md`
+
+**Testing Email Styles:**
+- Send test emails when changing related design tokens
+- Verify rendering in multiple email clients (Gmail, Outlook, Apple Mail)
+- Check both desktop and mobile views
+
 ## Common Debugging
 
 Use these functions for troubleshooting:

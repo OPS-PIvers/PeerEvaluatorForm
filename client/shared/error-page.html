@@ -2,14 +2,14 @@
 <html>
 <head>
   <base target="_top">
-  
+  <?!= include('client/shared/design-tokens'); ?>
   <!-- Content Security Policy - Allow framing from any origin -->
   <meta http-equiv="Content-Security-Policy" content="frame-ancestors *;">
   <style>
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-      background-color: #f8f9fa;
-      color: #3c4043;
+      font-family: var(--font-sans);
+      background-color: var(--color-gray-bg-light);
+      color: var(--color-text-default);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -17,36 +17,36 @@
       margin: 0;
     }
     .container {
-      background: #fff;
-      border-radius: 8px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
-      padding: 40px;
+      background: var(--color-white);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-md);
+      padding: var(--spacing-3xl);
       max-width: 800px;
       text-align: center;
     }
     h1 {
-      color: #d93025;
+      color: var(--color-red-dark);
       font-size: 24px;
-      margin-bottom: 16px;
+      margin-bottom: var(--spacing-lg);
     }
     p {
       font-size: 16px;
       line-height: 1.5;
     }
     .error-details {
-      background: #f1f3f4;
-      border-radius: 4px;
-      padding: 20px;
-      margin-top: 20px;
+      background: var(--color-gray-100);
+      border-radius: var(--radius-md);
+      padding: var(--spacing-xl);
+      margin-top: var(--spacing-xl);
       text-align: left;
-      font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+      font-family: var(--font-mono);
       font-size: 13px;
       white-space: pre-wrap;
       word-wrap: break-word;
-      color: #5f6368;
+      color: var(--color-text-muted);
     }
     .error-details strong {
-      color: #202124;
+      color: var(--color-text-light);
     }
   </style>
 </head>
