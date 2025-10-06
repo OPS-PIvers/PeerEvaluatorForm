@@ -6,6 +6,16 @@
  * while adding support for multiple roles and automatic cache management.
  */
 
+/**
+ * =================================================================
+ * CONSTANTS
+ * =================================================================
+ */
+const MAX_JOBS_PER_RUN = 5;
+const MAX_JOB_ATTEMPTS = 3;
+const GEMINI_TRANSCRIPTION_MODEL = 'gemini-flash-lite-latest';
+const MAX_BATCH_FILE_SIZE_BYTES = 37 * 1024 * 1024;
+
 
 /**
  * =================================================================
@@ -300,6 +310,495 @@ function loadRubricData(filterParams) {
         return { success: false, error: error.message };
     }
 }
+
+/**
+ * Processes transcription queue using Gemini Batch API
+ * This runs on a time-based trigger (every 15-30 minutes)
+ */
+function processTranscriptionQueue() {
+    const startTime = new Date().getTime();
+    const MAX_EXECUTION_TIME = 5 * 60 * 1000; // 5 minutes buffer
+
+    try {
+        const properties = PropertiesService.getScriptProperties();
+        let jobQueue = properties.getProperty('transcription_queue');
+
+        if (!jobQueue) {
+            debugLog('Transcription queue empty');
+            return;
+        }
+
+        jobQueue = JSON.parse(jobQueue);
+        if (jobQueue.length === 0) {
+            debugLog('No pending transcription jobs');
+            return;
+        }
+
+        const apiKey = properties.getProperty('GEMINI_API_KEY');
+        if (!apiKey) {
+            console.error('GEMINI_API_KEY not configured');
+            return;
+        }
+
+        // Separate jobs by status
+        const pendingJobs = [];
+        const processingJobs = [];
+
+        jobQueue.forEach(jobId => {
+            const jobDataStr = properties.getProperty('transcription_job_' + jobId);
+            if (!jobDataStr) {
+                console.error('Job data not found:', jobId);
+                return;
+            }
+
+            let jobData;
+            try {
+                jobData = JSON.parse(jobDataStr);
+            } catch (err) {
+                console.error('Malformed JSON for job:', jobId, err);
+                return;
+            }
+
+            if (jobData.status === 'pending') {
+                pendingJobs.push({ jobId, jobData });
+            } else if (jobData.status === 'processing' && jobData.batchJobName) {
+                processingJobs.push({ jobId, jobData });
+            }
+        });
+
+        debugLog('Queue status', {
+            total: jobQueue.length,
+            pending: pendingJobs.length,
+            processing: processingJobs.length
+        });
+
+        // STEP 1: Check status of processing jobs
+        const jobsToRemoveFromQueue = [];
+        for (const job of processingJobs) {
+            try {
+                const result = checkBatchJobStatus(job.jobData.batchJobName, apiKey);
+
+                if (result.state === 'SUCCEEDED') {
+                    completeBatchTranscription(job.jobId, job.jobData, result, apiKey);
+                    // Always remove from queue after completeBatchTranscription, whether it succeeded or failed
+                    // (completeBatchTranscription sets status to 'complete' or 'failed')
+                    jobsToRemoveFromQueue.push(job.jobId);
+                } else if (result.state === 'FAILED') {
+                    job.jobData.status = 'failed';
+                    job.jobData.error = result.error || 'Batch API processing failed';
+                    properties.setProperty('transcription_job_' + job.jobId, JSON.stringify(job.jobData));
+                    jobsToRemoveFromQueue.push(job.jobId);
+                    sendTranscriptionNotification(job.jobData, false);
+                }
+            } catch (error) {
+                console.error('Error checking batch job status:', error);
+            }
+        }
+
+        // Batch update the queue after processing all jobs
+        if (jobsToRemoveFromQueue.length > 0) {
+            jobQueue = jobQueue.filter(id => !jobsToRemoveFromQueue.includes(id));
+            properties.setProperty('transcription_queue', JSON.stringify(jobQueue));
+        }
+
+        // STEP 2: Submit pending jobs to Batch API
+        if (pendingJobs.length > 0) {
+            const jobsToSubmit = pendingJobs.slice(0, MAX_JOBS_PER_RUN); // Process up to 5 per trigger
+            const jobsToRemoveFromQueuePending = [];
+
+            for (const job of jobsToSubmit) {
+                try {
+                    const elapsedTime = new Date().getTime() - startTime;
+                    if (elapsedTime > MAX_EXECUTION_TIME) {
+                        debugLog('Approaching execution limit, stopping job submission');
+                        break;
+                    }
+
+                    const batchResult = submitToBatchAPI(job.jobId, job.jobData, apiKey);
+
+                    if (batchResult.success) {
+                        job.jobData.status = 'processing';
+                        job.jobData.batchJobName = batchResult.batchJobName;
+                        job.jobData.submittedAt = new Date().toISOString();
+                        properties.setProperty('transcription_job_' + job.jobId, JSON.stringify(job.jobData));
+
+                        debugLog('Job submitted to Batch API', {
+                            jobId: job.jobId,
+                            batchJobName: batchResult.batchJobName
+                        });
+                    } else {
+                        job.jobData.attempts = (job.jobData.attempts || 0) + 1;
+
+                        if (job.jobData.attempts >= MAX_JOB_ATTEMPTS) {
+                            job.jobData.status = 'failed';
+                            job.jobData.error = batchResult.error;
+                            properties.setProperty('transcription_job_' + job.jobId, JSON.stringify(job.jobData));
+                            jobsToRemoveFromQueuePending.push(job.jobId);
+                            sendTranscriptionNotification(job.jobData, false);
+                        } else {
+                            job.jobData.error = batchResult.error;
+                            properties.setProperty('transcription_job_' + job.jobId, JSON.stringify(job.jobData));
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error submitting job to Batch API:', error);
+                }
+            }
+
+            // Batch update the queue after processing pending jobs
+            if (jobsToRemoveFromQueuePending.length > 0) {
+                jobQueue = jobQueue.filter(id => !jobsToRemoveFromQueuePending.includes(id));
+                properties.setProperty('transcription_queue', JSON.stringify(jobQueue));
+            }
+        }
+
+    } catch (error) {
+        console.error('Error in processTranscriptionQueue:', error);
+    }
+}
+
+/**
+ * Submits a transcription job to Gemini Batch API
+ */
+function submitToBatchAPI(jobId, jobData, apiKey) {
+    try {
+        const audioFile = DriveApp.getFileById(jobData.fileId);
+        const audioBlob = audioFile.getBlob();
+        const audioBytes = audioBlob.getBytes();
+        const base64Audio = Utilities.base64Encode(audioBytes);
+        const mimeType = audioFile.getMimeType();
+
+        const model = GEMINI_TRANSCRIPTION_MODEL;
+        const batchApiUrl = `https://generativelanguage.googleapis.com/v1beta/batches?key=${apiKey}`;
+
+        const payload = {
+            requests: [
+                {
+                    model: `models/${model}`,
+                    contents: [{
+                        parts: [
+                            { text: jobData.prompt },
+                            {
+                                inline_data: {
+                                    mime_type: mimeType,
+                                    data: base64Audio
+                                }
+                            }
+                        ]
+                    }],
+                    generationConfig: {
+                        temperature: 0.2,
+                        topK: 40,
+                        topP: 0.95,
+                        maxOutputTokens: 8192
+                    }
+                }
+            ]
+        };
+
+        const options = {
+            method: 'post',
+            contentType: 'application/json',
+            payload: JSON.stringify(payload),
+            muteHttpExceptions: true
+        };
+
+        debugLog('Submitting to Gemini Batch API', {
+            jobId: jobId,
+            model: model,
+            filename: jobData.filename
+        });
+
+        const response = UrlFetchApp.fetch(batchApiUrl, options);
+        const responseCode = response.getResponseCode();
+        const responseText = response.getContentText();
+
+        if (responseCode !== 200 && responseCode !== 201) {
+            console.error('Batch API submission error:', responseCode, responseText);
+            return {
+                success: false,
+                error: `Batch API error ${responseCode}`
+            };
+        }
+
+        const jsonResponse = JSON.parse(responseText);
+        const batchJobName = jsonResponse.name;
+
+        if (!batchJobName) {
+            return {
+                success: false,
+                error: 'Batch API did not return job name'
+            };
+        }
+
+        return {
+            success: true,
+            batchJobName: batchJobName
+        };
+
+    } catch (error) {
+        console.error('Error submitting to Batch API:', error);
+        return {
+            success: false,
+            error: error.message
+        };
+    }
+}
+
+/**
+ * Checks the status of a Gemini Batch API job
+ */
+function checkBatchJobStatus(batchJobName, apiKey) {
+    try {
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/${batchJobName}?key=${apiKey}`;
+
+        const options = {
+            method: 'get',
+            muteHttpExceptions: true
+        };
+
+        const response = UrlFetchApp.fetch(apiUrl, options);
+        const responseCode = response.getResponseCode();
+        const responseText = response.getContentText();
+
+        if (responseCode !== 200) {
+            console.error('Batch status check error:', responseCode, responseText);
+            return {
+                state: 'UNKNOWN',
+                error: `Status check error: ${responseCode}`
+            };
+        }
+
+        const jsonResponse = JSON.parse(responseText);
+
+        return {
+            state: jsonResponse.state,
+            metadata: jsonResponse.metadata,
+            results: jsonResponse.results,
+            error: jsonResponse.error
+        };
+
+    } catch (error) {
+        console.error('Error checking batch status:', error);
+        return {
+            state: 'UNKNOWN',
+            error: error.message
+        };
+    }
+}
+
+/**
+ * Completes a batch transcription job
+ */
+function completeBatchTranscription(jobId, jobData, batchResult, apiKey) {
+    const lock = LockService.getScriptLock();
+
+    try {
+        lock.waitLock(10000);
+
+        const properties = PropertiesService.getScriptProperties();
+
+        if (!batchResult.results || batchResult.results.length === 0) {
+            throw new Error('No results in batch response');
+        }
+
+        const result = batchResult.results[0];
+
+        if (!result.response || !result.response.candidates || result.response.candidates.length === 0) {
+            throw new Error('No transcription in batch result');
+        }
+
+        const transcriptionText = result.response.candidates[0].content.parts[0].text;
+
+        if (!transcriptionText) {
+            throw new Error('Empty transcription received');
+        }
+
+        const observation = getObservationById(jobData.observationId);
+        if (!observation) {
+            throw new Error('Observation not found');
+        }
+
+        // Save transcription to Google Doc
+        const folder = getOrCreateObservationFolder(jobData.observationId);
+        const docUrl = saveTranscriptionToDoc(folder, jobData.filename, transcriptionText, observation);
+
+        // Update observation record
+        if (!observation.transcriptions) {
+            observation.transcriptions = [];
+        }
+        observation.transcriptions.push({
+            audioFilename: jobData.filename,
+            docUrl: docUrl,
+            timestamp: new Date().toISOString(),
+            transcribedBy: jobData.createdBy,
+            jobId: jobId,
+            method: 'batch_api'
+        });
+        updateObservationInSheet(observation);
+
+        // Mark job as complete
+        jobData.status = 'complete';
+        jobData.completedAt = new Date().toISOString();
+        jobData.transcriptionUrl = docUrl;
+        jobData.transcriptionContent = transcriptionText;
+        properties.setProperty('transcription_job_' + jobId, JSON.stringify(jobData));
+
+        // Note: Queue removal is now batched in processTranscriptionQueue for performance
+        // The calling function will handle removing completed jobs from the queue
+
+        sendTranscriptionNotification(jobData, true);
+
+        debugLog('Batch transcription completed', {
+            jobId,
+            docUrl,
+            processingTime: calculateProcessingTime(jobData)
+        });
+
+    } catch (error) {
+        console.error('Error completing batch transcription:', error);
+
+        jobData.status = 'failed';
+        jobData.error = error.message;
+        PropertiesService.getScriptProperties().setProperty('transcription_job_' + jobId, JSON.stringify(jobData));
+
+        // Note: Queue removal is now batched in processTranscriptionQueue for performance
+        // The calling function will handle removing failed jobs from the queue
+
+        sendTranscriptionNotification(jobData, false);
+
+    } finally {
+        lock.releaseLock();
+    }
+}
+
+/**
+ * Saves the transcription text to a new Google Doc in the specified folder.
+ * @param {GoogleAppsScript.Drive.Folder} folder The Drive folder to save the document in.
+ * @param {string} originalFilename The name of the original audio file.
+ * @param {string} transcriptionText The transcribed text.
+ * @param {Object} observation The observation data object.
+ * @returns {string} The URL of the newly created Google Doc.
+ */
+function saveTranscriptionToDoc(folder, originalFilename, transcriptionText, observation) {
+    try {
+        const docName = `Transcription of ${originalFilename} - ${new Date().toISOString().slice(0, 10)}`;
+        const doc = DocumentApp.create(docName);
+        const body = doc.getBody();
+
+        // Add a header
+        body.appendParagraph(`Transcription for Observation: ${observation.observationName || observation.observationId}`)
+            .setHeading(DocumentApp.ParagraphHeading.HEADING1);
+        body.appendParagraph(`Observed Staff: ${observation.observedName} | Observer: ${observation.observerEmail}`);
+        body.appendParagraph(`Date Transcribed: ${new Date().toLocaleString()}`);
+        body.appendHorizontalRule();
+        body.appendParagraph('');
+
+        // Add the transcription content
+        body.appendParagraph(transcriptionText);
+
+        doc.saveAndClose();
+
+        // Move the new document to the correct observation folder
+        const docFile = DriveApp.getFileById(doc.getId());
+        folder.addFile(docFile);
+        DriveApp.getRootFolder().removeFile(docFile); // Remove from root
+
+        debugLog('Transcription saved to Google Doc', { docName, docId: doc.getId() });
+
+        return docFile.getUrl();
+    } catch (error) {
+        console.error('Error saving transcription to Doc:', error);
+        throw new Error('Failed to save transcription document: ' + error.message);
+    }
+}
+
+/**
+ * Sends an email notification to the user about the transcription job status.
+ * @param {Object} jobData The data for the transcription job.
+ * @param {boolean} success Whether the job was successful or not.
+ */
+function sendTranscriptionNotification(jobData, success) {
+    try {
+        const recipient = jobData.createdBy;
+        if (!recipient) {
+            console.error('No recipient found for transcription notification', { jobId: jobData.jobId });
+            return;
+        }
+
+        // Use the centralized escapeHtml utility function from Utils.js
+        const safeFilename = escapeHtml(jobData.filename);
+        const safeError = escapeHtml(jobData.error);
+
+        let subject = '';
+        let htmlBody = '';
+
+        if (success) {
+            subject = `✅ Transcription Complete: ${safeFilename}`;
+            htmlBody = `
+                <p>Hello,</p>
+                <p>Your transcription for the file <strong>${safeFilename}</strong> is complete.</p>
+                <p>You can view the transcribed document here:</p>
+                <p><a href="${jobData.transcriptionUrl}">View Transcription</a></p>
+                <p>This transcription has been automatically added to the observation materials.</p>
+                <br>
+                <p>Job Details:</p>
+                <ul>
+                    <li>Job ID: ${jobData.jobId}</li>
+                    <li>Observation ID: ${jobData.observationId}</li>
+                </ul>
+            `;
+        } else {
+            subject = `❌ Transcription Failed: ${safeFilename}`;
+            htmlBody = `
+                <p>Hello,</p>
+                <p>We're sorry, but the transcription for the file <strong>${safeFilename}</strong> has failed.</p>
+                <p><strong>Error details:</strong></p>
+                <pre>${safeError || 'An unknown error occurred.'}</pre>
+                <br>
+                <p>You may want to try submitting the job again. If the problem persists, please contact support.</p>
+                <br>
+                <p>Job Details:</p>
+                <ul>
+                    <li>Job ID: ${jobData.jobId}</li>
+                    <li>Observation ID: ${jobData.observationId}</li>
+                </ul>
+            `;
+        }
+
+        MailApp.sendEmail({
+            to: recipient,
+            subject: subject,
+            htmlBody: htmlBody,
+            name: 'Peer Evaluator System'
+        });
+
+        debugLog('Transcription notification sent', { recipient, success, jobId: jobData.jobId });
+
+    } catch (error) {
+        console.error('Error sending transcription notification email:', error);
+    }
+}
+
+/**
+ * Helper function to calculate processing time from job data
+ * @param {Object} jobData The job data object
+ * @returns {string} A string representing the processing time
+ */
+function calculateProcessingTime(jobData) {
+    if (!jobData.submittedAt || !jobData.completedAt) {
+        return 'N/A';
+    }
+    try {
+        const start = new Date(jobData.submittedAt);
+        const end = new Date(jobData.completedAt);
+        const diffSeconds = Math.round((end - start) / 1000);
+        return `${diffSeconds} seconds`;
+    } catch (e) {
+        return 'N/A';
+    }
+}
+
 
 // loadRubricDataWithViewMode function removed - using client-side toggle approach instead
 
@@ -3859,5 +4358,271 @@ const rootFolder = rootFolderIterator.hasNext()
             Logger.log(`Teardown: Cleared temporary spreadsheet ID property.`);
         }
         Logger.log('--- Test Suite Finished ---');
+    }
+}
+
+/**
+ * Creates a transcription job for batch processing
+ * Uses Gemini Batch API for 50% cost savings
+ */
+function createTranscriptionJob(observationId, filename, prompt) {
+    try {
+        const userContext = createUserContext();
+        if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR &&
+            userContext.role !== SPECIAL_ROLES.ADMINISTRATOR) {
+            return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
+        }
+
+        const observation = getObservationById(observationId);
+        if (!observation) {
+            return { success: false, error: 'Observation not found.' };
+        }
+
+        // Get audio file and check size
+        const folder = getOrCreateObservationFolder(observationId);
+        const files = folder.getFilesByName(filename);
+        if (!files.hasNext()) {
+            return { success: false, error: 'Audio file not found.' };
+        }
+        const audioFile = files.next();
+        const fileSizeBytes = audioFile.getSize();
+        const fileSizeMB = (fileSizeBytes / (1024 * 1024)).toFixed(2);
+
+        // Batch API has higher limits - check 50MB limit (with base64 overhead ~37MB source)
+        if (fileSizeBytes > MAX_BATCH_FILE_SIZE_BYTES) {
+            return {
+                success: false,
+                error: `File too large (${fileSizeMB}MB). Maximum size for batch transcription is 37MB. Please use the "Copy Prompt" option for larger files.`
+            };
+        }
+
+        // Generate unique job ID
+        const jobId = Utilities.getUuid();
+
+        // Store job in Script Properties
+        const jobData = {
+            jobId: jobId,
+            observationId: observationId,
+            filename: filename,
+            prompt: prompt,
+            status: 'pending', // pending, processing, complete, failed
+            createdAt: new Date().toISOString(),
+            createdBy: userContext.email,
+            fileSizeMB: fileSizeMB,
+            fileId: audioFile.getId(),
+            attempts: 0,
+            batchJobName: null
+        };
+
+        const properties = PropertiesService.getScriptProperties();
+        properties.setProperty('transcription_job_' + jobId, JSON.stringify(jobData));
+
+        // Add to job queue
+        let jobQueue = properties.getProperty('transcription_queue');
+        jobQueue = jobQueue ? JSON.parse(jobQueue) : [];
+        jobQueue.push(jobId);
+        properties.setProperty('transcription_queue', JSON.stringify(jobQueue));
+
+        debugLog('Batch transcription job created', { jobId, filename, fileSizeMB });
+
+        const estimatedMinutes = Math.ceil(fileSizeMB / 2) + 15;
+
+        return {
+            success: true,
+            jobId: jobId,
+            status: 'pending',
+            estimatedWaitMinutes: estimatedMinutes,
+            message: `Batch transcription job queued. Estimated completion: ${estimatedMinutes} minutes`,
+            costSavings: '50% cheaper using Batch API'
+        };
+
+    } catch (error) {
+        console.error('Error creating batch transcription job:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Checks the status of a transcription job
+ */
+function checkTranscriptionJobStatus(jobId) {
+    try {
+        const properties = PropertiesService.getScriptProperties();
+        const jobDataStr = properties.getProperty('transcription_job_' + jobId);
+
+        if (!jobDataStr) {
+            return { success: false, error: 'Job not found' };
+        }
+
+        const jobData = JSON.parse(jobDataStr);
+
+        return {
+            success: true,
+            status: jobData.status,
+            jobId: jobId,
+            filename: jobData.filename,
+            createdAt: jobData.createdAt,
+            completedAt: jobData.completedAt,
+            transcriptionUrl: jobData.transcriptionUrl,
+            error: jobData.error,
+            progress: jobData.progress || 'Waiting in queue...'
+        };
+
+    } catch (error) {
+        console.error('Error checking job status:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * =================================================================
+ * TRANSCRIPTION BATCH PROCESSING TRIGGER MANAGEMENT
+ * =================================================================
+ */
+
+/**
+ * Installs a time-based trigger to process the transcription queue every 15 minutes.
+ * This function should be run once by an administrator to set up the system.
+ * @param {boolean} forceReinstall If true, will remove existing triggers before installing.
+ * @returns {Object} A result object with success status and message.
+ */
+function installTranscriptionTrigger(forceReinstall = false) {
+    console.log('=== INSTALLING TRANSCRIPTION BATCH TRIGGER ===');
+    try {
+        const handlerFunction = 'processTranscriptionQueue';
+
+        // Check for existing triggers for this handler
+        const existingTriggers = ScriptApp.getProjectTriggers().filter(trigger =>
+            trigger.getHandlerFunction() === handlerFunction
+        );
+
+        if (existingTriggers.length > 0 && !forceReinstall) {
+            console.log(`✅ Transcription trigger for '${handlerFunction}' already installed.`);
+            return {
+                success: true,
+                message: 'Trigger already exists.',
+                triggerCount: existingTriggers.length
+            };
+        }
+
+        // Remove existing triggers if force reinstall
+        if (forceReinstall && existingTriggers.length > 0) {
+            console.log(`Removing ${existingTriggers.length} existing triggers for '${handlerFunction}'...`);
+            existingTriggers.forEach(trigger => {
+                ScriptApp.deleteTrigger(trigger);
+            });
+            console.log('✓ Existing triggers removed.');
+        }
+
+        // Create a new time-based trigger
+        console.log('Creating new time-based trigger to run every 15 minutes...');
+        const newTrigger = ScriptApp.newTrigger(handlerFunction)
+            .timeBased()
+            .everyMinutes(15)
+            .create();
+
+        const triggerId = newTrigger.getUniqueId();
+        console.log(`✅ TRANSCRIPTION TRIGGER INSTALLED SUCCESSFULLY (ID: ${triggerId})`);
+        console.log(`The function '${handlerFunction}' will now run approximately every 15 minutes.`);
+
+        return {
+            success: true,
+            message: 'Transcription trigger installed successfully.',
+            triggerId: triggerId
+        };
+
+    } catch (error) {
+        console.error(`Error installing transcription trigger: ${error.message}`);
+        return {
+            success: false,
+            error: `Failed to install trigger: ${error.message}`
+        };
+    }
+}
+
+/**
+ * Checks the status of the transcription processing trigger.
+ * @returns {Object} An object containing the status of the trigger.
+ */
+function checkTranscriptionTriggerStatus() {
+    console.log('=== CHECKING TRANSCRIPTION TRIGGER STATUS ===');
+    try {
+        const handlerFunction = 'processTranscriptionQueue';
+        const triggers = ScriptApp.getProjectTriggers().filter(trigger =>
+            trigger.getHandlerFunction() === handlerFunction
+        );
+
+        if (triggers.length === 0) {
+            console.log(`❌ No trigger found for '${handlerFunction}'.`);
+            return {
+                isInstalled: false,
+                message: `Transcription trigger is not installed. Please run installTranscriptionTrigger().`
+            };
+        }
+
+        const status = triggers.map(trigger => ({
+            id: trigger.getUniqueId(),
+            handler: trigger.getHandlerFunction(),
+            type: trigger.getTriggerSource().toString(),
+            eventType: trigger.getEventType().toString()
+        }));
+
+        console.log(`✅ Found ${triggers.length} trigger(s) for '${handlerFunction}':`, status);
+        return {
+            isInstalled: true,
+            triggerCount: triggers.length,
+            triggers: status
+        };
+
+    } catch (error) {
+        console.error(`Error checking transcription trigger status: ${error.message}`);
+        return {
+            isInstalled: false,
+            error: `Failed to check trigger status: ${error.message}`
+        };
+    }
+}
+
+/**
+ * Removes all time-based triggers for the transcription queue processor.
+ * @returns {Object} A result object with success status and message.
+ */
+function removeTranscriptionTrigger() {
+    console.log('=== REMOVING TRANSCRIPTION BATCH TRIGGER ===');
+    try {
+        const handlerFunction = 'processTranscriptionQueue';
+        const triggers = ScriptApp.getProjectTriggers().filter(trigger =>
+            trigger.getHandlerFunction() === handlerFunction
+        );
+
+        if (triggers.length === 0) {
+            console.log(`No triggers found for '${handlerFunction}' to remove.`);
+            return {
+                success: true,
+                message: 'No active transcription triggers to remove.',
+                removedCount: 0
+            };
+        }
+
+        console.log(`Found ${triggers.length} trigger(s) to remove...`);
+        triggers.forEach(trigger => {
+            const triggerId = trigger.getUniqueId();
+            ScriptApp.deleteTrigger(trigger);
+            console.log(`✓ Trigger ${triggerId} removed.`);
+        });
+
+        console.log(`✅ Successfully removed ${triggers.length} transcription trigger(s).`);
+        return {
+            success: true,
+            message: `Removed ${triggers.length} trigger(s).`,
+            removedCount: triggers.length
+        };
+
+    } catch (error) {
+        console.error(`Error removing transcription trigger: ${error.message}`);
+        return {
+            success: false,
+            error: `Failed to remove trigger: ${error.message}`
+        };
     }
 }
