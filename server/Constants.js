@@ -460,6 +460,12 @@ const OBSERVATION_STATUS = {
   FINALIZED: 'Finalized'
 };
 
+const OBSERVATION_TYPES = {
+  STANDARD: 'Standard',
+  WORK_PRODUCT: 'Work Product',
+  INSTRUCTIONAL_ROUND: 'Instructional Round'
+};
+
 const DRIVE_FOLDER_INFO = {
   ROOT_FOLDER_NAME: 'Danielson Rubric Observations'
 };
