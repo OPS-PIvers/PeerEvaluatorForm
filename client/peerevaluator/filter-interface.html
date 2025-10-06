@@ -2875,6 +2875,13 @@
                     </div>`;
             <? } ?>
 
+            actionButtonsHtml += `
+                    <div class="action-card" onclick="handleNewInstructionalRoundObservation('${safeObservedEmailJs}')">
+                        <span class="action-icon">📝</span>
+                        <div class="action-title">Create Instructional Round</div>
+                        <div class="action-desc">Request instructional round reflection responses from this staff member.</div>
+                    </div>`;
+
             actionButtonsHtml += `</div>`;
 
             // Filter toggle section
@@ -3046,6 +3053,16 @@
               .withSuccessHandler(handleRubricData)
               .withFailureHandler(handleError)
               .createWorkProductObservationForEvaluator(observedEmail);
+        }
+
+        function handleNewInstructionalRoundObservation(observedEmail) {
+            console.log('Starting new instructional round observation for:', observedEmail);
+            clearObservationState();
+            showLoading('Creating instructional round observation...');
+            google.script.run
+              .withSuccessHandler(handleRubricData)
+              .withFailureHandler(handleError)
+              .createInstructionalRoundObservationForEvaluator(observedEmail);
         }
         function handleEditObservation(obsId) { 
             console.log('Loading observation for editing:', obsId);

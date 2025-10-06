@@ -126,15 +126,15 @@ function doGet(e) {
     const htmlTemplate = HtmlService.createTemplateFromFile(TEMPLATE_PATHS.STAFF_RUBRIC); // This is now a fallback view
     htmlTemplate.data = rubricData;
 
-    // Check if user has any Work Product observations
+    // Check if user has any Work Product or Instructional Round observations
     let hasWorkProduct = false;
-    let hasStandardObservation = false;
+    let hasInstructionalRound = false;
     if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
       hasWorkProduct = checkUserHasWorkProductObservation(userContext.email);
-      hasStandardObservation = checkUserHasStandardObservationFromPeerEvaluator(userContext.email);
+      hasInstructionalRound = checkUserHasInstructionalRoundFromPeerEvaluator(userContext.email);
     }
     htmlTemplate.showWorkProductQuestionsButton = hasWorkProduct;
-    htmlTemplate.showStandardObservationQuestionsButton = hasStandardObservation;
+    htmlTemplate.showInstructionalRoundQuestionsButton = hasInstructionalRound;
 
     // Determine if staff member has finalized observations (for button positioning)
     const hasMyObservations = userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR ?
@@ -507,6 +507,59 @@ function createWorkProductObservationForEvaluator(observedEmail) {
 }
 
 /**
+ * Creates a new Instructional Round observation for a Peer Evaluator.
+ * @param {string} observedEmail The email of the staff member to be observed.
+ * @returns {Object} A response object containing the new observation and the rubric data.
+ */
+function createInstructionalRoundObservationForEvaluator(observedEmail) {
+  try {
+    const userContext = createUserContext();
+
+    if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
+      return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
+    }
+
+    const newObservation = createInstructionalRoundObservation(userContext.email, observedEmail);
+    if (!newObservation) {
+      return { success: false, error: 'Failed to create instructional round observation.' };
+    }
+
+    let assignedSubdomains = null;
+    // Peer Evaluator should use assigned subdomains approach
+    if (userContext.role === SPECIAL_ROLES.PEER_EVALUATOR) {
+        assignedSubdomains = getAssignedSubdomainsForRoleYear(newObservation.observedRole, newObservation.observedYear);
+    }
+
+    // Peer Evaluator uses assigned subdomains
+    const viewMode = (userContext.role === SPECIAL_ROLES.ADMINISTRATOR)
+      ? 'full'
+      : (userContext.role === SPECIAL_ROLES.PEER_EVALUATOR)
+        ? 'assigned'
+        : 'full';
+
+    const rubricData = getAllDomainsData(
+      newObservation.observedRole,
+      newObservation.observedYear,
+      viewMode,
+      assignedSubdomains
+    );
+
+    const evaluatorContext = createFilteredUserContext(observedEmail, userContext.role);
+    rubricData.userContext = evaluatorContext;
+
+    return {
+      success: true,
+      observation: newObservation,
+      rubricData: rubricData,
+      userContext: userContext
+    };
+  } catch (error) {
+    console.error('Error in createInstructionalRoundObservationForEvaluator:', error);
+    return { success: false, error: 'An unexpected error occurred: ' + error.message };
+  }
+}
+
+/**
  * Gets work product questions for client-side use.
  * @returns {Object} A response object containing the questions array.
  */
@@ -733,6 +786,107 @@ function getCurrentUserStandardObservationId() {
   } catch (error) {
     console.error('Error getting current user standard observation:', error);
     return { success: false, error: 'Failed to get observation ID: ' + error.message };
+  }
+}
+
+/**
+ * Gets the current user's instructional round observation ID and ensures response doc exists.
+ * @returns {Object} A response object containing the observation ID.
+ */
+function getCurrentUserInstructionalRoundObservationId() {
+  try {
+    const userContext = createUserContext();
+    const observations = _getObservationsDb();
+
+    const userInstructionalRoundObs = observations.find(obs => {
+      if (obs.observedEmail !== userContext.email) return false;
+      if (obs.Type !== 'Instructional Round') return false;
+      if (obs.status !== 'Draft') return false;
+
+      // Check if observer is Peer Evaluator
+      const observer = getUserByEmail(obs.observerEmail);
+      return observer && observer.role === 'Peer Evaluator';
+    });
+
+    if (userInstructionalRoundObs) {
+      // Ensure response document exists
+      const peerEvaluatorEmail = userInstructionalRoundObs.observerEmail;
+      const docResult = createOrGetInstructionalRoundResponseDoc(
+        userInstructionalRoundObs.observationId,
+        userContext.email,
+        peerEvaluatorEmail
+      );
+
+      if (!docResult) {
+        console.warn('Failed to create/get response document, but continuing...');
+      }
+
+      return { success: true, observationId: userInstructionalRoundObs.observationId };
+    } else {
+      return { success: false, error: 'No instructional round observation from Peer Evaluator found' };
+    }
+  } catch (error) {
+    console.error('Error getting current user instructional round observation:', error);
+    return { success: false, error: 'Failed to get observation ID: ' + error.message };
+  }
+}
+
+/**
+ * Saves an instructional round answer from the client.
+ * @param {string} observationId The ID of the observation.
+ * @param {string} questionId The ID of the question.
+ * @param {string} answerText The answer text.
+ * @returns {Object} A response object with success status.
+ */
+function saveInstructionalRoundAnswerFromClient(observationId, questionId, answerText) {
+  try {
+    const userContext = createUserContext();
+    const observation = getObservationById(observationId);
+
+    if (!observation) {
+      return { success: false, error: 'Observation not found.' };
+    }
+
+    // Allow access for observed staff or peer evaluators
+    if (observation.observedEmail !== userContext.email &&
+        userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
+      return { success: false, error: 'Access denied to this observation.' };
+    }
+
+    const saved = saveInstructionalRoundAnswerToDoc(observationId, questionId, answerText);
+    return { success: saved };
+  } catch (error) {
+    console.error('Error in saveInstructionalRoundAnswerFromClient:', error);
+    return { success: false, error: 'Failed to save answer: ' + error.message };
+  }
+}
+
+/**
+ * Gets instructional round answers for the client.
+ * @param {string} observationId The ID of the observation.
+ * @returns {Object} A response object containing the answers array.
+ */
+function getInstructionalRoundAnswersForClient(observationId) {
+  try {
+    const userContext = createUserContext();
+    const observation = getObservationById(observationId);
+
+    if (!observation) {
+      return { success: false, error: 'Observation not found.' };
+    }
+
+    // Allow access for observed staff or peer evaluators
+    if (observation.observedEmail !== userContext.email &&
+        userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
+      return { success: false, error: 'Access denied to this observation.' };
+    }
+
+    // Get answers from Google Doc
+    const answers = getInstructionalRoundAnswersFromDoc(observationId);
+    return { success: true, answers: answers };
+  } catch (error) {
+    console.error('Error in getInstructionalRoundAnswersForClient:', error);
+    return { success: false, error: 'Failed to load answers: ' + error.message };
   }
 }
 
