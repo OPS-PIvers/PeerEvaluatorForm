@@ -2338,18 +2338,18 @@
 
 .workflow-divider {
     font-weight: 700;
-    color: #9ca3af;
+    color: var(--color-text-deemphasized);
     text-align: center;
     font-size: 14px;
 }
 
 .workflow-batch {
-    border-left: 4px solid #10b981;
+    border-left: 4px solid var(--color-green-base);
 }
 
 .cost-badge {
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-    color: white;
+    background: linear-gradient(135deg, var(--color-green-base) 0%, var(--color-green-dark) 100%);
+    color: var(--color-white);
     padding: 2px 8px;
     border-radius: 12px;
     font-size: 11px;
@@ -2360,8 +2360,8 @@
 .btn-batch-transcribe {
     width: 100%;
     padding: 12px 20px;
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-    color: white;
+    background: linear-gradient(135deg, var(--color-green-base) 0%, var(--color-green-dark) 100%);
+    color: var(--color-white);
     border: none;
     border-radius: 8px;
     font-weight: 600;
@@ -2404,12 +2404,12 @@
 .workflow-title {
     font-weight: 700;
     font-size: 16px;
-    color: #1f2937;
+    color: var(--color-gray-text-light);
 }
 
 .workflow-description {
     font-size: 13px;
-    color: #6b7280;
+    color: var(--color-gray-bg-medium);
     line-height: 1.5;
     margin-bottom: 16px;
 }
@@ -2417,8 +2417,8 @@
 .btn-copy-prompt {
     width: 100%;
     padding: 12px 20px;
-    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-    color: white;
+    background: linear-gradient(135deg, var(--color-amber-base) 0%, var(--color-amber-dark) 100%);
+    color: var(--color-white);
     border: none;
     border-radius: 8px;
     font-weight: 600;
@@ -2435,8 +2435,8 @@
 .btn-cancel {
     width: 100%;
     padding: 10px 20px;
-    background: #e5e7eb;
-    color: #4b5563;
+    background: var(--color-gray-component-not-assigned-border);
+    color: var(--color-gray-bg-dark);
     border: none;
     border-radius: 8px;
     font-weight: 600;
@@ -2446,7 +2446,7 @@
 }
 
 .btn-cancel:hover {
-    background: #d1d5db;
+    background: var(--color-gray-border-light);
 }
 
 /* Responsive layout */
@@ -7986,8 +7986,7 @@ function copyPromptAndOpenGemini() {
 
     navigator.clipboard.writeText(prompt).then(() => {
         // Open Gemini Gem in new tab using the constant, with security attributes
-        const newWindow = window.open(UI_CONSTANTS.GEMINI_URL, '_blank', 'noopener,noreferrer');
-        if (newWindow) newWindow.opener = null;
+        window.open(UI_CONSTANTS.GEMINI_URL, '_blank', 'noopener,noreferrer');
 
         // Close modal
         closeTranscriptionPromptModal();
@@ -8014,11 +8013,17 @@ function autoTranscribeWithAPI() {
     google.script.run
         .withSuccessHandler(function(result) {
             if (result.success) {
+                // Validate and sanitize server-provided data before displaying it
+                const estimatedWait = Number.isFinite(Number(result.estimatedWaitMinutes)) && Number(result.estimatedWaitMinutes) > 0
+                    ? Math.round(Number(result.estimatedWaitMinutes))
+                    : 'N/A';
+                const costSavings = result.costSavings ? escapeHtml(result.costSavings) : 'N/A';
+
                 showToast(
                     `✅ Batch job queued!\\n\\n` +
                     `📧 You'll receive an email when complete\\n` +
-                    `⏱️ Estimated wait: ${result.estimatedWaitMinutes} minute(s)\\n` +
-                    `💰 ${result.costSavings}\\n\\n` +
+                    `⏱️ Estimated wait: ${estimatedWait} minute(s)\\n` +
+                    `💰 ${costSavings}\\n\\n` +
                     `Feel free to continue working - no need to wait around!`,
                     true,
                     12000

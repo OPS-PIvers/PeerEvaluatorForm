@@ -6,6 +6,16 @@
  * while adding support for multiple roles and automatic cache management.
  */
 
+/**
+ * =================================================================
+ * CONSTANTS
+ * =================================================================
+ */
+const MAX_JOBS_PER_RUN = 5;
+const MAX_JOB_ATTEMPTS = 3;
+const GEMINI_TRANSCRIPTION_MODEL = 'gemini-flash-lite-latest';
+const MAX_BATCH_FILE_SIZE_BYTES = 37 * 1024 * 1024;
+
 
 /**
  * =================================================================
@@ -380,7 +390,7 @@ function processTranscriptionQueue() {
 
         // STEP 2: Submit pending jobs to Batch API
         if (pendingJobs.length > 0) {
-            const jobsToSubmit = pendingJobs.slice(0, 5); // Process up to 5 per trigger
+            const jobsToSubmit = pendingJobs.slice(0, MAX_JOBS_PER_RUN); // Process up to 5 per trigger
 
             for (const job of jobsToSubmit) {
                 try {
@@ -405,7 +415,7 @@ function processTranscriptionQueue() {
                     } else {
                         job.jobData.attempts = (job.jobData.attempts || 0) + 1;
 
-                        if (job.jobData.attempts >= 3) {
+                        if (job.jobData.attempts >= MAX_JOB_ATTEMPTS) {
                             job.jobData.status = 'failed';
                             job.jobData.error = batchResult.error;
                             properties.setProperty('transcription_job_' + job.jobId, JSON.stringify(job.jobData));
@@ -441,7 +451,7 @@ function submitToBatchAPI(jobId, jobData, apiKey) {
         const base64Audio = Utilities.base64Encode(audioBytes);
         const mimeType = audioFile.getMimeType();
 
-        const model = 'gemini-flash-lite-latest';
+        const model = GEMINI_TRANSCRIPTION_MODEL;
         const batchApiUrl = `https://generativelanguage.googleapis.com/v1beta/batches?key=${apiKey}`;
 
         const payload = {
@@ -702,14 +712,30 @@ function sendTranscriptionNotification(jobData, success) {
             return;
         }
 
+        // Helper to escape HTML special characters for security
+        const escapeHtml = (unsafe) => {
+            if (typeof unsafe !== 'string') {
+                return '';
+            }
+            return unsafe
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        };
+
+        const safeFilename = escapeHtml(jobData.filename);
+        const safeError = escapeHtml(jobData.error);
+
         let subject = '';
         let htmlBody = '';
 
         if (success) {
-            subject = `✅ Transcription Complete: ${jobData.filename}`;
+            subject = `✅ Transcription Complete: ${safeFilename}`;
             htmlBody = `
                 <p>Hello,</p>
-                <p>Your transcription for the file <strong>${jobData.filename}</strong> is complete.</p>
+                <p>Your transcription for the file <strong>${safeFilename}</strong> is complete.</p>
                 <p>You can view the transcribed document here:</p>
                 <p><a href="${jobData.transcriptionUrl}">View Transcription</a></p>
                 <p>This transcription has been automatically added to the observation materials.</p>
@@ -721,12 +747,12 @@ function sendTranscriptionNotification(jobData, success) {
                 </ul>
             `;
         } else {
-            subject = `❌ Transcription Failed: ${jobData.filename}`;
+            subject = `❌ Transcription Failed: ${safeFilename}`;
             htmlBody = `
                 <p>Hello,</p>
-                <p>We're sorry, but the transcription for the file <strong>${jobData.filename}</strong> has failed.</p>
+                <p>We're sorry, but the transcription for the file <strong>${safeFilename}</strong> has failed.</p>
                 <p><strong>Error details:</strong></p>
-                <pre>${jobData.error || 'An unknown error occurred.'}</pre>
+                <pre>${safeError || 'An unknown error occurred.'}</pre>
                 <br>
                 <p>You may want to try submitting the job again. If the problem persists, please contact support.</p>
                 <br>
@@ -4207,7 +4233,7 @@ function createTranscriptionJob(observationId, filename, prompt) {
         const fileSizeMB = (fileSizeBytes / (1024 * 1024)).toFixed(2);
 
         // Batch API has higher limits - check 50MB limit (with base64 overhead ~37MB source)
-        if (fileSizeBytes > 37 * 1024 * 1024) {
+        if (fileSizeBytes > MAX_BATCH_FILE_SIZE_BYTES) {
             return {
                 success: false,
                 error: `File too large (${fileSizeMB}MB). Maximum size for batch transcription is 37MB. Please use the "Copy Prompt" option for larger files.`
