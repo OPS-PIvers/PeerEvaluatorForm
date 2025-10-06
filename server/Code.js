@@ -469,45 +469,59 @@ function submitToBatchAPI(jobId, jobData, apiKey) {
         const mimeType = audioFile.getMimeType();
 
         const model = GEMINI_TRANSCRIPTION_MODEL;
-        const batchApiUrl = `https://generativelanguage.googleapis.com/v1beta/batches?key=${apiKey}`;
+        const batchApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:batchGenerateContent`;
 
         const payload = {
-            name: `batches/transcription-${jobId}`,
-            requests: [
-                {
-                    model: `models/${model}`,
-                    contents: [{
-                        parts: [
-                            { text: jobData.prompt },
+            batch: {
+                display_name: `transcription-${jobId}`,
+                input_config: {
+                    requests: {
+                        requests: [
                             {
-                                inline_data: {
-                                    mime_type: mimeType,
-                                    data: base64Audio
+                                request: {
+                                    contents: [{
+                                        parts: [
+                                            { text: jobData.prompt },
+                                            {
+                                                inline_data: {
+                                                    mime_type: mimeType,
+                                                    data: base64Audio
+                                                }
+                                            }
+                                        ]
+                                    }],
+                                    generationConfig: {
+                                        temperature: 0.2,
+                                        topK: 40,
+                                        topP: 0.95,
+                                        maxOutputTokens: 8192
+                                    }
+                                },
+                                metadata: {
+                                    key: `transcription-${jobId}`
                                 }
                             }
                         ]
-                    }],
-                    generationConfig: {
-                        temperature: 0.2,
-                        topK: 40,
-                        topP: 0.95,
-                        maxOutputTokens: 8192
                     }
                 }
-            ]
+            }
         };
 
         const options = {
             method: 'post',
             contentType: 'application/json',
             payload: JSON.stringify(payload),
-            muteHttpExceptions: true
+            muteHttpExceptions: true,
+            headers: {
+                'x-goog-api-key': apiKey
+            }
         };
 
         debugLog('Submitting to Gemini Batch API', {
             jobId: jobId,
             model: model,
-            filename: jobData.filename
+            filename: jobData.filename,
+            audioSize: audioBytes.length
         });
 
         const response = UrlFetchApp.fetch(batchApiUrl, options);
@@ -518,7 +532,7 @@ function submitToBatchAPI(jobId, jobData, apiKey) {
             console.error('Batch API submission error:', responseCode, responseText);
             return {
                 success: false,
-                error: `Batch API error ${responseCode}`
+                error: `Batch API error ${responseCode}: ${responseText}`
             };
         }
 
@@ -551,11 +565,14 @@ function submitToBatchAPI(jobId, jobData, apiKey) {
  */
 function checkBatchJobStatus(batchJobName, apiKey) {
     try {
-        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/${batchJobName}?key=${apiKey}`;
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/${batchJobName}`;
 
         const options = {
             method: 'get',
-            muteHttpExceptions: true
+            muteHttpExceptions: true,
+            headers: {
+                'x-goog-api-key': apiKey
+            }
         };
 
         const response = UrlFetchApp.fetch(apiUrl, options);
