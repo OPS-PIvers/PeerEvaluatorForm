@@ -8024,6 +8024,7 @@ function copyPromptAndOpenGemini() {
  */
 function autoTranscribeWithAPI() {
     const prompt = buildTranscriptionPrompt();
+    const filename = transcriptionState.currentFile; // Capture before closing modal
 
     closeTranscriptionPromptModal();
 
@@ -8060,7 +8061,7 @@ function autoTranscribeWithAPI() {
         })
         .createTranscriptionJob(
             currentObservationId,
-            transcriptionState.currentFile,  // Use namespaced state
+            filename,  // Use local variable instead of state
             prompt
         );
 }

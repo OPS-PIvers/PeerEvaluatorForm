@@ -417,7 +417,9 @@ function _getObservationFolder(observation) {
     const rootFolder = _getOrCreateFolder(DriveApp.getRootFolder(), DRIVE_FOLDER_INFO.ROOT_FOLDER_NAME);
 
     // Get or create a folder for the observed user, using their email to ensure uniqueness.
-    const userFolderName = `${observation.observedName} (${observation.observedEmail})`;
+    // Handle cases where observedName might be null/undefined
+    const observedName = observation.observedName || 'Unknown User';
+    const userFolderName = `${observedName} (${observation.observedEmail})`;
     const userFolder = _getOrCreateFolder(rootFolder, userFolderName);
 
     // Get or create a folder for this specific observation.
@@ -448,7 +450,8 @@ function _findExistingObservationFolder(observation) {
                 const parentFolders = folder.getParents();
                 if (parentFolders.hasNext()) {
                     const userFolder = parentFolders.next();
-                    const expectedUserFolderName = `${observation.observedName} (${observation.observedEmail})`;
+                    const observedName = observation.observedName || 'Unknown User';
+                    const expectedUserFolderName = `${observedName} (${observation.observedEmail})`;
                     
                     if (userFolder.getName() === expectedUserFolderName) {
                         // Check if this folder has files (not empty)
