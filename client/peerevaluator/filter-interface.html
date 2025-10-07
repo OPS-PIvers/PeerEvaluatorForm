@@ -2633,6 +2633,10 @@
             TRANSCRIPTION: {
                 enabled: false, // SET TO true TO ENABLE FOR EVERYONE
                 betaTesters: ['paul.ivers@orono.k12.mn.us']
+            },
+            TRANSCRIPTION_BATCH_API: {
+                enabled: false, // SET TO true WHEN BATCH API IS READY
+                betaTesters: [] // Add beta testers here when testing
             }
         };
 
@@ -7813,6 +7817,9 @@ function openTranscriptionPromptBuilder(filename) {
                 // Show the modal
                 document.getElementById('transcriptionPromptModal').style.display = 'flex';
 
+                // Update workflow visibility based on feature flags
+                updateTranscriptionWorkflowVisibility();
+
                 // Initial preview update
                 updatePromptPreview();
 
@@ -7937,6 +7944,33 @@ function buildTranscriptionPrompt() {
 function updatePromptPreview() {
     const prompt = buildTranscriptionPrompt();
     document.getElementById('promptPreview').textContent = prompt;
+}
+
+/**
+ * Updates the visibility of transcription workflow options based on feature flags
+ */
+function updateTranscriptionWorkflowVisibility() {
+    const batchApiEnabled = isFeatureEnabled('TRANSCRIPTION_BATCH_API');
+
+    // Get workflow elements
+    const batchWorkflow = document.querySelector('.workflow-batch');
+    const workflowDivider = document.querySelector('.workflow-divider');
+    const workflowSelection = document.querySelector('.workflow-selection');
+
+    if (batchWorkflow && workflowDivider && workflowSelection) {
+        if (batchApiEnabled) {
+            // Show both workflows (3-column grid layout)
+            batchWorkflow.style.display = 'block';
+            workflowDivider.style.display = 'block';
+        } else {
+            // Hide batch API workflow and divider (single column layout)
+            batchWorkflow.style.display = 'none';
+            workflowDivider.style.display = 'none';
+
+            // Adjust grid to single column when only one option is available
+            workflowSelection.style.gridTemplateColumns = '1fr';
+        }
+    }
 }
 
 /**
