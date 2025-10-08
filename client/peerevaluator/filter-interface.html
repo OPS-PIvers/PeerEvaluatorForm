@@ -656,6 +656,47 @@
             display: flex;
             gap: 16px;
             flex-wrap: wrap;
+            align-items: flex-start;
+        }
+
+        .recording-control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            align-items: flex-start;
+        }
+
+        .auto-continue-toggle {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.85rem;
+            color: var(--color-gray-text-light);
+            cursor: pointer;
+            user-select: none;
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: background-color 0.2s ease;
+        }
+
+        .auto-continue-toggle:hover {
+            background-color: var(--color-gray-bg-light);
+        }
+
+        .auto-continue-toggle input[type="checkbox"] {
+            cursor: pointer;
+            width: 16px;
+            height: 16px;
+        }
+
+        .auto-continue-toggle input[type="checkbox"]:checked + .toggle-label {
+            color: var(--color-green-base);
+            font-weight: 600;
+        }
+
+        .toggle-label {
+            white-space: nowrap;
+            transition: color 0.2s ease;
         }
 
         .global-tool-btn {
@@ -3817,14 +3858,26 @@
             html += `
             <div class="global-tools-bar" id="globalToolsBar" style="display: none;">
                 <div class="global-tools-container">
-                    <button class="global-tool-btn" id="recordAudioBtn" onclick="toggleAudioRecording()">
-                        🎤 Record Audio
-                    </button>
-                    <div id="audioTimerDisplay" class="timer-display"></div>
-                    <button class="global-tool-btn" id="recordVideoBtn" onclick="toggleVideoRecording()">
-                        📹 Record Video
-                    </button>
-                    <div id="videoTimerDisplay" class="timer-display"></div>
+                    <div class="recording-control-group">
+                        <button class="global-tool-btn" id="recordAudioBtn" onclick="toggleAudioRecording()">
+                            🎤 Record Audio
+                        </button>
+                        <label class="auto-continue-toggle">
+                            <input type="checkbox" id="audioAutoContinue" onchange="toggleAutoContinue('audio', this.checked)">
+                            <span class="toggle-label">Auto-Continue</span>
+                        </label>
+                        <div id="audioTimerDisplay" class="timer-display"></div>
+                    </div>
+                    <div class="recording-control-group">
+                        <button class="global-tool-btn" id="recordVideoBtn" onclick="toggleVideoRecording()">
+                            📹 Record Video
+                        </button>
+                        <label class="auto-continue-toggle">
+                            <input type="checkbox" id="videoAutoContinue" onchange="toggleAutoContinue('video', this.checked)">
+                            <span class="toggle-label">Auto-Continue</span>
+                        </label>
+                        <div id="videoTimerDisplay" class="timer-display"></div>
+                    </div>
                     <button class="global-tool-btn" id="scriptEditorBtn" onclick="openScriptEditor()">
                         📝 Script Editor
                     </button>
@@ -4645,28 +4698,31 @@
 
         // Consolidated recording state management
         const recordingState = {
-            audio: { 
-                recorder: null, 
-                stream: null, 
+            audio: {
+                recorder: null,
+                stream: null,
                 isRecording: false,
                 timer: null,
                 startTime: null,
                 sessionCount: 0,
-                totalSessionTime: 0
+                totalSessionTime: 0,
+                autoContinue: false
             },
-            video: { 
-                recorder: null, 
-                stream: null, 
+            video: {
+                recorder: null,
+                stream: null,
                 isRecording: false,
                 timer: null,
                 startTime: null,
                 sessionCount: 0,
-                totalSessionTime: 0
+                totalSessionTime: 0,
+                autoContinue: false
             }
         };
 
         // Recording constants
         const RECORDING_MAX_DURATION_MS = 10 * 60 * 1000; // 10 minutes
+        const RECORDING_MAX_AUTO_SESSIONS = 5; // Maximum 5 auto-continues (60 minutes total)
         const WARNING_TIMES = [30000, 10000]; // 30 seconds, 10 seconds
 
         // Global AudioContext for reuse across recordings (performance optimization)
@@ -4733,18 +4789,19 @@
             if (displayElement) {
                 const formattedTime = `${minutes}:${seconds.toString().padStart(2, '0')}`;
                 const percentage = ((RECORDING_MAX_DURATION_MS - remaining) / RECORDING_MAX_DURATION_MS) * 100;
-                
+                const autoContinueBadge = state.autoContinue ? '<span style="color: #10b981; font-size: 0.8em;"> ♻️ Auto</span>' : '';
+
                 displayElement.innerHTML = `
                     <div class="recording-timer">
                         <div class="timer-info">
-                            🔴 Recording ${state.sessionCount} (${formattedTime} remaining)
+                            🔴 Recording ${state.sessionCount} (${formattedTime} remaining)${autoContinueBadge}
                         </div>
                         <div class="timer-progress">
                             <div class="progress-bar" style="width: ${percentage}%"></div>
                         </div>
                     </div>
                 `;
-                
+
                 // Add warning styling for last 30 seconds
                 if (remaining <= 30000) {
                     displayElement.classList.add('timer-warning');
@@ -4770,38 +4827,76 @@
         function checkRecordingWarnings(type) {
             const state = recordingState[type];
             if (!state.startTime) return;
-            
+
             const elapsed = Date.now() - state.startTime;
             const remaining = RECORDING_MAX_DURATION_MS - elapsed;
-            
+
             for (const warningTime of WARNING_TIMES) {
                 if (remaining <= warningTime && remaining > warningTime - 1000) {
                     const seconds = Math.ceil(warningTime / 1000);
-                    showToast(`Recording will stop in ${seconds} seconds`, false, 3000);
+                    const autoContinueMsg = state.autoContinue ? ' (Auto-Continue enabled)' : '';
+                    showToast(`Recording will stop in ${seconds} seconds${autoContinueMsg}`, false, 3000);
                     break;
                 }
             }
         }
 
+        function toggleAutoContinue(type, enabled) {
+            const state = recordingState[type];
+            state.autoContinue = enabled;
+
+            const typeText = type === 'audio' ? 'Audio' : 'Video';
+            if (enabled) {
+                showToast(`${typeText} Auto-Continue enabled - recordings will restart automatically (max ${RECORDING_MAX_AUTO_SESSIONS} sessions)`, true, 4000);
+            } else {
+                showToast(`${typeText} Auto-Continue disabled`, true, 2000);
+            }
+
+            console.log(`${typeText} auto-continue:`, enabled);
+        }
+
         function autoStopRecording(type) {
             const state = recordingState[type];
             const config = recordingConfig[type];
-            
+
             if (state.isRecording) {
                 // Stop the recording
                 state.recorder.stop();
                 state.stream.getTracks().forEach(track => track.stop());
                 state.isRecording = false;
-                
-                // Update button
+
+                // Update button temporarily
                 const btn = document.getElementById(config.buttonId);
                 btn.textContent = config.stopText;
                 btn.classList.remove('recording');
-                
+
                 stopRecordingTimer(type);
-                
-                // Show auto-stop notification and restart option
-                showRecordingStoppedNotification(type);
+
+                // Check if auto-continue is enabled and we haven't exceeded max sessions
+                if (state.autoContinue && state.sessionCount < RECORDING_MAX_AUTO_SESSIONS) {
+                    // Auto-continue enabled - restart recording after brief delay
+                    const typeText = type === 'audio' ? 'Audio' : 'Video';
+                    showToast(`${typeText} session ${state.sessionCount} saved. Starting session ${state.sessionCount + 1}...`, true, 3000);
+
+                    // Restart recording after a brief delay (500ms) to allow proper cleanup
+                    setTimeout(() => {
+                        toggleRecording(type);
+                    }, 500);
+                } else {
+                    // No auto-continue or max sessions reached
+                    if (state.autoContinue && state.sessionCount >= RECORDING_MAX_AUTO_SESSIONS) {
+                        const typeText = type === 'audio' ? 'Audio' : 'Video';
+                        showToast(`${typeText} recording stopped - Maximum session limit (${RECORDING_MAX_AUTO_SESSIONS}) reached`, false, 5000);
+                        // Disable auto-continue
+                        state.autoContinue = false;
+                        const checkbox = document.getElementById(`${type}AutoContinue`);
+                        if (checkbox) {
+                            checkbox.checked = false;
+                        }
+                    }
+                    // Show auto-stop notification and restart option
+                    showRecordingStoppedNotification(type);
+                }
             }
         }
 
@@ -4900,7 +4995,8 @@
                 state.startTime = null;
                 state.sessionCount = 0;
                 state.totalSessionTime = 0;
-                
+                state.autoContinue = false;
+
                 // Reset UI
                 const config = recordingConfig[type];
                 const btn = document.getElementById(config.buttonId);
@@ -4909,10 +5005,16 @@
                     btn.classList.remove('recording');
                     btn.style.backgroundColor = '';
                 }
-                
+
+                // Reset auto-continue checkbox
+                const checkbox = document.getElementById(`${type}AutoContinue`);
+                if (checkbox) {
+                    checkbox.checked = false;
+                }
+
                 hideTimerDisplay(type);
             }
-            
+
             console.log('Recording sessions reset');
         }
 
