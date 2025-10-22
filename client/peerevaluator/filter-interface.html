@@ -6783,7 +6783,7 @@
             // CRITICAL: Auto-save content before closing if STT is running or content is dirty
             if (sttIsRecording || isScriptDirty) {
                 // Auto-saving content before closing
-                
+
                 try {
                     // Force save the current content
                     const success = await saveScriptContent();
@@ -6802,20 +6802,32 @@
                     }
                 }
             }
-            
+
+            // FIX #6: Save component tags before closing if any exist
+            if (Object.keys(componentTags).length > 0) {
+                try {
+                    const success = await saveComponentTags();
+                    if (!success) {
+                        console.warn('Component tags save failed on close');
+                    }
+                } catch (error) {
+                    console.error('Error saving component tags on close:', error);
+                }
+            }
+
             // Clear any pending auto-save timer
             clearTimeout(scriptSaveDebounceTimer);
-            
+
             // CRITICAL: Clean up speech recognition when closing editor
             cleanupSpeechRecognition();
-            
+
             const modal = document.getElementById('scriptEditorModal');
             modal.style.display = 'none';
             document.body.style.overflow = ''; // Restore background scrolling
 
             // Hide loading overlay if still visible
             hideScriptEditorLoading();
-            
+
             isScriptDirty = false;
         }
 
@@ -7504,7 +7516,8 @@
                 length: range.length,
                 text: selectedText.trim(),
                 timestamp: new Date().toISOString(),
-                color: tagColor
+                color: tagColor,
+                pushedToNotes: false  // FIX #2: Track if tag has been pushed to notes
             };
             
             if (!componentTags[componentId]) {
@@ -7639,7 +7652,8 @@
                     length: lineLength,
                     text: lineText,
                     timestamp: new Date().toISOString(),
-                    color: tagColor
+                    color: tagColor,
+                    pushedToNotes: false  // FIX #2: Track if tag has been pushed to notes
                 };
 
                 if (!componentTags[componentId]) {
@@ -7671,6 +7685,42 @@
             if (allTags.length === 0) {
                 showToast('No tagged evidence to push.', false);
                 return;
+            }
+
+            // FIX #4: Check for already-pushed tags and confirm with user
+            let totalUnpushed = 0;
+            let totalAlreadyPushed = 0;
+            const componentSummary = [];
+
+            allTags.forEach(componentId => {
+                const tags = componentTags[componentId];
+                if (tags && tags.length > 0) {
+                    const unpushedCount = tags.filter(t => !t.pushedToNotes).length;
+                    const pushedCount = tags.length - unpushedCount;
+                    totalUnpushed += unpushedCount;
+                    totalAlreadyPushed += pushedCount;
+                    componentSummary.push({
+                        componentId,
+                        unpushed: unpushedCount,
+                        pushed: pushedCount,
+                        total: tags.length
+                    });
+                }
+            });
+
+            // If some tags are already pushed, confirm with user
+            if (totalAlreadyPushed > 0) {
+                const summaryText = componentSummary
+                    .filter(s => s.pushed > 0)
+                    .map(s => `  • ${s.componentId}: ${s.pushed} already pushed, ${s.unpushed} new`)
+                    .join('\n');
+
+                const confirmMsg = `Some tags have already been pushed to notes:\n\n${summaryText}\n\nPush ${totalUnpushed} new tag(s) only?`;
+
+                if (!confirm(confirmMsg)) {
+                    showToast('Push to notes cancelled', false);
+                    return;
+                }
             }
 
             let pushedCount = 0;
@@ -7724,28 +7774,40 @@
         }
         
         function completePushToNotes(componentId, tags, notesEditor) {
-            // Combine all tagged text for this component
-            const taggedContent = tags.map(tag => tag.text).join('\n\n');
-            
+            // FIX #3: Only push tags that haven't been pushed yet
+            const unpushedTags = tags.filter(tag => !tag.pushedToNotes);
+
+            if (unpushedTags.length === 0) {
+                showToast(`All tags for ${componentId} have already been pushed to notes`, false);
+                return;
+            }
+
+            // Combine unpushed tagged text for this component
+            const taggedContent = unpushedTags.map(tag => tag.text).join('\n\n');
+
             // Get current notes content
             const currentContent = notesEditor.root.innerHTML;
             const separator = currentContent && currentContent !== '<p><br></p>' ? '\n\n' : '';
             const scriptHeader = '<p><strong>From Script:</strong></p>';
             const newContent = currentContent + separator + scriptHeader + '<p>' + taggedContent.replace(/\n/g, '</p><p>') + '</p>';
-            
+
             // Update notes editor
             notesEditor.root.innerHTML = newContent;
-            
-            // Trigger save
+
+            // Mark tags as pushed and save
+            unpushedTags.forEach(tag => tag.pushedToNotes = true);
+            saveComponentTags();
+
+            // Trigger save for notes content
             setTimeout(() => {
                 const event = new Event('input', { bubbles: true });
                 notesEditor.root.dispatchEvent(event);
             }, 100);
-            
-            document.getElementById('tagStatus').textContent = 
-                `Pushed ${tags.length} tagged item(s) to ${componentId} notes`;
-            
-            showToast(`Tagged content added to ${componentId} notes`, true);
+
+            document.getElementById('tagStatus').textContent =
+                `Pushed ${unpushedTags.length} new tagged item(s) to ${componentId} notes`;
+
+            showToast(`${unpushedTags.length} new tag(s) added to ${componentId} notes`, true);
         }
 
         function clearComponentTags() {
@@ -7767,6 +7829,20 @@
                 // Clear tags for specific component
                 if (componentTags[componentId] && componentTags[componentId].length > 0) {
                     if (confirm(`Clear all tags for component ${componentId}?`)) {
+                        // FIX #1: Remove visual formatting before deleting tag metadata
+                        const tagsToRemove = componentTags[componentId];
+                        if (tagsToRemove && scriptQuill) {
+                            tagsToRemove.forEach(tag => {
+                                if (tag.start !== undefined && tag.length !== undefined) {
+                                    try {
+                                        scriptQuill.removeFormat(tag.start, tag.length);
+                                    } catch (error) {
+                                        console.warn(`Failed to remove formatting for tag at ${tag.start}:`, error);
+                                    }
+                                }
+                            });
+                        }
+
                         delete componentTags[componentId];
                         saveComponentTags();
                         document.getElementById('tagStatus').textContent = `Tags cleared for ${componentId}`;
@@ -7777,22 +7853,28 @@
         }
 
         function saveComponentTags() {
-            if (!currentObservationId) return;
-            
-            google.script.run
-                .withSuccessHandler(function(result) {
-                    if (result.success) {
-                        console.log('Component tags saved successfully');
-                    } else {
-                        console.error('Failed to save component tags:', result.error);
-                        showToast('Failed to save tags: ' + result.error, false);
-                    }
-                })
-                .withFailureHandler(function(error) {
-                    console.error('Error saving component tags:', error);
-                    showToast('Error saving tags: ' + error.message, false);
-                })
-                .saveComponentTags(currentObservationId, componentTags);
+            // FIX #5: Convert to Promise-based for async/await support
+            if (!currentObservationId) return Promise.resolve(false);
+
+            return new Promise((resolve, reject) => {
+                google.script.run
+                    .withSuccessHandler(function(result) {
+                        if (result.success) {
+                            console.log('Component tags saved successfully');
+                            resolve(true);
+                        } else {
+                            console.error('Failed to save component tags:', result.error);
+                            showToast('Failed to save tags: ' + result.error, false);
+                            resolve(false);
+                        }
+                    })
+                    .withFailureHandler(function(error) {
+                        console.error('Error saving component tags:', error);
+                        showToast('Error saving tags: ' + error.message, false);
+                        reject(error);
+                    })
+                    .saveComponentTags(currentObservationId, componentTags);
+            });
         }
 
         function loadComponentTags() {
