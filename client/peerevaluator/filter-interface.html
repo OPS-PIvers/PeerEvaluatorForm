@@ -7479,36 +7479,36 @@
             }
         }
 
-        function tagSelectedText() {
+        async function tagSelectedText() {
             if (!scriptQuill) {
                 showToast('Script editor not initialized', false);
                 return;
             }
-            
+
             const range = scriptQuill.getSelection();
             if (!range || range.length === 0) {
                 showToast('Please select text to tag', false);
                 return;
             }
-            
+
             const componentId = document.getElementById('componentSelector').value;
             if (!componentId) {
                 showToast('Please select a component', false);
                 return;
             }
-            
+
             // Get the selected text
             const selectedText = scriptQuill.getText(range.index, range.length);
             if (!selectedText.trim()) {
                 showToast('Selected text is empty', false);
                 return;
             }
-            
+
             // Apply visual formatting to tagged text
             const tagColor = TAG_COLORS[componentId] || '#e3f2fd';
             scriptQuill.formatText(range.index, range.length, 'background', tagColor);
             scriptQuill.formatText(range.index, range.length, 'color', '#1565c0');
-            
+
             // Store tag information
             const tagData = {
                 componentId: componentId,
@@ -7519,23 +7519,37 @@
                 color: tagColor,
                 pushedToNotes: false  // FIX #2: Track if tag has been pushed to notes
             };
-            
+
             if (!componentTags[componentId]) {
                 componentTags[componentId] = [];
             }
             componentTags[componentId].push(tagData);
-            
+
             // Update status
-            document.getElementById('tagStatus').textContent = 
+            document.getElementById('tagStatus').textContent =
                 `Tagged "${selectedText.substring(0, 30)}${selectedText.length > 30 ? '...' : ''}" to ${componentId}`;
-            
-            // Save tags
-            saveComponentTags();
-            
-            showToast('Text tagged successfully', true);
+
+            // Save tags and script content in parallel for better performance
+            try {
+                const [tagsSaved, scriptSaved] = await Promise.all([
+                    saveComponentTags(),
+                    saveScriptContent()
+                ]);
+
+                if (tagsSaved && scriptSaved) {
+                    showToast('Text tagged and script saved successfully', true);
+                } else if (!scriptSaved) {
+                    showToast('Text tagged but script save failed', false);
+                } else {
+                    showToast('Text tagged but tags save failed', false);
+                }
+            } catch (error) {
+                console.error('Error saving after tagging:', error);
+                showToast('Text tagged but save error occurred', false);
+            }
         }
 
-        function autoTagEvidence() {
+        async function autoTagEvidence() {
             if (!scriptQuill) {
                 showToast('Script editor not initialized', false);
                 return;
@@ -7666,18 +7680,23 @@
                 taggedCount++;
             });
 
-            // Save tags
-            saveComponentTags();
-
             // Generate summary message
             const componentList = Object.keys(componentCounts)
                 .map(id => `${id} (${componentCounts[id]})`)
                 .join(', ');
 
-            const statusMessage = `Auto-tagged ${taggedCount} line${taggedCount !== 1 ? 's' : ''}: ${componentList}`;
-            document.getElementById('tagStatus').textContent = statusMessage;
+            // Save tags and script content in parallel
+            try {
+                await Promise.all([saveComponentTags(), saveScriptContent()]);
 
-            showToast(`Successfully auto-tagged ${taggedCount} line${taggedCount !== 1 ? 's' : ''} across ${Object.keys(componentCounts).length} component${Object.keys(componentCounts).length !== 1 ? 's' : ''}`, true);
+                const statusMessage = `Auto-tagged ${taggedCount} line${taggedCount !== 1 ? 's' : ''}: ${componentList}`;
+                document.getElementById('tagStatus').textContent = statusMessage;
+
+                showToast(`Successfully auto-tagged ${taggedCount} line${taggedCount !== 1 ? 's' : ''} across ${Object.keys(componentCounts).length} component${Object.keys(componentCounts).length !== 1 ? 's' : ''} and saved`, true);
+            } catch (error) {
+                console.error('Error saving auto-tagged content:', error);
+                showToast(`Auto-tagged ${taggedCount} line${taggedCount !== 1 ? 's' : ''} but save failed`, false);
+            }
         }
 
         function pushTaggedToNotes() {
@@ -7773,7 +7792,15 @@
             }
         }
         
-        function completePushToNotes(componentId, tags, notesEditor) {
+        async function completePushToNotes(componentId, tags, notesEditor) {
+            // FIX: Save script content first to ensure tagged content with formatting is persisted
+            try {
+                await saveScriptContent();
+            } catch (error) {
+                console.error('Error saving script content before pushing to notes:', error);
+                // Continue anyway - the push to notes can still proceed
+            }
+
             // FIX #3: Only push tags that haven't been pushed yet
             const unpushedTags = tags.filter(tag => !tag.pushedToNotes);
 
@@ -7796,7 +7823,7 @@
 
             // Mark tags as pushed and save
             unpushedTags.forEach(tag => tag.pushedToNotes = true);
-            saveComponentTags();
+            await saveComponentTags();
 
             // Trigger save for notes content
             setTimeout(() => {
@@ -7810,7 +7837,7 @@
             showToast(`${unpushedTags.length} new tag(s) added to ${componentId} notes`, true);
         }
 
-        function clearComponentTags() {
+        async function clearComponentTags() {
             const componentId = document.getElementById('componentSelector').value;
             if (!componentId) {
                 // Clear all tags
@@ -7821,9 +7848,16 @@
                         const length = scriptQuill.getLength();
                         scriptQuill.removeFormat(0, length);
                     }
-                    saveComponentTags();
-                    document.getElementById('tagStatus').textContent = 'All tags cleared';
-                    showToast('All tags cleared', true);
+                    // Save tags and script content in parallel
+                    try {
+                        await Promise.all([saveComponentTags(), saveScriptContent()]);
+                        document.getElementById('tagStatus').textContent = 'All tags cleared and script saved';
+                        showToast('All tags cleared and script saved', true);
+                    } catch (error) {
+                        console.error('Error saving after clearing all tags:', error);
+                        document.getElementById('tagStatus').textContent = 'All tags cleared';
+                        showToast('All tags cleared but save error', false);
+                    }
                 }
             } else {
                 // Clear tags for specific component
@@ -7844,9 +7878,17 @@
                         }
 
                         delete componentTags[componentId];
-                        saveComponentTags();
-                        document.getElementById('tagStatus').textContent = `Tags cleared for ${componentId}`;
-                        showToast(`Tags cleared for ${componentId}`, true);
+
+                        // Save tags and script content in parallel
+                        try {
+                            await Promise.all([saveComponentTags(), saveScriptContent()]);
+                            document.getElementById('tagStatus').textContent = `Tags cleared for ${componentId} and script saved`;
+                            showToast(`Tags cleared for ${componentId} and script saved`, true);
+                        } catch (error) {
+                            console.error('Error saving after clearing tags:', error);
+                            document.getElementById('tagStatus').textContent = `Tags cleared for ${componentId}`;
+                            showToast(`Tags cleared for ${componentId} but save error`, false);
+                        }
                     }
                 }
             }

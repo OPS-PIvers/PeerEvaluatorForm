@@ -2583,7 +2583,22 @@ function generateScriptPDF(observationId, scriptHtml = null) {
             return { success: false, error: 'No script content found for this observation.' };
         }
 
-        debugLog('Starting script PDF generation', { observationId, contentSource });
+        // Enhanced debug logging to track script content state
+        const scriptContentInfo = {
+            contentSource: contentSource,
+            contentType: typeof scriptContent,
+            hasOps: scriptContent && scriptContent.ops ? true : false,
+            opsCount: scriptContent && scriptContent.ops ? scriptContent.ops.length : 0,
+            hasComponentTags: observation.componentTags && Object.keys(observation.componentTags).length > 0,
+            componentTagsCount: observation.componentTags ? Object.keys(observation.componentTags).length : 0,
+            lastModifiedAt: observation.lastModifiedAt || 'not set',
+            observationStatus: observation.status
+        };
+
+        debugLog('Starting script PDF generation with content details', {
+            observationId,
+            ...scriptContentInfo
+        });
 
         const docName = `Script - ${observation.observedName} - ${new Date().toISOString().slice(0, 10)}`;
 
@@ -2663,11 +2678,17 @@ function _createScriptPdfDocument(observation, scriptContent, docName, contentSo
     if (contentSource === 'html') {
         addHtmlContentToDoc(body, scriptContent);
     } else if (contentSource === 'observation' && scriptContent.ops) {
+        let opsProcessed = 0;
+        let paragraphsAdded = 0;
+        let opsSkipped = 0;
+
         scriptContent.ops.forEach(op => {
+            opsProcessed++;
             if (op.insert && typeof op.insert === 'string') {
                 const text = op.insert;
                 if (text.trim() || text === '\n') {
                     const p = body.appendParagraph(text);
+                    paragraphsAdded++;
                     if (op.attributes) {
                         const style = {};
                         if (op.attributes.bold) style[DocumentApp.Attribute.BOLD] = true;
@@ -2677,8 +2698,20 @@ function _createScriptPdfDocument(observation, scriptContent, docName, contentSo
                         if (op.attributes.header === 1) p.setHeading(DocumentApp.ParagraphHeading.HEADING3);
                         if (op.attributes.header === 2) p.setHeading(DocumentApp.ParagraphHeading.HEADING4);
                     }
+                } else {
+                    opsSkipped++;
                 }
+            } else {
+                opsSkipped++;
             }
+        });
+
+        debugLog('Script PDF content rendering stats', {
+            observationId: observation.observationId,
+            opsProcessed,
+            paragraphsAdded,
+            opsSkipped,
+            hasComponentTags: observation.componentTags && Object.keys(observation.componentTags).length > 0
         });
     } else {
         body.appendParagraph('No script content was provided or content format is invalid.').setItalic(true);
