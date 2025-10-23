@@ -2962,3 +2962,296 @@ function debugStandardObservationButton() {
   const result = checkUserHasStandardObservationFromPeerEvaluator(userEmail);
   console.log('Check result:', result);
 }
+
+/**
+ * ============================================================================
+ * SCRIPT CONTENT OVERFLOW STORAGE - Google Doc Storage for Large Scripts
+ * ============================================================================
+ * When script content exceeds safe sheet storage limits (~45K characters),
+ * it's automatically saved to a Google Doc instead.
+ */
+
+/**
+ * Constants for script storage management.
+ */
+const SCRIPT_STORAGE = {
+  SHEET_SIZE_LIMIT: 45000,  // Safe limit before switching to doc storage
+  WARNING_THRESHOLD: 40000,  // Warn user when approaching limit
+  DOC_NAME_PREFIX: 'Script Content - '
+};
+
+/**
+ * Finds a script content document using Drive search with caching.
+ * @param {string} observationId The ID of the observation.
+ * @returns {Object|null} Object with docId and docUrl, or null if not found.
+ */
+function findScriptDoc(observationId) {
+  try {
+    const searchName = `${SCRIPT_STORAGE.DOC_NAME_PREFIX}${observationId}`;
+
+    // Cache to avoid repeated Drive searches
+    const cacheKey = `script_doc_${observationId}`;
+    const cached = getCachedDataEnhanced(cacheKey);
+    if (cached) {
+      debugLog('Script doc found in cache', { observationId });
+      return cached;
+    }
+
+    debugLog('Searching for script doc', { observationId, searchName });
+
+    // Search in all accessible files
+    const files = DriveApp.getFilesByName(searchName);
+
+    let docResult = null;
+    while (files.hasNext()) {
+      const file = files.next();
+      try {
+        // Verify we can access this doc
+        const doc = DocumentApp.openById(file.getId());
+        docResult = {
+          docId: file.getId(),
+          docUrl: file.getUrl()
+        };
+        debugLog('Found script doc', { docId: docResult.docId, observationId });
+        break;
+      } catch (accessError) {
+        debugLog('Script doc not accessible, continuing search', {
+          fileId: file.getId(),
+          error: accessError.message
+        });
+      }
+    }
+
+    if (docResult) {
+      // Cache the result for 15 minutes
+      setCachedDataEnhanced(cacheKey, docResult, CACHE_DURATIONS.SHEET_DATA);
+    }
+
+    return docResult;
+
+  } catch (error) {
+    console.error('Error in findScriptDoc:', error, { observationId });
+    return null;
+  }
+}
+
+/**
+ * Creates or retrieves a script content document for overflow storage.
+ * Document is created in the observation's folder.
+ * @param {string} observationId The ID of the observation.
+ * @returns {Object|null} Object with docId and docUrl, or null on error.
+ */
+function createOrGetScriptDoc(observationId) {
+  try {
+    // Check if doc already exists
+    const existingDoc = findScriptDoc(observationId);
+    if (existingDoc) {
+      debugLog('Found existing script doc', { observationId, docId: existingDoc.docId });
+      return existingDoc;
+    }
+
+    // Get observation to find its folder
+    const observation = getObservationById(observationId);
+    if (!observation) {
+      console.error('Observation not found for script doc creation:', observationId);
+      return null;
+    }
+
+    // Create new document
+    const docName = `${SCRIPT_STORAGE.DOC_NAME_PREFIX}${observationId}`;
+    const doc = DocumentApp.create(docName);
+    const docId = doc.getId();
+    const file = DriveApp.getFileById(docId);
+
+    debugLog('Created new script doc', { observationId, docId });
+
+    // Add header to document
+    const body = doc.getBody();
+    body.clear();
+    const header = body.appendParagraph('Observation Script Content');
+    header.setHeading(DocumentApp.ParagraphHeading.HEADING1);
+    body.appendParagraph(`Observation ID: ${observationId}`);
+    body.appendParagraph(`Created: ${new Date().toLocaleString()}`);
+    body.appendHorizontalRule();
+    body.appendParagraph(''); // Blank line before content
+
+    // Move to observation folder if it exists
+    if (observation.folderUrl) {
+      try {
+        const folderId = observation.folderUrl.split('/folders/')[1];
+        if (folderId) {
+          const obsFolder = DriveApp.getFolderById(folderId);
+          file.moveTo(obsFolder);
+          debugLog('Script doc moved to observation folder', { observationId, docId });
+        }
+      } catch (moveError) {
+        console.error('Error moving script doc to observation folder:', moveError);
+        // Continue anyway - document is still accessible
+      }
+    }
+
+    const result = {
+      docId: docId,
+      docUrl: doc.getUrl()
+    };
+
+    // Cache the result
+    const cacheKey = `script_doc_${observationId}`;
+    setCachedDataEnhanced(cacheKey, result, CACHE_DURATIONS.SHEET_DATA);
+
+    return result;
+
+  } catch (error) {
+    console.error('Critical error creating script doc:', error, { observationId });
+    return null;
+  }
+}
+
+/**
+ * Saves script content to a Google Doc (for overflow storage).
+ * Converts Quill Delta format to DocumentApp formatted text.
+ * @param {string} observationId The ID of the observation.
+ * @param {Object} scriptContent The Quill Delta object.
+ * @returns {Object} Result with success status and optional docUrl.
+ */
+function saveScriptContentToDoc(observationId, scriptContent) {
+  try {
+    if (!scriptContent || !scriptContent.ops) {
+      return { success: false, error: 'Invalid script content format' };
+    }
+
+    // Get or create the script doc
+    const docResult = createOrGetScriptDoc(observationId);
+    if (!docResult) {
+      return { success: false, error: 'Failed to create or find script document' };
+    }
+
+    // Open the document
+    const doc = DocumentApp.openById(docResult.docId);
+    const body = doc.getBody();
+
+    // Clear existing content after the header
+    const paragraphs = body.getParagraphs();
+    // Keep first 4 paragraphs (title, observation ID, created date, horizontal rule)
+    for (let i = paragraphs.length - 1; i >= 4; i--) {
+      paragraphs[i].removeFromParent();
+    }
+
+    // Add script content from Quill Delta
+    scriptContent.ops.forEach(op => {
+      if (op.insert && typeof op.insert === 'string') {
+        const text = op.insert;
+        if (text.trim() || text === '\n') {
+          const p = body.appendParagraph(text);
+
+          // Apply formatting from Quill attributes
+          if (op.attributes) {
+            const style = {};
+            if (op.attributes.bold) style[DocumentApp.Attribute.BOLD] = true;
+            if (op.attributes.italic) style[DocumentApp.Attribute.ITALIC] = true;
+            if (op.attributes.underline) style[DocumentApp.Attribute.UNDERLINE] = true;
+            if (op.attributes.background) {
+              // Convert hex color to RGB for Google Docs
+              // Note: Google Docs has limited color support
+              style[DocumentApp.Attribute.BACKGROUND_COLOR] = op.attributes.background;
+            }
+            if (Object.keys(style).length > 0) {
+              p.setAttributes(style);
+            }
+
+            // Handle headers
+            if (op.attributes.header === 1) p.setHeading(DocumentApp.ParagraphHeading.HEADING2);
+            if (op.attributes.header === 2) p.setHeading(DocumentApp.ParagraphHeading.HEADING3);
+          }
+        }
+      }
+    });
+
+    // Add timestamp footer
+    body.appendHorizontalRule();
+    const footer = body.appendParagraph(`Last updated: ${new Date().toLocaleString()}`);
+    footer.setItalic(true);
+    footer.setFontSize(9);
+
+    debugLog('Script content saved to doc', {
+      observationId,
+      docId: docResult.docId,
+      opsCount: scriptContent.ops.length
+    });
+
+    return {
+      success: true,
+      docUrl: docResult.docUrl,
+      docId: docResult.docId
+    };
+
+  } catch (error) {
+    console.error('Error saving script content to doc:', error, { observationId });
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Retrieves script content from a Google Doc.
+ * Converts DocumentApp content back to basic Quill Delta format.
+ * @param {string} observationId The ID of the observation.
+ * @returns {Object|null} Quill Delta object or null if not found.
+ */
+function getScriptContentFromDoc(observationId) {
+  try {
+    // Find the script doc
+    const docResult = findScriptDoc(observationId);
+    if (!docResult) {
+      debugLog('No script doc found', { observationId });
+      return null;
+    }
+
+    // Open and read the document
+    const doc = DocumentApp.openById(docResult.docId);
+    const body = doc.getBody();
+    const paragraphs = body.getParagraphs();
+
+    // Convert paragraphs to Quill Delta ops
+    // Skip first 4 paragraphs (header content)
+    const ops = [];
+    for (let i = 4; i < paragraphs.length; i++) {
+      const para = paragraphs[i];
+      const text = para.getText();
+
+      // Skip the footer (last 2 paragraphs: horizontal rule + timestamp)
+      if (i >= paragraphs.length - 2) break;
+
+      if (text) {
+        const attributes = {};
+
+        // Extract basic formatting
+        if (para.isBold()) attributes.bold = true;
+        if (para.isItalic()) attributes.italic = true;
+        if (para.isUnderline()) attributes.underline = true;
+
+        const heading = para.getHeading();
+        if (heading === DocumentApp.ParagraphHeading.HEADING2) attributes.header = 1;
+        if (heading === DocumentApp.ParagraphHeading.HEADING3) attributes.header = 2;
+
+        ops.push({
+          insert: text + '\n',
+          attributes: Object.keys(attributes).length > 0 ? attributes : undefined
+        });
+      } else {
+        ops.push({ insert: '\n' });
+      }
+    }
+
+    debugLog('Script content retrieved from doc', {
+      observationId,
+      docId: docResult.docId,
+      opsCount: ops.length
+    });
+
+    return { ops: ops };
+
+  } catch (error) {
+    console.error('Error retrieving script content from doc:', error, { observationId });
+    return null;
+  }
+}

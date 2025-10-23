@@ -1567,13 +1567,61 @@ function updateObservationScript(observationId, scriptContent) {
             return { success: false, error: 'Observation not found.' };
         }
 
-        // Add or update the scriptContent field
-        observation.scriptContent = scriptContent;
+        // Smart threshold: Check size before storing
+        const jsonString = JSON.stringify(scriptContent);
+        const contentSize = jsonString.length;
 
-        // Persist the changes
+        debugLog('Updating script content', {
+            observationId,
+            contentSize,
+            threshold: SCRIPT_STORAGE.SHEET_SIZE_LIMIT
+        });
+
+        // If content is under the safe limit, store in sheet (fast path)
+        if (contentSize < SCRIPT_STORAGE.SHEET_SIZE_LIMIT) {
+            observation.scriptContent = scriptContent;
+            observation.scriptDocUrl = null; // Clear any previous doc reference
+            observation.scriptStorageMethod = 'sheet';
+
+            updateObservationInSheet(observation);
+
+            // Check if approaching warning threshold
+            const nearLimit = contentSize > SCRIPT_STORAGE.WARNING_THRESHOLD;
+
+            return {
+                success: true,
+                storageMethod: 'sheet',
+                contentSize: contentSize,
+                nearSizeLimit: nearLimit
+            };
+        }
+
+        // Content exceeds safe limit - use Google Doc storage (overflow path)
+        debugLog('Script content exceeds sheet limit, using doc storage', {
+            observationId,
+            contentSize,
+            limit: SCRIPT_STORAGE.SHEET_SIZE_LIMIT
+        });
+
+        const docResult = saveScriptContentToDoc(observationId, scriptContent);
+        if (!docResult.success) {
+            return { success: false, error: 'Failed to save script to document: ' + docResult.error };
+        }
+
+        // Update observation to reference the doc instead of inline content
+        observation.scriptContent = null; // Clear sheet storage
+        observation.scriptDocUrl = docResult.docUrl;
+        observation.scriptStorageMethod = 'doc';
+
         updateObservationInSheet(observation);
 
-        return { success: true };
+        return {
+            success: true,
+            storageMethod: 'doc',
+            docUrl: docResult.docUrl,
+            contentSize: contentSize
+        };
+
     } catch (error) {
         console.error('Error updating script content:', error);
         return { success: false, error: error.message };
@@ -1582,6 +1630,7 @@ function updateObservationScript(observationId, scriptContent) {
 
 /**
  * Retrieves the script content for an observation.
+ * Handles both sheet storage (inline) and doc storage (overflow) automatically.
  * @param {string} observationId The ID of the observation.
  * @returns {Object|null} The Quill Delta object or null if not found.
  */
@@ -1593,8 +1642,38 @@ function getObservationScript(observationId) {
         }
 
         const observation = getObservationById(observationId);
-        // Return the scriptContent if it exists, otherwise return null
-        return observation ? (observation.scriptContent || null) : null;
+        if (!observation) {
+            return null;
+        }
+
+        // Check storage method and retrieve accordingly
+        debugLog('Retrieving script content', {
+            observationId,
+            hasInlineContent: !!observation.scriptContent,
+            hasDocUrl: !!observation.scriptDocUrl,
+            storageMethod: observation.scriptStorageMethod
+        });
+
+        // Priority 1: Check for inline content (sheet storage - fast path)
+        if (observation.scriptContent) {
+            debugLog('Retrieved script from sheet storage', { observationId });
+            return observation.scriptContent;
+        }
+
+        // Priority 2: Check for doc storage (overflow path)
+        if (observation.scriptDocUrl || observation.scriptStorageMethod === 'doc') {
+            debugLog('Attempting to retrieve script from doc storage', { observationId });
+            const docContent = getScriptContentFromDoc(observationId);
+            if (docContent) {
+                debugLog('Retrieved script from doc storage', { observationId });
+                return docContent;
+            }
+        }
+
+        // No content found in either location
+        debugLog('No script content found in any storage', { observationId });
+        return null;
+
     } catch (error) {
         console.error('Error getting script content:', error);
         return null; // Return null on error to prevent client-side issues
@@ -2576,8 +2655,24 @@ function generateScriptPDF(observationId, scriptHtml = null) {
         }
 
         // Determine the source of the script content
-        const contentSource = scriptHtml ? 'html' : 'observation';
-        const scriptContent = scriptHtml ? scriptHtml : observation.scriptContent;
+        // Smart retrieval: Check sheet storage first, then doc storage
+        let contentSource, scriptContent;
+
+        if (scriptHtml) {
+            contentSource = 'html';
+            scriptContent = scriptHtml;
+        } else {
+            // Check sheet storage first (inline scriptContent)
+            if (observation.scriptContent) {
+                contentSource = 'observation_sheet';
+                scriptContent = observation.scriptContent;
+            }
+            // Check doc storage (overflow storage)
+            else if (observation.scriptDocUrl || observation.scriptStorageMethod === 'doc') {
+                contentSource = 'observation_doc';
+                scriptContent = getScriptContentFromDoc(observationId);
+            }
+        }
 
         if (!scriptContent) {
             return { success: false, error: 'No script content found for this observation.' };
@@ -2591,6 +2686,8 @@ function generateScriptPDF(observationId, scriptHtml = null) {
             opsCount: scriptContent && scriptContent.ops ? scriptContent.ops.length : 0,
             hasComponentTags: observation.componentTags && Object.keys(observation.componentTags).length > 0,
             componentTagsCount: observation.componentTags ? Object.keys(observation.componentTags).length : 0,
+            storageMethod: observation.scriptStorageMethod || 'sheet',
+            hasScriptDocUrl: !!observation.scriptDocUrl,
             lastModifiedAt: observation.lastModifiedAt || 'not set',
             observationStatus: observation.status
         };

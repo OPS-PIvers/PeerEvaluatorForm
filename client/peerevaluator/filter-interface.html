@@ -7175,6 +7175,19 @@
                         if (result.success) {
                             isScriptDirty = false;
                             updateSaveButtonState();
+
+                            // Check for size warnings and storage method changes
+                            if (result.storageMethod === 'doc') {
+                                showToast('Script content is large - saved to Google Doc (' +
+                                    Math.round(result.contentSize / 1024) + ' KB)', true);
+                                console.log('Script saved to Google Doc due to size:', result.contentSize);
+                            } else if (result.nearSizeLimit) {
+                                const sizeKb = Math.round(result.contentSize / 1024);
+                                const limitKb = Math.round(45000 / 1024);
+                                showToast('Script is getting large (' + sizeKb + ' KB / ' + limitKb + ' KB limit)', true);
+                                console.warn('Script approaching size limit:', result.contentSize);
+                            }
+
                             resolve(true);
                         } else {
                             console.error('Failed to save script content:', result.error);
