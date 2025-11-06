@@ -348,9 +348,14 @@ const PdfService = (function() {
           mediaHeader.setHeading(DocumentApp.ParagraphHeading.HEADING2);
           mediaHeader.getChild(0).asText().setFontSize(14).setBold(true).setForegroundColor('#2d3748');
 
-          // Script PDF link
+          // Script Document link (PDF or Google Doc)
           if (hasScriptPdf) {
-              const scriptParagraph = body.appendParagraph(`📝 Observation Script Document: ${observation.scriptPdfUrl}`);
+              // Detect if URL is a Google Doc or PDF
+              const isGoogleDoc = observation.scriptPdfUrl.includes('docs.google.com/document');
+              const icon = isGoogleDoc ? '📄' : '📝';
+              const label = isGoogleDoc ? 'Observation Script (Google Doc)' : 'Observation Script Document';
+
+              const scriptParagraph = body.appendParagraph(`${icon} ${label}: ${observation.scriptPdfUrl}`);
               scriptParagraph.getChild(0).asText().setFontSize(11).setForegroundColor('#2563eb');
               scriptParagraph.setLinkUrl(observation.scriptPdfUrl);
           }

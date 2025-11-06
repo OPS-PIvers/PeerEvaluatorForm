@@ -1762,20 +1762,21 @@ function finalizeObservation(observationId) {
             return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
         }
 
-        // Step 1: Generate script PDF first if script content exists
+        // Step 1: Script PDF generation DISABLED - evaluators now export to Google Docs manually
+        // Keeping this block commented for historical reference
         let scriptPdfResult = null;
-        const observation = getObservationById(observationId);
-        if (observation && observation.scriptContent) {
-            debugLog('Generating script PDF during finalization', { observationId });
-            scriptPdfResult = generateScriptPDF(observationId);
-            if (!scriptPdfResult.success) {
-                debugLog('Script PDF generation failed during finalization', { 
-                    observationId, 
-                    error: scriptPdfResult.error 
-                });
-                // Continue with main PDF even if script PDF fails
-            }
-        }
+        // const observation = getObservationById(observationId);
+        // if (observation && observation.scriptContent) {
+        //     debugLog('Generating script PDF during finalization', { observationId });
+        //     scriptPdfResult = generateScriptPDF(observationId);
+        //     if (!scriptPdfResult.success) {
+        //         debugLog('Script PDF generation failed during finalization', {
+        //             observationId,
+        //             error: scriptPdfResult.error
+        //         });
+        //         // Continue with main PDF even if script PDF fails
+        //     }
+        // }
 
         // Step 2: Generate the main observation PDF.
         const pdfProcessingResult = PdfService.processPdfForFinalization(observationId, userContext);
@@ -2629,6 +2630,203 @@ function uploadGlobalRecording(observationId, base64Data, filename, recordingTyp
 function exportScriptToPdf(scriptHtml, observationId) {
     // This function now simply calls the robust, centralized PDF generation function.
     return generateScriptPDF(observationId, scriptHtml);
+}
+
+/**
+ * Exports script content to a Google Doc (instead of PDF) and saves it to the observation folder.
+ * This replaces the script PDF functionality with a more editable, collaborative format.
+ * @param {string} observationId The ID of the observation
+ * @param {Object} scriptContent The Quill Delta format script content
+ * @returns {Object} Result with success status, docUrl, and isNewDoc flag
+ */
+function exportScriptToGoogleDoc(observationId, scriptContent) {
+    try {
+        const userContext = createUserContext();
+        if (!userContext || !userContext.email) {
+            return { success: false, error: 'Invalid user session.' };
+        }
+
+        const observation = getObservationById(observationId);
+        if (!observation) {
+            return { success: false, error: 'Observation not found.' };
+        }
+
+        if (observation.observerEmail !== userContext.email) {
+            return { success: false, error: 'Permission denied. You did not create this observation.' };
+        }
+
+        if (!scriptContent || !scriptContent.ops || scriptContent.ops.length === 0) {
+            return { success: false, error: 'No script content provided.' };
+        }
+
+        const docName = `Script - ${observation.observedName} - ${new Date().toISOString().slice(0, 10)}`;
+
+        // Check if doc already exists (stored in scriptPdfUrl field)
+        let doc, docId, isNewDoc;
+
+        if (observation.scriptPdfUrl) {
+            // Extract doc ID from URL and update existing doc
+            const urlMatch = observation.scriptPdfUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
+            if (urlMatch && urlMatch[1]) {
+                try {
+                    docId = urlMatch[1];
+                    doc = DocumentApp.openById(docId);
+                    isNewDoc = false;
+                    debugLog('Updating existing script Google Doc', { observationId, docId });
+                } catch (error) {
+                    // Doc not found or no access - create new one
+                    debugLog('Existing doc not accessible, creating new', { observationId, error: error.message });
+                    doc = null;
+                }
+            }
+        }
+
+        if (!doc) {
+            // Create new Google Doc
+            doc = DocumentApp.create(docName);
+            docId = doc.getId();
+            isNewDoc = true;
+            debugLog('Created new script Google Doc', { observationId, docId });
+        }
+
+        const body = doc.getBody();
+        body.clear();
+
+        // --- Add Header ---
+        const title = body.appendParagraph(`Observation Script: ${observation.observedName}`);
+        title.setHeading(DocumentApp.ParagraphHeading.HEADING1);
+        title.setAlignment(DocumentApp.HorizontalAlignment.CENTER);
+
+        const subtitle = body.appendParagraph(`Generated on: ${new Date().toLocaleString()}`);
+        subtitle.setAlignment(DocumentApp.HorizontalAlignment.CENTER);
+        subtitle.getChild(0).asText().setFontSize(10).setItalic(true).setForegroundColor('#666666');
+
+        body.appendParagraph(''); // Spacing
+
+        // --- Add Metadata Table ---
+        const metadataTable = body.appendTable([
+            ['Observer:', observation.observerEmail],
+            ['Observed Staff:', `${observation.observedName} (${observation.observedEmail})`],
+            ['Role:', observation.observedRole],
+            ['Year:', observation.observedYear ? observation.observedYear.toString() : 'N/A']
+        ]);
+        metadataTable.setBorderWidth(0);
+
+        for (let i = 0; i < metadataTable.getNumRows(); i++) {
+            const row = metadataTable.getRow(i);
+            row.getCell(0).getChild(0).asParagraph().setBold(true);
+            row.getCell(0).setWidth(120);
+        }
+
+        body.appendParagraph(''); // Spacing
+
+        // --- Add Script Content Section ---
+        const contentHeader = body.appendParagraph('Script Content');
+        contentHeader.setHeading(DocumentApp.ParagraphHeading.HEADING2);
+
+        // Convert Quill Delta to Google Doc paragraphs
+        _addQuillContentToDoc(body, scriptContent);
+
+        // Save and close
+        doc.saveAndClose();
+
+        // Move doc to observation folder if newly created
+        if (isNewDoc) {
+            const obsFolder = getOrCreateObservationFolder(observationId);
+            const docFile = DriveApp.getFileById(docId);
+
+            // Move to observation folder (removes from root "My Drive")
+            obsFolder.addFile(docFile);
+            DriveApp.getRootFolder().removeFile(docFile);
+
+            debugLog('Moved script doc to observation folder', { observationId, docId });
+        }
+
+        // Get doc URL
+        const docUrl = `https://docs.google.com/document/d/${docId}/edit`;
+
+        // Update observation record with doc URL (reuses scriptPdfUrl column)
+        const updateResult = updateObservationScriptUrl(observationId, docUrl);
+        if (!updateResult.success) {
+            console.warn('Failed to update script doc URL in sheet:', updateResult.error);
+        }
+
+        debugLog('Script Google Doc export successful', { observationId, docId, docUrl, isNewDoc });
+
+        return {
+            success: true,
+            docUrl: docUrl,
+            docId: docId,
+            isNewDoc: isNewDoc,
+            fileName: `${docName}.gdoc`
+        };
+
+    } catch (error) {
+        console.error('Error exporting script to Google Doc:', error);
+        debugLog('Failed to export script to Google Doc', { error: error.message, stack: error.stack });
+        return { success: false, error: 'Error exporting to Google Doc: ' + error.message };
+    }
+}
+
+/**
+ * Converts Quill Delta content to Google Doc paragraphs.
+ * @param {DocumentApp.Body} body The Google Doc body
+ * @param {Object} scriptContent Quill Delta object with ops array
+ * @private
+ */
+function _addQuillContentToDoc(body, scriptContent) {
+    if (!scriptContent || !scriptContent.ops) {
+        body.appendParagraph('No content available.').setItalic(true);
+        return;
+    }
+
+    scriptContent.ops.forEach(op => {
+        if (op.insert && typeof op.insert === 'string') {
+            const text = op.insert;
+
+            // Split by newlines to create separate paragraphs
+            const lines = text.split('\n');
+
+            lines.forEach((line, index) => {
+                // Skip empty lines except the last one (which creates spacing)
+                if (line.trim() || index === lines.length - 1) {
+                    const para = body.appendParagraph(line);
+
+                    // Apply formatting from Quill attributes
+                    if (op.attributes) {
+                        const textElement = para.getChild(0).asText();
+
+                        if (op.attributes.bold) {
+                            textElement.setBold(true);
+                        }
+                        if (op.attributes.italic) {
+                            textElement.setItalic(true);
+                        }
+                        if (op.attributes.underline) {
+                            textElement.setUnderline(true);
+                        }
+                        if (op.attributes.strike) {
+                            textElement.setStrikethrough(true);
+                        }
+
+                        // Handle lists
+                        if (op.attributes.list === 'bullet') {
+                            para.setGlyphType(DocumentApp.GlyphType.BULLET);
+                        } else if (op.attributes.list === 'ordered') {
+                            para.setGlyphType(DocumentApp.GlyphType.NUMBER);
+                        }
+
+                        // Handle headings
+                        if (op.attributes.header === 1) {
+                            para.setHeading(DocumentApp.ParagraphHeading.HEADING1);
+                        } else if (op.attributes.header === 2) {
+                            para.setHeading(DocumentApp.ParagraphHeading.HEADING2);
+                        }
+                    }
+                }
+            });
+        }
+    });
 }
 
 /**

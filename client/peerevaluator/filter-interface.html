@@ -1428,6 +1428,43 @@
             font-weight: 500;
         }
 
+        /* Export to Google Doc Button Styling */
+        .btn-export-doc {
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.95rem;
+            font-weight: 500;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-export-doc:hover {
+            background: linear-gradient(135deg, #059669, #047857);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+        }
+
+        .btn-export-doc:disabled {
+            background: #d1d5db;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .btn-export-doc.updating {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+        }
+
+        .btn-export-doc.updating:hover {
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+        }
+
         .script-editor-content {
             flex-grow: 1;
             padding: 0 24px 24px 24px;
@@ -3534,7 +3571,70 @@
         }
         function handleDeleteObservation(obsId, email, name) { if (confirm('Are you sure you want to delete this draft? This cannot be undone.')) { showLoading('Deleting draft...'); google.script.run.withSuccessHandler(res => { if(res.success) { displayObservationOptions(email, name); } else { showError(res.error); } }).withFailureHandler(handleError).deleteObservation(obsId); } }
 
+        /**
+         * Checks if observation has unexported script content and shows prominent warning if needed.
+         * @param {Object} observation The observation object to check
+         * @returns {boolean} True if finalization should proceed, false if user cancelled
+         */
+        function checkScriptExportBeforeFinalize(observation) {
+            if (!observation) {
+                return true; // No observation data, allow finalization to proceed
+            }
+
+            // Check if there is script content that hasn't been exported
+            const hasScriptContent = observation.scriptContent &&
+                                   observation.scriptContent.ops &&
+                                   observation.scriptContent.ops.length > 0;
+            const hasScriptExport = observation.scriptPdfUrl && observation.scriptPdfUrl.trim() !== '';
+
+            if (hasScriptContent && !hasScriptExport) {
+                // Show prominent warning dialog
+                const message = `⚠️ SCRIPT CONTENT NOT EXPORTED ⚠️\n\n` +
+                              `This observation contains script notes that have NOT been exported to a Google Doc.\n\n` +
+                              `If you finalize now:\n` +
+                              `• The script content will be saved in the observation\n` +
+                              `• But it will NOT be included as a separate document\n` +
+                              `• You should export it first for better documentation\n\n` +
+                              `RECOMMENDATION: Click "Cancel", then:\n` +
+                              `1. Open the Script Editor\n` +
+                              `2. Click "📄 Export to Google Doc"\n` +
+                              `3. Then finalize the observation\n\n` +
+                              `Do you want to finalize WITHOUT exporting the script?`;
+
+                const proceed = confirm(message);
+                if (!proceed) {
+                    showToast('Finalization cancelled. Please export your script content first.', false);
+                    return false;
+                }
+
+                // User chose to proceed anyway - show final warning
+                const finalConfirm = confirm(
+                    '⚠️ FINAL WARNING ⚠️\n\n' +
+                    'You are about to finalize WITHOUT exporting the script.\n\n' +
+                    'Are you absolutely sure you want to proceed?'
+                );
+
+                if (!finalConfirm) {
+                    showToast('Finalization cancelled. Please export your script content first.', false);
+                    return false;
+                }
+
+                // Log this decision for audit purposes
+                console.warn('Observation finalized with unexported script content:', observation.observationId);
+            }
+
+            return true; // Proceed with finalization
+        }
+
         function handleFinalizeObservation(obsId, email, name) {
+            // Find observation in cached data
+            const observation = currentObservationsData?.find(obs => obs.observationId === obsId);
+
+            // Check for unexported script content
+            if (!checkScriptExportBeforeFinalize(observation)) {
+                return; // User cancelled finalization
+            }
+
             if (confirm('Are you sure you want to finalize this observation? You will not be able to edit it further.')) {
                 showLoading('Finalizing observation, please wait...');
                 google.script.run
@@ -3558,7 +3658,12 @@
                 showError('Unable to finalize: Missing observation context.');
                 return;
             }
-            
+
+            // Check for unexported script content using currently loaded observation
+            if (!checkScriptExportBeforeFinalize(window.currentLoadedObservation)) {
+                return; // User cancelled finalization
+            }
+
             if (confirm('Are you sure you want to finalize this observation? You will not be able to edit it further.')) {
                 showLoading('Finalizing observation, please wait...');
                 google.script.run
@@ -3743,6 +3848,7 @@
 
             // Store observation type and show work product section if needed
             window.currentObservationType = result.observation?.Type || 'Standard';
+            window.currentLoadedObservation = result.observation; // Store full observation for export button state
             toggleWorkProductAnswersSection(window.currentObservationType === 'Work Product');
 
             // Auto-load answers for work product observations
@@ -6804,9 +6910,12 @@
                 // Reusing existing script editor
                 loadScriptContent();
             }
-            
+
             isScriptDirty = false;
             updateSaveButtonState();
+
+            // Update export button state based on whether script doc exists
+            updateExportButtonState(window.currentLoadedObservation);
         }
 
         async function closeScriptEditor() {
@@ -6859,6 +6968,92 @@
             hideScriptEditorLoading();
 
             isScriptDirty = false;
+        }
+
+        /**
+         * Exports the current script content to a Google Doc in the observation folder.
+         * If doc already exists, updates it instead of creating new one.
+         */
+        async function exportScriptToGoogleDoc() {
+            if (!currentObservationId) {
+                showToast('No active observation to export', false);
+                return;
+            }
+
+            if (!scriptQuill) {
+                showToast('Script editor not initialized', false);
+                return;
+            }
+
+            // Get current script content (Quill Delta format)
+            const scriptContent = scriptQuill.getContents();
+
+            if (!scriptContent || !scriptContent.ops || scriptContent.ops.length === 0) {
+                showToast('No script content to export', false);
+                return;
+            }
+
+            // Update button state
+            const exportBtn = document.getElementById('exportToDocBtn');
+            const originalText = exportBtn.innerHTML;
+            exportBtn.disabled = true;
+            exportBtn.innerHTML = '⏳ Exporting...';
+
+            try {
+                // Call server function to create/update Google Doc
+                const result = await new Promise((resolve, reject) => {
+                    google.script.run
+                        .withSuccessHandler(resolve)
+                        .withFailureHandler(reject)
+                        .exportScriptToGoogleDoc(currentObservationId, scriptContent);
+                });
+
+                if (result.success) {
+                    // Update button to show "Update" state for future exports
+                    exportBtn.innerHTML = result.isNewDoc ? '📄 Export to Google Doc' : '🔄 Update Google Doc';
+                    if (!result.isNewDoc) {
+                        exportBtn.classList.add('updating');
+                    }
+
+                    showToast(`Script ${result.isNewDoc ? 'exported' : 'updated'} successfully!`, true);
+
+                    // Update current observation cache to reflect new scriptPdfUrl
+                    if (window.currentLoadedObservation) {
+                        window.currentLoadedObservation.scriptPdfUrl = result.docUrl;
+                    }
+                } else {
+                    exportBtn.innerHTML = originalText;
+                    showToast('Export failed: ' + result.error, false);
+                }
+            } catch (error) {
+                console.error('Export error:', error);
+                exportBtn.innerHTML = originalText;
+                showToast('Export error: ' + error.message, false);
+            } finally {
+                exportBtn.disabled = false;
+            }
+        }
+
+        /**
+         * Updates the export button state based on whether script doc exists.
+         * Called when opening script editor.
+         */
+        function updateExportButtonState(observation) {
+            const exportBtn = document.getElementById('exportToDocBtn');
+            if (!exportBtn) return;
+
+            // Show button for draft and finalized observations
+            exportBtn.style.display = 'inline-flex';
+
+            if (observation && observation.scriptPdfUrl) {
+                // Doc already exists - show update button
+                exportBtn.innerHTML = '🔄 Update Google Doc';
+                exportBtn.classList.add('updating');
+            } else {
+                // New export
+                exportBtn.innerHTML = '📄 Export to Google Doc';
+                exportBtn.classList.remove('updating');
+            }
         }
 
         /* ==========================================
@@ -8402,11 +8597,14 @@ function autoTranscribeWithAPI() {
                 </div>
 
                 <div class="script-editor-controls">
+                    <button id="exportToDocBtn" class="btn-export-doc" onclick="exportScriptToGoogleDoc()" style="display: none;">
+                        📄 Export to Google Doc
+                    </button>
                     <button id="saveScriptBtn" class="btn-secondary" onclick="manualSaveScriptContent()" disabled>Saved!</button>
                     <button class="btn-secondary" onclick="closeScriptEditor()">Close</button>
                 </div>
             </div>
-            
+
             <!-- Component Tagging Toolbar -->
             <div class="script-tagging-toolbar">
                 <div class="tagging-controls">
