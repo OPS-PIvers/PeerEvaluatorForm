@@ -344,8 +344,8 @@ function _findObservationRow(sheet, observationId) {
  * @returns {Object} A response object with success status.
  */
 function _saveProficiencySelection(observationId, componentId, proficiency) {
-  if (!observationId || !componentId || !proficiency) {
-    return { success: false, error: 'Observation ID, component ID, and proficiency level are required.' };
+  if (!observationId || !componentId) {
+    return { success: false, error: 'Observation ID and component ID are required.' };
   }
 
   return _updateObservationJsonData(observationId, 'observationData', (currentData) => {
@@ -353,9 +353,15 @@ function _saveProficiencySelection(observationId, componentId, proficiency) {
     if (!currentData[componentId]) {
       currentData[componentId] = { lookfors: [], notes: '' };
     }
-    
-    // Update the proficiency
-    currentData[componentId].proficiency = proficiency;
+
+    // Update or clear the proficiency
+    if (proficiency) {
+      // Set the proficiency if a value is provided
+      currentData[componentId].proficiency = proficiency;
+    } else {
+      // Clear the proficiency if null/empty (deselection)
+      delete currentData[componentId].proficiency;
+    }
 
     return currentData;
   });

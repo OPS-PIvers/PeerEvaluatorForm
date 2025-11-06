@@ -2150,10 +2150,10 @@
         document.addEventListener('DOMContentLoaded', function() {
             // Add keyboard listener for escape key
             document.addEventListener('keydown', handleModalKeydown);
-            
+
             // Show welcome modal after a brief delay
-            showWelcomeModal();
-            
+            // showWelcomeModal(); // DISABLED: Welcome modal no longer shows on page load
+
             // Optional: Close modal if clicking outside (on overlay)
             const overlay = document.getElementById('welcomeModalOverlay');
             if (overlay) {
