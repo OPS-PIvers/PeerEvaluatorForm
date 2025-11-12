@@ -603,3 +603,9 @@ const CACHE_SALT_PROPERTY = 'CACHE_SALT_V1';
  * Security admin email property key
  */
 const SECURITY_ADMIN_EMAIL_PROPERTY = 'SECURITY_ADMIN_EMAIL';
+
+/**
+ * The number of audit log entries to batch in the cache before writing to the sheet.
+ * A larger size is more efficient but has a higher risk of data loss on script failure.
+ */
+const AUDIT_LOG_BATCH_SIZE = 20;

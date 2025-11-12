@@ -68,13 +68,20 @@ function auditLog(action, details = {}) {
     // Always log to console for Apps Script logging
     console.log('AUDIT:', JSON.stringify(logEntry));
 
-    // Write to persistent audit sheet (non-blocking)
-    try {
-      writeToAuditSheet(logEntry);
-    } catch (sheetError) {
-      console.error('Failed to write to audit sheet:', sheetError.message);
-      // Don't fail the operation if audit logging fails
+    // --- BATCHING LOGIC ---
+    const cache = CacheService.getUserCache();
+    const cacheKey = `audit_log_batch_${userEmail}`;
+    let logBatch = JSON.parse(cache.get(cacheKey) || '[]');
+
+    logBatch.push(logEntry);
+
+    if (logBatch.length >= AUDIT_LOG_BATCH_SIZE) {
+      flushAuditLogs(logBatch, userEmail); // Pass the batch and user
+      cache.remove(cacheKey); // Clear the batch from cache
+    } else {
+      cache.put(cacheKey, JSON.stringify(logBatch), 3600); // Store batch for up to 1 hour
     }
+    // --- END BATCHING LOGIC ---
 
     // Check for suspicious activity and alert if needed
     if (isSuspiciousActivity(action, details, userEmail)) {
@@ -136,51 +143,78 @@ function getActionSeverity(action) {
 }
 
 /**
- * Writes audit log entry to persistent sheet storage
- * @param {Object} logEntry - The log entry to write
+ * Flushes a batch of audit logs to the spreadsheet.
+ * @param {Array<Object>} logBatch - The array of log entries to write.
+ * @param {string} userEmail - The email of the user for whom the logs are being flushed.
  * @private
  */
-function writeToAuditSheet(logEntry) {
-  const spreadsheet = openSpreadsheet();
-  let auditSheet = getSheetByName(spreadsheet, 'AuditLog');
-
-  // Create audit sheet if it doesn't exist
-  if (!auditSheet) {
-    auditSheet = spreadsheet.insertSheet('AuditLog');
-
-    // Set up headers
-    const headers = ['Timestamp', 'Action', 'User', 'Severity', 'Session ID', 'User Agent', 'Details'];
-    auditSheet.appendRow(headers);
-
-    // Format header row
-    const headerRange = auditSheet.getRange(1, 1, 1, headers.length);
-    headerRange.setFontWeight('bold');
-    headerRange.setBackground('#4a5568');
-    headerRange.setFontColor('#ffffff');
-
-    // Freeze header row
-    auditSheet.setFrozenRows(1);
-
-    // Set column widths
-    auditSheet.setColumnWidth(1, 180); // Timestamp
-    auditSheet.setColumnWidth(2, 200); // Action
-    auditSheet.setColumnWidth(3, 250); // User
-    auditSheet.setColumnWidth(4, 80);  // Severity
-    auditSheet.setColumnWidth(5, 200); // Session ID
-    auditSheet.setColumnWidth(6, 150); // User Agent
-    auditSheet.setColumnWidth(7, 400); // Details
+function flushAuditLogs(logBatch, userEmail) {
+  if (!logBatch || logBatch.length === 0) {
+    return;
   }
 
-  // Append log entry
-  auditSheet.appendRow([
-    logEntry.timestamp,
-    logEntry.action,
-    logEntry.user,
-    logEntry.severity,
-    logEntry.sessionId,
-    logEntry.userAgent,
-    JSON.stringify(logEntry.details)
-  ]);
+  try {
+    const spreadsheet = openSpreadsheet();
+    let auditSheet = getSheetByName(spreadsheet, 'AuditLog');
+
+    // Create audit sheet if it doesn't exist
+    if (!auditSheet) {
+      auditSheet = spreadsheet.insertSheet('AuditLog');
+      const headers = ['Timestamp', 'Action', 'User', 'Severity', 'Session ID', 'User Agent', 'Details'];
+      auditSheet.appendRow(headers);
+      const headerRange = auditSheet.getRange(1, 1, 1, headers.length);
+      headerRange.setFontWeight('bold').setBackground('#4a5568').setFontColor('#ffffff');
+      auditSheet.setFrozenRows(1);
+      auditSheet.setColumnWidth(1, 180);
+      auditSheet.setColumnWidth(2, 200);
+      auditSheet.setColumnWidth(3, 250);
+      auditSheet.setColumnWidth(4, 80);
+      auditSheet.setColumnWidth(5, 200);
+      auditSheet.setColumnWidth(6, 150);
+      auditSheet.setColumnWidth(7, 400);
+    }
+
+    const rows = logBatch.map(entry => [
+      entry.timestamp,
+      entry.action,
+      entry.user,
+      entry.severity,
+      entry.sessionId,
+      entry.userAgent,
+      JSON.stringify(entry.details)
+    ]);
+
+    // Efficiently write all rows in one API call
+    const startRow = auditSheet.getLastRow() + 1;
+    auditSheet.getRange(startRow, 1, rows.length, rows[0].length).setValues(rows);
+
+  } catch (error) {
+    console.error(`Failed to flush audit log batch for user ${userEmail}:`, error.message);
+    // Optional: Could try to put the batch back in the cache for a later attempt
+  }
+}
+
+/**
+ * Flushes any remaining audit logs from a previous session for a given user.
+ * @param {string} userEmail - The email of the user.
+ */
+function flushRemainingAuditLogs(userEmail) {
+  try {
+    const cache = CacheService.getUserCache();
+    const cacheKey = `audit_log_batch_${userEmail}`;
+    const logBatchJson = cache.get(cacheKey);
+
+    if (logBatchJson) {
+      const logBatch = JSON.parse(logBatchJson);
+      if (logBatch.length > 0) {
+        flushAuditLogs(logBatch, userEmail);
+        cache.remove(cacheKey);
+        console.log(`Flushed ${logBatch.length} remaining audit logs for user ${userEmail}.`);
+      }
+    }
+  } catch (error) {
+    console.error(`Error flushing remaining audit logs for user ${userEmail}:`, error.message);
+  }
 }
 
 /**

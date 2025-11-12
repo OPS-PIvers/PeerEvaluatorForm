@@ -59,6 +59,11 @@ function getUserSession(userEmail) {
     return null;
   }
 
+  // Flush any logs left over from a previous session
+  if (typeof flushRemainingAuditLogs === 'function') {
+    flushRemainingAuditLogs(userEmail);
+  }
+
   try {
     const properties = PropertiesService.getUserProperties();
     const sessionKey = SESSION_CONSTANTS.SESSION_KEY_PREFIX + userEmail;
