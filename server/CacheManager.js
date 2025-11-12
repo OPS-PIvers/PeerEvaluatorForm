@@ -168,7 +168,7 @@ function setCachedDataEnhanced(baseKey, params = {}, data, ttl = CACHE_SETTINGS.
     };
 
     // SECURITY: Reduce maximum TTL to prevent long-lived cached data
-    const maxTTL = 600; // 10 minutes maximum
+    const maxTTL = 3600; // 60 minutes maximum
     const safeTTL = Math.min(ttl, maxTTL);
 
     cache.put(fullKey, JSON.stringify(cacheEntry), safeTTL);
