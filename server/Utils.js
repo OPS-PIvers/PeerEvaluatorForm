@@ -974,7 +974,7 @@ function escapeHtmlSecure(unsafe) {
     '=': '&#x3D;'
   };
 
-  return str.replace(/[&<>"'`=\/]/g, function(match) {
+  return str.replace(/[&<>"'`=/]/g, function(match) {
     return entityMap[match];
   });
 }
@@ -1119,10 +1119,20 @@ function validateObservationData(observation) {
 
   // Validate observed email is from same domain as observer
   const userEmail = Session.getActiveUser().getEmail();
+
+  // Defensive check: ensure both emails contain '@' before splitting
+  if (!userEmail || !userEmail.includes('@')) {
+    throw new Error('Invalid user email format');
+  }
+
+  if (!observation.observedEmail.includes('@')) {
+    throw new Error('Invalid observed staff email format');
+  }
+
   const userDomain = userEmail.split('@')[1];
   const observedDomain = observation.observedEmail.split('@')[1];
 
-  if (userDomain !== observedDomain) {
+  if (!userDomain || !observedDomain || userDomain !== observedDomain) {
     throw new Error('Observed staff must be from the same organization');
   }
 

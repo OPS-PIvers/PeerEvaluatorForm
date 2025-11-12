@@ -38,7 +38,8 @@ function generateCacheKey(baseKey, params = {}) {
       Utilities.DigestAlgorithm.SHA_256,
       preHashKey
     );
-    const hashedKey = Utilities.base64Encode(hash).substring(0, 32);
+    // Use full base64-encoded hash to maintain security properties
+    const hashedKey = Utilities.base64Encode(hash);
 
     // Prefix with baseKey for debugging purposes
     const fullKey = `${baseKey}_${hashedKey}`;

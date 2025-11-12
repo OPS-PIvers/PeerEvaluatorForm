@@ -269,7 +269,14 @@ window.addEventListener('error', function(event) {
 
   // Prevent clickjacking (belt-and-suspenders with CSP)
   if (window.top !== window.self) {
-    console.warn('Page loaded in iframe - potential clickjacking attempt');
+    console.error('Page loaded in iframe - potential clickjacking attempt detected!');
+    // Prevent rendering by breaking out of iframe or blocking
+    try {
+      window.top.location = window.self.location;
+    } catch (e) {
+      // If we can't break out (due to CORS), block rendering
+      document.body.innerHTML = '<h1 style="color: red; text-align: center; margin-top: 50px;">Security Error: This page cannot be displayed in a frame.</h1>';
+    }
   }
 
   console.log('✅ Client-side security helpers loaded');

@@ -218,6 +218,10 @@ function canDeleteObservation(observation, requestingEmail) {
  * Securely retrieves an observation with authorization check
  * SECURITY WRAPPER: Use this instead of direct _getObservationById
  *
+ * DEPENDENCY NOTE: This function calls _getObservationById() from ObservationService.js
+ * This is an intentional cross-module dependency for security layer separation.
+ * The security service wraps the data access layer to enforce authorization.
+ *
  * @param {string} observationId - The observation ID to retrieve
  * @param {string} requestingEmail - Optional email of requesting user (uses session if not provided)
  * @returns {Object|null} The observation if authorized, null otherwise
@@ -234,7 +238,8 @@ function getObservationSecure(observationId, requestingEmail = null) {
   // Apply rate limiting
   checkRateLimit('getObservation', userEmail);
 
-  // Get the observation (internal function - no security)
+  // Get the observation (internal function from ObservationService.js - no security)
+  // NOTE: Direct access to private function is intentional for security layer
   const observation = _getObservationById(observationId);
 
   if (!observation) {
@@ -324,6 +329,10 @@ function filterObservationsByAccess(observations, requestingEmail = null) {
  * Gets observations for the current user with proper access control
  * SECURITY: Returns only observations the user is authorized to see
  *
+ * DEPENDENCY NOTE: This function calls _getObservationsDb() from ObservationService.js
+ * This is an intentional cross-module dependency for security layer separation.
+ * The security service wraps the data access layer to enforce authorization.
+ *
  * @param {string} requestingEmail - Optional email of requesting user
  * @returns {Array<Object>} Observations accessible to the user
  */
@@ -337,7 +346,8 @@ function getObservationsForUserSecure(requestingEmail = null) {
   // Apply rate limiting
   checkRateLimit('loadObservations', userEmail);
 
-  // Get all observations (internal function)
+  // Get all observations (internal function from ObservationService.js)
+  // NOTE: Direct access to private function is intentional for security layer
   const allObservations = _getObservationsDb();
 
   // Filter by access rights

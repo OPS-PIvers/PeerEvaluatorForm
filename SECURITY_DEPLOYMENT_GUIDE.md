@@ -124,7 +124,8 @@ function initializeSecurity() {
       'getSecuritySalt'
     ];
 
-    const missing = functionsToCheck.filter(fname => typeof eval(fname) !== 'function');
+    // Safe function checking without eval()
+    const missing = functionsToCheck.filter(fname => typeof this[fname] !== 'function');
 
     if (missing.length > 0) {
       console.error('❌ Missing functions:', missing.join(', '));

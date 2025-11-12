@@ -251,7 +251,7 @@ function countRecentAuditActions(userEmail, action, minutesAgo) {
  * @private
  */
 function alertOnSuspiciousActivity(logEntry) {
-  const securityAdminEmail = PropertiesService.getScriptProperties().getProperty('SECURITY_ADMIN_EMAIL');
+  const securityAdminEmail = PropertiesService.getScriptProperties().getProperty(SECURITY_ADMIN_EMAIL_PROPERTY);
 
   // If no security admin configured, log but don't fail
   if (!securityAdminEmail) {
@@ -300,13 +300,9 @@ function setupSecurityAlerts(adminEmail) {
     throw new Error('Valid admin email address required');
   }
 
-  PropertiesService.getScriptProperties().setProperty('SECURITY_ADMIN_EMAIL', adminEmail);
+  PropertiesService.getScriptProperties().setProperty(SECURITY_ADMIN_EMAIL_PROPERTY, adminEmail);
 
   console.log('Security alerts configured for:', adminEmail);
-  auditLog(AUDIT_ACTIONS.ADMIN_OBSERVATION_ACCESS, {
-    action: 'security_alerts_configured',
-    adminEmail: adminEmail
-  });
 }
 
 /**
