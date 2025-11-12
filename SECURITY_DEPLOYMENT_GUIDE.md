@@ -27,7 +27,7 @@ This deployment adds enterprise-grade security to the Peer Evaluator Form with:
 4. **SECURITY_DEPLOYMENT_GUIDE.md** - This file
 
 ### ✏️ Files Modified (4 files)
-1. **server/0_Constants.js** (renamed from Constants.js) - Added security constants, renamed for load order
+1. **server/Constants.js** (renamed from Constants.js) - Added security constants, renamed for load order
 2. **server/Utils.js** - Added security helper functions
 3. **server/CacheManager.js** - Secured cache implementation
 4. **server/UserService.js** - Fixed authorization bypass
@@ -62,7 +62,7 @@ clasp push
 
 # Or manually copy files in Apps Script Editor:
 # 1. Create new files: AuditService.js, ObservationSecurityService.js
-# 2. Update existing files: 0_Constants.js, Utils.js, CacheManager.js, UserService.js
+# 2. Update existing files: Constants.js, Utils.js, CacheManager.js, UserService.js
 ```
 
 ### Step 3: Initialize Security Settings
@@ -343,9 +343,9 @@ function diagnoseUserAccess(email) {
 ```
 
 ### Issue: "Rate limit exceeded"
-**Solution:** This is working as designed. Wait 5 minutes or adjust limits in 0_Constants.js:
+**Solution:** This is working as designed. Wait 5 minutes or adjust limits in Constants.js:
 ```javascript
-// In 0_Constants.js
+// In Constants.js
 const RATE_LIMITS = {
   getObservation: { maxRequests: 50, windowMs: 300000 }, // Increase from 30 to 50
 };
@@ -407,7 +407,7 @@ If critical issues occur:
 
 ### Partial Rollback (Disable Features)
 ```javascript
-// In 0_Constants.js - disable rate limiting
+// In Constants.js - disable rate limiting
 const RATE_LIMITS = {}; // Empty object disables all rate limits
 
 // In Utils.js - disable audit logging (emergency only)

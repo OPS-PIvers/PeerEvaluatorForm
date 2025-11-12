@@ -66,7 +66,7 @@
 ### Medium Priority Fixes (P2) - ALL COMPLETED ✅
 
 8. **Security Constants** 🟡→✅
-   - **File:** `server/0_Constants.js`
+   - **File:** `server/Constants.js`
    - **Addition:** Rate limits, input limits, validation patterns
    - **Impact:** Centralized security configuration
    - **Regression Risk:** ZERO - new constants only
@@ -105,7 +105,7 @@
 
 ## ✏️ Files Modified (4 files)
 
-1. **server/0_Constants.js**
+1. **server/Constants.js**
    - Added `RATE_LIMITS` configuration
    - Added `INPUT_LIMITS` validation rules
    - Added `ALLOWED_EVIDENCE_PATTERNS`

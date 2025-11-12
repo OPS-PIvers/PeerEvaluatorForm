@@ -993,6 +993,12 @@ function checkRateLimit(action, userEmail) {
     return true; // Don't block if we can't identify user
   }
 
+  // Defensive check: Ensure RATE_LIMITS constant is loaded
+  if (typeof RATE_LIMITS === 'undefined') {
+    console.warn('RATE_LIMITS not loaded yet - allowing request');
+    return true; // Don't block if constants not loaded yet
+  }
+
   // Check if rate limiting is configured for this action
   const limitConfig = RATE_LIMITS[action];
   if (!limitConfig) {

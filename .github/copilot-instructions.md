@@ -20,7 +20,7 @@ This is a Google Apps Script (GAS) web application that implements a multi-role 
 
 ### Code Validation and Testing
 - Validate JavaScript syntax: `for file in *.js; do node -c "$file" && echo "✓ $file OK" || echo "✗ $file error"; done` (takes ~0.4 seconds)
-- Run the test suite: `node -e "const fs=require('fs'); const vm=require('vm'); const ctx=vm.createContext({console}); vm.runInContext(fs.readFileSync('0_Constants.js','utf8'),ctx); vm.runInContext(fs.readFileSync('Utils.js','utf8'),ctx); vm.runInContext(fs.readFileSync('Tests.js','utf8'),ctx); vm.runInContext('runAllTests();',ctx);"` (takes ~0.05 seconds)
+- Run the test suite: `node -e "const fs=require('fs'); const vm=require('vm'); const ctx=vm.createContext({console}); vm.runInContext(fs.readFileSync('Constants.js','utf8'),ctx); vm.runInContext(fs.readFileSync('Utils.js','utf8'),ctx); vm.runInContext(fs.readFileSync('Tests.js','utf8'),ctx); vm.runInContext('runAllTests();',ctx);"` (takes ~0.05 seconds)
 - **Expected test result**: 2 failing tests for email validation edge cases - this is NORMAL behavior
 
 ### Development Workflow
@@ -41,7 +41,7 @@ This is a Google Apps Script (GAS) web application that implements a multi-role 
 Key Files (16 tracked by clasp):
 ├── appsscript.json          # GAS manifest - defines scopes and web app settings
 ├── Code.js (2,082 lines)    # Main entry point with doGet() function
-├── 0_Constants.js (305 lines) # System constants and configuration (loads first)
+├── Constants.js (305 lines) # System constants and configuration (loads first)
 ├── Utils.js (525 lines)     # Utility functions including isValidEmail()
 ├── Tests.js (59 lines)      # Test suite - run locally for validation
 ├── CacheManager.js          # Advanced caching system with dependencies
@@ -75,7 +75,7 @@ for file in *.js; do node -c "$file" && echo "✓ $file syntax OK" || echo "✗ 
 # Run the complete test suite (required - takes ~0.05 seconds)
 node -e "
 const fs=require('fs'), vm=require('vm'), ctx=vm.createContext({console});
-vm.runInContext(fs.readFileSync('0_Constants.js','utf8'),ctx);
+vm.runInContext(fs.readFileSync('Constants.js','utf8'),ctx);
 vm.runInContext(fs.readFileSync('Utils.js','utf8'),ctx);
 vm.runInContext(fs.readFileSync('Tests.js','utf8'),ctx);
 vm.runInContext('runAllTests();',ctx);
@@ -147,7 +147,7 @@ cat appsscript.json | jq . > /dev/null && echo "✓ appsscript.json valid" || ec
 ## Troubleshooting
 
 ### Common Issues
-1. **"VALIDATION_PATTERNS is not defined"**: Load 0_Constants.js before Utils.js (file renamed with 0_ prefix to enforce load order)
+1. **"VALIDATION_PATTERNS is not defined"**: Load Constants.js before Utils.js (file renamed with 0_ prefix to enforce load order)
 2. **Clasp authentication errors**: Expected in this environment - ignore them
 3. **Missing Sheet errors**: Normal - app uses fallbacks when sheets unavailable  
 4. **Cache-related errors**: Clear with `forceCleanAllCaches()` function
@@ -170,7 +170,7 @@ validateUserAccess('email');  // Test user permissions
 
 ## Quick Reference
 
-**Key constants in 0_Constants.js:**
+**Key constants in Constants.js:**
 - `AVAILABLE_ROLES`: List of user roles
 - `SPECIAL_ROLES`: Admin, Peer Evaluator, Full Access  
 - `VALIDATION_PATTERNS`: Email and component ID regex

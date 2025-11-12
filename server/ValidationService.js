@@ -66,7 +66,7 @@ function validateRole(role) {
       });
       result.severity = VALIDATION_SEVERITY.ERROR;
       result.fallbackRole = findClosestRole(role) || 'Teacher';
-      result.recommendedActions.push(`Add "${role}" to AVAILABLE_ROLES in 0_Constants.js`);
+      result.recommendedActions.push(`Add "${role}" to AVAILABLE_ROLES in Constants.js`);
       result.recommendedActions.push(`Or use fallback role: ${result.fallbackRole}`);
     }
 

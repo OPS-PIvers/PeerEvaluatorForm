@@ -28,7 +28,7 @@ This document tracks the comprehensive security implementation for the Peer Eval
    - Security alert emails
    - Audit report generation
 
-2. **0_Constants.js** (renamed from Constants.js) - UPDATED
+2. **Constants.js** (renamed from Constants.js) - UPDATED
    - Renamed with 0_ prefix to enforce alphabetical load order
    - Added RATE_LIMITS configuration
    - Added INPUT_LIMITS validation rules
@@ -234,7 +234,7 @@ card.innerHTML = `<h3>${escapeHtmlSecure(observation.name)}</h3>`;
 
 ### Phase 1: Server-Side Security (Current)
 1. Deploy AuditService.js ✅
-2. Deploy updated 0_Constants.js (renamed from Constants.js) ✅
+2. Deploy updated Constants.js (renamed from Constants.js) ✅
 3. Deploy updated Utils.js ✅
 4. Deploy updated CacheManager.js ✅
 5. Deploy updated UserService.js ⏳

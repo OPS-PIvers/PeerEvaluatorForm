@@ -1,38 +1,51 @@
-# File Load Order and Dependencies
+# File Dependencies and Defensive Programming
 ## Peer Evaluator Form - Google Apps Script
 
 **Last Updated:** 2025-11-12
-**Purpose:** Documents file loading order and cross-module dependencies
+**Purpose:** Documents cross-module dependencies and defensive programming patterns
 
 ---
 
-## Required Load Order
+## ⚠️ IMPORTANT: Google Apps Script Load Behavior
 
-Google Apps Script loads files alphabetically by default. The security implementation requires certain files to be loaded before others to ensure functions are available when called.
+**Google Apps Script loads ALL files SIMULTANEOUSLY** - there is NO guaranteed sequential load order.
 
-### Critical Dependencies
+Files are NOT loaded alphabetically or in any predictable sequence. All `.gs` files in a project are loaded and executed in parallel when the script runs.
 
-```
-1. server/0_Constants.js         ← Must load FIRST (defines all constants)
-2. server/Utils.js              ← Must load SECOND (defines helper functions)
-3. server/AuditService.js       ← Must load THIRD (defines auditLog())
-4. server/CacheManager.js       ← Depends on: _Constants, Utils
-5. server/ValidationService.js  ← Depends on: _Constants, Utils
-6. server/UserService.js        ← Depends on: _Constants, Utils, AuditService
-7. server/SessionManager.js     ← Depends on: UserService, CacheManager
-8. server/SheetService.js       ← Depends on: _Constants, Utils
-9. server/ObservationService.js ← Depends on: _Constants, Utils, SheetService
-10. server/ObservationSecurityService.js ← Depends on: ObservationService, AuditService
-11. server/PdfService.js        ← Depends on: _Constants, Utils
-12. server/UiService.js         ← Depends on: _Constants, Utils
-13. server/Code.js              ← Main orchestrator, depends on ALL above
+### Implications
+
+1. **Cannot rely on file names** to control load order
+2. **Cannot assume** one file loads before another
+3. **Must use defensive programming** to handle dependencies
+4. **Global variables/functions** may not be available when first accessed
+
+### Solution: Defensive Programming
+
+All cross-module dependencies use existence checks to handle simultaneous loading:
+
+```javascript
+// ✅ CORRECT: Check if constant exists before using
+if (typeof RATE_LIMITS !== 'undefined' && RATE_LIMITS.someAction) {
+  const limit = RATE_LIMITS.someAction.maxRequests;
+}
+
+// ✅ CORRECT: Check if function exists before calling
+if (typeof auditLog === 'function') {
+  auditLog(AUDIT_ACTIONS.SOME_ACTION, details);
+}
+
+// ❌ WRONG: Assume constant is available
+const limit = RATE_LIMITS.someAction.maxRequests; // May throw ReferenceError
+
+// ❌ WRONG: Assume function is available
+auditLog(AUDIT_ACTIONS.SOME_ACTION, details); // May throw ReferenceError
 ```
 
 ---
 
 ## File Dependencies Map
 
-### 0_Constants.js
+### Constants.js
 **Provides:**
 - `SHEET_NAMES`
 - `AVAILABLE_ROLES`
@@ -61,7 +74,7 @@ Google Apps Script loads files alphabetically by default. The security implement
 - `initializeSecuritySalt()`
 
 **Dependencies:**
-- 0_Constants.js (for `RATE_LIMITS`, `INPUT_LIMITS`, etc.)
+- Constants.js (for `RATE_LIMITS`, `INPUT_LIMITS`, etc.)
 - AuditService.js (for `auditLog()` - optional, guarded)
 
 **Notes:**
@@ -79,7 +92,7 @@ Google Apps Script loads files alphabetically by default. The security implement
 - `generateAuditReport()`
 
 **Dependencies:**
-- 0_Constants.js (for `SECURITY_ADMIN_EMAIL_PROPERTY`)
+- Constants.js (for `SECURITY_ADMIN_EMAIL_PROPERTY`)
 - Utils.js (for `isValidEmail()`, `generateUniqueId()`)
 - SessionManager.js (for `getUserSession()` - optional)
 
@@ -93,7 +106,7 @@ Google Apps Script loads files alphabetically by default. The security implement
 - `invalidateDependentCaches()`
 
 **Dependencies:**
-- 0_Constants.js (for cache settings)
+- Constants.js (for cache settings)
 - Utils.js (for `getSecuritySalt()`, `debugLog()`)
 
 ---
@@ -107,7 +120,7 @@ Google Apps Script loads files alphabetically by default. The security implement
 - `deleteObservation()`
 
 **Dependencies:**
-- 0_Constants.js
+- Constants.js
 - Utils.js
 - SheetService.js
 
@@ -148,50 +161,60 @@ Google Apps Script loads files alphabetically by default. The security implement
 - `getUserByEmail()`
 
 **Dependencies:**
-- 0_Constants.js
+- Constants.js
 - Utils.js
 - AuditService.js (calls `auditLog()`)
 - SheetService.js
 
 ---
 
-## Alphabetical Loading Considerations
+## File Listing
 
-Google Apps Script loads files alphabetically. The current file names ensure correct order:
+For reference, here are all server-side JavaScript files in the project:
 
 ```
-✅ CORRECT ORDER (alphabetical):
-- AuditService.js       (A)
-- CacheManager.js       (C)
-- Code.js               (C)
-- 0_Constants.js         (_C)
-- ObservationSecurityService.js (O)
-- ObservationService.js (O)
-- PdfService.js         (P)
-- SessionManager.js     (S)
-- SheetService.js       (S)
-- UiService.js          (U)
-- UserService.js        (U)
-- Utils.js              (U)
-- ValidationService.js  (V)
+📁 Project Files (alphabetical listing - NOT load order):
+- AuditService.js
+- CacheManager.js
+- Code.js
+- Constants.js
+- ObservationSecurityService.js
+- ObservationService.js
+- PdfService.js
+- SessionManager.js
+- SheetService.js
+- UiService.js
+- UserService.js
+- Utils.js
+- ValidationService.js
 ```
 
-**✅ RESOLVED:** 0_Constants.js loads FIRST alphabetically (underscore sorts first)!
+**⚠️ IMPORTANT:** File alphabetical order is IRRELEVANT for load order! Google Apps Script loads all files simultaneously.
 
-### Solution: Ensure 0_Constants.js loads first
+### Solution: Defensive Programming (CORRECT APPROACH)
 
-**Option 1:** (IMPLEMENTED) Rename to ensure alphabetical precedence
-- Renamed `Constants.js` to `0_Constants.js` (underscore sorts first) ✅
-- Utils.js loads after 0_Constants.js (U > _C alphabetically)
+Since Google Apps Script loads files simultaneously, we **CANNOT** control load order through file naming. The correct solution is defensive programming:
 
-**Option 2:** Rely on Apps Script's handling of dependencies
-- Apps Script generally resolves dependencies correctly
-- Constants are global and available once script initializes
-- Not recommended for critical load order
+**✅ IMPLEMENTED PATTERN:** Existence checks before using cross-module dependencies
 
-**Option 3:** Explicit dependency management
-- Use wrapper functions that check for constant availability
-- Used as secondary defense (e.g., auditLog() existence checks)
+```javascript
+// Pattern 1: Check constant exists before using
+if (typeof RATE_LIMITS !== 'undefined' && RATE_LIMITS.someAction) {
+  // Use RATE_LIMITS safely
+}
+
+// Pattern 2: Check function exists before calling
+if (typeof auditLog === 'function') {
+  auditLog(AUDIT_ACTIONS.SOME_ACTION, details);
+}
+
+// Pattern 3: Graceful degradation
+const limit = (typeof RATE_LIMITS !== 'undefined' && RATE_LIMITS.someAction)
+  ? RATE_LIMITS.someAction.maxRequests
+  : 100; // fallback value
+```
+
+**Why this works:** Even though files load simultaneously, global constants and functions become available once their containing file finishes loading. Existence checks ensure we only use them when available.
 
 ---
 
@@ -264,19 +287,21 @@ function testFileLoadOrder() {
 ## Troubleshooting
 
 ### Error: "ReferenceError: auditLog is not defined"
-**Cause:** AuditService.js not loaded or load order incorrect
+**Cause:** AuditService.js not loaded yet (simultaneous loading race condition)
 **Solution:**
 1. Verify AuditService.js exists in project
 2. Check file is saved and deployed
-3. Add existence guard: `if (typeof auditLog === 'function')`
+3. **Always use existence guard:** `if (typeof auditLog === 'function')`
+4. This is expected behavior - use defensive programming
 
 ### Error: "ReferenceError: RATE_LIMITS is not defined"
-**Cause:** 0_Constants.js not loaded
+**Cause:** Constants.js not loaded yet (simultaneous loading race condition)
 **Solution:**
-1. Verify 0_Constants.js exists (renamed from Constants.js)
+1. Verify Constants.js exists in project
 2. Ensure file is deployed
-3. Check for syntax errors in 0_Constants.js
-4. Verify underscore prefix is present for alphabetical precedence
+3. Check for syntax errors in Constants.js
+4. **Always use existence guard:** `if (typeof RATE_LIMITS !== 'undefined')`
+5. This is expected behavior - use defensive programming
 
 ### Error: "TypeError: getObservationById is not a function"
 **Cause:** ObservationService.js not loaded
@@ -292,27 +317,32 @@ function testFileLoadOrder() {
 ### ✅ DO:
 - Use existence checks for optional dependencies
 - Document cross-module function calls
-- Keep 0_Constants.js simple and dependency-free
+- Keep Constants.js simple and dependency-free
 - Use descriptive function names to avoid conflicts
 
 ### ❌ DON'T:
 - Create circular dependencies
-- Assume load order without testing
+- **Assume any specific load order** - files load simultaneously
 - Use global variables without declaring them in Constants
-- Call functions without checking existence first (for optional deps)
+- Call cross-module functions without existence checks
+- **Rely on file naming to control load order** - it doesn't work
 
 ---
 
 ## Summary
 
-**Load Order:** Alphabetical by default, but Apps Script resolves most dependencies
+**Load Behavior:** Google Apps Script loads ALL files SIMULTANEOUSLY - no guaranteed order
+
+**Solution:** Defensive programming with existence checks
 
 **Critical Dependencies:**
-1. 0_Constants.js → Everything depends on this (loads first alphabetically)
-2. Utils.js → Core helpers, widely used
-3. AuditService.js → Security logging
-4. ObservationService.js → Data access layer
-5. ObservationSecurityService.js → Security layer
+1. Constants.js → Provides constants used by all other files
+2. Utils.js → Provides utility functions used by other files
+3. AuditService.js → Provides audit logging (optional dependency)
+4. ObservationService.js → Provides data access layer
+5. ObservationSecurityService.js → Wraps data access with security checks
+
+**Key Pattern:** All cross-module dependencies use `typeof` checks to verify availability before use.
 
 **Key Takeaway:** The security architecture intentionally layers authorization (ObservationSecurityService) on top of data access (ObservationService). This is not a bug, it's a feature.
 

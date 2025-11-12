@@ -152,7 +152,7 @@ if (userDomain.trim().toLowerCase() !== observedDomain.trim().toLowerCase()) {
 ---
 
 ### ✅ Issue #6: Rate Limit Configuration
-**File:** `server/0_Constants.js`
+**File:** `server/Constants.js`
 **Reviewer Comment:** "20 saves per minute seems excessive"
 **Severity:** LOW - Policy Question
 
@@ -166,10 +166,10 @@ if (userDomain.trim().toLowerCase() !== observedDomain.trim().toLowerCase()) {
 
 **Recommendation:**
 - ✅ Current limit appropriate for normal use
-- ✅ Can be adjusted via 0_Constants.js if needed in production
+- ✅ Can be adjusted via Constants.js if needed in production
 - ✅ No code changes required
 
-**Evidence from 0_Constants.js:**
+**Evidence from Constants.js:**
 ```javascript
 saveObservation: { maxRequests: 20, windowMs: 60000 }, // 20 per minute
 ```
@@ -178,7 +178,7 @@ saveObservation: { maxRequests: 20, windowMs: 60000 }, // 20 per minute
 
 ### ✅ Issue #7: Constant Loading Order
 **File:** Multiple
-**Reviewer Comment:** "References to SECURITY_ADMIN_EMAIL_PROPERTY require 0_Constants.js to load first"
+**Reviewer Comment:** "References to SECURITY_ADMIN_EMAIL_PROPERTY require Constants.js to load first"
 **Severity:** MEDIUM - Potential Runtime Error
 
 **STATUS: DOCUMENTED in commit a5cf804**
@@ -194,12 +194,12 @@ Load Order (Alphabetical):
 1. AuditService.js
 2. CacheManager.js
 3. Code.js
-4. 0_Constants.js  ← Loads here
+4. Constants.js  ← Loads here
 ...
 ```
 
 **Verification:**
-- ✅ 0_Constants.js loads before files that reference it
+- ✅ Constants.js loads before files that reference it
 - ✅ All constant references work correctly
 - ✅ No runtime errors in testing
 

@@ -10,7 +10,7 @@ The `server` directory contains all the server-side Google Apps Script (`.js`) f
 
 ```
 server/
-├── 0_Constants.js                    # Global constants and configuration (loads first)
+├── Constants.js                    # Global constants and configuration (loads first)
 ├── CLAUDE.md                        # This file - server-specific guidance
 ├── CacheManager.js                  # Advanced caching system with versioning
 ├── Code.js                          # Main orchestrator and entry point
@@ -103,6 +103,6 @@ server/
 
 -   **Maintain Modularity:** When adding new functionality, place it in the appropriate service file. For example, user-related logic goes in `UserService.js`, and sheet reading/writing goes in `SheetService.js`.
 -   **Use Services:** Do not call `SpreadsheetApp` or `CacheService` directly from `Code.js`. Use the functions provided by `SheetService.js` and `CacheManager.js`.
--   **Centralize Constants:** All constants (sheet names, column numbers, error messages) should be defined in `0_Constants.js`.
+-   **Centralize Constants:** All constants (sheet names, column numbers, error messages) should be defined in `Constants.js`.
 -   **Cache Everything:** Any data read from the spreadsheet should be cached. Use the `getCachedDataEnhanced` and `setCachedDataEnhanced` functions from `CacheManager.js`.
 -   **Handle Role Changes:** When data that affects user views is changed (e.g., the "Settings" sheet), ensure that the cache is properly invalidated, typically by calling `incrementMasterCacheVersion()`.
