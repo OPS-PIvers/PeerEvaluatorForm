@@ -168,11 +168,13 @@ function validateUserAccess(email) {
       result.recommendedActions.push('Provide valid email address');
 
       // Log unauthorized access attempt
-      auditLog(AUDIT_ACTIONS.ACCESS_DENIED, {
-        reason: 'invalid_email',
-        email: email,
-        validationId: validationId
-      });
+      if (typeof auditLog === 'function') {
+        auditLog(AUDIT_ACTIONS.ACCESS_DENIED, {
+          reason: 'invalid_email',
+          email: email,
+          validationId: validationId
+        });
+      }
 
       return result;
     }
@@ -194,11 +196,13 @@ function validateUserAccess(email) {
       result.recommendedActions.push('Contact your administrator to be added to the Staff sheet');
 
       // Log unauthorized access attempt
-      auditLog(AUDIT_ACTIONS.ACCESS_DENIED, {
-        reason: 'user_not_found',
-        email: email,
-        validationId: validationId
-      });
+      if (typeof auditLog === 'function') {
+        auditLog(AUDIT_ACTIONS.ACCESS_DENIED, {
+          reason: 'user_not_found',
+          email: email,
+          validationId: validationId
+        });
+      }
 
       debugLog('User not found - access denied', {
         email: email,
@@ -292,12 +296,14 @@ function validateUserAccess(email) {
 
     // SECURITY FIX: Deny access on error instead of granting default access
     // Log the error attempt
-    auditLog(AUDIT_ACTIONS.ACCESS_DENIED, {
-      reason: 'validation_error',
-      email: email,
-      error: error.message,
-      validationId: validationId
-    });
+    if (typeof auditLog === 'function') {
+      auditLog(AUDIT_ACTIONS.ACCESS_DENIED, {
+        reason: 'validation_error',
+        email: email,
+        error: error.message,
+        validationId: validationId
+      });
+    }
 
     return {
       validationId: validationId,

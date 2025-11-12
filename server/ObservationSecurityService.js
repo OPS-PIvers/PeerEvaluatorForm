@@ -54,13 +54,15 @@ function canAccessObservation(observation, requestingEmail) {
 
     // 3. ADMINISTRATOR ACCESS: Can view all observations (with audit log)
     if (userContext.role === SPECIAL_ROLES.ADMINISTRATOR) {
-      auditLog(AUDIT_ACTIONS.ADMIN_OBSERVATION_ACCESS, {
-        observationId: observation.observationId,
-        adminEmail: requestingEmail,
-        observerEmail: observation.observerEmail,
-        observedEmail: observation.observedEmail,
-        status: observation.status
-      });
+      if (typeof auditLog === 'function') {
+        auditLog(AUDIT_ACTIONS.ADMIN_OBSERVATION_ACCESS, {
+          observationId: observation.observationId,
+          adminEmail: requestingEmail,
+          observerEmail: observation.observerEmail,
+          observedEmail: observation.observedEmail,
+          status: observation.status
+        });
+      }
       debugLog('Observation access granted: Administrator', {
         observationId: observation.observationId,
         adminEmail: requestingEmail
@@ -70,13 +72,15 @@ function canAccessObservation(observation, requestingEmail) {
 
     // 4. FULL ACCESS ROLE: Can view all observations (with audit log)
     if (userContext.role === SPECIAL_ROLES.FULL_ACCESS) {
-      auditLog(AUDIT_ACTIONS.FULL_ACCESS_OBSERVATION_VIEW, {
-        observationId: observation.observationId,
-        accessorEmail: requestingEmail,
-        observerEmail: observation.observerEmail,
-        observedEmail: observation.observedEmail,
-        status: observation.status
-      });
+      if (typeof auditLog === 'function') {
+        auditLog(AUDIT_ACTIONS.FULL_ACCESS_OBSERVATION_VIEW, {
+          observationId: observation.observationId,
+          accessorEmail: requestingEmail,
+          observerEmail: observation.observerEmail,
+          observedEmail: observation.observedEmail,
+          status: observation.status
+        });
+      }
       debugLog('Observation access granted: Full Access role', {
         observationId: observation.observationId,
         accessorEmail: requestingEmail
@@ -85,14 +89,16 @@ function canAccessObservation(observation, requestingEmail) {
     }
 
     // 5. DENY ALL OTHERS
-    auditLog(AUDIT_ACTIONS.UNAUTHORIZED_ACCESS_ATTEMPT, {
-      resource: 'observation',
-      observationId: observation.observationId,
-      attemptedBy: requestingEmail,
-      observerEmail: observation.observerEmail,
-      observedEmail: observation.observedEmail,
-      userRole: userContext.role
-    });
+    if (typeof auditLog === 'function') {
+      auditLog(AUDIT_ACTIONS.UNAUTHORIZED_ACCESS_ATTEMPT, {
+        resource: 'observation',
+        observationId: observation.observationId,
+        attemptedBy: requestingEmail,
+        observerEmail: observation.observerEmail,
+        observedEmail: observation.observedEmail,
+        userRole: userContext.role
+      });
+    }
 
     debugLog('Observation access denied: No authorization', {
       observationId: observation.observationId,
@@ -248,22 +254,26 @@ function getObservationSecure(observationId, requestingEmail = null) {
 
   // Check authorization
   if (!canAccessObservation(observation, userEmail)) {
-    auditLog(AUDIT_ACTIONS.UNAUTHORIZED_ACCESS_ATTEMPT, {
-      resource: 'observation',
-      observationId: observationId,
-      attemptedBy: userEmail,
-      observerEmail: observation.observerEmail
-    });
+    if (typeof auditLog === 'function') {
+      auditLog(AUDIT_ACTIONS.UNAUTHORIZED_ACCESS_ATTEMPT, {
+        resource: 'observation',
+        observationId: observationId,
+        attemptedBy: userEmail,
+        observerEmail: observation.observerEmail
+      });
+    }
     throw new Error('Access denied: You do not have permission to view this observation');
   }
 
   // Log successful access
-  auditLog(AUDIT_ACTIONS.OBSERVATION_VIEWED, {
-    observationId: observationId,
-    viewedBy: userEmail,
-    observerEmail: observation.observerEmail,
-    observedEmail: observation.observedEmail
-  });
+  if (typeof auditLog === 'function') {
+    auditLog(AUDIT_ACTIONS.OBSERVATION_VIEWED, {
+      observationId: observationId,
+      viewedBy: userEmail,
+      observerEmail: observation.observerEmail,
+      observedEmail: observation.observedEmail
+    });
+  }
 
   return observation;
 }
@@ -284,12 +294,14 @@ function validateObservationEmailRecipient(observation, recipientEmail) {
 
   // SECURITY: Only observed staff can receive the email
   if (recipientEmail !== observation.observedEmail) {
-    auditLog(AUDIT_ACTIONS.EMAIL_BLOCKED, {
-      observationId: observation.observationId,
-      attemptedRecipient: recipientEmail,
-      allowedRecipient: observation.observedEmail,
-      blockedBy: Session.getActiveUser().getEmail()
-    });
+    if (typeof auditLog === 'function') {
+      auditLog(AUDIT_ACTIONS.EMAIL_BLOCKED, {
+        observationId: observation.observationId,
+        attemptedRecipient: recipientEmail,
+        allowedRecipient: observation.observedEmail,
+        blockedBy: Session.getActiveUser().getEmail()
+      });
+    }
     throw new Error('Observation emails can only be sent to the observed staff member');
   }
 
@@ -354,11 +366,13 @@ function getObservationsForUserSecure(requestingEmail = null) {
   const accessibleObservations = filterObservationsByAccess(allObservations, userEmail);
 
   // Log the access
-  auditLog(AUDIT_ACTIONS.OBSERVATION_VIEWED, {
-    action: 'list_observations',
-    userEmail: userEmail,
-    observationCount: accessibleObservations.length
-  });
+  if (typeof auditLog === 'function') {
+    auditLog(AUDIT_ACTIONS.OBSERVATION_VIEWED, {
+      action: 'list_observations',
+      userEmail: userEmail,
+      observationCount: accessibleObservations.length
+    });
+  }
 
   return accessibleObservations;
 }
