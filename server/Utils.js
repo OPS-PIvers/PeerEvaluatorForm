@@ -1006,13 +1006,15 @@ function checkRateLimit(action, userEmail) {
     const currentCount = parseInt(cache.get(cacheKey) || '0');
 
     if (currentCount >= limitConfig.maxRequests) {
-      // Log rate limit violation
-      auditLog(AUDIT_ACTIONS.RATE_LIMIT_EXCEEDED, {
-        action: action,
-        user: userEmail,
-        count: currentCount,
-        limit: limitConfig.maxRequests
-      });
+      // Log rate limit violation (if audit service available)
+      if (typeof auditLog === 'function' && typeof AUDIT_ACTIONS !== 'undefined') {
+        auditLog(AUDIT_ACTIONS.RATE_LIMIT_EXCEEDED, {
+          action: action,
+          user: userEmail,
+          count: currentCount,
+          limit: limitConfig.maxRequests
+        });
+      }
 
       throw new Error(`Rate limit exceeded for ${action}. Please wait before trying again.`);
     }
@@ -1118,7 +1120,12 @@ function validateObservationData(observation) {
   }
 
   // Validate observed email is from same domain as observer
-  const userEmail = Session.getActiveUser().getEmail();
+  let userEmail;
+  try {
+    userEmail = Session.getActiveUser().getEmail();
+  } catch (sessionError) {
+    throw new Error('Unable to determine current user - session may have expired');
+  }
 
   // Defensive check: ensure both emails contain '@' before splitting
   if (!userEmail || !userEmail.includes('@')) {
@@ -1132,7 +1139,14 @@ function validateObservationData(observation) {
   const userDomain = userEmail.split('@')[1];
   const observedDomain = observation.observedEmail.split('@')[1];
 
-  if (!userDomain || !observedDomain || userDomain !== observedDomain) {
+  // Check for empty or whitespace-only domains
+  if (!userDomain || !observedDomain ||
+      userDomain.trim() === '' || observedDomain.trim() === '') {
+    throw new Error('Invalid email domain format');
+  }
+
+  // Compare domains (case-insensitive)
+  if (userDomain.trim().toLowerCase() !== observedDomain.trim().toLowerCase()) {
     throw new Error('Observed staff must be from the same organization');
   }
 

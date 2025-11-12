@@ -216,11 +216,11 @@ function canDeleteObservation(observation, requestingEmail) {
 
 /**
  * Securely retrieves an observation with authorization check
- * SECURITY WRAPPER: Use this instead of direct _getObservationById
+ * SECURITY WRAPPER: Use this instead of direct getObservationById
  *
- * DEPENDENCY NOTE: This function calls _getObservationById() from ObservationService.js
- * This is an intentional cross-module dependency for security layer separation.
- * The security service wraps the data access layer to enforce authorization.
+ * DEPENDENCY NOTE: This function calls getObservationById() from ObservationService.js
+ * This wraps the public function with authorization checks and audit logging.
+ * The security service adds access control on top of the data access layer.
  *
  * @param {string} observationId - The observation ID to retrieve
  * @param {string} requestingEmail - Optional email of requesting user (uses session if not provided)
@@ -238,9 +238,9 @@ function getObservationSecure(observationId, requestingEmail = null) {
   // Apply rate limiting
   checkRateLimit('getObservation', userEmail);
 
-  // Get the observation (internal function from ObservationService.js - no security)
-  // NOTE: Direct access to private function is intentional for security layer
-  const observation = _getObservationById(observationId);
+  // Get the observation (function from ObservationService.js - no security checks)
+  // NOTE: This is the public function - we add security layer on top
+  const observation = getObservationById(observationId);
 
   if (!observation) {
     return null;
