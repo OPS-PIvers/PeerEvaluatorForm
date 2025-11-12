@@ -22,10 +22,10 @@ This is a Google Apps Script (GAS) web application called "Peer Evaluator Form" 
 │   └── staff/
 │       └── rubric.html              # Main evaluation rubric interface
 ├── server/                          # Server-side JavaScript modules
+│   ├── 0_Constants.js                # Global constants and configuration (loads first)
 │   ├── CLAUDE.md                    # Server-specific Claude instructions
 │   ├── CacheManager.js              # Advanced caching system with versioning
 │   ├── Code.js                      # Main orchestrator and entry point (streamlined)
-│   ├── Constants.js                 # Global constants and configuration
 │   ├── ObservationService.js        # Manages peer evaluation observations
 │   ├── PdfService.js                # PDF generation, styling, and Drive integration
 │   ├── SessionManager.js            # User sessions and state persistence
@@ -57,7 +57,7 @@ This is a Google Apps Script (GAS) web application called "Peer Evaluator Form" 
 - **server/CacheManager.js**: Advanced caching system with versioning and dependency management
 - **server/ValidationService.js**: Data validation and error handling
 - **server/Utils.js**: Utility functions and constants
-- **server/Constants.js**: Global constants including sheet names, roles, cache settings, and validation patterns
+- **server/0_Constants.js**: Global constants including sheet names, roles, cache settings, and validation patterns (renamed with underscore prefix to ensure it loads first alphabetically)
 
 ### HTML Templates
 
@@ -121,7 +121,7 @@ clearUserCaches('user@email.com');
 ### Role Management
 
 To add a new role:
-1. Add to `AVAILABLE_ROLES` constant in server/Constants.js
+1. Add to `AVAILABLE_ROLES` constant in server/0_Constants.js
 2. Create corresponding sheet with rubric data
 3. Add role-year mappings in Settings sheet
 4. Update validation logic if needed

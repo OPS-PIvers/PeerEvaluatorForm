@@ -1,6 +1,13 @@
 /**
- * Constants.js
+ * 0_Constants.js
  * Configuration constants and default settings for the Danielson Framework Multi-Role System
+ *
+ * IMPORTANT: This file is prefixed with "0_" to ensure it loads FIRST alphabetically in Google
+ * Apps Script (numbers sort before letters in ASCII). All other files depend on constants defined
+ * here (RATE_LIMITS, INPUT_LIMITS, SHEET_NAMES, AVAILABLE_ROLES, etc.). Do not rename without
+ * updating all documentation references.
+ *
+ * Load Order: 0_Constants.js → AuditService.js → CacheManager.js → ... (alphabetical)
  */
 
 /**

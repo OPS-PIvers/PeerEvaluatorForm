@@ -13,18 +13,18 @@ Google Apps Script loads files alphabetically by default. The security implement
 ### Critical Dependencies
 
 ```
-1. server/Constants.js          ← Must load FIRST (defines all constants)
+1. server/0_Constants.js         ← Must load FIRST (defines all constants)
 2. server/Utils.js              ← Must load SECOND (defines helper functions)
 3. server/AuditService.js       ← Must load THIRD (defines auditLog())
-4. server/CacheManager.js       ← Depends on: Constants, Utils
-5. server/ValidationService.js  ← Depends on: Constants, Utils
-6. server/UserService.js        ← Depends on: Constants, Utils, AuditService
+4. server/CacheManager.js       ← Depends on: _Constants, Utils
+5. server/ValidationService.js  ← Depends on: _Constants, Utils
+6. server/UserService.js        ← Depends on: _Constants, Utils, AuditService
 7. server/SessionManager.js     ← Depends on: UserService, CacheManager
-8. server/SheetService.js       ← Depends on: Constants, Utils
-9. server/ObservationService.js ← Depends on: Constants, Utils, SheetService
+8. server/SheetService.js       ← Depends on: _Constants, Utils
+9. server/ObservationService.js ← Depends on: _Constants, Utils, SheetService
 10. server/ObservationSecurityService.js ← Depends on: ObservationService, AuditService
-11. server/PdfService.js        ← Depends on: Constants, Utils
-12. server/UiService.js         ← Depends on: Constants, Utils
+11. server/PdfService.js        ← Depends on: _Constants, Utils
+12. server/UiService.js         ← Depends on: _Constants, Utils
 13. server/Code.js              ← Main orchestrator, depends on ALL above
 ```
 
@@ -32,7 +32,7 @@ Google Apps Script loads files alphabetically by default. The security implement
 
 ## File Dependencies Map
 
-### Constants.js
+### 0_Constants.js
 **Provides:**
 - `SHEET_NAMES`
 - `AVAILABLE_ROLES`
@@ -61,7 +61,7 @@ Google Apps Script loads files alphabetically by default. The security implement
 - `initializeSecuritySalt()`
 
 **Dependencies:**
-- Constants.js (for `RATE_LIMITS`, `INPUT_LIMITS`, etc.)
+- 0_Constants.js (for `RATE_LIMITS`, `INPUT_LIMITS`, etc.)
 - AuditService.js (for `auditLog()` - optional, guarded)
 
 **Notes:**
@@ -79,7 +79,7 @@ Google Apps Script loads files alphabetically by default. The security implement
 - `generateAuditReport()`
 
 **Dependencies:**
-- Constants.js (for `SECURITY_ADMIN_EMAIL_PROPERTY`)
+- 0_Constants.js (for `SECURITY_ADMIN_EMAIL_PROPERTY`)
 - Utils.js (for `isValidEmail()`, `generateUniqueId()`)
 - SessionManager.js (for `getUserSession()` - optional)
 
@@ -93,7 +93,7 @@ Google Apps Script loads files alphabetically by default. The security implement
 - `invalidateDependentCaches()`
 
 **Dependencies:**
-- Constants.js (for cache settings)
+- 0_Constants.js (for cache settings)
 - Utils.js (for `getSecuritySalt()`, `debugLog()`)
 
 ---
@@ -107,7 +107,7 @@ Google Apps Script loads files alphabetically by default. The security implement
 - `deleteObservation()`
 
 **Dependencies:**
-- Constants.js
+- 0_Constants.js
 - Utils.js
 - SheetService.js
 
@@ -148,7 +148,7 @@ Google Apps Script loads files alphabetically by default. The security implement
 - `getUserByEmail()`
 
 **Dependencies:**
-- Constants.js
+- 0_Constants.js
 - Utils.js
 - AuditService.js (calls `auditLog()`)
 - SheetService.js
@@ -164,7 +164,7 @@ Google Apps Script loads files alphabetically. The current file names ensure cor
 - AuditService.js       (A)
 - CacheManager.js       (C)
 - Code.js               (C)
-- Constants.js          (C)
+- 0_Constants.js         (_C)
 - ObservationSecurityService.js (O)
 - ObservationService.js (O)
 - PdfService.js         (P)
@@ -176,20 +176,22 @@ Google Apps Script loads files alphabetically. The current file names ensure cor
 - ValidationService.js  (V)
 ```
 
-**POTENTIAL ISSUE:** Constants.js loads AFTER AuditService.js alphabetically!
+**✅ RESOLVED:** 0_Constants.js loads FIRST alphabetically (underscore sorts first)!
 
-### Solution: Ensure Constants.js loads first
+### Solution: Ensure 0_Constants.js loads first
 
-**Option 1:** Rename to ensure alphabetical precedence
-- Rename `Constants.js` to `_Constants.js` (underscore sorts first)
-- Rename `Utils.js` to `_Utils.js`
+**Option 1:** (IMPLEMENTED) Rename to ensure alphabetical precedence
+- Renamed `Constants.js` to `0_Constants.js` (underscore sorts first) ✅
+- Utils.js loads after 0_Constants.js (U > _C alphabetically)
 
-**Option 2:** (CURRENT) Rely on Apps Script's handling of dependencies
+**Option 2:** Rely on Apps Script's handling of dependencies
 - Apps Script generally resolves dependencies correctly
 - Constants are global and available once script initializes
+- Not recommended for critical load order
 
 **Option 3:** Explicit dependency management
 - Use wrapper functions that check for constant availability
+- Used as secondary defense (e.g., auditLog() existence checks)
 
 ---
 
@@ -269,11 +271,12 @@ function testFileLoadOrder() {
 3. Add existence guard: `if (typeof auditLog === 'function')`
 
 ### Error: "ReferenceError: RATE_LIMITS is not defined"
-**Cause:** Constants.js not loaded
+**Cause:** 0_Constants.js not loaded
 **Solution:**
-1. Verify Constants.js exists
+1. Verify 0_Constants.js exists (renamed from Constants.js)
 2. Ensure file is deployed
-3. Check for syntax errors in Constants.js
+3. Check for syntax errors in 0_Constants.js
+4. Verify underscore prefix is present for alphabetical precedence
 
 ### Error: "TypeError: getObservationById is not a function"
 **Cause:** ObservationService.js not loaded
@@ -289,7 +292,7 @@ function testFileLoadOrder() {
 ### ✅ DO:
 - Use existence checks for optional dependencies
 - Document cross-module function calls
-- Keep Constants.js simple and dependency-free
+- Keep 0_Constants.js simple and dependency-free
 - Use descriptive function names to avoid conflicts
 
 ### ❌ DON'T:
@@ -305,7 +308,7 @@ function testFileLoadOrder() {
 **Load Order:** Alphabetical by default, but Apps Script resolves most dependencies
 
 **Critical Dependencies:**
-1. Constants.js → Everything depends on this
+1. 0_Constants.js → Everything depends on this (loads first alphabetically)
 2. Utils.js → Core helpers, widely used
 3. AuditService.js → Security logging
 4. ObservationService.js → Data access layer
