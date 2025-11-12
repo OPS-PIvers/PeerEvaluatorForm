@@ -48,10 +48,10 @@ The project follows a modular, service-oriented architecture.
 │    └─── staff/
 │         └─── rubric.html                     # Main HTML/JS template for evaluation rubric interface
 ├─── server/                                   # Server-side JavaScript modules
+│    ├─── 0_Constants.js                       # Global constants (sheet names, roles, cache settings, etc.) - loads first
 │    ├─── CLAUDE.md                            # Server-specific Claude instructions
 │    ├─── CacheManager.js                      # Advanced versioned caching system
 │    ├─── Code.js                              # Main server-side entry point (doGet) and orchestrator
-│    ├─── Constants.js                         # Global constants (sheet names, roles, cache settings, etc.)
 │    ├─── ObservationService.js                # Backend logic for managing observation records
 │    ├─── SessionManager.js                    # User sessions and state change detection
 │    ├─── SheetService.js                      # Data access layer for all Google Sheets operations
@@ -138,7 +138,7 @@ This section outlines the technical configuration of the Google Apps Script proj
 ## 7. Development Workflow & Coding Conventions
 
 -   **Modularity:** Code is separated into "services" based on functionality (`server/UserService`, `server/SheetService`, etc.). `server/Code.js` acts as the main controller that orchestrates these services.
--   **Constants:** All hardcoded strings, sheet names, and configuration values should be defined in `server/Constants.js`.
+-   **Constants:** All hardcoded strings, sheet names, and configuration values should be defined in `server/0_Constants.js` (renamed with 0_ prefix to ensure it loads first alphabetically).
 -   **Caching:** All functions that read data from Google Sheets should be aggressively cached using the functions in `server/CacheManager.js` to ensure performance.
 -   **Client-Server Communication:** Use `google.script.run` for all communication from the client (`.html` files) to the server (`.js` files).
 -   **Error Handling:** Wrap potentially failing operations (especially API calls) in `try...catch` blocks. Use the `formatErrorMessage` utility for consistent error logging.

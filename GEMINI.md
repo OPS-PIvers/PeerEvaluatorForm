@@ -22,10 +22,10 @@ This is a Google Apps Script (GAS) web application called "Peer Evaluator Form" 
 │   └── staff/
 │       └── rubric.html              # Main evaluation rubric interface
 ├── server/                          # Server-side JavaScript modules
+│   ├── 0_Constants.js               # Global constants and configuration (loads first)
 │   ├── CLAUDE.md                    # Server-specific Claude instructions
 │   ├── CacheManager.js              # Advanced caching system with versioning
 │   ├── Code.js                      # Main orchestrator and entry point
-│   ├── Constants.js                 # Global constants and configuration
 │   ├── ObservationService.js        # Manages peer evaluation observations
 │   ├── SessionManager.js            # User sessions and state persistence
 │   ├── SheetService.js              # Data access layer for Google Sheets
