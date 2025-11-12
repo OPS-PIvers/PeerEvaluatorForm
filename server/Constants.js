@@ -518,3 +518,78 @@ const SCRIPT_EDITOR_SETTINGS = {
     PDF_UNAVAILABLE: 'PDF export functionality will be available soon.'
   }
 };
+
+/**
+ * SECURITY CONSTANTS
+ * Added for security hardening implementation
+ */
+
+/**
+ * Rate limiting configuration to prevent abuse and data scraping
+ */
+const RATE_LIMITS = {
+  // Observation operations
+  getObservation: { maxRequests: 30, windowMs: 300000 },        // 30 per 5 minutes
+  saveObservation: { maxRequests: 20, windowMs: 60000 },        // 20 per minute
+  finalizeObservation: { maxRequests: 5, windowMs: 300000 },    // 5 per 5 minutes
+  deleteObservation: { maxRequests: 3, windowMs: 300000 },      // 3 per 5 minutes
+
+  // Data access operations
+  loadStaffList: { maxRequests: 10, windowMs: 60000 },          // 10 per minute
+  loadRubricData: { maxRequests: 20, windowMs: 60000 },         // 20 per minute
+  getStaffListForDropdown: { maxRequests: 15, windowMs: 60000 }, // 15 per minute
+
+  // Email operations
+  sendEmail: { maxRequests: 5, windowMs: 300000 },              // 5 per 5 minutes
+
+  // PDF operations
+  generatePdf: { maxRequests: 10, windowMs: 300000 }            // 10 per 5 minutes
+};
+
+/**
+ * Input validation limits to prevent abuse
+ */
+const INPUT_LIMITS = {
+  // Observation fields
+  observationName: 200,
+  observationNotes: 50000,
+  scriptContent: 100000,
+
+  // Evidence fields
+  evidenceName: 500,
+  evidenceUrl: 2048,
+
+  // User fields
+  userName: 200,
+  userEmail: 320,
+  userRole: 100,
+
+  // General text fields
+  generalText: 10000,
+  shortText: 500
+};
+
+/**
+ * Allowed file patterns for evidence uploads
+ */
+const ALLOWED_EVIDENCE_PATTERNS = [
+  /^https:\/\/drive\.google\.com\/file\/d\/[a-zA-Z0-9_-]+/,
+  /^https:\/\/docs\.google\.com\/document\/d\/[a-zA-Z0-9_-]+/,
+  /^https:\/\/docs\.google\.com\/spreadsheets\/d\/[a-zA-Z0-9_-]+/,
+  /^https:\/\/docs\.google\.com\/presentation\/d\/[a-zA-Z0-9_-]+/
+];
+
+/**
+ * Maximum file size for uploads (in bytes)
+ */
+const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
+
+/**
+ * Cache salt property key (used for secure cache key hashing)
+ */
+const CACHE_SALT_PROPERTY = 'CACHE_SALT_V1';
+
+/**
+ * Security admin email property key
+ */
+const SECURITY_ADMIN_EMAIL_PROPERTY = 'SECURITY_ADMIN_EMAIL';

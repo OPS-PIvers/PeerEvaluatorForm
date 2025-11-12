@@ -8,15 +8,19 @@
 let scriptScopedMasterCacheVersion = null;
 
 /**
- * Enhanced cache key generator with versioning
+ * Enhanced cache key generator with versioning and secure hashing
+ * SECURITY: Now includes salt-based hashing to prevent cache key enumeration
  * @param {string} baseKey - Base cache key (e.g., 'user', 'role_sheet')
  * @param {Object} params - Parameters to include in key
- * @return {string} Versioned cache key
+ * @return {string} Versioned and hashed cache key
  */
 function generateCacheKey(baseKey, params = {}) {
   try {
     // Get master version
     const masterVersion = getMasterCacheVersion();
+
+    // Get security salt for hashing
+    const salt = getSecuritySalt();
 
     // Build parameter string
     const paramString = Object.keys(params)
@@ -24,17 +28,27 @@ function generateCacheKey(baseKey, params = {}) {
       .map(key => `${key}:${params[key]}`)
       .join('_');
 
-    // Combine all parts
-    const fullKey = paramString ?
-      `${baseKey}_${paramString}_v${masterVersion}` :
-      `${baseKey}_v${masterVersion}`;
+    // Create pre-hash key
+    const preHashKey = paramString ?
+      `${baseKey}_${paramString}_v${masterVersion}_${salt}` :
+      `${baseKey}_v${masterVersion}_${salt}`;
 
-    debugLog('Generated cache key', { baseKey, params, fullKey });
+    // Hash the key for security (prevents enumeration)
+    const hash = Utilities.computeDigest(
+      Utilities.DigestAlgorithm.SHA_256,
+      preHashKey
+    );
+    const hashedKey = Utilities.base64Encode(hash).substring(0, 32);
+
+    // Prefix with baseKey for debugging purposes
+    const fullKey = `${baseKey}_${hashedKey}`;
+
+    debugLog('Generated secure cache key', { baseKey, params, fullKey });
     return fullKey;
 
   } catch (error) {
     console.error('Error generating cache key:', error);
-    // Fallback to simple key
+    // Fallback to simple key with timestamp
     return `${baseKey}_${Date.now()}`;
   }
 }
@@ -103,6 +117,7 @@ function incrementMasterCacheVersion() {
 
 /**
  * Enhanced cache get with dependency tracking
+ * SECURITY: Now uses user-scoped cache for isolation between users
  * @param {string} baseKey - Base cache key
  * @param {Object} params - Cache parameters
  * @return {*} Cached data or null
@@ -110,7 +125,8 @@ function incrementMasterCacheVersion() {
 function getCachedDataEnhanced(baseKey, params = {}) {
   try {
     const fullKey = generateCacheKey(baseKey, params);
-    const cache = CacheService.getScriptCache();
+    // SECURITY FIX: Use user-scoped cache instead of script cache
+    const cache = CacheService.getUserCache();
     const cachedString = cache.get(fullKey);
 
     if (cachedString) {
@@ -129,6 +145,7 @@ function getCachedDataEnhanced(baseKey, params = {}) {
 
 /**
  * Enhanced cache set with dependency tracking
+ * SECURITY: Now uses user-scoped cache and reduced TTL values
  * @param {string} baseKey - Base cache key
  * @param {Object} params - Cache parameters
  * @param {*} data - Data to cache
@@ -137,7 +154,8 @@ function getCachedDataEnhanced(baseKey, params = {}) {
 function setCachedDataEnhanced(baseKey, params = {}, data, ttl = CACHE_SETTINGS.DEFAULT_TTL) {
   try {
     const fullKey = generateCacheKey(baseKey, params);
-    const cache = CacheService.getScriptCache();
+    // SECURITY FIX: Use user-scoped cache instead of script cache
+    const cache = CacheService.getUserCache();
 
     // Add metadata to cached data
     const cacheEntry = {
@@ -148,8 +166,12 @@ function setCachedDataEnhanced(baseKey, params = {}, data, ttl = CACHE_SETTINGS.
       params: params
     };
 
-    cache.put(fullKey, JSON.stringify(cacheEntry), ttl);
-    debugLog('Cache SET', { baseKey, fullKey, ttl });
+    // SECURITY: Reduce maximum TTL to prevent long-lived cached data
+    const maxTTL = 600; // 10 minutes maximum
+    const safeTTL = Math.min(ttl, maxTTL);
+
+    cache.put(fullKey, JSON.stringify(cacheEntry), safeTTL);
+    debugLog('Cache SET', { baseKey, fullKey, ttl: safeTTL });
 
   } catch (error) {
     console.error('Error setting cached data:', error);
@@ -158,13 +180,15 @@ function setCachedDataEnhanced(baseKey, params = {}, data, ttl = CACHE_SETTINGS.
 
 /**
  * Clear caches based on dependency map
+ * SECURITY: Now uses user-scoped cache for cache invalidation
  * @param {string} changedKey - The base cache key that changed
  */
 function invalidateDependentCaches(changedKey) {
   try {
     debugLog('Invalidating dependent caches based on changed key', { changedKey });
 
-    const cache = CacheService.getScriptCache();
+    // SECURITY FIX: Use user-scoped cache
+    const cache = CacheService.getUserCache();
     const dependencies = CACHE_DEPENDENCIES[changedKey] || [];
 
     dependencies.forEach(dependentPattern => {

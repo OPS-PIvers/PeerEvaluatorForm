@@ -156,21 +156,23 @@ function validateUserAccess(email) {
     });
 
     // Email validation
+    // SECURITY FIX: Deny access for invalid email instead of granting default access
     if (!email || !isValidEmail(email)) {
       result.issues.push({
         type: VALIDATION_ERROR_TYPES.INVALID_EMAIL,
         message: 'Invalid or missing email address',
-        severity: VALIDATION_SEVERITY.ERROR
+        severity: VALIDATION_SEVERITY.CRITICAL
       });
-      result.message = ERROR_MESSAGES.INVALID_EMAIL;
+      result.hasAccess = false;  // ✅ SECURITY: Deny access
+      result.message = 'Access denied: Invalid or missing email address';
       result.recommendedActions.push('Provide valid email address');
 
-      // Still allow access with default settings
-      result.hasAccess = true;
-      result.role = 'Teacher';
-      result.year = 1;
-      result.isDefaultUser = true;
-      result.message = 'Using default Teacher role due to invalid email';
+      // Log unauthorized access attempt
+      auditLog(AUDIT_ACTIONS.ACCESS_DENIED, {
+        reason: 'invalid_email',
+        email: email,
+        validationId: validationId
+      });
 
       return result;
     }
@@ -180,25 +182,26 @@ function validateUserAccess(email) {
     // User lookup with validation
     const user = getUserByEmail(email);
 
+    // SECURITY FIX: Deny access for users not in Staff sheet
     if (!user) {
       result.issues.push({
         type: VALIDATION_ERROR_TYPES.MISSING_USER,
         message: 'User not found in Staff sheet',
-        severity: VALIDATION_SEVERITY.WARNING
+        severity: VALIDATION_SEVERITY.CRITICAL
       });
-      result.recommendedActions.push('Add user to Staff sheet');
-      result.recommendedActions.push('Or use default Teacher role');
+      result.hasAccess = false;  // ✅ SECURITY: Deny access
+      result.message = 'Access denied: User not authorized for this application';
+      result.recommendedActions.push('Contact your administrator to be added to the Staff sheet');
 
-      // Allow access with default settings
-      result.hasAccess = true;
-      result.role = 'Teacher';
-      result.year = 1;
-      result.isDefaultUser = true;
-      result.message = ERROR_MESSAGES.USER_NOT_FOUND;
-
-      debugLog('User not found - using defaults', {
+      // Log unauthorized access attempt
+      auditLog(AUDIT_ACTIONS.ACCESS_DENIED, {
+        reason: 'user_not_found',
         email: email,
-        defaultRole: result.role,
+        validationId: validationId
+      });
+
+      debugLog('User not found - access denied', {
+        email: email,
         validationId: validationId
       });
 
@@ -287,14 +290,23 @@ function validateUserAccess(email) {
   } catch (error) {
     console.error('Error in enhanced user access validation:', formatErrorMessage(error, 'validateUserAccess'));
 
+    // SECURITY FIX: Deny access on error instead of granting default access
+    // Log the error attempt
+    auditLog(AUDIT_ACTIONS.ACCESS_DENIED, {
+      reason: 'validation_error',
+      email: email,
+      error: error.message,
+      validationId: validationId
+    });
+
     return {
       validationId: validationId,
-      hasAccess: true,
+      hasAccess: false,  // ✅ SECURITY: Deny access on error
       email: email,
-      role: 'Teacher',
-      year: 1,
-      isDefaultUser: true,
-      message: 'Validation error - using default access: ' + error.message,
+      role: null,
+      year: null,
+      isDefaultUser: false,
+      message: 'Access denied: System error during validation. Please try again or contact support.',
       validation: {
         emailValid: false,
         userFound: false,

@@ -1,0 +1,339 @@
+<!--
+  security-helpers.html
+  Client-side security helper functions for XSS prevention
+
+  USAGE: Include this file in all HTML templates:
+  <?!= HtmlService.createHtmlOutputFromFile('client/shared/security-helpers').getContent(); ?>
+
+  BACKWARDS COMPATIBLE: All existing code continues to work
+  NEW CODE: Use escapeHtml() for all user-generated content
+-->
+
+<script>
+/**
+ * Client-side security helper functions
+ * These functions help prevent XSS attacks in the browser
+ */
+
+/**
+ * Escapes HTML special characters to prevent XSS attacks
+ * Use this for ALL user-generated content before inserting into innerHTML
+ *
+ * @param {string} unsafe - The potentially unsafe string to escape
+ * @returns {string} The HTML-safe escaped string
+ *
+ * @example
+ * // UNSAFE - Don't do this:
+ * element.innerHTML = observation.name;
+ *
+ * // SAFE - Do this instead:
+ * element.innerHTML = escapeHtml(observation.name);
+ */
+function escapeHtml(unsafe) {
+  if (unsafe == null || unsafe === undefined) {
+    return '';
+  }
+
+  const str = String(unsafe);
+
+  const entityMap = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#x27;',
+    '/': '&#x2F;',
+    '`': '&#x60;',
+    '=': '&#x3D;'
+  };
+
+  return str.replace(/[&<>"'`=\/]/g, function(match) {
+    return entityMap[match];
+  });
+}
+
+/**
+ * Sanitizes rich text HTML content for safe display
+ * Allows basic formatting tags but removes potentially dangerous content
+ *
+ * @param {string} html - The HTML content to sanitize
+ * @returns {string} Sanitized HTML safe for innerHTML
+ *
+ * @example
+ * // For rich text content like notes:
+ * notesContainer.innerHTML = sanitizeHtml(observation.notes);
+ */
+function sanitizeHtml(html) {
+  if (!html) return '';
+
+  // Create a temporary div to parse HTML
+  const temp = document.createElement('div');
+  temp.innerHTML = html;
+
+  // Remove all script tags
+  const scripts = temp.querySelectorAll('script');
+  scripts.forEach(script => script.remove());
+
+  // Remove all event handlers
+  const allElements = temp.querySelectorAll('*');
+  allElements.forEach(element => {
+    // Remove event handler attributes
+    const attributes = element.attributes;
+    for (let i = attributes.length - 1; i >= 0; i--) {
+      const attr = attributes[i];
+      if (attr.name.startsWith('on')) {
+        element.removeAttribute(attr.name);
+      }
+    }
+
+    // Remove javascript: URLs
+    if (element.hasAttribute('href')) {
+      const href = element.getAttribute('href');
+      if (href && href.toLowerCase().startsWith('javascript:')) {
+        element.removeAttribute('href');
+      }
+    }
+
+    if (element.hasAttribute('src')) {
+      const src = element.getAttribute('src');
+      if (src && src.toLowerCase().startsWith('javascript:')) {
+        element.removeAttribute('src');
+      }
+    }
+  });
+
+  return temp.innerHTML;
+}
+
+/**
+ * Safely sets text content (never interprets as HTML)
+ * Use this as the safest option when you don't need HTML formatting
+ *
+ * @param {HTMLElement} element - The element to set text on
+ * @param {string} text - The text content to set
+ *
+ * @example
+ * // Safest option - no HTML interpretation:
+ * safeSetText(titleElement, observation.name);
+ */
+function safeSetText(element, text) {
+  if (!element) return;
+  element.textContent = text || '';
+}
+
+/**
+ * Safely creates an HTML element with escaped content
+ *
+ * @param {string} tagName - The tag name (e.g., 'div', 'span', 'p')
+ * @param {string} content - The text content (will be escaped)
+ * @param {Object} attributes - Optional attributes to set
+ * @returns {HTMLElement} The created element
+ *
+ * @example
+ * const card = createSafeElement('div', observation.name, {
+ *   class: 'observation-card',
+ *   'data-id': observation.id
+ * });
+ * container.appendChild(card);
+ */
+function createSafeElement(tagName, content, attributes = {}) {
+  const element = document.createElement(tagName);
+
+  // Set text content (safe - no HTML interpretation)
+  if (content) {
+    element.textContent = content;
+  }
+
+  // Set attributes
+  Object.keys(attributes).forEach(key => {
+    element.setAttribute(key, attributes[key]);
+  });
+
+  return element;
+}
+
+/**
+ * Validates and sanitizes a URL
+ * Only allows safe URLs (http, https, mailto, Google Drive/Docs)
+ *
+ * @param {string} url - The URL to validate
+ * @returns {string|null} The safe URL or null if invalid
+ *
+ * @example
+ * const safeUrl = validateUrl(link.url);
+ * if (safeUrl) {
+ *   anchor.href = safeUrl;
+ * }
+ */
+function validateUrl(url) {
+  if (!url || typeof url !== 'string') {
+    return null;
+  }
+
+  const trimmedUrl = url.trim();
+
+  // Block javascript: and data: URLs
+  const dangerous = /^(javascript|data|vbscript):/i;
+  if (dangerous.test(trimmedUrl)) {
+    console.warn('Blocked dangerous URL:', trimmedUrl);
+    return null;
+  }
+
+  // Allow only safe protocols
+  const safeProtocols = /^(https?:\/\/|mailto:|tel:)/i;
+  const googleDomains = /^https:\/\/(drive|docs)\.google\.com\//i;
+
+  if (safeProtocols.test(trimmedUrl) || googleDomains.test(trimmedUrl)) {
+    return trimmedUrl;
+  }
+
+  // If no protocol, assume https (for Google Drive links)
+  if (trimmedUrl.startsWith('drive.google.com') || trimmedUrl.startsWith('docs.google.com')) {
+    return 'https://' + trimmedUrl;
+  }
+
+  console.warn('URL does not match safe patterns:', trimmedUrl);
+  return null;
+}
+
+/**
+ * Safely creates a link element with validation
+ *
+ * @param {string} url - The URL for the link
+ * @param {string} text - The link text
+ * @param {Object} options - Optional settings
+ * @returns {HTMLElement|null} The link element or null if URL is invalid
+ *
+ * @example
+ * const link = createSafeLink(evidence.url, evidence.name, {
+ *   target: '_blank',
+ *   class: 'evidence-link'
+ * });
+ * if (link) {
+ *   container.appendChild(link);
+ * }
+ */
+function createSafeLink(url, text, options = {}) {
+  const safeUrl = validateUrl(url);
+  if (!safeUrl) {
+    console.warn('Cannot create link with invalid URL:', url);
+    return null;
+  }
+
+  const link = document.createElement('a');
+  link.href = safeUrl;
+  link.textContent = text || safeUrl;
+
+  // Set default options for external links
+  if (options.target || safeUrl.startsWith('http')) {
+    link.target = options.target || '_blank';
+    link.rel = 'noopener noreferrer'; // Security best practice
+  }
+
+  // Set additional attributes
+  if (options.class) {
+    link.className = options.class;
+  }
+  if (options.id) {
+    link.id = options.id;
+  }
+
+  return link;
+}
+
+/**
+ * Global error handler for security-related errors
+ * Logs errors for debugging but shows user-friendly messages
+ */
+window.addEventListener('error', function(event) {
+  // Log detailed error for debugging
+  console.error('Security error:', event.error);
+
+  // Don't expose error details to user
+  // Let the application handle error display
+});
+
+/**
+ * Security initialization
+ * Runs when the page loads to set up security measures
+ */
+(function initializeSecurity() {
+  // Add CSP violation reporting
+  document.addEventListener('securitypolicyviolation', function(e) {
+    console.warn('CSP Violation:', {
+      violatedDirective: e.violatedDirective,
+      blockedURI: e.blockedURI,
+      lineNumber: e.lineNumber
+    });
+  });
+
+  // Prevent clickjacking (belt-and-suspenders with CSP)
+  if (window.top !== window.self) {
+    console.warn('Page loaded in iframe - potential clickjacking attempt');
+  }
+
+  console.log('✅ Client-side security helpers loaded');
+})();
+
+// Export for use in inline scripts if needed
+if (typeof window !== 'undefined') {
+  window.SecurityHelpers = {
+    escapeHtml,
+    sanitizeHtml,
+    safeSetText,
+    createSafeElement,
+    validateUrl,
+    createSafeLink
+  };
+}
+</script>
+
+<style>
+/* Security-related styles */
+
+/* Prevent text selection of sensitive IDs (defense in depth) */
+[data-sensitive] {
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
+/* Visual indicator for sanitized content (development only) */
+.sanitized-content {
+  /* No visual change in production */
+}
+</style>
+
+<!--
+USAGE EXAMPLES:
+
+1. ESCAPING USER DATA IN TEMPLATES:
+   <h3><?= escapeHtml(observation.name) ?></h3>
+
+2. ESCAPING IN JAVASCRIPT:
+   card.innerHTML = `<h3>${escapeHtml(observation.name)}</h3>`;
+
+3. SANITIZING RICH TEXT:
+   notesContainer.innerHTML = sanitizeHtml(observation.notes);
+
+4. SAFEST OPTION (NO HTML):
+   safeSetText(titleElement, observation.name);
+
+5. CREATING ELEMENTS SAFELY:
+   const card = createSafeElement('div', observation.name, { class: 'card' });
+
+6. CREATING SAFE LINKS:
+   const link = createSafeLink(evidence.url, evidence.name, { target: '_blank' });
+
+MIGRATION STRATEGY:
+- Include this file in all HTML templates
+- Gradually update innerHTML assignments to use escapeHtml()
+- Prioritize user-generated content (names, notes, emails)
+- Test each change to ensure no regressions
+
+BACKWARDS COMPATIBILITY:
+- All existing code continues to work unchanged
+- New code can gradually adopt these helpers
+- No breaking changes to existing functionality
+-->

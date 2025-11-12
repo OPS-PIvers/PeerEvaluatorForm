@@ -943,3 +943,251 @@ function buildingsMatch(userBuildingString, adminBuildingString) {
     adminBuildings.includes(userBuilding)
   );
 }
+
+/**
+ * =================================================================
+ * SECURITY HELPER FUNCTIONS
+ * Added for security hardening implementation
+ * =================================================================
+ */
+
+/**
+ * Enhanced HTML escaping that's more thorough than the existing escapeHtml
+ * Prevents XSS attacks by escaping all potentially dangerous characters
+ * @param {*} unsafe - The input to escape
+ * @returns {string} The escaped string safe for HTML insertion
+ */
+function escapeHtmlSecure(unsafe) {
+  if (unsafe == null) return '';
+
+  const str = String(unsafe);
+
+  // Comprehensive entity map for security
+  const entityMap = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#x27;',
+    '/': '&#x2F;',
+    '`': '&#x60;',
+    '=': '&#x3D;'
+  };
+
+  return str.replace(/[&<>"'`=\/]/g, function(match) {
+    return entityMap[match];
+  });
+}
+
+/**
+ * Rate limiting check to prevent abuse and data scraping
+ * Uses user-scoped cache for isolation between users
+ * @param {string} action - Action name from RATE_LIMITS constant
+ * @param {string} userEmail - User email performing the action
+ * @throws {Error} If rate limit is exceeded
+ * @returns {boolean} True if rate limit check passed
+ */
+function checkRateLimit(action, userEmail) {
+  if (!userEmail) {
+    console.warn('checkRateLimit called without userEmail');
+    return true; // Don't block if we can't identify user
+  }
+
+  // Check if rate limiting is configured for this action
+  const limitConfig = RATE_LIMITS[action];
+  if (!limitConfig) {
+    console.warn(`No rate limit configured for action: ${action}`);
+    return true; // Don't block if not configured
+  }
+
+  try {
+    const cache = CacheService.getUserCache();
+    const cacheKey = `ratelimit_${action}_${userEmail}`;
+    const currentCount = parseInt(cache.get(cacheKey) || '0');
+
+    if (currentCount >= limitConfig.maxRequests) {
+      // Log rate limit violation
+      auditLog(AUDIT_ACTIONS.RATE_LIMIT_EXCEEDED, {
+        action: action,
+        user: userEmail,
+        count: currentCount,
+        limit: limitConfig.maxRequests
+      });
+
+      throw new Error(`Rate limit exceeded for ${action}. Please wait before trying again.`);
+    }
+
+    // Increment counter
+    const ttlSeconds = Math.ceil(limitConfig.windowMs / 1000);
+    cache.put(cacheKey, (currentCount + 1).toString(), ttlSeconds);
+
+    return true;
+  } catch (error) {
+    // If it's our rate limit error, re-throw it
+    if (error.message.includes('Rate limit exceeded')) {
+      throw error;
+    }
+    // Otherwise, log and allow (fail open for availability)
+    console.error('Error in checkRateLimit:', error.message);
+    return true;
+  }
+}
+
+/**
+ * Validates input length against configured limits
+ * @param {string} fieldName - Field name from INPUT_LIMITS constant
+ * @param {*} value - Value to validate
+ * @throws {Error} If value exceeds limit
+ * @returns {boolean} True if validation passed
+ */
+function validateInputLength(fieldName, value) {
+  if (value == null) return true;
+
+  const limit = INPUT_LIMITS[fieldName];
+  if (!limit) {
+    console.warn(`No input limit configured for field: ${fieldName}`);
+    return true; // Don't block if not configured
+  }
+
+  const valueStr = String(value);
+  if (valueStr.length > limit) {
+    throw new Error(`${fieldName} exceeds maximum length of ${limit} characters (current: ${valueStr.length})`);
+  }
+
+  return true;
+}
+
+/**
+ * Validates that a URL is a valid Google Drive/Docs URL
+ * Prevents injection of external URLs as evidence
+ * @param {string} url - URL to validate
+ * @returns {boolean} True if URL is valid and from Google Drive/Docs
+ */
+function isValidDriveUrl(url) {
+  if (!url || typeof url !== 'string') {
+    return false;
+  }
+
+  // Check against allowed patterns
+  return ALLOWED_EVIDENCE_PATTERNS.some(pattern => pattern.test(url));
+}
+
+/**
+ * Sanitizes error messages for user display
+ * Prevents exposure of internal system details while logging full error
+ * @param {Error|string} error - Error to sanitize
+ * @param {string} context - Context where error occurred
+ * @returns {Object} Sanitized error object for user
+ */
+function sanitizeErrorForUser(error, context = '') {
+  // Log full error details server-side
+  const errorMessage = error instanceof Error ? error.message : String(error);
+  const errorStack = error instanceof Error ? error.stack : '';
+
+  console.error(`Error in ${context}:`, errorMessage);
+  if (errorStack) {
+    console.error('Stack trace:', errorStack);
+  }
+
+  // Generate unique error code for tracking
+  const errorCode = `ERR_${Date.now().toString(36).toUpperCase()}`;
+
+  // Return generic message to user
+  return {
+    success: false,
+    error: 'An error occurred while processing your request. Please try again.',
+    errorCode: errorCode,
+    timestamp: new Date().toISOString()
+  };
+}
+
+/**
+ * Validates observation data structure and content
+ * @param {Object} observation - Observation object to validate
+ * @throws {Error} If validation fails
+ * @returns {boolean} True if validation passed
+ */
+function validateObservationData(observation) {
+  if (!observation || typeof observation !== 'object') {
+    throw new Error('Invalid observation data structure');
+  }
+
+  // Validate required fields
+  if (!observation.observedEmail || !isValidEmail(observation.observedEmail)) {
+    throw new Error('Valid observed staff email is required');
+  }
+
+  // Validate observed email is from same domain as observer
+  const userEmail = Session.getActiveUser().getEmail();
+  const userDomain = userEmail.split('@')[1];
+  const observedDomain = observation.observedEmail.split('@')[1];
+
+  if (userDomain !== observedDomain) {
+    throw new Error('Observed staff must be from the same organization');
+  }
+
+  // Validate field lengths
+  if (observation.observationName) {
+    validateInputLength('observationName', observation.observationName);
+  }
+
+  // Validate evidence links if present
+  if (observation.evidenceLinks && Array.isArray(observation.evidenceLinks)) {
+    observation.evidenceLinks.forEach((evidence, index) => {
+      if (evidence.url && !isValidDriveUrl(evidence.url)) {
+        throw new Error(`Invalid evidence URL at index ${index}: Must be a Google Drive/Docs URL`);
+      }
+      if (evidence.name) {
+        validateInputLength('evidenceName', evidence.name);
+      }
+    });
+  }
+
+  // Validate notes if present
+  if (observation.observationNotes) {
+    const notesStr = typeof observation.observationNotes === 'string'
+      ? observation.observationNotes
+      : JSON.stringify(observation.observationNotes);
+    validateInputLength('observationNotes', notesStr);
+  }
+
+  // Validate script content if present
+  if (observation.scriptContent) {
+    validateInputLength('scriptContent', observation.scriptContent);
+  }
+
+  return true;
+}
+
+/**
+ * Initializes security salt if not present
+ * Should be called on first deployment
+ * @returns {string} The cache salt value
+ */
+function initializeSecuritySalt() {
+  const properties = PropertiesService.getScriptProperties();
+  let salt = properties.getProperty(CACHE_SALT_PROPERTY);
+
+  if (!salt) {
+    salt = Utilities.getUuid();
+    properties.setProperty(CACHE_SALT_PROPERTY, salt);
+    console.log('Security salt initialized');
+  }
+
+  return salt;
+}
+
+/**
+ * Gets the security salt for cache key hashing
+ * @returns {string} Cache salt value
+ */
+function getSecuritySalt() {
+  const properties = PropertiesService.getScriptProperties();
+  let salt = properties.getProperty(CACHE_SALT_PROPERTY);
+
+  if (!salt) {
+    salt = initializeSecuritySalt();
+  }
+
+  return salt;
+}
