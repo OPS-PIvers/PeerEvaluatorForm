@@ -3626,7 +3626,16 @@
             return true; // Proceed with finalization
         }
 
-        function handleFinalizeObservation(obsId, email, name) {
+        async function handleFinalizeObservation(obsId, email, name) {
+            // Flush pending saves before finalizing
+            if (window.flushPendingSaves) {
+                try {
+                    await window.flushPendingSaves();
+                } catch (e) {
+                    console.error('Error flushing pending saves:', e);
+                }
+            }
+
             // Find observation in cached data
             const observation = currentObservationsData?.find(obs => obs.observationId === obsId);
 
@@ -3653,7 +3662,16 @@
             }
         }
 
-        function handleFinalizeFromNav() {
+        async function handleFinalizeFromNav() {
+            // Flush pending saves before finalizing
+            if (window.flushPendingSaves) {
+                try {
+                    await window.flushPendingSaves();
+                } catch (e) {
+                    console.error('Error flushing pending saves:', e);
+                }
+            }
+
             if (!currentObservationId || !currentObservedUser.email || !currentObservedUser.name) {
                 showError('Unable to finalize: Missing observation context.');
                 return;
@@ -3741,6 +3759,52 @@
             }
         }
 
+        function backupNotesToDoc() {
+            if (!currentObservationId) {
+                showToast('No active observation to backup.', false);
+                return;
+            }
+            
+            const btn = document.getElementById('backupNotesBtn');
+            const originalText = btn.textContent;
+            btn.textContent = 'Backing up...';
+            btn.disabled = true;
+
+            const performBackup = () => {
+                google.script.run
+                    .withSuccessHandler((res) => {
+                        btn.textContent = originalText;
+                        btn.disabled = false;
+                        if (res.success) {
+                            showToast('✅ Notes backed up to Google Doc!', true);
+                            if (res.docUrl) {
+                                // Open in new tab but blocked by popup blocker usually, so maybe just notify
+                                // or we can add a link to the toast? Toast HTML is not supported by current implementation.
+                                // We can ask user if they want to open it.
+                                if (confirm('Backup successful! Open the backup document now?')) {
+                                    window.open(res.docUrl, '_blank');
+                                }
+                            }
+                        } else {
+                            showToast('Backup failed: ' + res.error, false);
+                        }
+                    })
+                    .withFailureHandler((err) => {
+                        btn.textContent = originalText;
+                        btn.disabled = false;
+                        showToast('Backup failed: ' + err.message, false);
+                    })
+                    .backupObservationNotes(currentObservationId);
+            };
+
+            // Ensure all pending note saves are flushed before backing up
+            if (window.flushPendingSaves) {
+                window.flushPendingSaves().then(performBackup);
+            } else {
+                performBackup();
+            }
+        }
+
         function toggleLookFors(componentId) {
             const content = document.getElementById(`lookForsContent-${componentId}`);
             const chevron = document.getElementById(`chevron-${componentId}`);
@@ -3781,7 +3845,16 @@
             }
         }
 
-        function goBackToObservations() {
+        async function goBackToObservations() {
+            // Flush pending saves before navigating back
+            if (window.flushPendingSaves) {
+                try {
+                    await window.flushPendingSaves();
+                } catch (e) {
+                    console.error('Error flushing pending saves:', e);
+                }
+            }
+
             if (currentObservedUser.email && currentObservedUser.name) {
                 displayObservationOptions(currentObservedUser.email, currentObservedUser.name);
             } else {
@@ -3989,6 +4062,9 @@
                     </button>
                     <button class="global-tool-btn" id="mediaManagerBtn" onclick="openMediaManager()">
                         📁 Upload & View Media
+                    </button>
+                    <button class="global-tool-btn" id="backupNotesBtn" onclick="backupNotesToDoc()" style="background-color: #059669;">
+                        💾 Backup Notes to Doc
                     </button>
                 </div>
             </div>`;
@@ -4239,6 +4315,29 @@
         // Global Quill management system - consolidated for both interfaces
         window.globalQuillInstances = window.globalQuillInstances || {};
         window.globalObservationNotes = window.globalObservationNotes || {};
+        window.pendingSaveTimers = {}; // Track pending save timers
+
+        // Flush any pending saves immediately
+        window.flushPendingSaves = function() {
+            const pendingKeys = Object.keys(window.pendingSaveTimers);
+            if (pendingKeys.length > 0) {
+                console.log(`Flushing ${pendingKeys.length} pending note saves...`);
+                const savePromises = pendingKeys.map(componentId => {
+                    const timer = window.pendingSaveTimers[componentId];
+                    if (timer) {
+                        clearTimeout(timer.timeoutId);
+                        // Execute the pending save immediately
+                        console.log(`Force saving notes for ${componentId}`);
+                        const savePromise = saveNotes(componentId, timer.content);
+                        delete window.pendingSaveTimers[componentId];
+                        return savePromise;
+                    }
+                    return Promise.resolve();
+                });
+                return Promise.all(savePromises);
+            }
+            return Promise.resolve();
+        };
         
         function toggleEvidenceSection(contentId) {
             console.log('toggleEvidenceSection called with:', contentId);
@@ -4361,12 +4460,24 @@
                     
                     // Ensure auto-save is set up (check if already has listeners to avoid duplicates)
                     if (!existingEditor._hasAutoSaveListener) {
-                        let timeout;
                         existingEditor.on('text-change', () => {
-                            clearTimeout(timeout);
-                            timeout = setTimeout(() => {
-                                saveNotes(componentId, existingEditor.root.innerHTML);
+                            // Clear existing timeout
+                            if (window.pendingSaveTimers[componentId]) {
+                                clearTimeout(window.pendingSaveTimers[componentId].timeoutId);
+                            }
+                            
+                            // Set new timeout
+                            const content = existingEditor.root.innerHTML;
+                            const timeoutId = setTimeout(() => {
+                                saveNotes(componentId, content);
+                                delete window.pendingSaveTimers[componentId];
                             }, 1500);
+                            
+                            // Track pending save
+                            window.pendingSaveTimers[componentId] = {
+                                timeoutId: timeoutId,
+                                content: content
+                            };
                         });
                         existingEditor._hasAutoSaveListener = true;
                         console.log('Auto-save listener attached to existing editor for:', componentId);
@@ -4409,12 +4520,24 @@
                 }
 
                 // Add debounced auto-save
-                let timeout;
                 editor.on('text-change', () => {
-                    clearTimeout(timeout);
-                    timeout = setTimeout(() => {
-                        saveNotes(componentId, editor.root.innerHTML);
+                    // Clear existing timeout
+                    if (window.pendingSaveTimers[componentId]) {
+                        clearTimeout(window.pendingSaveTimers[componentId].timeoutId);
+                    }
+                    
+                    // Set new timeout
+                    const content = editor.root.innerHTML;
+                    const timeoutId = setTimeout(() => {
+                        saveNotes(componentId, content);
+                        delete window.pendingSaveTimers[componentId];
                     }, 1500); // Save 1.5 seconds after typing stops
+                    
+                    // Track pending save
+                    window.pendingSaveTimers[componentId] = {
+                        timeoutId: timeoutId,
+                        content: content
+                    };
                 });
                 editor._hasAutoSaveListener = true;
 
@@ -4431,19 +4554,27 @@
             if (!currentObservationId) {
                 console.error('Cannot save notes: No observation context available.');
                 showToast('Error: No active observation found. Cannot save notes.');
-                return;
+                return Promise.resolve(); // Return resolved promise to not block flush
             }
 
             // Update local data using global storage
             window.globalObservationNotes[componentId] = content;
 
-            google.script.run
-                .withSuccessHandler(() => console.log(`Notes saved for ${componentId}`))
-                .withFailureHandler(error => {
-                    console.error('Failed to save notes:', error);
-                    showToast('Error saving notes. Please check your connection.');
-                })
-                .saveObservationNotes(currentObservationId, componentId, content);
+            return new Promise((resolve, reject) => {
+                google.script.run
+                    .withSuccessHandler(() => {
+                        console.log(`Notes saved for ${componentId}`);
+                        resolve();
+                    })
+                    .withFailureHandler(error => {
+                        console.error('Failed to save notes:', error);
+                        showToast('Error saving notes. Please check your connection.');
+                        // Don't reject, just resolve so other operations can continue
+                        // Ideally we might want to retry or flag as dirty
+                        resolve(); 
+                    })
+                    .saveObservationNotes(currentObservationId, componentId, content);
+            });
         }
 
         // Clear all notes for a specific component
@@ -5491,8 +5622,17 @@
         /**
          * Clears all observation-related state to prevent cross-contamination between observations
          */
-        function clearObservationState() {
+        async function clearObservationState() {
             console.log('Clearing all observation state...');
+            
+            // Flush pending saves before clearing context
+            if (window.flushPendingSaves) {
+                try {
+                    await window.flushPendingSaves();
+                } catch (e) {
+                    console.error('Error flushing pending saves:', e);
+                }
+            }
             
             // Clear observation context
             currentObservationId = null;

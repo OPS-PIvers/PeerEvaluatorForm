@@ -1681,6 +1681,35 @@ function getObservationScript(observationId) {
 }
 
 /**
+ * Backs up all observation notes to a Google Doc.
+ * @param {string} observationId The ID of the observation.
+ * @returns {Object} Result with success status and docUrl.
+ */
+function backupObservationNotes(observationId) {
+    try {
+        const userContext = createUserContext();
+        // Allow Peer Evaluator and Administrator to backup notes
+        if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR && userContext.role !== SPECIAL_ROLES.ADMINISTRATOR) {
+            return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
+        }
+        
+        const observation = getObservationById(observationId);
+        if (!observation) {
+            return { success: false, error: 'Observation not found.' };
+        }
+        
+        if (observation.observerEmail !== userContext.email) {
+            return { success: false, error: 'Permission denied. You did not create this observation.' };
+        }
+
+        return backupObservationNotesToDoc(observationId);
+    } catch (error) {
+        console.error('Error in backupObservationNotes wrapper:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
  * Saves component tags for a specific observation.
  * Component tags map script content sections to rubric components.
  * @param {string} observationId The ID of the observation.

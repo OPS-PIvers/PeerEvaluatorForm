@@ -3114,6 +3114,126 @@ function createOrGetScriptDoc(observationId) {
 }
 
 /**
+ * Creates or retrieves a backup document for observation notes.
+ * @param {string} observationId The ID of the observation.
+ * @returns {Object|null} Object with docId and docUrl, or null on error.
+ */
+function createOrGetNotesBackupDoc(observationId) {
+  try {
+    const observation = getObservationById(observationId);
+    if (!observation) {
+        console.error('Observation not found for backup:', observationId);
+        return null;
+    }
+
+    const docName = `Observation Notes Backup - ${observationId}`;
+    let obsFolder = getOrCreateObservationFolder(observationId);
+    
+    // Try to find existing doc in the observation folder
+    const files = obsFolder.getFilesByName(docName);
+    if (files.hasNext()) {
+        const existingFile = files.next();
+        return {
+            docId: existingFile.getId(),
+            docUrl: existingFile.getUrl()
+        };
+    }
+
+    // Create new doc
+    const doc = DocumentApp.create(docName);
+    const docId = doc.getId();
+    const file = DriveApp.getFileById(docId);
+    
+    // Add header
+    const body = doc.getBody();
+    body.clear();
+    const header = body.appendParagraph('Observation Notes Backup');
+    header.setHeading(DocumentApp.ParagraphHeading.HEADING1);
+    body.appendParagraph(`Observation: ${observation.observationName || observationId}`);
+    body.appendParagraph(`Observed: ${observation.observedName}`);
+    body.appendParagraph(`Created: ${new Date().toLocaleString()}`);
+    body.appendHorizontalRule();
+    body.appendParagraph(''); 
+
+    // Move to folder
+    file.moveTo(obsFolder);
+
+    return {
+        docId: docId,
+        docUrl: doc.getUrl()
+    };
+
+  } catch (error) {
+    console.error('Error creating notes backup doc:', error);
+    return null;
+  }
+}
+
+/**
+ * Backs up all observation notes to a Google Doc.
+ * @param {string} observationId The ID of the observation.
+ * @returns {Object} Result with success status and docUrl.
+ */
+function backupObservationNotesToDoc(observationId) {
+    try {
+        const observation = getObservationById(observationId);
+        if (!observation || !observation.observationData) {
+            return { success: false, error: 'No observation data found' };
+        }
+
+        const docResult = createOrGetNotesBackupDoc(observationId);
+        if (!docResult) {
+            return { success: false, error: 'Failed to create backup document' };
+        }
+
+        const doc = DocumentApp.openById(docResult.docId);
+        const body = doc.getBody();
+
+        // Clear content after header (keep first 5 paragraphs: Title, ID, Name, Date, Rule)
+        const paragraphs = body.getParagraphs();
+        const keepCount = 5; 
+        for (let i = paragraphs.length - 1; i >= keepCount; i--) {
+            paragraphs[i].removeFromParent();
+        }
+
+        // Add timestamp of backup
+        const timestampPara = body.appendParagraph(`Backup Timestamp: ${new Date().toLocaleString()}`);
+        timestampPara.setItalic(true).setForegroundColor('#666666');
+        body.appendParagraph('');
+
+        // Iterate through components
+        const sortedKeys = Object.keys(observation.observationData).sort();
+        let hasNotes = false;
+
+        sortedKeys.forEach(key => {
+            const data = observation.observationData[key];
+            if (data && data.notes && data.notes.trim()) {
+                hasNotes = true;
+                // Add Component Header
+                const compHeader = body.appendParagraph(`Component ${key}`);
+                compHeader.setHeading(DocumentApp.ParagraphHeading.HEADING2);
+                
+                // Parse and add HTML notes
+                addHtmlContentToDoc(body, data.notes);
+                body.appendParagraph(''); // Spacing
+            }
+        });
+
+        if (!hasNotes) {
+            body.appendParagraph('(No notes recorded yet)');
+        }
+
+        doc.saveAndClose();
+        
+        return { success: true, docUrl: docResult.docUrl };
+
+    } catch (error) {
+        console.error('Error backing up notes:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
  * Saves script content to a Google Doc (for overflow storage).
  * Converts Quill Delta format to DocumentApp formatted text.
  * @param {string} observationId The ID of the observation.
