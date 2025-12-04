@@ -79,7 +79,7 @@ function auditLog(action, details = {}) {
       flushAuditLogs(logBatch, userEmail); // Pass the batch and user
       cache.remove(cacheKey); // Clear the batch from cache
     } else {
-      cache.put(cacheKey, JSON.stringify(logBatch), 3600); // Store batch for up to 1 hour
+      cache.put(cacheKey, JSON.stringify(logBatch), 1800); // Store batch for up to 30 minutes
     }
     // --- END BATCHING LOGIC ---
 

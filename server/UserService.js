@@ -174,6 +174,8 @@ function validateUserAccess(email) {
           email: email,
           validationId: validationId
         });
+      } else {
+        console.warn('auditLog not available - access denied (invalid email) not logged');
       }
 
       return result;
@@ -202,6 +204,8 @@ function validateUserAccess(email) {
           email: email,
           validationId: validationId
         });
+      } else {
+        console.warn('auditLog not available - access denied (user not found) not logged');
       }
 
       debugLog('User not found - access denied', {
@@ -303,6 +307,8 @@ function validateUserAccess(email) {
         error: error.message,
         validationId: validationId
       });
+    } else {
+      console.warn('auditLog not available - access denied (validation error) not logged');
     }
 
     return {

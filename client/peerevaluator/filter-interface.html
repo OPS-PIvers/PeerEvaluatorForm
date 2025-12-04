@@ -4316,9 +4316,31 @@
         window.globalQuillInstances = window.globalQuillInstances || {};
         window.globalObservationNotes = window.globalObservationNotes || {};
         window.pendingSaveTimers = {}; // Track pending save timers
+        window.failedSaves = {}; // Track failed saves for retry
+
+        // Retry any failed saves
+        window.retryFailedSaves = function() {
+            const failedKeys = Object.keys(window.failedSaves);
+            if (failedKeys.length > 0) {
+                console.log(`Retrying ${failedKeys.length} failed saves...`);
+                const retryPromises = failedKeys.map(componentId => {
+                    const failedSave = window.failedSaves[componentId];
+                    if (failedSave) {
+                        console.log(`Retrying save for ${componentId}`);
+                        return saveNotes(componentId, failedSave.content);
+                    }
+                    return Promise.resolve();
+                });
+                return Promise.all(retryPromises);
+            }
+            return Promise.resolve();
+        };
 
         // Flush any pending saves immediately
         window.flushPendingSaves = function() {
+            const promises = [];
+
+            // First, flush any pending timers
             const pendingKeys = Object.keys(window.pendingSaveTimers);
             if (pendingKeys.length > 0) {
                 console.log(`Flushing ${pendingKeys.length} pending note saves...`);
@@ -4326,7 +4348,6 @@
                     const timer = window.pendingSaveTimers[componentId];
                     if (timer) {
                         clearTimeout(timer.timeoutId);
-                        // Execute the pending save immediately
                         console.log(`Force saving notes for ${componentId}`);
                         const savePromise = saveNotes(componentId, timer.content);
                         delete window.pendingSaveTimers[componentId];
@@ -4334,9 +4355,17 @@
                     }
                     return Promise.resolve();
                 });
-                return Promise.all(savePromises);
+                promises.push(...savePromises);
             }
-            return Promise.resolve();
+
+            // Then, retry any failed saves
+            const failedKeys = Object.keys(window.failedSaves);
+            if (failedKeys.length > 0) {
+                console.log(`Retrying ${failedKeys.length} failed saves during flush...`);
+                promises.push(window.retryFailedSaves());
+            }
+
+            return promises.length > 0 ? Promise.all(promises) : Promise.resolve();
         };
         
         function toggleEvidenceSection(contentId) {
@@ -4564,14 +4593,28 @@
                 google.script.run
                     .withSuccessHandler(() => {
                         console.log(`Notes saved for ${componentId}`);
+                        // Clear failed save flag on success
+                        if (window.failedSaves[componentId]) {
+                            delete window.failedSaves[componentId];
+                            console.log(`Cleared failed save flag for ${componentId}`);
+                        }
                         resolve();
                     })
                     .withFailureHandler(error => {
                         console.error('Failed to save notes:', error);
-                        showToast('Error saving notes. Please check your connection.');
-                        // Don't reject, just resolve so other operations can continue
-                        // Ideally we might want to retry or flag as dirty
-                        resolve(); 
+
+                        // Track failed save
+                        window.failedSaves[componentId] = {
+                            content: content,
+                            timestamp: Date.now(),
+                            error: error.message
+                        };
+
+                        showToast('⚠️ Error saving notes. Data stored locally - will retry.', false);
+                        console.warn(`Failed save tracked for ${componentId}. Will retry on next opportunity.`);
+
+                        // Don't reject - resolve to allow other operations to continue
+                        resolve();
                     })
                     .saveObservationNotes(currentObservationId, componentId, content);
             });

@@ -177,11 +177,25 @@ const ERROR_MESSAGES = {
  */
 const FOUR_HOURS_IN_SECONDS = 14400; // 4 hours = 4 * 60 * 60 seconds
 
+/**
+ * Tiered cache TTL settings based on data volatility
+ * STATIC: Data that rarely changes (staff lists, rubric structure)
+ * DYNAMIC: Data that changes moderately (observations, assignments)
+ * REALTIME: Data that changes frequently (session data, current state)
+ */
 const CACHE_SETTINGS = {
-  USER_DATA_TTL: FOUR_HOURS_IN_SECONDS,      // 4 hours for user data - improves performance by reducing frequent spreadsheet reads
-  ROLE_CONFIG_TTL: 600,                      // 10 minutes for role configurations
-  SHEET_DATA_TTL: FOUR_HOURS_IN_SECONDS,     // 4 hours for sheet data - improves performance by reducing frequent spreadsheet reads
-  DEFAULT_TTL: 300                           // Default cache time
+  // Static data - rarely changes (60 minutes)
+  USER_DATA_TTL: 3600,                       // Staff data changes infrequently
+  SHEET_DATA_TTL: 3600,                      // Sheet structure rarely changes
+  ROLE_CONFIG_TTL: 3600,                     // Role configurations are stable
+
+  // Dynamic data - moderate change frequency (15 minutes)
+  OBSERVATION_DATA_TTL: 900,                 // Observations may be updated during sessions
+  ASSIGNMENT_DATA_TTL: 900,                  // Assignment data changes occasionally
+
+  // Realtime data - frequent changes (5 minutes)
+  SESSION_DATA_TTL: 300,                     // Session state changes frequently
+  DEFAULT_TTL: 300                           // Default for unspecified data
 };
 
 /**
@@ -607,5 +621,6 @@ const SECURITY_ADMIN_EMAIL_PROPERTY = 'SECURITY_ADMIN_EMAIL';
 /**
  * The number of audit log entries to batch in the cache before writing to the sheet.
  * A larger size is more efficient but has a higher risk of data loss on script failure.
+ * Reduced to 10 to minimize potential data loss while maintaining performance.
  */
-const AUDIT_LOG_BATCH_SIZE = 20;
+const AUDIT_LOG_BATCH_SIZE = 10;

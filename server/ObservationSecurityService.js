@@ -62,6 +62,8 @@ function canAccessObservation(observation, requestingEmail) {
           observedEmail: observation.observedEmail,
           status: observation.status
         });
+      } else {
+        console.warn('auditLog not available - admin observation access not logged');
       }
       debugLog('Observation access granted: Administrator', {
         observationId: observation.observationId,
@@ -80,6 +82,8 @@ function canAccessObservation(observation, requestingEmail) {
           observedEmail: observation.observedEmail,
           status: observation.status
         });
+      } else {
+        console.warn('auditLog not available - full access observation view not logged');
       }
       debugLog('Observation access granted: Full Access role', {
         observationId: observation.observationId,
@@ -98,6 +102,8 @@ function canAccessObservation(observation, requestingEmail) {
         observedEmail: observation.observedEmail,
         userRole: userContext.role
       });
+    } else {
+      console.warn('auditLog not available - unauthorized access attempt not logged');
     }
 
     debugLog('Observation access denied: No authorization', {
@@ -261,6 +267,8 @@ function getObservationSecure(observationId, requestingEmail = null) {
         attemptedBy: userEmail,
         observerEmail: observation.observerEmail
       });
+    } else {
+      console.warn('auditLog not available - unauthorized observation access attempt not logged');
     }
     throw new Error('Access denied: You do not have permission to view this observation');
   }
@@ -273,6 +281,8 @@ function getObservationSecure(observationId, requestingEmail = null) {
       observerEmail: observation.observerEmail,
       observedEmail: observation.observedEmail
     });
+  } else {
+    console.warn('auditLog not available - observation view not logged');
   }
 
   return observation;
@@ -301,6 +311,8 @@ function validateObservationEmailRecipient(observation, recipientEmail) {
         allowedRecipient: observation.observedEmail,
         blockedBy: Session.getActiveUser().getEmail()
       });
+    } else {
+      console.warn('auditLog not available - email block attempt not logged');
     }
     throw new Error('Observation emails can only be sent to the observed staff member');
   }
@@ -372,6 +384,8 @@ function getObservationsForUserSecure(requestingEmail = null) {
       userEmail: userEmail,
       observationCount: accessibleObservations.length
     });
+  } else {
+    console.warn('auditLog not available - observation list access not logged');
   }
 
   return accessibleObservations;
