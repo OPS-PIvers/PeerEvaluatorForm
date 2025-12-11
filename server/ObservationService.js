@@ -1745,11 +1745,11 @@ function saveWorkProductAnswerToDoc(observationId, questionId, answerText) {
     return false;
   }
 
-  let doc = null;
-  const userContext = createUserContext();
-  let observation = null;
-
   try {
+    let doc = null;
+    const userContext = createUserContext();
+    let observation = null;
+
     // Get the observation to find staff email
     const observations = _getObservationsDb();
     observation = observations.find(obs => obs.observationId === observationId);
@@ -1900,8 +1900,6 @@ function saveWorkProductAnswerToDoc(observationId, questionId, answerText) {
     console.error('Critical error saving work product answer to doc:', error, {
       observationId: observationId,
       questionId: questionId,
-      currentUserEmail: userContext ? userContext.email : 'unknown',
-      observedEmail: observation ? observation.observedEmail : 'unknown',
       operation: 'saveWorkProductAnswerToDoc',
       answerLength: answerText ? answerText.length : 0
     });
@@ -2151,11 +2149,11 @@ function saveStandardObservationAnswerToDoc(observationId, questionId, answerTex
     return false;
   }
 
-  let doc = null;
-  const userContext = createUserContext();
-  let observation = null;
-
   try {
+    let doc = null;
+    const userContext = createUserContext();
+    let observation = null;
+
     const observations = _getObservationsDb();
     observation = observations.find(obs => obs.observationId === observationId);
 
@@ -2256,8 +2254,6 @@ function saveStandardObservationAnswerToDoc(observationId, questionId, answerTex
     console.error('Critical error saving standard observation answer to doc:', error, {
       observationId: observationId,
       questionId: questionId,
-      currentUserEmail: userContext ? userContext.email : 'unknown',
-      observedEmail: observation ? observation.observedEmail : 'unknown',
       operation: 'saveStandardObservationAnswerToDoc',
       answerLength: answerText ? answerText.length : 0
     });
@@ -2721,11 +2717,11 @@ function saveInstructionalRoundAnswerToDoc(observationId, questionId, answerText
     return false;
   }
 
-  let doc = null;
-  const userContext = createUserContext();
-  let observation = null;
-
   try {
+    let doc = null;
+    const userContext = createUserContext();
+    let observation = null;
+
     const observations = _getObservationsDb();
     observation = observations.find(obs => obs.observationId === observationId);
 
@@ -2871,8 +2867,6 @@ function saveInstructionalRoundAnswerToDoc(observationId, questionId, answerText
     console.error('Critical error saving instructional round answer to doc:', error, {
       observationId: observationId,
       questionId: questionId,
-      currentUserEmail: userContext ? userContext.email : 'unknown',
-      observedEmail: observation ? observation.observedEmail : 'unknown',
       operation: 'saveInstructionalRoundAnswerToDoc',
       answerLength: answerText ? answerText.length : 0
     });
