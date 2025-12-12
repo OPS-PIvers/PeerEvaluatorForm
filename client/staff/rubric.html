@@ -3756,14 +3756,12 @@
                         } else {
                             statusDiv.textContent = 'Error saving: ' + result.error;
                             statusDiv.className = 'save-status error';
-                            workProductSaveState[questionId].dirty = true; // Mark as dirty so user can retry
                         }
                     }
                 })
                 .withFailureHandler(function(error) {
                     console.error('Save failed:', error);
                     workProductSaveState[questionId].pending = false;
-                    workProductSaveState[questionId].dirty = true; // Mark as dirty so user can retry
                     statusDiv.textContent = 'Save failed. Please try again.';
                     statusDiv.className = 'save-status error';
                 })
@@ -3968,14 +3966,12 @@
                         } else {
                             statusDiv.textContent = 'Error saving: ' + result.error;
                             statusDiv.className = 'save-status error';
-                            instructionalRoundSaveState[questionId].dirty = true;
                         }
                     }
                 })
                 .withFailureHandler(function(error) {
                     console.error('Save failed:', error);
                     instructionalRoundSaveState[questionId].pending = false;
-                    instructionalRoundSaveState[questionId].dirty = true;
                     statusDiv.textContent = 'Save failed. Please try again.';
                     statusDiv.className = 'save-status error';
                 })

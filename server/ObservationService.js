@@ -1737,9 +1737,11 @@ function createOrGetWorkProductResponseDoc(observationId, staffEmail, peerEvalua
  */
 function saveWorkProductAnswerToDoc(observationId, questionId, answerText) {
   const lock = LockService.getUserLock();
+  let hasLock = false;
   try {
     // Wait for up to 30 seconds for other processes to finish
     lock.waitLock(30000);
+    hasLock = true;
   } catch (e) {
     console.error('Could not acquire lock for saveWorkProductAnswerToDoc:', e);
     return false;
@@ -1905,7 +1907,9 @@ function saveWorkProductAnswerToDoc(observationId, questionId, answerText) {
     });
     return false;
   } finally {
-    lock.releaseLock();
+    if (hasLock) {
+      lock.releaseLock();
+    }
   }
 }
 
@@ -2142,8 +2146,10 @@ function findStandardObservationResponseDoc(observationId, staffEmail, currentUs
  */
 function saveStandardObservationAnswerToDoc(observationId, questionId, answerText) {
   const lock = LockService.getUserLock();
+  let hasLock = false;
   try {
     lock.waitLock(30000);
+    hasLock = true;
   } catch (e) {
     console.error('Could not acquire lock for saveStandardObservationAnswerToDoc:', e);
     return false;
@@ -2259,7 +2265,9 @@ function saveStandardObservationAnswerToDoc(observationId, questionId, answerTex
     });
     return false;
   } finally {
-    lock.releaseLock();
+    if (hasLock) {
+      lock.releaseLock();
+    }
   }
 }
 
@@ -2710,8 +2718,10 @@ function createOrGetInstructionalRoundResponseDoc(observationId, staffEmail, pee
  */
 function saveInstructionalRoundAnswerToDoc(observationId, questionId, answerText) {
   const lock = LockService.getUserLock();
+  let hasLock = false;
   try {
     lock.waitLock(30000);
+    hasLock = true;
   } catch (e) {
     console.error('Could not acquire lock for saveInstructionalRoundAnswerToDoc:', e);
     return false;
@@ -2872,7 +2882,9 @@ function saveInstructionalRoundAnswerToDoc(observationId, questionId, answerText
     });
     return false;
   } finally {
-    lock.releaseLock();
+    if (hasLock) {
+      lock.releaseLock();
+    }
   }
 }
 
