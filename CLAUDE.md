@@ -66,10 +66,6 @@ This is a Google Apps Script (GAS) web application called "Peer Evaluator Form" 
 - **client/shared/error-page.html**: Error display template with debugging information
 - **client/shared/finalized-observation-email.html**: Email template for finalized observations
 
-### Development Notes
-
-- **performance-todo.md**: Performance optimization notes
-
 ### Key Features
 
 1. **Multi-Role System**: Different roles see different rubric views and have different permissions
