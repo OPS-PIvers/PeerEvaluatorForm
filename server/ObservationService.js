@@ -1215,6 +1215,11 @@ function getWorkProductQuestions() {
       }))
       .sort((a, b) => a.order - b.order);
 
+    console.log(`[Server] Loaded ${questions.length} work product questions (WPQ):`);
+    questions.forEach((q, index) => {
+      console.log(`  ${index + 1}. QuestionID: "${q.questionId}" | Text: "${q.questionText.substring(0, 40)}..."`);
+    });
+
     setCachedDataEnhanced(cacheKey, questions);
     return questions;
   } catch (error) {
@@ -1247,6 +1252,11 @@ function getStandardObservationQuestions() {
         order: row[2] || 0
       }))
       .sort((a, b) => a.order - b.order);
+
+    console.log(`[Server] Loaded ${questions.length} standard observation questions (OBSQ):`);
+    questions.forEach((q, index) => {
+      console.log(`  ${index + 1}. QuestionID: "${q.questionId}" | Text: "${q.questionText.substring(0, 40)}..."`);
+    });
 
     setCachedDataEnhanced(cacheKey, questions);
     return questions;
@@ -1801,14 +1811,19 @@ function saveWorkProductAnswerToDoc(observationId, questionId, answerText) {
     }
 
     try {
+      console.log(`[Server] saveWorkProductAnswerToDoc - Processing questionId: "${questionId}"`);
+
       // Get the question text from the questions sheet
       const questions = getWorkProductQuestions();
       const question = questions.find(q => q.questionId === questionId);
       const questionText = question ? question.questionText : '';
+      console.log(`[Server] Found question definition: ${!!question}, questionText: "${questionText ? questionText.substring(0, 40) + '...' : '(empty)'}"`);
 
       // Search for existing answer section
       const searchPattern = `Question ${questionId}:`;
+      console.log(`[Server] Searching document for pattern: "${searchPattern}"`);
       const searchResult = body.findText(searchPattern);
+      console.log(`[Server] Search result: ${searchResult ? 'FOUND - will update existing' : 'NOT FOUND - will append new section'}`);
 
       if (searchResult) {
         // Update existing answer
@@ -1932,9 +1947,35 @@ function getWorkProductAnswersFromDoc(observationId) {
     const userContext = createUserContext();
 
     // Find the response document using Drive search
-    const docResult = findWorkProductResponseDoc(observationId, observation.observedEmail, userContext.email);
+    let docResult = findWorkProductResponseDoc(observationId, observation.observedEmail, userContext.email);
     if (!docResult) {
       console.log('No response document found for observation:', observationId);
+
+      // Create doc proactively if user is the observed staff member
+      if (userContext.email === observation.observedEmail) {
+        console.log('[Parser] Creating new response document for staff member during load');
+        const newDocResult = createOrGetWorkProductResponseDoc(
+          observationId,
+          observation.observedEmail,
+          observation.observerEmail
+        );
+
+        if (newDocResult) {
+          console.log('[Parser] Created new empty response document');
+          docResult = newDocResult;
+          // Doc is empty, so return empty array (but doc now exists for future saves)
+        } else {
+          console.error('[Parser] Failed to create response document during load');
+          return [];
+        }
+      } else {
+        // Peer evaluator can't create doc, return empty
+        return [];
+      }
+    }
+
+    // If still no document (creation failed), return empty
+    if (!docResult) {
       return [];
     }
 
@@ -2001,7 +2042,24 @@ function getWorkProductAnswersFromDoc(observationId) {
     }
 
     console.log(`Retrieved ${answers.length} work product answers from doc`);
-    return answers;
+
+    // Deduplicate answers by questionId (keep last occurrence which has most recent content)
+    const deduplicatedAnswers = [];
+    const seenQuestions = new Set();
+
+    // Iterate backwards to keep LAST occurrence of each question
+    for (let i = answers.length - 1; i >= 0; i--) {
+      const answer = answers[i];
+      if (!seenQuestions.has(answer.questionId)) {
+        seenQuestions.add(answer.questionId);
+        deduplicatedAnswers.unshift(answer);  // Add to front to maintain order
+      } else {
+        console.warn(`[Parser] Duplicate question found: ${answer.questionId}, keeping last occurrence`);
+      }
+    }
+
+    console.log(`After deduplication: ${deduplicatedAnswers.length} unique answers`);
+    return deduplicatedAnswers;
 
   } catch (error) {
     console.error('Critical error getting work product answers from doc:', error, {
@@ -2779,14 +2837,19 @@ function saveInstructionalRoundAnswerToDoc(observationId, questionId, answerText
     }
 
     try {
+      console.log(`[Server] saveInstructionalRoundAnswerToDoc - Processing questionId: "${questionId}"`);
+
       // Get the question text from the questions sheet
       const questions = getStandardObservationQuestions();
       const question = questions.find(q => q.questionId === questionId);
       const questionText = question ? question.questionText : '';
+      console.log(`[Server] Found question definition: ${!!question}, questionText: "${questionText ? questionText.substring(0, 40) + '...' : '(empty)'}"`);
 
       // Search for existing answer section
       const searchPattern = `Question ${questionId}:`;
+      console.log(`[Server] Searching document for pattern: "${searchPattern}"`);
       const searchResult = body.findText(searchPattern);
+      console.log(`[Server] Search result: ${searchResult ? 'FOUND - will update existing' : 'NOT FOUND - will append new section'}`);
 
       if (searchResult) {
         // Update existing answer
@@ -2906,9 +2969,35 @@ function getInstructionalRoundAnswersFromDoc(observationId) {
     const userContext = createUserContext();
 
     // Find the response document
-    const docResult = findInstructionalRoundResponseDoc(observationId, observation.observedEmail, userContext.email);
+    let docResult = findInstructionalRoundResponseDoc(observationId, observation.observedEmail, userContext.email);
     if (!docResult) {
       console.log('No response document found for observation:', observationId);
+
+      // Create doc proactively if user is the observed staff member
+      if (userContext.email === observation.observedEmail) {
+        console.log('[Parser] Creating new response document for staff member during load');
+        const newDocResult = createOrGetInstructionalRoundResponseDoc(
+          observationId,
+          observation.observedEmail,
+          observation.observerEmail
+        );
+
+        if (newDocResult) {
+          console.log('[Parser] Created new empty response document');
+          docResult = newDocResult;
+          // Doc is empty, so return empty array (but doc now exists for future saves)
+        } else {
+          console.error('[Parser] Failed to create response document during load');
+          return [];
+        }
+      } else {
+        // Peer evaluator can't create doc, return empty
+        return [];
+      }
+    }
+
+    // If still no document (creation failed), return empty
+    if (!docResult) {
       return [];
     }
 
@@ -2976,7 +3065,24 @@ function getInstructionalRoundAnswersFromDoc(observationId) {
     }
 
     console.log(`Retrieved ${answers.length} instructional round answers from doc`);
-    return answers;
+
+    // Deduplicate answers by questionId (keep last occurrence which has most recent content)
+    const deduplicatedAnswers = [];
+    const seenQuestions = new Set();
+
+    // Iterate backwards to keep LAST occurrence of each question
+    for (let i = answers.length - 1; i >= 0; i--) {
+      const answer = answers[i];
+      if (!seenQuestions.has(answer.questionId)) {
+        seenQuestions.add(answer.questionId);
+        deduplicatedAnswers.unshift(answer);  // Add to front to maintain order
+      } else {
+        console.warn(`[Parser] Duplicate question found: ${answer.questionId}, keeping last occurrence`);
+      }
+    }
+
+    console.log(`After deduplication: ${deduplicatedAnswers.length} unique answers`);
+    return deduplicatedAnswers;
 
   } catch (error) {
     console.error('Critical error getting instructional round answers from doc:', error, {

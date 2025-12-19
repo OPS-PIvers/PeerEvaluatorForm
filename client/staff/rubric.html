@@ -3604,6 +3604,11 @@
                 return;
             }
 
+            console.log(`[Work Product] Rendering ${questions.length} questions:`);
+            questions.forEach((q, index) => {
+                console.log(`  ${index + 1}. QuestionID: "${q.questionId}" | Text: "${q.questionText.substring(0, 40)}..."`);
+            });
+
             let html = '';
             questions.forEach(question => {
                 html += `
@@ -3620,6 +3625,10 @@
             });
 
             container.innerHTML = html;
+
+            // Verify textareas were created with correct IDs
+            const textareas = container.querySelectorAll('.work-product-textarea');
+            console.log(`[Work Product] Created ${textareas.length} textareas with IDs:`, Array.from(textareas).map(t => t.id));
 
             // Load existing answers
             loadExistingAnswers();
@@ -3639,12 +3648,21 @@
                 google.script.run
                     .withSuccessHandler(function(result) {
                         if (result.success && result.answers) {
+                            console.log(`[Work Product] Loading ${result.answers.length} answers from server:`);
                             result.answers.forEach(answer => {
-                                const textarea = document.getElementById('answer-' + answer.questionId);
+                                const textareaId = 'answer-' + answer.questionId;
+                                const textarea = document.getElementById(textareaId);
                                 if (textarea) {
+                                    console.log(`  ✓ Loading answer for ${answer.questionId} (${answer.answerText.length} chars) into #${textareaId}`);
                                     textarea.value = answer.answerText;
+                                } else {
+                                    console.error(`  ✗ Textarea NOT FOUND for questionId: ${answer.questionId} (expected #${textareaId})`);
+                                    const allTextareas = document.querySelectorAll('.work-product-textarea');
+                                    console.log(`    Available textareas:`, Array.from(allTextareas).map(t => t.id));
                                 }
                             });
+                        } else {
+                            console.log(`[Work Product] No answers to load (success: ${result.success}, answers: ${result.answers})`);
                         }
                         // Enable textareas and clear loading state
                         enableTextareasAndClearLoadingState();
@@ -3695,10 +3713,14 @@
         }
 
         function handleAnswerInput(questionId) {
+            console.log(`[Work Product] handleAnswerInput called with questionId: "${questionId}"`);
             const textarea = document.getElementById('answer-' + questionId);
             const statusDiv = document.getElementById('status-' + questionId);
 
-            if (!textarea || !currentWorkProductObservationId) return;
+            if (!textarea || !currentWorkProductObservationId) {
+                console.warn(`[Work Product] Cannot handle input - textarea exists: ${!!textarea}, observationId: ${currentWorkProductObservationId}`);
+                return;
+            }
 
             if (!workProductSaveState[questionId]) {
                 workProductSaveState[questionId] = { pending: false, dirty: false, text: '', timeout: null };
@@ -3725,9 +3747,14 @@
         }
 
         function triggerSaveAnswer(questionId, statusDiv) {
-            if (!workProductSaveState[questionId]) return;
+            console.log(`[Work Product] triggerSaveAnswer called for questionId: "${questionId}"`);
+            if (!workProductSaveState[questionId]) {
+                console.warn(`[Work Product] No save state found for questionId: "${questionId}"`);
+                return;
+            }
 
             if (workProductSaveState[questionId].pending) {
+                console.log(`[Work Product] Save already pending for questionId: "${questionId}", will retry after current save completes`);
                 // Already saving, dirty flag remains true, will be picked up after current save
                 return;
             }
@@ -3735,6 +3762,7 @@
             workProductSaveState[questionId].pending = true;
             workProductSaveState[questionId].dirty = false;
             const textToSave = workProductSaveState[questionId].text;
+            console.log(`[Work Product] Initiating save for questionId: "${questionId}", text length: ${textToSave.length} chars`);
 
             if (statusDiv && statusDiv.parentElement) {
                 statusDiv.textContent = 'Saving...';
@@ -3768,7 +3796,7 @@
                     }
                 })
                 .withFailureHandler(function(error) {
-                    console.error('Save failed:', error);
+                    console.error(`[Work Product] Save failed for questionId: "${questionId}":`, error);
                     workProductSaveState[questionId].pending = false;
                     if (statusDiv && statusDiv.parentElement) {
                         statusDiv.textContent = 'Save failed. Please try again.';
@@ -3776,6 +3804,8 @@
                     }
                 })
                 .saveWorkProductAnswerFromClient(currentWorkProductObservationId, questionId, textToSave);
+
+            console.log(`[Work Product] Called server: saveWorkProductAnswerFromClient(observationId: "${currentWorkProductObservationId}", questionId: "${questionId}", textLength: ${textToSave.length})`);
         }
 
         // === Instructional Round Modal Functions ===
@@ -3831,6 +3861,11 @@
                 return;
             }
 
+            console.log(`[Instructional Round] Rendering ${questions.length} questions:`);
+            questions.forEach((q, index) => {
+                console.log(`  ${index + 1}. QuestionID: "${q.questionId}" | Text: "${q.questionText.substring(0, 40)}..."`);
+            });
+
             let html = '';
             questions.forEach(question => {
                 html += `
@@ -3848,6 +3883,10 @@
 
             container.innerHTML = html;
 
+            // Verify textareas were created with correct IDs
+            const textareas = container.querySelectorAll('.work-product-textarea');
+            console.log(`[Instructional Round] Created ${textareas.length} textareas with IDs:`, Array.from(textareas).map(t => t.id));
+
             // Load existing answers
             loadExistingInstructionalRoundAnswers();
         }
@@ -3864,17 +3903,26 @@
                 google.script.run
                     .withSuccessHandler(function(result) {
                         if (result.success && result.answers) {
+                            console.log(`[Instructional Round] Loading ${result.answers.length} answers from server:`);
                             result.answers.forEach(answer => {
-                                const textarea = document.getElementById('instructional-round-answer-' + answer.questionId);
+                                const textareaId = 'instructional-round-answer-' + answer.questionId;
+                                const textarea = document.getElementById(textareaId);
                                 if (textarea) {
+                                    console.log(`  ✓ Loading answer for ${answer.questionId} (${answer.answerText.length} chars) into #${textareaId}`);
                                     textarea.value = answer.answerText;
+                                } else {
+                                    console.error(`  ✗ Textarea NOT FOUND for questionId: ${answer.questionId} (expected #${textareaId})`);
+                                    const allTextareas = document.querySelectorAll('#instructionalRoundQuestionsContainer .work-product-textarea');
+                                    console.log(`    Available textareas:`, Array.from(allTextareas).map(t => t.id));
                                 }
                             });
+                        } else {
+                            console.log(`[Instructional Round] No answers to load (success: ${result.success}, answers: ${result.answers})`);
                         }
                         enableInstructionalRoundTextareasAndClearLoadingState();
                     })
                     .withFailureHandler(function(error) {
-                        console.error('Failed to load existing answers:', error);
+                        console.error('[Instructional Round] Failed to load existing answers:', error);
                         enableInstructionalRoundTextareasAndClearLoadingState();
                     })
                     .getInstructionalRoundAnswersForClient(observationId);
@@ -3916,10 +3964,14 @@
         }
 
         function handleInstructionalRoundAnswerInput(questionId) {
+            console.log(`[Instructional Round] handleInstructionalRoundAnswerInput called with questionId: "${questionId}"`);
             const textarea = document.getElementById('instructional-round-answer-' + questionId);
             const statusDiv = document.getElementById('instructional-round-status-' + questionId);
 
-            if (!textarea || !currentInstructionalRoundObservationId) return;
+            if (!textarea || !currentInstructionalRoundObservationId) {
+                console.warn(`[Instructional Round] Cannot handle input - textarea exists: ${!!textarea}, observationId: ${currentInstructionalRoundObservationId}`);
+                return;
+            }
 
             if (!instructionalRoundSaveState[questionId]) {
                 instructionalRoundSaveState[questionId] = { pending: false, dirty: false, text: '', timeout: null };
@@ -3947,15 +3999,21 @@
         }
 
         function triggerSaveInstructionalRoundAnswer(questionId, statusDiv) {
-            if (!instructionalRoundSaveState[questionId]) return;
+            console.log(`[Instructional Round] triggerSaveInstructionalRoundAnswer called for questionId: "${questionId}"`);
+            if (!instructionalRoundSaveState[questionId]) {
+                console.warn(`[Instructional Round] No save state found for questionId: "${questionId}"`);
+                return;
+            }
 
             if (instructionalRoundSaveState[questionId].pending) {
+                console.log(`[Instructional Round] Save already pending for questionId: "${questionId}", will retry after current save completes`);
                 return;
             }
 
             instructionalRoundSaveState[questionId].pending = true;
             instructionalRoundSaveState[questionId].dirty = false;
             const textToSave = instructionalRoundSaveState[questionId].text;
+            console.log(`[Instructional Round] Initiating save for questionId: "${questionId}", text length: ${textToSave.length} chars`);
 
             if (statusDiv && statusDiv.parentElement) {
                 statusDiv.textContent = 'Saving...';
@@ -3988,7 +4046,7 @@
                     }
                 })
                 .withFailureHandler(function(error) {
-                    console.error('Save failed:', error);
+                    console.error(`[Instructional Round] Save failed for questionId: "${questionId}":`, error);
                     instructionalRoundSaveState[questionId].pending = false;
                     if (statusDiv && statusDiv.parentElement) {
                         statusDiv.textContent = 'Save failed. Please try again.';
@@ -3996,6 +4054,8 @@
                     }
                 })
                 .saveInstructionalRoundAnswerFromClient(currentInstructionalRoundObservationId, questionId, textToSave);
+
+            console.log(`[Instructional Round] Called server: saveInstructionalRoundAnswerFromClient(observationId: "${currentInstructionalRoundObservationId}", questionId: "${questionId}", textLength: ${textToSave.length})`);
         }
 
     </script>

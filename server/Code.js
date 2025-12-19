@@ -1099,16 +1099,20 @@ function getWorkProductQuestionsForClient() {
  */
 function saveWorkProductAnswerFromClient(observationId, questionId, answerText) {
   try {
+    console.log(`[Server] saveWorkProductAnswerFromClient called with observationId: "${observationId}", questionId: "${questionId}", textLength: ${answerText ? answerText.length : 0}`);
     const userContext = createUserContext();
 
     // Verify user has access to this observation
     const observation = getObservationById(observationId);
     if (!observation || observation.observedEmail !== userContext.email) {
+      console.warn(`[Server] Access denied - observation found: ${!!observation}, user: ${userContext.email}`);
       return { success: false, error: 'Access denied to this observation.' };
     }
 
     // Save to Google Doc instead of spreadsheet
+    console.log(`[Server] Calling saveWorkProductAnswerToDoc with questionId: "${questionId}"`);
     const saved = saveWorkProductAnswerToDoc(observationId, questionId, answerText);
+    console.log(`[Server] saveWorkProductAnswerToDoc returned: ${saved}`);
     return { success: saved };
   } catch (error) {
     console.error('Error in saveWorkProductAnswerFromClient:', error);
@@ -1357,20 +1361,25 @@ function getCurrentUserInstructionalRoundObservationId() {
  */
 function saveInstructionalRoundAnswerFromClient(observationId, questionId, answerText) {
   try {
+    console.log(`[Server] saveInstructionalRoundAnswerFromClient called with observationId: "${observationId}", questionId: "${questionId}", textLength: ${answerText ? answerText.length : 0}`);
     const userContext = createUserContext();
     const observation = getObservationById(observationId);
 
     if (!observation) {
+      console.warn(`[Server] Observation not found: ${observationId}`);
       return { success: false, error: 'Observation not found.' };
     }
 
     // Allow access for observed staff or peer evaluators
     if (observation.observedEmail !== userContext.email &&
         userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
+      console.warn(`[Server] Access denied - user: ${userContext.email}, observed: ${observation.observedEmail}`);
       return { success: false, error: 'Access denied to this observation.' };
     }
 
+    console.log(`[Server] Calling saveInstructionalRoundAnswerToDoc with questionId: "${questionId}"`);
     const saved = saveInstructionalRoundAnswerToDoc(observationId, questionId, answerText);
+    console.log(`[Server] saveInstructionalRoundAnswerToDoc returned: ${saved}`);
     return { success: saved };
   } catch (error) {
     console.error('Error in saveInstructionalRoundAnswerFromClient:', error);
