@@ -1736,17 +1736,30 @@ function createOrGetWorkProductResponseDoc(observationId, staffEmail, peerEvalua
  * @returns {boolean} True if saved successfully, false otherwise.
  */
 function saveWorkProductAnswerToDoc(observationId, questionId, answerText) {
+  const lock = LockService.getUserLock();
+  let hasLock = false;
   try {
+    // Wait for up to 30 seconds for other processes to finish
+    lock.waitLock(30000);
+    hasLock = true;
+  } catch (e) {
+    console.error('Could not acquire lock for saveWorkProductAnswerToDoc:', e);
+    return false;
+  }
+
+  try {
+    let doc = null;
+    const userContext = createUserContext();
+    let observation = null;
+
     // Get the observation to find staff email
     const observations = _getObservationsDb();
-    const observation = observations.find(obs => obs.observationId === observationId);
+    observation = observations.find(obs => obs.observationId === observationId);
 
     if (!observation) {
       console.error('Observation not found:', observationId);
       return false;
     }
-
-    const userContext = createUserContext();
 
     // Find or create the response document using Drive search
     let docResult = findWorkProductResponseDoc(observationId, observation.observedEmail, userContext.email);
@@ -1772,13 +1785,13 @@ function saveWorkProductAnswerToDoc(observationId, questionId, answerText) {
       return false;
     }
 
-    let doc;
     try {
       doc = DocumentApp.openById(docResult.docId);
     } catch (docError) {
       console.error('Error opening work product response doc:', docError);
       return false;
     }
+
     let body;
     try {
       body = doc.getBody();
@@ -1873,6 +1886,10 @@ function saveWorkProductAnswerToDoc(observationId, questionId, answerText) {
         body.appendParagraph('');
         body.appendParagraph(`Last updated: ${new Date().toLocaleString()}`);
       }
+
+      // Force save to ensure changes are written before lock release
+      if (doc) doc.saveAndClose();
+
     } catch (editError) {
       console.error('Error editing work product response doc content:', editError);
       return false;
@@ -1885,12 +1902,14 @@ function saveWorkProductAnswerToDoc(observationId, questionId, answerText) {
     console.error('Critical error saving work product answer to doc:', error, {
       observationId: observationId,
       questionId: questionId,
-      currentUserEmail: userContext ? userContext.email : 'unknown',
-      observedEmail: observation ? observation.observedEmail : 'unknown',
       operation: 'saveWorkProductAnswerToDoc',
       answerLength: answerText ? answerText.length : 0
     });
     return false;
+  } finally {
+    if (hasLock) {
+      lock.releaseLock();
+    }
   }
 }
 
@@ -2126,16 +2145,28 @@ function findStandardObservationResponseDoc(observationId, staffEmail, currentUs
  * @returns {boolean} True if saved successfully, false otherwise.
  */
 function saveStandardObservationAnswerToDoc(observationId, questionId, answerText) {
+  const lock = LockService.getUserLock();
+  let hasLock = false;
   try {
+    lock.waitLock(30000);
+    hasLock = true;
+  } catch (e) {
+    console.error('Could not acquire lock for saveStandardObservationAnswerToDoc:', e);
+    return false;
+  }
+
+  try {
+    let doc = null;
+    const userContext = createUserContext();
+    let observation = null;
+
     const observations = _getObservationsDb();
-    const observation = observations.find(obs => obs.observationId === observationId);
+    observation = observations.find(obs => obs.observationId === observationId);
 
     if (!observation) {
       console.error('Observation not found:', observationId);
       return false;
     }
-
-    const userContext = createUserContext();
 
     // Find or create the response document
     let docResult = findStandardObservationResponseDoc(observationId, observation.observedEmail, userContext.email);
@@ -2160,7 +2191,6 @@ function saveStandardObservationAnswerToDoc(observationId, questionId, answerTex
       return false;
     }
 
-    let doc;
     try {
       doc = DocumentApp.openById(docResult.docId);
     } catch (docError) {
@@ -2215,6 +2245,9 @@ function saveStandardObservationAnswerToDoc(observationId, questionId, answerTex
         body.appendParagraph('');
         body.appendParagraph(`Last updated: ${new Date().toLocaleString()}`);
       }
+
+      if (doc) doc.saveAndClose();
+
     } catch (editError) {
       console.error('Error editing standard observation response doc content:', editError);
       return false;
@@ -2227,12 +2260,14 @@ function saveStandardObservationAnswerToDoc(observationId, questionId, answerTex
     console.error('Critical error saving standard observation answer to doc:', error, {
       observationId: observationId,
       questionId: questionId,
-      currentUserEmail: userContext ? userContext.email : 'unknown',
-      observedEmail: observation ? observation.observedEmail : 'unknown',
       operation: 'saveStandardObservationAnswerToDoc',
       answerLength: answerText ? answerText.length : 0
     });
     return false;
+  } finally {
+    if (hasLock) {
+      lock.releaseLock();
+    }
   }
 }
 
@@ -2682,16 +2717,28 @@ function createOrGetInstructionalRoundResponseDoc(observationId, staffEmail, pee
  * @returns {boolean} True if saved successfully, false otherwise.
  */
 function saveInstructionalRoundAnswerToDoc(observationId, questionId, answerText) {
+  const lock = LockService.getUserLock();
+  let hasLock = false;
   try {
+    lock.waitLock(30000);
+    hasLock = true;
+  } catch (e) {
+    console.error('Could not acquire lock for saveInstructionalRoundAnswerToDoc:', e);
+    return false;
+  }
+
+  try {
+    let doc = null;
+    const userContext = createUserContext();
+    let observation = null;
+
     const observations = _getObservationsDb();
-    const observation = observations.find(obs => obs.observationId === observationId);
+    observation = observations.find(obs => obs.observationId === observationId);
 
     if (!observation) {
       console.error('Observation not found:', observationId);
       return false;
     }
-
-    const userContext = createUserContext();
 
     // Find or create the response document
     let docResult = findInstructionalRoundResponseDoc(observationId, observation.observedEmail, userContext.email);
@@ -2716,7 +2763,6 @@ function saveInstructionalRoundAnswerToDoc(observationId, questionId, answerText
       return false;
     }
 
-    let doc;
     try {
       doc = DocumentApp.openById(docResult.docId);
     } catch (docError) {
@@ -2816,6 +2862,9 @@ function saveInstructionalRoundAnswerToDoc(observationId, questionId, answerText
         body.appendParagraph('');
         body.appendParagraph(`Last updated: ${new Date().toLocaleString()}`);
       }
+
+      if (doc) doc.saveAndClose();
+
     } catch (editError) {
       console.error('Error editing instructional round response doc content:', editError);
       return false;
@@ -2828,12 +2877,14 @@ function saveInstructionalRoundAnswerToDoc(observationId, questionId, answerText
     console.error('Critical error saving instructional round answer to doc:', error, {
       observationId: observationId,
       questionId: questionId,
-      currentUserEmail: userContext ? userContext.email : 'unknown',
-      observedEmail: observation ? observation.observedEmail : 'unknown',
       operation: 'saveInstructionalRoundAnswerToDoc',
       answerLength: answerText ? answerText.length : 0
     });
     return false;
+  } finally {
+    if (hasLock) {
+      lock.releaseLock();
+    }
   }
 }
 

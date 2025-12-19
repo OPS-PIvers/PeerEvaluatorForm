@@ -3552,7 +3552,7 @@
         }
 
         // === Work Product Modal Functions ===
-        let saveTimeouts = {};
+        const workProductSaveState = {}; // { questionId: { pending: boolean, dirty: boolean, text: string, timeout: number } }
         let currentWorkProductObservationId = null;
 
         function openWorkProductModal() {
@@ -3700,48 +3700,86 @@
 
             if (!textarea || !currentWorkProductObservationId) return;
 
-            // Clear existing timeout
-            if (saveTimeouts[questionId]) {
-                clearTimeout(saveTimeouts[questionId]);
+            if (!workProductSaveState[questionId]) {
+                workProductSaveState[questionId] = { pending: false, dirty: false, text: '', timeout: null };
             }
 
-            // Show saving status
-            statusDiv.textContent = 'Typing...';
-            statusDiv.className = 'save-status saving';
+            workProductSaveState[questionId].text = textarea.value;
+            workProductSaveState[questionId].dirty = true;
+
+            // Clear existing timeout
+            if (workProductSaveState[questionId].timeout) {
+                clearTimeout(workProductSaveState[questionId].timeout);
+            }
+
+            // Show typing status
+            if (statusDiv && statusDiv.parentElement) {
+                statusDiv.textContent = 'Typing...';
+                statusDiv.className = 'save-status saving';
+            }
 
             // Set new timeout for debounced save
-            saveTimeouts[questionId] = setTimeout(() => {
-                saveAnswer(questionId, textarea.value, statusDiv);
+            workProductSaveState[questionId].timeout = setTimeout(() => {
+                triggerSaveAnswer(questionId, statusDiv);
             }, 1500); // 1.5 second debounce
         }
 
-        function saveAnswer(questionId, answerText, statusDiv) {
-            statusDiv.textContent = 'Saving...';
-            statusDiv.className = 'save-status saving';
+        function triggerSaveAnswer(questionId, statusDiv) {
+            if (!workProductSaveState[questionId]) return;
+
+            if (workProductSaveState[questionId].pending) {
+                // Already saving, dirty flag remains true, will be picked up after current save
+                return;
+            }
+
+            workProductSaveState[questionId].pending = true;
+            workProductSaveState[questionId].dirty = false;
+            const textToSave = workProductSaveState[questionId].text;
+
+            if (statusDiv && statusDiv.parentElement) {
+                statusDiv.textContent = 'Saving...';
+                statusDiv.className = 'save-status saving';
+            }
 
             google.script.run
                 .withSuccessHandler(function(result) {
-                    if (result.success) {
-                        statusDiv.textContent = 'Saved';
-                        statusDiv.className = 'save-status saved';
-                        setTimeout(() => {
-                            statusDiv.style.opacity = '0.5';
-                        }, 2000);
+                    workProductSaveState[questionId].pending = false;
+
+                    if (workProductSaveState[questionId].dirty) {
+                        // Content changed while saving, trigger another save immediately
+                        triggerSaveAnswer(questionId, statusDiv);
                     } else {
-                        statusDiv.textContent = 'Error saving: ' + result.error;
-                        statusDiv.className = 'save-status error';
+                        if (result.success) {
+                            if (statusDiv && statusDiv.parentElement) {
+                                statusDiv.textContent = 'Saved';
+                                statusDiv.className = 'save-status saved';
+                                setTimeout(() => {
+                                    if (!workProductSaveState[questionId].dirty && statusDiv && statusDiv.parentElement) {
+                                        statusDiv.style.opacity = '0.5';
+                                    }
+                                }, 2000);
+                            }
+                        } else {
+                            if (statusDiv && statusDiv.parentElement) {
+                                statusDiv.textContent = 'Error saving: ' + result.error;
+                                statusDiv.className = 'save-status error';
+                            }
+                        }
                     }
                 })
                 .withFailureHandler(function(error) {
                     console.error('Save failed:', error);
-                    statusDiv.textContent = 'Save failed. Please try again.';
-                    statusDiv.className = 'save-status error';
+                    workProductSaveState[questionId].pending = false;
+                    if (statusDiv && statusDiv.parentElement) {
+                        statusDiv.textContent = 'Save failed. Please try again.';
+                        statusDiv.className = 'save-status error';
+                    }
                 })
-                .saveWorkProductAnswerFromClient(currentWorkProductObservationId, questionId, answerText);
+                .saveWorkProductAnswerFromClient(currentWorkProductObservationId, questionId, textToSave);
         }
 
         // === Instructional Round Modal Functions ===
-        let instructionalRoundSaveTimeouts = {};
+        const instructionalRoundSaveState = {}; // { questionId: { pending: boolean, dirty: boolean, text: string, timeout: number } }
         let currentInstructionalRoundObservationId = null;
 
         function openInstructionalRoundModal() {
@@ -3883,45 +3921,81 @@
 
             if (!textarea || !currentInstructionalRoundObservationId) return;
 
+            if (!instructionalRoundSaveState[questionId]) {
+                instructionalRoundSaveState[questionId] = { pending: false, dirty: false, text: '', timeout: null };
+            }
+
+            instructionalRoundSaveState[questionId].text = textarea.value;
+            instructionalRoundSaveState[questionId].dirty = true;
+
             // Clear existing timeout
-            if (instructionalRoundSaveTimeouts[questionId]) {
-                clearTimeout(instructionalRoundSaveTimeouts[questionId]);
+            if (instructionalRoundSaveState[questionId].timeout) {
+                clearTimeout(instructionalRoundSaveState[questionId].timeout);
             }
 
             // Set status to show user input is captured
-            statusDiv.textContent = 'Typing...';
-            statusDiv.className = 'save-status typing';
-            statusDiv.style.opacity = '1';
+            if (statusDiv && statusDiv.parentElement) {
+                statusDiv.textContent = 'Typing...';
+                statusDiv.className = 'save-status typing';
+                statusDiv.style.opacity = '1';
+            }
 
             // Save after 1.5 seconds of inactivity
-            instructionalRoundSaveTimeouts[questionId] = setTimeout(() => {
-                saveInstructionalRoundAnswer(questionId, textarea.value, statusDiv);
+            instructionalRoundSaveState[questionId].timeout = setTimeout(() => {
+                triggerSaveInstructionalRoundAnswer(questionId, statusDiv);
             }, 1500);
         }
 
-        function saveInstructionalRoundAnswer(questionId, answerText, statusDiv) {
-            statusDiv.textContent = 'Saving...';
-            statusDiv.className = 'save-status saving';
+        function triggerSaveInstructionalRoundAnswer(questionId, statusDiv) {
+            if (!instructionalRoundSaveState[questionId]) return;
+
+            if (instructionalRoundSaveState[questionId].pending) {
+                return;
+            }
+
+            instructionalRoundSaveState[questionId].pending = true;
+            instructionalRoundSaveState[questionId].dirty = false;
+            const textToSave = instructionalRoundSaveState[questionId].text;
+
+            if (statusDiv && statusDiv.parentElement) {
+                statusDiv.textContent = 'Saving...';
+                statusDiv.className = 'save-status saving';
+            }
 
             google.script.run
                 .withSuccessHandler(function(result) {
-                    if (result.success) {
-                        statusDiv.textContent = 'Saved';
-                        statusDiv.className = 'save-status saved';
-                        setTimeout(() => {
-                            statusDiv.style.opacity = '0.5';
-                        }, 2000);
+                    instructionalRoundSaveState[questionId].pending = false;
+
+                    if (instructionalRoundSaveState[questionId].dirty) {
+                        triggerSaveInstructionalRoundAnswer(questionId, statusDiv);
                     } else {
-                        statusDiv.textContent = 'Error saving: ' + result.error;
-                        statusDiv.className = 'save-status error';
+                        if (result.success) {
+                            if (statusDiv && statusDiv.parentElement) {
+                                statusDiv.textContent = 'Saved';
+                                statusDiv.className = 'save-status saved';
+                                setTimeout(() => {
+                                    if (!instructionalRoundSaveState[questionId].dirty && statusDiv && statusDiv.parentElement) {
+                                        statusDiv.style.opacity = '0.5';
+                                    }
+                                }, 2000);
+                            }
+                        } else {
+                            if (statusDiv && statusDiv.parentElement) {
+                                statusDiv.textContent = 'Error saving: ' + result.error;
+                                statusDiv.className = 'save-status error';
+                            }
+                        }
                     }
                 })
                 .withFailureHandler(function(error) {
                     console.error('Save failed:', error);
-                    statusDiv.textContent = 'Save failed. Please try again.';
-                    statusDiv.className = 'save-status error';
+                    instructionalRoundSaveState[questionId].pending = false;
+                    if (statusDiv && statusDiv.parentElement) {
+                        statusDiv.textContent = 'Save failed. Please try again.';
+                        statusDiv.className = 'save-status error';
+                    }
                 })
-                .saveInstructionalRoundAnswerFromClient(currentInstructionalRoundObservationId, questionId, answerText);
+                .saveInstructionalRoundAnswerFromClient(currentInstructionalRoundObservationId, questionId, textToSave);
         }
 
     </script>
