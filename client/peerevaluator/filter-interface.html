@@ -6532,8 +6532,8 @@
         const SCRIPT_EDITOR_CONSTANTS = <?!= JSON.stringify(scriptEditorSettings) ?>;
         let scriptQuill = null;
         let scriptContent = {};
-        const SILENT_SAVE_DEBOUNCE_MS = 5000;
-        const SILENT_SAVE_DEBOUNCE_HIGH_ACTIVITY_MS = 8000; // Extended debounce during high activity
+        const SILENT_SAVE_DEBOUNCE_MS = 1500;  // Reduced from 5000ms to capture saves before navigation
+        const SILENT_SAVE_DEBOUNCE_HIGH_ACTIVITY_MS = 3000; // Reduced from 8000ms for faster saves
         let isScriptDirty = false;
         let scriptSaveDebounceTimer;
         let isSavingScript = false;
@@ -6984,6 +6984,25 @@
                         // No interim text to worry about - just save!
                         silentSaveScriptContent();
                     }, debounceTime);
+                }
+            });
+
+            // === Pre-Exit Save Handlers ===
+            // Save when window loses focus (user switching tabs or apps)
+            window.addEventListener('blur', function() {
+                if (isScriptDirty && scriptQuill && currentObservationId && !isSavingScript) {
+                    console.log('Window blur detected - triggering immediate save');
+                    clearTimeout(scriptSaveDebounceTimer);  // Cancel pending debounce
+                    silentSaveScriptContent();              // Save immediately
+                }
+            });
+
+            // Save when page becomes hidden (tab switch, minimize, etc.)
+            document.addEventListener('visibilitychange', function() {
+                if (document.hidden && isScriptDirty && scriptQuill && currentObservationId && !isSavingScript) {
+                    console.log('Page hidden - triggering immediate save');
+                    clearTimeout(scriptSaveDebounceTimer);  // Cancel pending debounce
+                    silentSaveScriptContent();              // Save immediately
                 }
             });
         }
@@ -7779,10 +7798,14 @@
                             const maxAge = 30 * 60 * 1000; // 30 minutes
                             
                             if (backupAge < maxAge) {
+                                const backupMinutes = Math.round(backupAge / 60000);
                                 const useBackupResponse = confirm(
-                                    'Found unsaved script content from a previous session. ' +
-                                    'This might contain speech-to-text data that wasn\'t saved. ' +
-                                    'Do you want to restore it?'
+                                    `Found unsaved script content from ${backupMinutes} minute(s) ago.\n\n` +
+                                    'This content was not saved to the server, possibly due to:\n' +
+                                    '• Closing the browser before autosave completed\n' +
+                                    '• Network interruption\n' +
+                                    '• Navigating away too quickly\n\n' +
+                                    'Do you want to restore this content?'
                                 );
                                 
                                 if (useBackupResponse) {
