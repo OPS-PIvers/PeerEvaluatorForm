@@ -183,6 +183,16 @@ function jsStringEscape(unsafe) {
 }
 
 /**
+ * Escapes a string for use in a regular expression.
+ * @param {string} string - The string to escape.
+ * @returns {string} The escaped string.
+ */
+function escapeRegExp(string) {
+  if (!string) return '';
+  return string.toString().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
  * Sanitizes text content by trimming whitespace and handling null values
  * @param {string|null|undefined} text - Text to sanitize
  * @return {string} Sanitized text

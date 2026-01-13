@@ -1820,7 +1820,7 @@ function saveWorkProductAnswerToDoc(observationId, questionId, answerText) {
       console.log(`[Server] Found question definition: ${!!question}, questionText: "${questionText ? questionText.substring(0, 40) + '...' : '(empty)'}"`);
 
       // Search for existing answer section
-      const searchPattern = `Question ${questionId}:`;
+      const searchPattern = `Question ${escapeRegExp(questionId.trim())}:`;
       console.log(`[Server] Searching document for pattern: "${searchPattern}"`);
       const searchResult = body.findText(searchPattern);
       console.log(`[Server] Search result: ${searchResult ? 'FOUND - will update existing' : 'NOT FOUND - will append new section'}`);
@@ -2266,7 +2266,7 @@ function saveStandardObservationAnswerToDoc(observationId, questionId, answerTex
 
     try {
       // Search for existing answer section
-      const searchPattern = `Question ${questionId}:`;
+      const searchPattern = `Question ${escapeRegExp(questionId.trim())}:`;
       const searchResult = body.findText(searchPattern);
 
       if (searchResult) {
