@@ -13,6 +13,8 @@
     <script src="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.js"></script>
     <!-- Lame.js for MP3 encoding -->
     <script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js"></script>
+    <!-- Google Material Icons -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <style>
 :root {
     --color-white: white;
@@ -4049,7 +4051,7 @@
                     </div>
                     <div class="recording-control-group">
                         <button class="global-tool-btn" id="recordVideoBtn" onclick="toggleVideoRecording()">
-                            📹 Record Video
+                            <span class="material-icons">cast</span>
                         </button>
                         <label class="auto-continue-toggle">
                             <input type="checkbox" id="videoAutoContinue" onchange="toggleAutoContinue('video', this.checked)">
@@ -5370,8 +5372,8 @@
             video: {
                 constraints: { video: true, audio: true },
                 buttonId: 'recordVideoBtn', 
-                startText: '🛑 Stop Video',
-                stopText: '📹 Record Video',
+                startText: '<span class="material-icons">cast_connected</span>',
+                stopText: '<span class="material-icons">cast</span>',
                 errorMessage: 'Error accessing camera: '
             }
         };
@@ -5408,7 +5410,7 @@
                         showToast(`Recording failed: ${event.error || 'Unknown error'}. Try shorter recordings.`, false);
                         // Reset recording state
                         state.isRecording = false;
-                        btn.textContent = config.stopText;
+                        btn.innerHTML = config.stopText;
                         btn.classList.remove('recording');
                         stopRecordingTimer(type);
                     };
@@ -5424,7 +5426,7 @@
 
                     state.recorder.start();
                     state.isRecording = true;
-                    btn.textContent = config.startText;
+                    btn.innerHTML = config.startText;
                     btn.classList.add('recording');
                     
                     // Start the recording timer
@@ -5437,7 +5439,7 @@
                 state.recorder.stop();
                 state.stream.getTracks().forEach(track => track.stop());
                 state.isRecording = false;
-                btn.textContent = config.stopText;
+                btn.innerHTML = config.stopText;
                 btn.classList.remove('recording');
                 
                 // Stop the recording timer
