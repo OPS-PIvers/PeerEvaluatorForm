@@ -62,8 +62,7 @@ The project follows a modular, service-oriented architecture.
 ├─── CLAUDE.md                                 # Instructional context for Claude AI
 ├─── GEMINI.md                                 # Instructional context for Gemini AI
 ├─── appsscript.json                           # GAS manifest: scopes, dependencies, and web app settings
-├─── global-tools-implementation-plan.md       # Development planning document
-└─── performance-todo.md                       # Development notes for performance optimization
+└─── global-tools-implementation-plan.md       # Development planning document
 ```
 
 ## 4. Function Index by File
