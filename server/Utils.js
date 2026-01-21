@@ -754,10 +754,18 @@ function _isUserYearMatching(userYear, targetYear) {
   // Trim the string inputs for comparison.
   const sUserYear = sUserYearInput.trim();
   const sTargetYear = sTargetYearInput.trim();
+  const lowerTargetYear = sTargetYear.toLowerCase();
+
+  // Check for "Probationary" wildcard filter (0, "Probationary", "Prob")
+  // This allows the filter to match any probationary year (P1, P2, P3)
+  if (lowerTargetYear === '0' || lowerTargetYear === 'probationary' || lowerTargetYear === 'prob') {
+    const parsedUserYear = parseYearValue(userYear);
+    return [PROB_YEAR_1, PROB_YEAR_2, PROB_YEAR_3].includes(parsedUserYear);
+  }
 
   // If the string representations (trimmed, case-insensitive) are identical, they match.
   // This handles "foo" vs "foo", "" vs "", "1" vs "1".
-  if (sUserYear.toLowerCase() === sTargetYear.toLowerCase()) {
+  if (sUserYear.toLowerCase() === lowerTargetYear) {
     return true;
   }
 
