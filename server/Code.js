@@ -834,6 +834,14 @@ function getStaffListForDropdown(role, year) {
 
     if (userContext.role === SPECIAL_ROLES.ADMINISTRATOR) {
       staffList = getStaffForAdmin(userContext);
+
+      // Apply filtering for admins too, so the dropdown respects the selections
+      if (role) {
+        staffList = staffList.filter(user => user.role === role);
+      }
+      if (year) {
+        staffList = staffList.filter(user => _isUserYearMatching(user.year, year));
+      }
     } else {
       staffList = getStaffByRoleAndYear(role, year);
     }
