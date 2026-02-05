@@ -40,6 +40,28 @@ function doGet(e) {
   });
   
   try {
+    // Check if the user has authorized all required OAuth scopes.
+    // When deployed as "Execute as: User accessing the web app", each user
+    // must individually grant the required scopes. If scopes were added after
+    // their initial authorization, or if their authorization was revoked,
+    // they need to re-authorize. Google does not always auto-prompt for this.
+    const authInfo = ScriptApp.getAuthorizationInfo(ScriptApp.AuthMode.FULL);
+    if (authInfo.getAuthorizationStatus() === ScriptApp.AuthorizationStatus.REQUIRED) {
+      const authUrl = authInfo.getAuthorizationUrl();
+      console.warn('User requires re-authorization', { requestId: requestId });
+      const authHtml = '<html><body style="font-family: Arial, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background: #f5f5f5;">' +
+        '<div style="text-align: center; padding: 40px; background: white; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); max-width: 500px;">' +
+        '<h2 style="color: #333; margin-bottom: 16px;">Authorization Required</h2>' +
+        '<p style="color: #666; margin-bottom: 24px;">This application needs your permission to access the required resources. ' +
+        'This is a one-time step (or may be needed after an update).</p>' +
+        '<a href="' + authUrl + '" style="display: inline-block; padding: 12px 32px; background: #1a73e8; color: white; text-decoration: none; border-radius: 6px; font-size: 16px;">Authorize Access</a>' +
+        '<p style="color: #999; margin-top: 24px; font-size: 13px;">After authorizing, please reload this page.</p>' +
+        '</div></body></html>';
+      return HtmlService.createHtmlOutput(authHtml)
+        .setTitle('Authorization Required')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+    }
+
     // Clean up expired sessions periodically (10% chance)
     if (Math.random() < 0.1) {
       cleanupExpiredSessions();
