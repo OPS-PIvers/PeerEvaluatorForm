@@ -54,7 +54,7 @@ function doGet(e) {
         '<h2 style="color: #333; margin-bottom: 16px;">Authorization Required</h2>' +
         '<p style="color: #666; margin-bottom: 24px;">This application needs your permission to access the required resources. ' +
         'This is a one-time step (or may be needed after an update).</p>' +
-        '<a href="' + authUrl + '" style="display: inline-block; padding: 12px 32px; background: #1a73e8; color: white; text-decoration: none; border-radius: 6px; font-size: 16px;">Authorize Access</a>' +
+        '<a href="' + authUrl + '" target="_top" style="display: inline-block; padding: 12px 32px; background: #1a73e8; color: white; text-decoration: none; border-radius: 6px; font-size: 16px;">Authorize Access</a>' +
         '<p style="color: #999; margin-top: 24px; font-size: 13px;">After authorizing, please reload this page.</p>' +
         '</div></body></html>';
       return HtmlService.createHtmlOutput(authHtml)
