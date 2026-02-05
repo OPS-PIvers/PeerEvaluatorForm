@@ -39,10 +39,6 @@ function doGet(e) {
     urlParameters: e && e.parameter ? Object.keys(e.parameter) : []
   });
   
-  try {
-    // Ensure the Observation_Data sheet has the correct columns before any other operation.
-    setupObservationSheet();
-
     // Clean up expired sessions periodically (10% chance)
     if (Math.random() < 0.1) {
       cleanupExpiredSessions();
@@ -70,15 +66,26 @@ function doGet(e) {
 
     let userContext = createUserContext();
 
-    // Handle special role filtering
+    // Ensure the Observation_Data sheet has the correct columns if user has special access.
+    // Regular teachers (read-only) do not need to perform this potentially expensive and
+    // permission-sensitive operation on every page load.
+    if (userContext && userContext.hasSpecialAccess) {
+      try {
+        setupObservationSheet();
+      } catch (setupError) {
+        console.warn("Non-fatal error in setupObservationSheet during doGet:", setupError.message);
+        // Continue loading app even if setup fails for admin (they may still have read access)
+      }
+    }
+
     if (userContext.hasSpecialAccess && UiService.hasActiveFilters(params)) {
       const effectiveRole = params.filterRole || userContext.role;
       const effectiveYear = params.filterYear || userContext.year;
       const filterDetails = {
-        filterType: params.filterType || 'staff',
+        filterType: params.filterType || "staff",
         filterStaff: params.filterStaff || null,
-        showFullRubric: params.view === 'full',
-        showAssignedAreas: params.view === 'assigned'
+        showFullRubric: params.view === "full",
+        showAssignedAreas: params.view === "assigned"
       };
 
       userContext = UiService.createSyntheticUserContext(effectiveRole, effectiveYear, userContext, filterDetails);
@@ -1467,14 +1474,20 @@ function loadObservationForEditing(observationId) {
  * @param {string} observationId The ID of the observation to delete.
  * @returns {Object} A response object indicating success or failure.
  */
+
+/**
+ * Deletes an observation draft.
+ * @param {string} observationId The ID of the observation to delete.
+ * @returns {Object} A response object indicating success or failure.
+ */
 function deleteObservation(observationId) {
     try {
-        setupObservationSheet(); // Ensure the sheet is ready
         const userContext = createUserContext();
         // Allow both Peer Evaluator and Administrator to delete observations
         if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR && userContext.role !== SPECIAL_ROLES.ADMINISTRATOR) {
             return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
         }
+        setupObservationSheet(); // Ensure the sheet is ready
         return deleteObservationRecord(observationId, userContext.email);
     } catch (error) {
         console.error('Error in deleteObservation wrapper:', error);
@@ -1735,7 +1748,6 @@ function backupObservationNotes(observationId) {
  */
 function saveComponentTags(observationId, componentTags) {
     try {
-        setupObservationSheet();
         const userContext = createUserContext();
         if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR && userContext.role !== SPECIAL_ROLES.ADMINISTRATOR) {
             return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
@@ -1750,6 +1762,7 @@ function saveComponentTags(observationId, componentTags) {
             return { success: false, error: 'Permission denied. You did not create this observation.' };
         }
 
+        setupObservationSheet();
         // Add or update the componentTags field
         observation.componentTags = componentTags || {};
 
@@ -1772,7 +1785,6 @@ function saveComponentTags(observationId, componentTags) {
  */
 function getComponentTags(observationId) {
     try {
-        setupObservationSheet();
         const userContext = createUserContext();
         if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR && userContext.role !== SPECIAL_ROLES.ADMINISTRATOR) {
             return {};
@@ -1809,21 +1821,6 @@ function finalizeObservation(observationId) {
         }
 
         // Step 1: Script PDF generation DISABLED - evaluators now export to Google Docs manually
-        // Keeping this block commented for historical reference
-        let scriptPdfResult = null;
-        // const observation = getObservationById(observationId);
-        // if (observation && observation.scriptContent) {
-        //     debugLog('Generating script PDF during finalization', { observationId });
-        //     scriptPdfResult = generateScriptPDF(observationId);
-        //     if (!scriptPdfResult.success) {
-        //         debugLog('Script PDF generation failed during finalization', {
-        //             observationId,
-        //             error: scriptPdfResult.error
-        //         });
-        //         // Continue with main PDF even if script PDF fails
-        //     }
-        // }
-
         // Step 2: Generate the main observation PDF.
         const pdfProcessingResult = PdfService.processPdfForFinalization(observationId, userContext);
 
@@ -1846,16 +1843,6 @@ function finalizeObservation(observationId) {
             result.pdfError = pdfProcessingResult.pdfError;
         }
 
-        // Add script PDF info to result if generated
-        if (scriptPdfResult) {
-            result.scriptPdfStatus = scriptPdfResult.success ? 'generated' : 'failed';
-            if (scriptPdfResult.success) {
-                result.scriptPdfUrl = scriptPdfResult.pdfUrl;
-            } else {
-                result.scriptPdfError = scriptPdfResult.error;
-            }
-        }
-
         return result;
 
     } catch (error) {
@@ -1871,11 +1858,11 @@ function finalizeObservation(observationId) {
  */
 function deleteFinalizedObservation(observationId) {
     try {
-        setupObservationSheet(); // Ensure the sheet is ready
         const userContext = createUserContext();
         if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR && userContext.role !== SPECIAL_ROLES.ADMINISTRATOR) {
             return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
         }
+        setupObservationSheet(); // Ensure the sheet is ready
         return deleteFinalizedObservationRecord(observationId, userContext.email);
     } catch (error) {
         console.error('Error in deleteFinalizedObservation wrapper:', error);
@@ -1890,8 +1877,6 @@ function deleteFinalizedObservation(observationId) {
  */
 function loadFinalizedObservationForViewing(observationId) {
     try {
-        setupObservationSheet(); // Ensure the sheet is ready
-
         const viewingUserContext = createUserContext(); // Get context for the currently authenticated user accessing the observation (could be observer, observed staff, or another authorized user)
         const observation = getObservationById(observationId);
 
@@ -1980,7 +1965,6 @@ function loadFinalizedObservationForViewing(observationId) {
  */
 function getObservationPdfUrl(observationId) {
     try {
-        setupObservationSheet(); // Ensure the sheet is ready
         const userContext = createUserContext();
         if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR && userContext.role !== SPECIAL_ROLES.ADMINISTRATOR) {
             return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
@@ -2092,12 +2076,6 @@ function getFinalizedObservationsForStaff(staffEmail = null) {
         return { success: false, error: 'An unexpected error occurred while retrieving observations.' };
     }
 }
-
-/**
- * Helper function to get files from an observation's Drive folder
- * @param {string} observationId The observation ID
- * @returns {Array} Array of file objects with name, url, and type
- */
 function getObservationFiles(observationId) {
     try {
         const observation = getObservationById(observationId);
@@ -3027,7 +3005,8 @@ function _createScriptPdfDocument(observation, scriptContent, docName, contentSo
             opsProcessed++;
             if (op.insert && typeof op.insert === 'string') {
                 const text = op.insert;
-                if (text.trim() || text === '\n') {
+                if (text.trim() || text === '
+') {
                     const p = body.appendParagraph(text);
                     paragraphsAdded++;
                     if (op.attributes) {
@@ -3087,7 +3066,8 @@ function _createScriptPdfDocument(observation, scriptContent, docName, contentSo
                 const componentName = componentMap.get(componentId) || componentId;
 
                 body.appendParagraph(componentName).setHeading(DocumentApp.ParagraphHeading.HEADING3);
-                const content = tags.map(tag => tag.text).join('\n');
+                const content = tags.map(tag => tag.text).join('
+');
                 body.appendParagraph(content).setSpacingAfter(12);
             }
         });
@@ -4584,7 +4564,8 @@ function test_OrphanedFolderBugFix() {
         const headers = obsSheet.getRange(1, 1, 1, obsSheet.getLastColumn()).getValues()[0];
 
         // TEST 1: Delete observation WITHOUT existing folder (original bug scenario)
-        Logger.log('\n=== TEST 1: Delete observation WITHOUT existing folder ===');
+        Logger.log('
+=== TEST 1: Delete observation WITHOUT existing folder ===');
         const testObsId1 = 'test-no-folder-' + new Date().getTime();
         const FOLDER_NAME_1 = `Observation - ${testObsId1}`;
 
@@ -4642,7 +4623,8 @@ function test_OrphanedFolderBugFix() {
         }
 
         // TEST 2: Delete observation WITH existing folder
-        Logger.log('\n=== TEST 2: Delete observation WITH existing folder ===');
+        Logger.log('
+=== TEST 2: Delete observation WITH existing folder ===');
         const testObsId2 = 'test-with-folder-' + new Date().getTime();
         const FOLDER_NAME_2 = `Observation - ${testObsId2}`;
 
@@ -4727,7 +4709,8 @@ const rootFolder = rootFolderIterator.hasNext()
         }
 
         // FINAL RESULTS
-        Logger.log('\n=== FINAL TEST RESULTS ===');
+        Logger.log('
+=== FINAL TEST RESULTS ===');
         Logger.log(`Tests passed: ${testsPassed}/${testsTotal}`);
         if (testsPassed === testsTotal) {
             Logger.log('--- ALL TESTS PASSED ---');

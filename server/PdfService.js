@@ -14,11 +14,11 @@ const PdfService = (function() {
    */
   function regenerateObservationPdf(observationId) {
       try {
-          setupObservationSheet();
           const userContext = createUserContext();
           if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
               return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
           }
+          setupObservationSheet();
 
           const observation = getObservationById(observationId);
           if (!observation) {

@@ -61,7 +61,20 @@ function openSpreadsheet() {
 
   try {
     const sheetId = getSheetId();
-    _spreadsheet = SpreadsheetApp.openById(sheetId);
+    try {
+      _spreadsheet = SpreadsheetApp.openById(sheetId);
+    } catch (permError) {
+      const msg = permError.message || '';
+      if (msg.includes('permission') || msg.includes('not found')) {
+        console.error('Spreadsheet access denied for user:', {
+          user: Session.getActiveUser().getEmail(),
+          sheetId: sheetId,
+          error: msg
+        });
+        throw new Error('Access Denied: You do not have permission to access the data spreadsheet. Please contact your system administrator to ensure you have been granted at least "Viewer" access to the spreadsheet.');
+      }
+      throw permError;
+    }
 
     debugLog('Spreadsheet opened successfully', {
       name: _spreadsheet.getName(),
@@ -70,6 +83,10 @@ function openSpreadsheet() {
 
     return _spreadsheet;
   } catch (error) {
+    // If it's already our custom error, re-throw it
+    if (error.message && error.message.includes('Access Denied')) {
+      throw error;
+    }
     throw new Error(`Failed to open spreadsheet: ${error.message}`);
   }
 }
