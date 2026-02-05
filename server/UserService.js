@@ -541,6 +541,8 @@ function createUserContext(email = null) {
       isAuthenticated: false,
       isDefaultUser: true,
       isEvaluator: false, // Error fallback users are not evaluators
+      hasSpecialAccess: false,
+      canFilter: false,
       hasStaffRecord: false,
       roleChangeDetected: false,
       stateChanges: [],

@@ -40,9 +40,6 @@ function doGet(e) {
   });
   
   try {
-    // Ensure the Observation_Data sheet has the correct columns before any other operation.
-    setupObservationSheet();
-
     // Clean up expired sessions periodically (10% chance)
     if (Math.random() < 0.1) {
       cleanupExpiredSessions();
@@ -69,6 +66,17 @@ function doGet(e) {
     }
 
     let userContext = createUserContext();
+
+    // Ensure the Observation_Data sheet is set up for users who need it.
+    // Teachers don't use observations, so skip this for them to avoid
+    // unnecessary permission requirements.
+    if (userContext.hasSpecialAccess) {
+      try {
+        setupObservationSheet();
+      } catch (obsError) {
+        console.warn('Non-fatal: Could not initialize Observation_Data sheet during doGet', obsError.message);
+      }
+    }
 
     // Handle special role filtering
     if (userContext.hasSpecialAccess && UiService.hasActiveFilters(params)) {
