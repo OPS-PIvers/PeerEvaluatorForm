@@ -1630,7 +1630,10 @@ function updateObservationScript(observationId, scriptContent) {
             observation.scriptDocUrl = null; // Clear any previous doc reference
             observation.scriptStorageMethod = 'sheet';
 
-            updateObservationInSheet(observation);
+            const updateResult = updateObservationInSheet(observation);
+            if (!updateResult.success) {
+                return { success: false, error: 'Failed to save script to sheet: ' + updateResult.error };
+            }
 
             // Check if approaching warning threshold
             const nearLimit = contentSize > SCRIPT_STORAGE.WARNING_THRESHOLD;
@@ -1660,7 +1663,10 @@ function updateObservationScript(observationId, scriptContent) {
         observation.scriptDocUrl = docResult.docUrl;
         observation.scriptStorageMethod = 'doc';
 
-        updateObservationInSheet(observation);
+        const updateResultDoc = updateObservationInSheet(observation);
+        if (!updateResultDoc.success) {
+            return { success: false, error: 'Failed to update observation after document save: ' + updateResultDoc.error };
+        }
 
         return {
             success: true,

@@ -106,7 +106,7 @@ function _appendObservationToSheet(observation) {
     const rowData = headers.map(header => {
       let value = observation[header];
       if (JSON_SERIALIZED_FIELDS.includes(header) && typeof value === 'object') {
-        return JSON.stringify(value, null, 2);
+        return JSON.stringify(value);
       }
       return value;
     });
@@ -185,7 +185,7 @@ function _updateObservationJsonData(observationId, dataColumnName, updateFn) {
     const updatedData = updateFn(currentData);
 
     // Save the updated object back to the cell
-    dataCell.setValue(JSON.stringify(updatedData, null, 2));
+    dataCell.setValue(JSON.stringify(updatedData));
     if (lastModifiedCol > 0) {
       sheet.getRange(row, lastModifiedCol).setValue(new Date().toISOString());
     }
@@ -665,7 +665,7 @@ function uploadMediaEvidence(observationId, componentId, base64Data, fileName, m
     });
 
     // Update the sheet with the new evidence links and timestamp
-    evidenceLinksCell.setValue(JSON.stringify(currentLinks, null, 2));
+    evidenceLinksCell.setValue(JSON.stringify(currentLinks));
     if (lastModifiedCol > 0) {
       sheet.getRange(row, lastModifiedCol).setValue(new Date().toISOString());
     }
@@ -1032,14 +1032,16 @@ function _saveObservationNotes(observationId, componentId, notesContent) {
 
 // Add a simple HTML sanitizer to prevent script injection
 function sanitizeHtml(html) {
-    // This is a very basic sanitizer. For a real-world application,
-    // a more robust library would be recommended if available.
-    // It allows simple formatting tags.
+    if (!html) return '';
+    // Strip out potentially dangerous tags but keep formatting like span
     return html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-               .replace(/>/g, '&gt;').replace(/</g, '&lt;')
-               .replace(/&lt;(\/?(p|strong|em|u|ol|ul|li|br|h1|h2))&gt;/g, '<$1>');
+               .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
+               .replace(/<object\b[^<]*(?:(?!<\/object>)<[^<]*)*<\/object>/gi, '')
+               .replace(/<embed\b[^<]*(?:(?!<\/embed>)<[^<]*)*<\/embed>/gi, '')
+               .replace(/<applet\b[^<]*(?:(?!<\/applet>)<[^<]*)*<\/applet>/gi, '')
+               .replace(/\bon[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]*)/gi, '') // Strip onEvent handlers
+               .replace(/href\s*=\s*("javascript:[^"]*"|'javascript:[^']*'|javascript:[^\s>]*)/gi, 'href="#"');
 }
-
 /**
  * Updates an entire observation record in the Google Sheet.
  * This is a generic function that can update any fields in the observation object.
@@ -1075,7 +1077,7 @@ function updateObservationInSheet(observation) {
             
             // Convert objects to JSON strings for storage
             if (JSON_SERIALIZED_FIELDS.includes(header) && typeof value === 'object') {
-                return JSON.stringify(value, null, 2);
+                return JSON.stringify(value);
             }
             
             // Return the value as is, or empty string if undefined
