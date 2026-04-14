@@ -1839,9 +1839,8 @@ function saveWorkProductAnswerToDoc(observationId, questionId, answerText) {
 
         // Look for the question text and answer paragraphs
         if (currentSibling && currentSibling.getType() === DocumentApp.ElementType.PARAGRAPH) {
-          const siblingText = currentSibling.asParagraph().getText();
-          // If it's italic, it's the question text
-          if (currentSibling.asParagraph().editAsText().isItalic()) {
+          // If it's italic, it's the question text - skip it
+          if (currentSibling.asParagraph().editAsText().isItalic() === true) {
             questionTextParagraph = currentSibling.asParagraph();
             currentSibling = currentSibling.getNextSibling();
           }
@@ -1931,6 +1930,99 @@ function saveWorkProductAnswerToDoc(observationId, questionId, answerText) {
 }
 
 /**
+ * Parses answers from a response Google Doc body using paragraph-level iteration.
+ * Uses paragraph formatting to distinguish question headers (bold), question text (italic),
+ * and answer content, avoiding the duplication bug caused by plain-text parsing.
+ * @param {GoogleAppsScript.Document.Body} body The document body to parse.
+ * @returns {Array<Object>} Deduplicated array of { questionId, answerText } objects.
+ */
+function _parseAnswersFromDocBody(body) {
+  var answers = [];
+  var currentQuestionId = null;
+  var answerParts = [];
+  var collectingAnswer = false;
+  var numChildren = body.getNumChildren();
+
+  for (var i = 0; i < numChildren; i++) {
+    var child = body.getChild(i);
+
+    // Skip non-paragraph elements (horizontal rules, etc.)
+    if (child.getType() !== DocumentApp.ElementType.PARAGRAPH) {
+      continue;
+    }
+
+    var paragraph = child.asParagraph();
+    var text = paragraph.getText().trim();
+
+    // Skip empty paragraphs
+    if (!text) {
+      continue;
+    }
+
+    // Skip heading paragraphs (document title)
+    if (paragraph.getHeading() !== DocumentApp.ParagraphHeading.NORMAL) {
+      continue;
+    }
+
+    // Skip metadata lines
+    if (text.startsWith('Last updated:') || text.startsWith('Observation ID:') ||
+        text.startsWith('Staff Member:') || text.startsWith('Peer Evaluator:') ||
+        text.startsWith('Generated:') || text.includes('---') || text.includes('___')) {
+      continue;
+    }
+
+    // Check if this is a question header
+    var questionMatch = text.match(/^Question\s+([^:]+):\s*$/);
+    if (questionMatch) {
+      // Finalize previous answer
+      if (currentQuestionId && answerParts.length > 0) {
+        var answerText = answerParts.join('\n').trim();
+        if (answerText && answerText !== '(No response provided)') {
+          answers.push({ questionId: currentQuestionId, answerText: answerText });
+        }
+      }
+      currentQuestionId = questionMatch[1].trim();
+      answerParts = [];
+      collectingAnswer = true;
+      continue;
+    }
+
+    // While collecting an answer, skip italic paragraphs (question text)
+    if (collectingAnswer && currentQuestionId) {
+      var textElement = paragraph.editAsText();
+      if (textElement.isItalic() === true) {
+        continue;
+      }
+      answerParts.push(text);
+    }
+  }
+
+  // Finalize the last answer
+  if (currentQuestionId && answerParts.length > 0) {
+    var lastAnswerText = answerParts.join('\n').trim();
+    if (lastAnswerText && lastAnswerText !== '(No response provided)') {
+      answers.push({ questionId: currentQuestionId, answerText: lastAnswerText });
+    }
+  }
+
+  // Deduplicate by questionId (keep last occurrence which has most recent content)
+  var deduplicatedAnswers = [];
+  var seenQuestions = {};
+
+  for (var j = answers.length - 1; j >= 0; j--) {
+    var answer = answers[j];
+    if (!seenQuestions[answer.questionId]) {
+      seenQuestions[answer.questionId] = true;
+      deduplicatedAnswers.unshift(answer);
+    } else {
+      console.warn('[Parser] Duplicate question found: ' + answer.questionId + ', keeping last occurrence');
+    }
+  }
+
+  return deduplicatedAnswers;
+}
+
+/**
  * Gets work product answers from the response Google Doc.
  * @param {string} observationId The ID of the observation.
  * @returns {Array<Object>} Array of answer objects with questionId and answerText.
@@ -1989,79 +2081,9 @@ function getWorkProductAnswersFromDoc(observationId) {
       return [];
     }
     const body = doc.getBody();
-    const text = body.getText();
-
-    // Parse questions and answers
-    const answers = [];
-    const lines = text.split('\n');
-    let currentQuestionId = null;
-    let currentAnswer = '';
-    let collectingAnswer = false;
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
-
-      // Check if this is a question line
-      const questionMatch = line.match(/^Question\s+([^:]+):\s*$/);
-      if (questionMatch) {
-        // Save previous answer if we have one
-        if (currentQuestionId && currentAnswer.trim() && currentAnswer.trim() !== '(No response provided)') {
-          answers.push({
-            questionId: currentQuestionId,
-            answerText: currentAnswer.trim()
-          });
-        }
-
-        // Start new question
-        currentQuestionId = questionMatch[1].trim();
-        currentAnswer = '';
-        collectingAnswer = true;
-        continue;
-      }
-
-      // Skip metadata lines and horizontal rules
-      if (line.startsWith('Last updated:') || line.startsWith('Observation ID:') ||
-          line.startsWith('Staff Member:') || line.startsWith('Peer Evaluator:') ||
-          line.startsWith('Generated:') || line === '' ||
-          line === 'Work Product Reflection Responses' ||
-          line.includes('---') || line.includes('___')) {
-        continue;
-      }
-
-      // Collect answer text
-      if (collectingAnswer && currentQuestionId) {
-        if (currentAnswer) currentAnswer += '\n';
-        currentAnswer += line;
-      }
-    }
-
-    // Save the last answer
-    if (currentQuestionId && currentAnswer.trim() && currentAnswer.trim() !== '(No response provided)') {
-      answers.push({
-        questionId: currentQuestionId,
-        answerText: currentAnswer.trim()
-      });
-    }
-
+    const answers = _parseAnswersFromDocBody(body);
     console.log(`Retrieved ${answers.length} work product answers from doc`);
-
-    // Deduplicate answers by questionId (keep last occurrence which has most recent content)
-    const deduplicatedAnswers = [];
-    const seenQuestions = new Set();
-
-    // Iterate backwards to keep LAST occurrence of each question
-    for (let i = answers.length - 1; i >= 0; i--) {
-      const answer = answers[i];
-      if (!seenQuestions.has(answer.questionId)) {
-        seenQuestions.add(answer.questionId);
-        deduplicatedAnswers.unshift(answer);  // Add to front to maintain order
-      } else {
-        console.warn(`[Parser] Duplicate question found: ${answer.questionId}, keeping last occurrence`);
-      }
-    }
-
-    console.log(`After deduplication: ${deduplicatedAnswers.length} unique answers`);
-    return deduplicatedAnswers;
+    return answers;
 
   } catch (error) {
     console.error('Critical error getting work product answers from doc:', error, {
@@ -2275,12 +2297,31 @@ function saveStandardObservationAnswerToDoc(observationId, questionId, answerTex
         // Update existing answer
         const element = searchResult.getElement();
         const paragraph = element.getParent();
-        const nextParagraph = paragraph.getNextSibling();
 
-        if (nextParagraph && nextParagraph.getType() === DocumentApp.ElementType.PARAGRAPH) {
-          nextParagraph.asParagraph().setText(answerText || '(No response provided)');
+        // Check if there's a question text paragraph after the question ID
+        let currentSibling = paragraph.getNextSibling();
+        let questionTextParagraph = null;
+        let answerParagraph = null;
+
+        // Look for the question text and answer paragraphs
+        if (currentSibling && currentSibling.getType() === DocumentApp.ElementType.PARAGRAPH) {
+          // If it's italic, it's the question text - skip it
+          if (currentSibling.asParagraph().editAsText().isItalic() === true) {
+            questionTextParagraph = currentSibling.asParagraph();
+            currentSibling = currentSibling.getNextSibling();
+          }
+        }
+
+        // The next paragraph should be the answer
+        if (currentSibling && currentSibling.getType() === DocumentApp.ElementType.PARAGRAPH) {
+          answerParagraph = currentSibling.asParagraph();
+          answerParagraph.setText(answerText || '(No response provided)');
         } else {
-          const answerParagraph = body.insertParagraph(body.getChildIndex(paragraph) + 1, answerText || '(No response provided)');
+          // Insert answer paragraph
+          const insertIndex = questionTextParagraph
+            ? body.getChildIndex(questionTextParagraph) + 1
+            : body.getChildIndex(paragraph) + 1;
+          answerParagraph = body.insertParagraph(insertIndex, answerText || '(No response provided)');
           answerParagraph.setIndentFirstLine(20);
         }
       } else {
@@ -2471,60 +2512,7 @@ function getStandardObservationAnswersFromDoc(observationId) {
     }
 
     const body = doc.getBody();
-    const text = body.getText();
-
-    // Parse questions and answers
-    const answers = [];
-    const lines = text.split('\n');
-    let currentQuestionId = null;
-    let currentAnswer = '';
-    let collectingAnswer = false;
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
-
-      // Check if this is a question line
-      const questionMatch = line.match(/^Question\s+([^:]+):\s*$/);
-      if (questionMatch) {
-        // Save previous answer if we have one
-        if (currentQuestionId && currentAnswer.trim() && currentAnswer.trim() !== '(No response provided)') {
-          answers.push({
-            questionId: currentQuestionId,
-            answerText: currentAnswer.trim()
-          });
-        }
-
-        // Start new question
-        currentQuestionId = questionMatch[1].trim();
-        currentAnswer = '';
-        collectingAnswer = true;
-        continue;
-      }
-
-      // Skip metadata lines and horizontal rules
-      if (line.startsWith('Last updated:') || line.startsWith('Observation ID:') ||
-          line.startsWith('Staff Member:') || line.startsWith('Peer Evaluator:') ||
-          line.startsWith('Generated:') || line === '' ||
-          line === 'Standard Observation Reflection Responses' ||
-          line.includes('---') || line.includes('___')) {
-        continue;
-      }
-
-      // Collect answer text
-      if (collectingAnswer && currentQuestionId) {
-        if (currentAnswer) currentAnswer += '\n';
-        currentAnswer += line;
-      }
-    }
-
-    // Save the last answer
-    if (currentQuestionId && currentAnswer.trim() && currentAnswer.trim() !== '(No response provided)') {
-      answers.push({
-        questionId: currentQuestionId,
-        answerText: currentAnswer.trim()
-      });
-    }
-
+    const answers = _parseAnswersFromDocBody(body);
     console.log(`Retrieved ${answers.length} standard observation answers from doc`);
     return answers;
 
@@ -2848,7 +2836,7 @@ function saveInstructionalRoundAnswerToDoc(observationId, questionId, answerText
       console.log(`[Server] Found question definition: ${!!question}, questionText: "${questionText ? questionText.substring(0, 40) + '...' : '(empty)'}"`);
 
       // Search for existing answer section
-      const searchPattern = `Question ${questionId}:`;
+      const searchPattern = `Question ${escapeRegExp(questionId.trim())}:`;
       console.log(`[Server] Searching document for pattern: "${searchPattern}"`);
       const searchResult = body.findText(searchPattern);
       console.log(`[Server] Search result: ${searchResult ? 'FOUND - will update existing' : 'NOT FOUND - will append new section'}`);
@@ -2865,9 +2853,8 @@ function saveInstructionalRoundAnswerToDoc(observationId, questionId, answerText
 
         // Look for the question text and answer paragraphs
         if (currentSibling && currentSibling.getType() === DocumentApp.ElementType.PARAGRAPH) {
-          const siblingText = currentSibling.asParagraph().getText();
-          // If it's italic, it's the question text
-          if (currentSibling.asParagraph().editAsText().isItalic()) {
+          // If it's italic, it's the question text - skip it
+          if (currentSibling.asParagraph().editAsText().isItalic() === true) {
             questionTextParagraph = currentSibling.asParagraph();
             currentSibling = currentSibling.getNextSibling();
           }
@@ -3012,79 +2999,9 @@ function getInstructionalRoundAnswersFromDoc(observationId) {
     }
 
     const body = doc.getBody();
-    const text = body.getText();
-
-    // Parse questions and answers
-    const answers = [];
-    const lines = text.split('\n');
-    let currentQuestionId = null;
-    let currentAnswer = '';
-    let collectingAnswer = false;
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
-
-      // Check if this is a question line
-      const questionMatch = line.match(/^Question\s+([^:]+):\s*$/);
-      if (questionMatch) {
-        // Save previous answer if we have one
-        if (currentQuestionId && currentAnswer.trim() && currentAnswer.trim() !== '(No response provided)') {
-          answers.push({
-            questionId: currentQuestionId,
-            answerText: currentAnswer.trim()
-          });
-        }
-
-        // Start new question
-        currentQuestionId = questionMatch[1].trim();
-        currentAnswer = '';
-        collectingAnswer = true;
-        continue;
-      }
-
-      // Skip metadata lines and horizontal rules
-      if (line.startsWith('Last updated:') || line.startsWith('Observation ID:') ||
-          line.startsWith('Staff Member:') || line.startsWith('Peer Evaluator:') ||
-          line.startsWith('Generated:') || line === '' ||
-          line === 'Instructional Round Reflection Responses' ||
-          line.includes('---') || line.includes('___')) {
-        continue;
-      }
-
-      // Collect answer text
-      if (collectingAnswer && currentQuestionId) {
-        if (currentAnswer) currentAnswer += '\n';
-        currentAnswer += line;
-      }
-    }
-
-    // Save the last answer
-    if (currentQuestionId && currentAnswer.trim() && currentAnswer.trim() !== '(No response provided)') {
-      answers.push({
-        questionId: currentQuestionId,
-        answerText: currentAnswer.trim()
-      });
-    }
-
+    const answers = _parseAnswersFromDocBody(body);
     console.log(`Retrieved ${answers.length} instructional round answers from doc`);
-
-    // Deduplicate answers by questionId (keep last occurrence which has most recent content)
-    const deduplicatedAnswers = [];
-    const seenQuestions = new Set();
-
-    // Iterate backwards to keep LAST occurrence of each question
-    for (let i = answers.length - 1; i >= 0; i--) {
-      const answer = answers[i];
-      if (!seenQuestions.has(answer.questionId)) {
-        seenQuestions.add(answer.questionId);
-        deduplicatedAnswers.unshift(answer);  // Add to front to maintain order
-      } else {
-        console.warn(`[Parser] Duplicate question found: ${answer.questionId}, keeping last occurrence`);
-      }
-    }
-
-    console.log(`After deduplication: ${deduplicatedAnswers.length} unique answers`);
-    return deduplicatedAnswers;
+    return answers;
 
   } catch (error) {
     console.error('Critical error getting instructional round answers from doc:', error, {
