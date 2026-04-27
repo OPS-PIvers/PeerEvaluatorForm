@@ -306,6 +306,38 @@ function measureExecutionTime(func, args = []) {
 }
 
 /**
+ * Runs a Drive-touching operation with one retry after a short sleep.
+ * Drive backend returns generic "Service error: Drive" on transient hiccups
+ * that recover within a second; a single retry materially raises the success
+ * rate of finalization without masking persistent failures. Top-level twin of
+ * the private _withDriveRetry inside PdfService — kept duplicated because the
+ * IIFE in PdfService.js cannot reach top-level helpers reliably during load.
+ * @param {Function} op - Zero-arg function performing the Drive call.
+ * @param {string} label - Short label used in retry telemetry.
+ * @param {number} [maxAttempts=2] - Total attempts including the first.
+ * @returns The return value of `op()`.
+ * @throws The last error if all attempts fail.
+ */
+function withDriveRetry(op, label, maxAttempts) {
+  const attempts = maxAttempts || 2;
+  let lastError;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return op();
+    } catch (error) {
+      lastError = error;
+      if (typeof debugLog === 'function') {
+        debugLog('drive:retry', { label: label, attempt: i + 1, error: error.message });
+      }
+      if (i < attempts - 1) {
+        Utilities.sleep(750);
+      }
+    }
+  }
+  throw lastError;
+}
+
+/**
  * Logs performance metrics if performance logging is enabled
  * @param {string} operation - Name of the operation being measured
  * @param {number} executionTime - Time taken in milliseconds

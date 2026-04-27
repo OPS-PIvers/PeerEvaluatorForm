@@ -1863,8 +1863,26 @@ function finalizeObservation(observationId) {
         // Step 2: Generate the main observation PDF.
         const pdfProcessingResult = PdfService.processPdfForFinalization(observationId, userContext);
 
-        // Step 3: Now that all files are in place, update the status.
-        // This will trigger folder sharing and email notifications.
+        // Step 3: Only transition to Finalized when the PDF actually saved.
+        // updateObservationStatus(FINALIZED) is what triggers folder sharing
+        // and email notifications (ObservationService _shareObservationFolder
+        // and _sendFinalizedEmail), so leaving status untouched on PDF failure
+        // also prevents the half-finalized state with no PDF, no folder, and
+        // no email. The PE can re-attempt finalization from the Draft state.
+        if (!pdfProcessingResult.success) {
+            debugLog('Finalization aborted: PDF generation failed', {
+                observationId: observationId,
+                pdfError: pdfProcessingResult.pdfError
+            });
+            return {
+                success: false,
+                observationId: observationId,
+                pdfStatus: pdfProcessingResult.pdfStatus,
+                pdfError: pdfProcessingResult.pdfError,
+                error: 'PDF generation failed. The observation was not finalized — please retry.'
+            };
+        }
+
         const statusUpdateResult = updateObservationStatus(observationId, OBSERVATION_STATUS.FINALIZED, userContext.email);
         if (!statusUpdateResult.success) {
             // If the final step fails, we return its error, though the PDFs are already created.
@@ -1877,10 +1895,6 @@ function finalizeObservation(observationId) {
             observationId: observationId,
             pdfStatus: pdfProcessingResult.pdfStatus,
         };
-
-        if (!pdfProcessingResult.success) {
-            result.pdfError = pdfProcessingResult.pdfError;
-        }
 
         // Add script PDF info to result if generated
         if (scriptPdfResult) {

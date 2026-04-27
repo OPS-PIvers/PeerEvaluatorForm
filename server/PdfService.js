@@ -135,6 +135,34 @@ const PdfService = (function() {
       }
   }
 
+  /**
+   * Runs a Drive-touching operation with one retry after a short sleep.
+   * Drive backend returns generic "Service error: Drive" on transient hiccups
+   * that recover within a second; a single retry materially raises the success
+   * rate of finalization without masking persistent failures.
+   * @param {Function} op A zero-arg function performing the Drive call.
+   * @param {string} label A short label used in retry telemetry.
+   * @param {number} [maxAttempts=2] Total attempts including the first.
+   * @returns The return value of `op()`.
+   * @throws The last error if all attempts fail.
+   */
+  function _withDriveRetry(op, label, maxAttempts) {
+      const attempts = maxAttempts || 2;
+      let lastError;
+      for (let i = 0; i < attempts; i++) {
+          try {
+              return op();
+          } catch (error) {
+              lastError = error;
+              debugLog('drive:retry', { label, attempt: i + 1, error: error.message });
+              if (i < attempts - 1) {
+                  Utilities.sleep(750);
+              }
+          }
+      }
+      throw lastError;
+  }
+
   function _generateAndSavePdf(observationId, userContext) {
       debugLog('Starting PDF generation', { observationId });
 
@@ -176,8 +204,17 @@ const PdfService = (function() {
               const obsFolder = getOrCreateObservationFolder(observationId);
               debugLog('Retrieved/created observation folder', { observationId, obsFolderId: obsFolder.getId() });
 
-              // Use the already created styled PDF blob
-              const pdfFile = obsFolder.createFile(pdfBlob).setName(docName + ".pdf");
+              // Use the already created styled PDF blob.
+              // Wrapped in retry: same Drive flakiness that breaks temp-cleanup
+              // can also break this createFile call. Pre-name the blob so that
+              // a partial first attempt (createFile succeeded, setName errored)
+              // wouldn't leave behind a wrong-named orphan — the file is born
+              // correctly named, and a successful retry produces only one file.
+              pdfBlob.setName(docName + ".pdf");
+              const pdfFile = _withDriveRetry(
+                  () => obsFolder.createFile(pdfBlob),
+                  'pdf-save'
+              );
 
               // PDF sharing will be handled at the folder level during finalization
               // Individual file permissions are not set here
@@ -219,6 +256,8 @@ const PdfService = (function() {
       const observationId = observation && observation.observationId;
       let stage = 'doc-create';
       let docId = null;
+      let pdfBlob;
+
       try {
           const doc = DocumentApp.create(docName);
           docId = doc.getId();
@@ -244,19 +283,29 @@ const PdfService = (function() {
 
           stage = 'blob-convert';
           const docFile = DriveApp.getFileById(docId);
-          const pdfBlob = docFile.getBlob().getAs('application/pdf');
+          pdfBlob = docFile.getBlob().getAs('application/pdf');
           debugLog('pdf:blob-converted', { observationId, bytes: pdfBlob.getBytes().length });
-
-          stage = 'temp-cleanup';
-          DriveApp.getFileById(docId).setTrashed(true);
-          debugLog('pdf:temp-doc-trashed', { observationId, docId });
-
-          return pdfBlob;
       } catch (error) {
           console.error(`PDF doc creation failed at stage [${stage}] for observation ${observationId}: ${error.message}`, error.stack);
           debugLog('pdf:stage-failure', { observationId, stage, docId, error: error.message });
+          if (docId) {
+              try { DriveApp.getFileById(docId).setTrashed(true); } catch (_) { /* best-effort orphan cleanup */ }
+          }
           throw new Error(`Stage [${stage}]: ${error.message}`);
       }
+
+      // The blob is in hand. Cleanup is intentionally non-fatal: a transient
+      // Drive failure trashing the throwaway temp Doc must not cause the user's
+      // finalization to lose the PDF that was just successfully built.
+      try {
+          _withDriveRetry(() => DriveApp.getFileById(docId).setTrashed(true), 'temp-cleanup');
+          debugLog('pdf:temp-doc-trashed', { observationId, docId });
+      } catch (cleanupError) {
+          console.warn(`Temp doc cleanup failed but PDF blob is intact for observation ${observationId}: ${cleanupError.message}`);
+          debugLog('pdf:temp-cleanup-failed-nonfatal', { observationId, docId, error: cleanupError.message });
+      }
+
+      return pdfBlob;
   }
 
   /**
