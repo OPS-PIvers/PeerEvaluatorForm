@@ -16,7 +16,8 @@ const PdfService = (function() {
       try {
           setupObservationSheet();
           const userContext = createUserContext();
-          if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR) {
+          if (userContext.role !== SPECIAL_ROLES.PEER_EVALUATOR &&
+              userContext.role !== SPECIAL_ROLES.ADMINISTRATOR) {
               return { success: false, error: ERROR_MESSAGES.PERMISSION_DENIED };
           }
 
@@ -215,39 +216,47 @@ const PdfService = (function() {
    * @returns {Blob} PDF blob for the styled document
    */
   function _createStyledPdfDocument(observation, rubricData, docName) {
-      // Create a new Google Document
-      const doc = DocumentApp.create(docName);
-      const docId = doc.getId();
-      const body = doc.getBody();
+      const observationId = observation && observation.observationId;
+      let stage = 'doc-create';
+      let docId = null;
+      try {
+          const doc = DocumentApp.create(docName);
+          docId = doc.getId();
+          debugLog('pdf:doc-create-start', { observationId, docId });
+          const body = doc.getBody();
+          body.clear();
+          _addDocumentHeader(body, observation);
 
-      // Clear any default content
-      body.clear();
+          stage = 'doc-content';
+          const mergeOperations = [];
+          _addRubricContentWithMergeTracking(body, observation, rubricData, mergeOperations);
+          debugLog('pdf:doc-content-added', { observationId, mergeOps: mergeOperations.length });
 
-      // Add document header
-      _addDocumentHeader(body, observation);
+          stage = 'doc-save';
+          doc.saveAndClose();
+          debugLog('pdf:doc-saved', { observationId });
 
-      // Track merge operations needed
-      const mergeOperations = [];
+          stage = 'merges-apply';
+          if (mergeOperations.length > 0) {
+              _applyTableCellMerges(docId, mergeOperations);
+          }
+          debugLog('pdf:merges-applied', { observationId, mergeOps: mergeOperations.length });
 
-      // Add rubric content and collect merge operations
-      _addRubricContentWithMergeTracking(body, observation, rubricData, mergeOperations);
+          stage = 'blob-convert';
+          const docFile = DriveApp.getFileById(docId);
+          const pdfBlob = docFile.getBlob().getAs('application/pdf');
+          debugLog('pdf:blob-converted', { observationId, bytes: pdfBlob.getBytes().length });
 
-      // Save before applying merges
-      doc.saveAndClose();
+          stage = 'temp-cleanup';
+          DriveApp.getFileById(docId).setTrashed(true);
+          debugLog('pdf:temp-doc-trashed', { observationId, docId });
 
-      // Apply all cell merges using Google Docs API
-      if (mergeOperations.length > 0) {
-          _applyTableCellMerges(docId, mergeOperations);
+          return pdfBlob;
+      } catch (error) {
+          console.error(`PDF doc creation failed at stage [${stage}] for observation ${observationId}: ${error.message}`, error.stack);
+          debugLog('pdf:stage-failure', { observationId, stage, docId, error: error.message });
+          throw new Error(`Stage [${stage}]: ${error.message}`);
       }
-
-      // Convert to PDF
-      const docFile = DriveApp.getFileById(docId);
-      const pdfBlob = docFile.getBlob().getAs('application/pdf');
-
-      // Clean up - delete the temporary Google Doc
-      DriveApp.getFileById(docId).setTrashed(true);
-
-      return pdfBlob;
   }
 
   /**

@@ -1901,6 +1901,36 @@ function finalizeObservation(observationId) {
 }
 
 /**
+ * Top-level wrapper exposing PdfService.regenerateObservationPdf to client-side
+ * google.script.run calls. Also reconciles folder sharing and folderUrl persistence
+ * for observations whose original finalization failed before _shareObservationFolder
+ * ran or before folderUrl was saved to the sheet.
+ * @param {string} observationId The observation to regenerate the PDF for.
+ * @returns {Object} { success, pdfUrl?, error? }
+ */
+function regenerateObservationPdf(observationId) {
+    try {
+        const result = PdfService.regenerateObservationPdf(observationId);
+
+        if (result && result.success) {
+            const observation = getObservationById(observationId);
+            if (observation) {
+                const folderUrl = _shareObservationFolder(observation);
+                if (folderUrl && !observation.folderUrl) {
+                    updateObservationFolderUrl(observationId, folderUrl);
+                    debugLog('Folder URL reconciled during PDF retry', { observationId, folderUrl });
+                }
+            }
+        }
+
+        return result;
+    } catch (error) {
+        console.error('Error in regenerateObservationPdf wrapper:', error);
+        return { success: false, error: 'An unexpected error occurred while regenerating the PDF: ' + error.message };
+    }
+}
+
+/**
  * Deletes a finalized observation. This is a permanent action.
  * @param {string} observationId The ID of the observation to delete.
  * @returns {Object} A response object indicating success or failure.
